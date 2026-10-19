@@ -89,3 +89,10 @@ def test_save_binary(tmp_path):
     res = c.post("/api/save-binary", headers={TOKEN_HEADER: TOKEN},
                  json={"path": str(out), "content_b64": base64.b64encode(b"\x89PNG").decode()})
     assert res.status_code == 200 and out.read_bytes() == b"\x89PNG"
+
+
+def test_unsaved_count_is_forwarded():
+    seen = []
+    c = TestClient(create_app(TOKEN, None, [], seen.append), base_url="http://127.0.0.1")
+    assert c.post("/api/unsaved", headers={TOKEN_HEADER: TOKEN}, json={"count": 2}).status_code == 200
+    assert seen == [2]

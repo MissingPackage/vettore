@@ -890,6 +890,7 @@ dependencies = [
     { name = "pyqt6-webengine", marker = "sys_platform == 'linux'" },
     { name = "pywebview" },
     { name = "qtpy", marker = "sys_platform == 'linux'" },
+    { name = "sgffp" },
     { name = "uvicorn" },
 ]
 
@@ -915,6 +916,7 @@ requires-dist = [
     { name = "pywebview", specifier = ">=6.2" },
     { name = "qtpy", marker = "sys_platform == 'linux'", specifier = ">=2.4" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.8" },
+    { name = "sgffp", specifier = ">=0.22.1,<0.23" },
     { name = "uvicorn", specifier = ">=0.32" },
 ]
 provides-extras = ["dev"]

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import base64
 import secrets
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -37,6 +38,10 @@ class SaveBinary(BaseModel):
     content_b64: str
 
 
+class Unsaved(BaseModel):
+    count: int
+
+
 class TmRequest(BaseModel):
     sequence: str
 
@@ -55,7 +60,8 @@ def _export(data: dict[str, Any], fmt: str) -> str:
 
 
 def create_app(token: str, static_dir: Path | None,
-               startup_files: list[Path] | None = None) -> FastAPI:
+               startup_files: list[Path] | None = None,
+               on_unsaved: Callable[[int], None] | None = None) -> FastAPI:
     app = FastAPI(title="Vettore", docs_url=None, redoc_url=None, openapi_url=None)
 
     @app.middleware("http")
@@ -99,6 +105,13 @@ def create_app(token: str, static_dir: Path | None,
         documents = _read(path.name, path.read_bytes())
         settings.add_recent(path)
         return {"path": str(path), "documents": documents}
+
+    @app.post("/api/unsaved")
+    def unsaved(body: Unsaved) -> dict[str, int]:
+        """The UI reports how many documents have unsaved changes (used to confirm quitting)."""
+        if on_unsaved:
+            on_unsaved(body.count)
+        return {"count": body.count}
 
     @app.get("/api/recent")
     def recent() -> dict[str, list[str]]:

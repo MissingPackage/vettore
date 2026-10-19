@@ -8,6 +8,8 @@ dependencies = [
     "biopython>=1.88",
     "pydna>=5.5.16",
     "primer3-py>=2.3.1",
+    # .dna details Biopython does not read (colours, primer tails); 0.x, pinned.
+    "sgffp>=0.22.1,<0.23",
     "fastapi>=0.115",
     "uvicorn>=0.32",
     "pywebview>=6.2",

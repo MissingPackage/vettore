@@ -95,3 +95,26 @@ def test_ab1_is_read_as_sequence():
 def test_unsupported_extension_is_rejected():
     with pytest.raises(fileio.UnsupportedFile):
         fileio.read_documents("notes.docx", b"hello")
+
+
+def test_dna_file_colours_primer_tails_and_description_are_read():
+    doc = read_doc("sample-hybridization-params.dna")
+    colours = {f["name"]: f.get("color") for f in doc["features"]}
+    assert colours["hht2-ORF"] == "#993366"
+    primers = {p["name"]: p.get("bases") for p in doc["primers"]}
+    assert primers["XhoI-hht2(US)-Fwd"] == "AAAAAACTCGAGGAAAAGCTTCAAC"
+    assert doc["description"].startswith("SJAG_03543.1")
+
+
+def test_white_feature_colours_are_ignored():
+    doc = read_doc("pFA-KanMX4.dna")
+    colours = {f["name"]: f.get("color") for f in doc["features"]}
+    assert colours["SP6 promoter"] is None  # stored as #ffffff, would be invisible
+    assert colours["ori"] == "#ffff00"
+
+
+def test_primer_sequence_survives_genbank_round_trip():
+    doc = read_doc("sample-hybridization-params.dna")
+    [again] = fileio.read_documents("x.gb", fileio.write_genbank(doc).encode())
+    primers = {p["name"]: p.get("bases") for p in again["primers"]}
+    assert primers["XmaI-hht2(Cter)-Rev"] == "AAAAAACCCGGGAGAACGCTCACCACG"

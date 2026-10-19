@@ -44,8 +44,9 @@ def free_port() -> int:
         return s.getsockname()[1]
 
 
-def start_server(port: int, token: str, startup_files: list[Path] | None = None) -> uvicorn.Server:
-    app = create_app(token, static_dir(), startup_files or [])
+def start_server(port: int, token: str, startup_files: list[Path] | None = None,
+                 on_unsaved=None) -> uvicorn.Server:
+    app = create_app(token, static_dir(), startup_files or [], on_unsaved)
     # log_config=None: uvicorn's default formatter calls isatty() on streams that do not
     # exist in windowed builds; our own logging setup is used instead.
     config = uvicorn.Config(app, host="127.0.0.1", port=port, log_level="warning",
@@ -69,6 +70,11 @@ class DesktopApi:
 
     def __init__(self) -> None:
         self.window = None
+
+    def set_unsaved(self, count: int) -> None:
+        # pywebview reads confirm_close when the window is about to close.
+        if self.window is not None:
+            self.window.confirm_close = count > 0
 
     def open_dialog(self) -> list[str]:
         import webview
@@ -117,7 +123,8 @@ def main(argv: list[str] | None = None) -> None:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     token = args.token or secrets.token_urlsafe(24)
     port = args.port or free_port()
-    start_server(port, token, [Path(f).resolve() for f in args.files])
+    api = DesktopApi()
+    start_server(port, token, [Path(f).resolve() for f in args.files], api.set_unsaved)
     url = f"http://127.0.0.1:{port}/?token={token}"
 
     if args.no_window:
@@ -129,9 +136,11 @@ def main(argv: list[str] | None = None) -> None:
         try:
             import webview
 
-            api = DesktopApi()
-            api.window = webview.create_window("Vettore", url, js_api=api, width=1400,
-                                               height=900)
+            api.window = webview.create_window(
+                "Vettore", url, js_api=api, width=1400, height=900, maximized=True,
+                localization={"global.quitConfirmation":
+                              "Some documents have unsaved changes. Quit Vettore and discard them?"},
+            )
             storage = Path.home() / ".vettore" / "webview"
             storage.mkdir(parents=True, exist_ok=True)
             # On Linux the bundled Qt WebEngine is used (GTK bindings are not shipped).

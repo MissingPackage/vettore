@@ -78,6 +78,7 @@ async function toBase64(blob: Blob): Promise<string> {
 
 export const api = {
   recent: () => call<{ paths: string[] }>("recent"),
+  unsaved: (count: number) => call<{ count: number }>("unsaved", { count }),
   tm: (sequence: string) =>
     call<{ tm: number; method: string; presets: { key: string; label: string; description: string; tm: number }[] }>(
       "tm",

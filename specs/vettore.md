@@ -27,6 +27,9 @@ known reference results. The UI never computes biology on its own.
 | Desktop window | pywebview (Edge WebView2 on Windows, Qt WebEngine on Linux); fallback: open system browser | No Electron, single Python process |
 | Packaging | PyInstaller one-folder build, zipped; built by GitHub Actions on `windows-latest` and `ubuntu-latest` | Unsigned exe acceptable (personal PC) |
 | Native file format | Read `.dna`, `.gb/.gbk/.ape`, `.fasta`, `.ab1`; save GenBank (`.gb`) | Every sequence tool reads GenBank; it is the lossless open standard |
+| `.dna` reading | Biopython (sequence, features, primer sites after hybridization filtering) + sgffp 0.22 (MIT) for feature colours, full primer sequences, description | Biopython alone drops colours and primer 5′ tails |
+| Enzyme data | Nonredundant commercial set generated from REBASE via Biopython (`vettore.enzymes` → `frontend/src/data/enzymes.json`), fed to OVE | OVE's default list contains isoschizomers with uncharacterised cuts (seen: Atu1II GGATCC shown as blunt); OVE's cut engine is cross-checked against Biopython in tests |
+| Tm | Biopython `Tm_NN` with named presets: Standard (default), NEB Q5, NEB Taq; all shown in the tooltip | Values differ by several °C between tools; the method is always shown |
 
 ## Slices
 
@@ -84,7 +87,7 @@ release zip attached to a GitHub Release, and a short "what's new" note.
 
 **S1.6 Find.** As a bench scientist I want to find sequences so that I can locate sites and motifs.
 - [ ] Ctrl+F finds DNA (both strands) and protein (in all 6 frames), with optional mismatches (0–3); results are highlighted and navigable.
-- [ ] Show ORFs with a minimum length setting (default 75 aa [ASSUMED: common default]).
+- [ ] Show ORFs with a minimum length setting (OVE's default).
 
 ### S2 — Cloning simulations
 

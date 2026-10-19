@@ -74,6 +74,8 @@ def _annotation(feature: SeqFeature, seq_len: int, circular: bool) -> dict[str, 
     }
     if len(ranges) > 1:
         ann["locations"] = [{"start": s, "end": e} for s, e in ranges]
+    if bases := _first(feature.qualifiers, "primer_sequence"):
+        ann["bases"] = bases
     color = _first(feature.qualifiers, "ApEinfo_fwdcolor") or _first(feature.qualifiers, "color")
     if color:
         ann["color"] = color
@@ -138,6 +140,8 @@ def ove_to_record(data: dict[str, Any]) -> SeqRecord:
             qualifiers["label"] = [ann.get("name") or default_type]
             if ann.get("color"):
                 qualifiers["ApEinfo_fwdcolor"] = [ann["color"]]
+            if kind == "primers" and ann.get("bases"):
+                qualifiers["primer_sequence"] = [ann["bases"]]
             record.features.append(
                 SeqFeature(_location(ann, len(sequence)), type=ann.get("type") or default_type,
                            qualifiers=qualifiers)

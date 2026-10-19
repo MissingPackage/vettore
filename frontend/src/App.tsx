@@ -73,6 +73,11 @@ export default function App() {
     active ? (state.VectorEditor[active]?.sequenceData?.sequence as string | undefined) : undefined,
   );
 
+  const unsavedCount = Object.values(dirtyByEditor).filter(Boolean).length;
+  useEffect(() => {
+    api.unsaved(unsavedCount).catch(() => undefined);
+  }, [unsavedCount]);
+
   const updateDoc = useCallback((editorName: string, patch: Partial<Doc>) => {
     setDocs((prev) => prev.map((d) => (d.editorName === editorName ? { ...d, ...patch } : d)));
   }, []);
