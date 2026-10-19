@@ -7,7 +7,7 @@ const data = (name: string) => path.resolve(import.meta.dirname, "../../tests/da
 test("opens a .dna file and shows its map", async ({ page }) => {
   await page.goto(`/?token=${TOKEN}`);
   await page.getByTestId("file-input").setInputFiles(data("pFA-KanMX4.dna"));
-  await expect(page.locator(".vt-doctab.active")).toHaveText("pFA-KanMX4");
+  await expect(page.locator(".vt-doctab.active")).toContainText("pFA-KanMX4");
   await expect(page.locator(".veCircularView")).toBeVisible();
   await expect(page.getByText(/3941/).first()).toBeVisible();
   await page.screenshot({ path: "test-results/open-dna.png" });

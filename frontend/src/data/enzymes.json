@@ -1,0 +1,4523 @@
+{
+ "source": "REBASE via Biopython 1.88 (Bio.Restriction.CommOnly)",
+ "enzymes": {
+  "aatii": {
+   "name": "AatII",
+   "site": "gacgtc",
+   "forwardRegex": "gacgtc",
+   "reverseRegex": "gacgtc",
+   "topSnipOffset": 5,
+   "bottomSnipOffset": 1,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs",
+    "Roche Applied Science",
+    "SibEnzyme Ltd.",
+    "Takara Bio Inc.",
+    "Thermo Fisher Scientific",
+    "Vivantis Technologies"
+   ],
+   "isoschizomers": [],
+   "goldenGate": false
+  },
+  "absi": {
+   "name": "AbsI",
+   "site": "cctcgagg",
+   "forwardRegex": "cctcgagg",
+   "reverseRegex": "cctcgagg",
+   "topSnipOffset": 2,
+   "bottomSnipOffset": 6,
+   "isType2S": false,
+   "suppliers": [
+    "SibEnzyme Ltd."
+   ],
+   "isoschizomers": [],
+   "goldenGate": false
+  },
+  "acc65i": {
+   "name": "Acc65I",
+   "site": "ggtacc",
+   "forwardRegex": "ggtacc",
+   "reverseRegex": "ggtacc",
+   "topSnipOffset": 1,
+   "bottomSnipOffset": 5,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs",
+    "SibEnzyme Ltd.",
+    "Thermo Fisher Scientific",
+    "Vivantis Technologies"
+   ],
+   "isoschizomers": [
+    "Asp718I"
+   ],
+   "goldenGate": false
+  },
+  "acci": {
+   "name": "AccI",
+   "site": "gtmkac",
+   "forwardRegex": "gt[ac][gt]ac",
+   "reverseRegex": "gt[ac][gt]ac",
+   "topSnipOffset": 2,
+   "bottomSnipOffset": 4,
+   "isType2S": false,
+   "suppliers": [
+    "EURx Ltd.",
+    "Molecular Biology Resources - CHIMERx",
+    "New England Biolabs",
+    "Nippon Gene Co., Ltd.",
+    "Roche Applied Science",
+    "Takara Bio Inc.",
+    "Thermo Fisher Scientific"
+   ],
+   "isoschizomers": [
+    "FblI",
+    "XmiI"
+   ],
+   "goldenGate": false
+  },
+  "acii": {
+   "name": "AciI",
+   "site": "ccgc",
+   "forwardRegex": "ccgc",
+   "reverseRegex": "gcgg",
+   "topSnipOffset": 1,
+   "bottomSnipOffset": 3,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "BspACI",
+    "SsiI"
+   ],
+   "goldenGate": false
+  },
+  "acli": {
+   "name": "AclI",
+   "site": "aacgtt",
+   "forwardRegex": "aacgtt",
+   "reverseRegex": "aacgtt",
+   "topSnipOffset": 2,
+   "bottomSnipOffset": 4,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs",
+    "SibEnzyme Ltd.",
+    "Vivantis Technologies"
+   ],
+   "isoschizomers": [
+    "Psp1406I"
+   ],
+   "goldenGate": false
+  },
+  "acui": {
+   "name": "AcuI",
+   "site": "ctgaag",
+   "forwardRegex": "ctgaag",
+   "reverseRegex": "cttcag",
+   "topSnipOffset": 22,
+   "bottomSnipOffset": 20,
+   "isType2S": true,
+   "suppliers": [
+    "New England Biolabs",
+    "SibEnzyme Ltd."
+   ],
+   "isoschizomers": [
+    "Eco57I"
+   ],
+   "goldenGate": false
+  },
+  "afei": {
+   "name": "AfeI",
+   "site": "agcgct",
+   "forwardRegex": "agcgct",
+   "reverseRegex": "agcgct",
+   "topSnipOffset": 3,
+   "bottomSnipOffset": 3,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs",
+    "SibEnzyme Ltd."
+   ],
+   "isoschizomers": [
+    "Aor51HI",
+    "Eco47III"
+   ],
+   "goldenGate": false
+  },
+  "aflii": {
+   "name": "AflII",
+   "site": "cttaag",
+   "forwardRegex": "cttaag",
+   "reverseRegex": "cttaag",
+   "topSnipOffset": 1,
+   "bottomSnipOffset": 5,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs",
+    "Nippon Gene Co., Ltd.",
+    "Takara Bio Inc."
+   ],
+   "isoschizomers": [
+    "BfrI",
+    "BspTI",
+    "BstAFI",
+    "MspCI",
+    "Vha464I"
+   ],
+   "goldenGate": false
+  },
+  "afliii": {
+   "name": "AflIII",
+   "site": "acrygt",
+   "forwardRegex": "ac[ag][ct]gt",
+   "reverseRegex": "ac[ag][ct]gt",
+   "topSnipOffset": 1,
+   "bottomSnipOffset": 5,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs",
+    "Roche Applied Science",
+    "Sigma Chemical Corporation"
+   ],
+   "isoschizomers": [],
+   "goldenGate": false
+  },
+  "agei": {
+   "name": "AgeI",
+   "site": "accggt",
+   "forwardRegex": "accggt",
+   "reverseRegex": "accggt",
+   "topSnipOffset": 1,
+   "bottomSnipOffset": 5,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs",
+    "Nippon Gene Co., Ltd.",
+    "Promega Corporation"
+   ],
+   "isoschizomers": [
+    "AsiGI",
+    "BshTI",
+    "CspAI",
+    "PinAI"
+   ],
+   "goldenGate": false
+  },
+  "agsi": {
+   "name": "AgsI",
+   "site": "ttsaa",
+   "forwardRegex": "tt[cg]aa",
+   "reverseRegex": "tt[cg]aa",
+   "topSnipOffset": 3,
+   "bottomSnipOffset": 2,
+   "isType2S": false,
+   "suppliers": [
+    "SibEnzyme Ltd."
+   ],
+   "isoschizomers": [],
+   "goldenGate": false
+  },
+  "ahdi": {
+   "name": "AhdI",
+   "site": "gacnnnnngtc",
+   "forwardRegex": "gac[acgt][acgt][acgt][acgt][acgt]gtc",
+   "reverseRegex": "gac[acgt][acgt][acgt][acgt][acgt]gtc",
+   "topSnipOffset": 6,
+   "bottomSnipOffset": 5,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "BmeRI",
+    "DriI",
+    "Eam1105I"
+   ],
+   "goldenGate": false
+  },
+  "alei": {
+   "name": "AleI",
+   "site": "cacnnnngtg",
+   "forwardRegex": "cac[acgt][acgt][acgt][acgt]gtg",
+   "reverseRegex": "cac[acgt][acgt][acgt][acgt]gtg",
+   "topSnipOffset": 5,
+   "bottomSnipOffset": 5,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "OliI"
+   ],
+   "goldenGate": false
+  },
+  "alui": {
+   "name": "AluI",
+   "site": "agct",
+   "forwardRegex": "agct",
+   "reverseRegex": "agct",
+   "topSnipOffset": 2,
+   "bottomSnipOffset": 2,
+   "isType2S": false,
+   "suppliers": [
+    "EURx Ltd.",
+    "Minotech Biotechnology",
+    "Molecular Biology Resources - CHIMERx",
+    "New England Biolabs",
+    "Nippon Gene Co., Ltd.",
+    "Promega Corporation",
+    "Roche Applied Science",
+    "SibEnzyme Ltd.",
+    "Sigma Chemical Corporation",
+    "SinaClon BioScience Co.",
+    "Takara Bio Inc.",
+    "Thermo Fisher Scientific",
+    "Toyobo Biochemicals",
+    "Vivantis Technologies"
+   ],
+   "isoschizomers": [
+    "AluBI"
+   ],
+   "goldenGate": false
+  },
+  "alwi": {
+   "name": "AlwI",
+   "site": "ggatc",
+   "forwardRegex": "ggatc",
+   "reverseRegex": "gatcc",
+   "topSnipOffset": 9,
+   "bottomSnipOffset": 10,
+   "isType2S": true,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "AclWI",
+    "BspPI"
+   ],
+   "goldenGate": false
+  },
+  "alwni": {
+   "name": "AlwNI",
+   "site": "cagnnnctg",
+   "forwardRegex": "cag[acgt][acgt][acgt]ctg",
+   "reverseRegex": "cag[acgt][acgt][acgt]ctg",
+   "topSnipOffset": 6,
+   "bottomSnipOffset": 3,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "CaiI",
+    "PstNI"
+   ],
+   "goldenGate": false
+  },
+  "aoxi": {
+   "name": "AoxI",
+   "site": "ggcc",
+   "forwardRegex": "ggcc",
+   "reverseRegex": "ggcc",
+   "topSnipOffset": 0,
+   "bottomSnipOffset": 4,
+   "isType2S": false,
+   "suppliers": [
+    "SibEnzyme Ltd."
+   ],
+   "isoschizomers": [],
+   "goldenGate": false
+  },
+  "apai": {
+   "name": "ApaI",
+   "site": "gggccc",
+   "forwardRegex": "gggccc",
+   "reverseRegex": "gggccc",
+   "topSnipOffset": 5,
+   "bottomSnipOffset": 1,
+   "isType2S": false,
+   "suppliers": [
+    "EURx Ltd.",
+    "Molecular Biology Resources - CHIMERx",
+    "New England Biolabs",
+    "Nippon Gene Co., Ltd.",
+    "Promega Corporation",
+    "Roche Applied Science",
+    "SibEnzyme Ltd.",
+    "Takara Bio Inc.",
+    "Thermo Fisher Scientific",
+    "Vivantis Technologies"
+   ],
+   "isoschizomers": [],
+   "goldenGate": false
+  },
+  "apali": {
+   "name": "ApaLI",
+   "site": "gtgcac",
+   "forwardRegex": "gtgcac",
+   "reverseRegex": "gtgcac",
+   "topSnipOffset": 1,
+   "bottomSnipOffset": 5,
+   "isType2S": false,
+   "suppliers": [
+    "Minotech Biotechnology",
+    "New England Biolabs",
+    "Takara Bio Inc."
+   ],
+   "isoschizomers": [
+    "Alw44I",
+    "VneI"
+   ],
+   "goldenGate": false
+  },
+  "apeki": {
+   "name": "ApeKI",
+   "site": "gcwgc",
+   "forwardRegex": "gc[at]gc",
+   "reverseRegex": "gc[at]gc",
+   "topSnipOffset": 1,
+   "bottomSnipOffset": 4,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "TseI"
+   ],
+   "goldenGate": false
+  },
+  "apoi": {
+   "name": "ApoI",
+   "site": "raatty",
+   "forwardRegex": "[ag]aatt[ct]",
+   "reverseRegex": "[ag]aatt[ct]",
+   "topSnipOffset": 1,
+   "bottomSnipOffset": 5,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "AcsI",
+    "XapI"
+   ],
+   "goldenGate": false
+  },
+  "asci": {
+   "name": "AscI",
+   "site": "ggcgcgcc",
+   "forwardRegex": "ggcgcgcc",
+   "reverseRegex": "ggcgcgcc",
+   "topSnipOffset": 2,
+   "bottomSnipOffset": 6,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "PalAI",
+    "SgsI"
+   ],
+   "goldenGate": false
+  },
+  "asei": {
+   "name": "AseI",
+   "site": "attaat",
+   "forwardRegex": "attaat",
+   "reverseRegex": "attaat",
+   "topSnipOffset": 2,
+   "bottomSnipOffset": 4,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs",
+    "Nippon Gene Co., Ltd."
+   ],
+   "isoschizomers": [
+    "PshBI",
+    "VspI"
+   ],
+   "goldenGate": false
+  },
+  "asisi": {
+   "name": "AsiSI",
+   "site": "gcgatcgc",
+   "forwardRegex": "gcgatcgc",
+   "reverseRegex": "gcgatcgc",
+   "topSnipOffset": 5,
+   "bottomSnipOffset": 3,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs",
+    "SibEnzyme Ltd."
+   ],
+   "isoschizomers": [
+    "RgaI",
+    "SfaAI",
+    "SgfI"
+   ],
+   "goldenGate": false
+  },
+  "avai": {
+   "name": "AvaI",
+   "site": "cycgrg",
+   "forwardRegex": "c[ct]cg[ag]g",
+   "reverseRegex": "c[ct]cg[ag]g",
+   "topSnipOffset": 1,
+   "bottomSnipOffset": 5,
+   "isType2S": false,
+   "suppliers": [
+    "EURx Ltd.",
+    "Molecular Biology Resources - CHIMERx",
+    "New England Biolabs",
+    "Nippon Gene Co., Ltd."
+   ],
+   "isoschizomers": [
+    "Ama87I",
+    "BmeT110I",
+    "BsiHKCI",
+    "BsoBI",
+    "Eco88I"
+   ],
+   "goldenGate": false
+  },
+  "avaii": {
+   "name": "AvaII",
+   "site": "ggwcc",
+   "forwardRegex": "gg[at]cc",
+   "reverseRegex": "gg[at]cc",
+   "topSnipOffset": 1,
+   "bottomSnipOffset": 4,
+   "isType2S": false,
+   "suppliers": [
+    "EURx Ltd.",
+    "New England Biolabs",
+    "Nippon Gene Co., Ltd."
+   ],
+   "isoschizomers": [
+    "Bme18I",
+    "Eco47I",
+    "SinI",
+    "VpaK11BI"
+   ],
+   "goldenGate": false
+  },
+  "avrii": {
+   "name": "AvrII",
+   "site": "cctagg",
+   "forwardRegex": "cctagg",
+   "reverseRegex": "cctagg",
+   "topSnipOffset": 1,
+   "bottomSnipOffset": 5,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "AspA2I",
+    "BlnI",
+    "XmaJI"
+   ],
+   "goldenGate": false
+  },
+  "baegi": {
+   "name": "BaeGI",
+   "site": "gkgcmc",
+   "forwardRegex": "g[gt]gc[ac]c",
+   "reverseRegex": "g[gt]gc[ac]c",
+   "topSnipOffset": 5,
+   "bottomSnipOffset": 1,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "BseSI",
+    "BstSLI"
+   ],
+   "goldenGate": false
+  },
+  "bamhi": {
+   "name": "BamHI",
+   "site": "ggatcc",
+   "forwardRegex": "ggatcc",
+   "reverseRegex": "ggatcc",
+   "topSnipOffset": 1,
+   "bottomSnipOffset": 5,
+   "isType2S": false,
+   "suppliers": [
+    "EURx Ltd.",
+    "Minotech Biotechnology",
+    "Molecular Biology Resources - CHIMERx",
+    "New England Biolabs",
+    "Nippon Gene Co., Ltd.",
+    "Promega Corporation",
+    "Roche Applied Science",
+    "SibEnzyme Ltd.",
+    "Sigma Chemical Corporation",
+    "SinaClon BioScience Co.",
+    "Takara Bio Inc.",
+    "Thermo Fisher Scientific",
+    "Toyobo Biochemicals",
+    "Vivantis Technologies"
+   ],
+   "isoschizomers": [],
+   "goldenGate": false
+  },
+  "bani": {
+   "name": "BanI",
+   "site": "ggyrcc",
+   "forwardRegex": "gg[ct][ag]cc",
+   "reverseRegex": "gg[ct][ag]cc",
+   "topSnipOffset": 1,
+   "bottomSnipOffset": 5,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "AccB1I",
+    "BshNI",
+    "BspT107I"
+   ],
+   "goldenGate": false
+  },
+  "banii": {
+   "name": "BanII",
+   "site": "grgcyc",
+   "forwardRegex": "g[ag]gc[ct]c",
+   "reverseRegex": "g[ag]gc[ct]c",
+   "topSnipOffset": 5,
+   "bottomSnipOffset": 1,
+   "isType2S": false,
+   "suppliers": [
+    "EURx Ltd.",
+    "New England Biolabs",
+    "Takara Bio Inc."
+   ],
+   "isoschizomers": [
+    "Eco24I",
+    "EcoT38I",
+    "FriOI"
+   ],
+   "goldenGate": false
+  },
+  "bbsi": {
+   "name": "BbsI",
+   "site": "gaagac",
+   "forwardRegex": "gaagac",
+   "reverseRegex": "gtcttc",
+   "topSnipOffset": 8,
+   "bottomSnipOffset": 12,
+   "isType2S": true,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "BpiI",
+    "BstV2I"
+   ],
+   "goldenGate": true
+  },
+  "bbvci": {
+   "name": "BbvCI",
+   "site": "cctcagc",
+   "forwardRegex": "cctcagc",
+   "reverseRegex": "gctgagg",
+   "topSnipOffset": 2,
+   "bottomSnipOffset": 5,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [],
+   "goldenGate": false
+  },
+  "bbvi": {
+   "name": "BbvI",
+   "site": "gcagc",
+   "forwardRegex": "gcagc",
+   "reverseRegex": "gctgc",
+   "topSnipOffset": 13,
+   "bottomSnipOffset": 17,
+   "isType2S": true,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "BseXI",
+    "BstV1I",
+    "Lsp1109I"
+   ],
+   "goldenGate": false
+  },
+  "bcci": {
+   "name": "BccI",
+   "site": "ccatc",
+   "forwardRegex": "ccatc",
+   "reverseRegex": "gatgg",
+   "topSnipOffset": 9,
+   "bottomSnipOffset": 10,
+   "isType2S": true,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [],
+   "goldenGate": false
+  },
+  "bceai": {
+   "name": "BceAI",
+   "site": "acggc",
+   "forwardRegex": "acggc",
+   "reverseRegex": "gccgt",
+   "topSnipOffset": 17,
+   "bottomSnipOffset": 19,
+   "isType2S": true,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [],
+   "goldenGate": false
+  },
+  "bcivi": {
+   "name": "BciVI",
+   "site": "gtatcc",
+   "forwardRegex": "gtatcc",
+   "reverseRegex": "ggatac",
+   "topSnipOffset": 12,
+   "bottomSnipOffset": 11,
+   "isType2S": true,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "BfuI",
+    "BsuI"
+   ],
+   "goldenGate": false
+  },
+  "bcli": {
+   "name": "BclI",
+   "site": "tgatca",
+   "forwardRegex": "tgatca",
+   "reverseRegex": "tgatca",
+   "topSnipOffset": 1,
+   "bottomSnipOffset": 5,
+   "isType2S": false,
+   "suppliers": [
+    "Minotech Biotechnology",
+    "New England Biolabs",
+    "Nippon Gene Co., Ltd.",
+    "Promega Corporation",
+    "Roche Applied Science",
+    "Sigma Chemical Corporation",
+    "Thermo Fisher Scientific",
+    "Toyobo Biochemicals"
+   ],
+   "isoschizomers": [
+    "FbaI",
+    "Ksp22I"
+   ],
+   "goldenGate": false
+  },
+  "bcodi": {
+   "name": "BcoDI",
+   "site": "gtctc",
+   "forwardRegex": "gtctc",
+   "reverseRegex": "gagac",
+   "topSnipOffset": 6,
+   "bottomSnipOffset": 10,
+   "isType2S": true,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "Alw26I",
+    "BsmAI",
+    "BstMAI"
+   ],
+   "goldenGate": false
+  },
+  "bfai": {
+   "name": "BfaI",
+   "site": "ctag",
+   "forwardRegex": "ctag",
+   "reverseRegex": "ctag",
+   "topSnipOffset": 1,
+   "bottomSnipOffset": 3,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "FspBI",
+    "MaeI",
+    "SspMI",
+    "XspI"
+   ],
+   "goldenGate": false
+  },
+  "bfuai": {
+   "name": "BfuAI",
+   "site": "acctgc",
+   "forwardRegex": "acctgc",
+   "reverseRegex": "gcaggt",
+   "topSnipOffset": 10,
+   "bottomSnipOffset": 14,
+   "isType2S": true,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "Acc36I",
+    "BspMI",
+    "BveI"
+   ],
+   "goldenGate": false
+  },
+  "bgli": {
+   "name": "BglI",
+   "site": "gccnnnnnggc",
+   "forwardRegex": "gcc[acgt][acgt][acgt][acgt][acgt]ggc",
+   "reverseRegex": "gcc[acgt][acgt][acgt][acgt][acgt]ggc",
+   "topSnipOffset": 7,
+   "bottomSnipOffset": 4,
+   "isType2S": false,
+   "suppliers": [
+    "EURx Ltd.",
+    "Minotech Biotechnology",
+    "Molecular Biology Resources - CHIMERx",
+    "New England Biolabs",
+    "Nippon Gene Co., Ltd.",
+    "Promega Corporation",
+    "SibEnzyme Ltd.",
+    "Takara Bio Inc.",
+    "Thermo Fisher Scientific",
+    "Toyobo Biochemicals",
+    "Vivantis Technologies"
+   ],
+   "isoschizomers": [],
+   "goldenGate": false
+  },
+  "bglii": {
+   "name": "BglII",
+   "site": "agatct",
+   "forwardRegex": "agatct",
+   "reverseRegex": "agatct",
+   "topSnipOffset": 1,
+   "bottomSnipOffset": 5,
+   "isType2S": false,
+   "suppliers": [
+    "EURx Ltd.",
+    "Minotech Biotechnology",
+    "Molecular Biology Resources - CHIMERx",
+    "New England Biolabs",
+    "Nippon Gene Co., Ltd.",
+    "Promega Corporation",
+    "Roche Applied Science",
+    "SibEnzyme Ltd.",
+    "Sigma Chemical Corporation",
+    "Takara Bio Inc.",
+    "Thermo Fisher Scientific",
+    "Toyobo Biochemicals",
+    "Vivantis Technologies"
+   ],
+   "isoschizomers": [],
+   "goldenGate": false
+  },
+  "blpi": {
+   "name": "BlpI",
+   "site": "gctnagc",
+   "forwardRegex": "gct[acgt]agc",
+   "reverseRegex": "gct[acgt]agc",
+   "topSnipOffset": 2,
+   "bottomSnipOffset": 5,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "Bpu1102I",
+    "Bsp1720I"
+   ],
+   "goldenGate": false
+  },
+  "blsi": {
+   "name": "BlsI",
+   "site": "gcngc",
+   "forwardRegex": "gc[acgt]gc",
+   "reverseRegex": "gc[acgt]gc",
+   "topSnipOffset": 3,
+   "bottomSnipOffset": 2,
+   "isType2S": false,
+   "suppliers": [
+    "SibEnzyme Ltd."
+   ],
+   "isoschizomers": [
+    "PkrI"
+   ],
+   "goldenGate": false
+  },
+  "bmgbi": {
+   "name": "BmgBI",
+   "site": "cacgtc",
+   "forwardRegex": "cacgtc",
+   "reverseRegex": "gacgtg",
+   "topSnipOffset": 3,
+   "bottomSnipOffset": 3,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "AjiI",
+    "BtrI"
+   ],
+   "goldenGate": false
+  },
+  "bmri": {
+   "name": "BmrI",
+   "site": "actggg",
+   "forwardRegex": "actggg",
+   "reverseRegex": "cccagt",
+   "topSnipOffset": 11,
+   "bottomSnipOffset": 10,
+   "isType2S": true,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "BmuI"
+   ],
+   "goldenGate": false
+  },
+  "bmti": {
+   "name": "BmtI",
+   "site": "gctagc",
+   "forwardRegex": "gctagc",
+   "reverseRegex": "gctagc",
+   "topSnipOffset": 5,
+   "bottomSnipOffset": 1,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs",
+    "SibEnzyme Ltd.",
+    "Vivantis Technologies"
+   ],
+   "isoschizomers": [
+    "BspOI"
+   ],
+   "goldenGate": false
+  },
+  "bpmi": {
+   "name": "BpmI",
+   "site": "ctggag",
+   "forwardRegex": "ctggag",
+   "reverseRegex": "ctccag",
+   "topSnipOffset": 22,
+   "bottomSnipOffset": 20,
+   "isType2S": true,
+   "suppliers": [
+    "New England Biolabs",
+    "SibEnzyme Ltd."
+   ],
+   "isoschizomers": [
+    "GsuI"
+   ],
+   "goldenGate": false
+  },
+  "bpu10i": {
+   "name": "Bpu10I",
+   "site": "cctnagc",
+   "forwardRegex": "cct[acgt]agc",
+   "reverseRegex": "gct[acgt]agg",
+   "topSnipOffset": 2,
+   "bottomSnipOffset": 5,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs",
+    "SibEnzyme Ltd.",
+    "Thermo Fisher Scientific",
+    "Vivantis Technologies"
+   ],
+   "isoschizomers": [],
+   "goldenGate": false
+  },
+  "bpuei": {
+   "name": "BpuEI",
+   "site": "cttgag",
+   "forwardRegex": "cttgag",
+   "reverseRegex": "ctcaag",
+   "topSnipOffset": 22,
+   "bottomSnipOffset": 20,
+   "isType2S": true,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [],
+   "goldenGate": false
+  },
+  "bsaai": {
+   "name": "BsaAI",
+   "site": "yacgtr",
+   "forwardRegex": "[ct]acgt[ag]",
+   "reverseRegex": "[ct]acgt[ag]",
+   "topSnipOffset": 3,
+   "bottomSnipOffset": 3,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "BstBAI",
+    "Ppu21I"
+   ],
+   "goldenGate": false
+  },
+  "bsabi": {
+   "name": "BsaBI",
+   "site": "gatnnnnatc",
+   "forwardRegex": "gat[acgt][acgt][acgt][acgt]atc",
+   "reverseRegex": "gat[acgt][acgt][acgt][acgt]atc",
+   "topSnipOffset": 5,
+   "bottomSnipOffset": 5,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "Bse8I",
+    "BseJI"
+   ],
+   "goldenGate": false
+  },
+  "bsahi": {
+   "name": "BsaHI",
+   "site": "grcgyc",
+   "forwardRegex": "g[ag]cg[ct]c",
+   "reverseRegex": "g[ag]cg[ct]c",
+   "topSnipOffset": 2,
+   "bottomSnipOffset": 4,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "AcyI",
+    "BssNI",
+    "BstACI",
+    "Hin1I",
+    "Hsp92I"
+   ],
+   "goldenGate": false
+  },
+  "bsai": {
+   "name": "BsaI",
+   "site": "ggtctc",
+   "forwardRegex": "ggtctc",
+   "reverseRegex": "gagacc",
+   "topSnipOffset": 7,
+   "bottomSnipOffset": 11,
+   "isType2S": true,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "Bso31I",
+    "BspTNI",
+    "Eco31I"
+   ],
+   "goldenGate": true
+  },
+  "bsaji": {
+   "name": "BsaJI",
+   "site": "ccnngg",
+   "forwardRegex": "cc[acgt][acgt]gg",
+   "reverseRegex": "cc[acgt][acgt]gg",
+   "topSnipOffset": 1,
+   "bottomSnipOffset": 5,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "BseDI",
+    "BssECI"
+   ],
+   "goldenGate": false
+  },
+  "bsawi": {
+   "name": "BsaWI",
+   "site": "wccggw",
+   "forwardRegex": "[at]ccgg[at]",
+   "reverseRegex": "[at]ccgg[at]",
+   "topSnipOffset": 1,
+   "bottomSnipOffset": 5,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [],
+   "goldenGate": false
+  },
+  "bsemii": {
+   "name": "BseMII",
+   "site": "ctcag",
+   "forwardRegex": "ctcag",
+   "reverseRegex": "ctgag",
+   "topSnipOffset": 15,
+   "bottomSnipOffset": 13,
+   "isType2S": true,
+   "suppliers": [
+    "Thermo Fisher Scientific"
+   ],
+   "isoschizomers": [],
+   "goldenGate": false
+  },
+  "bseri": {
+   "name": "BseRI",
+   "site": "gaggag",
+   "forwardRegex": "gaggag",
+   "reverseRegex": "ctcctc",
+   "topSnipOffset": 16,
+   "bottomSnipOffset": 14,
+   "isType2S": true,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [],
+   "goldenGate": false
+  },
+  "bseyi": {
+   "name": "BseYI",
+   "site": "cccagc",
+   "forwardRegex": "cccagc",
+   "reverseRegex": "gctggg",
+   "topSnipOffset": 1,
+   "bottomSnipOffset": 5,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "PspFI"
+   ],
+   "goldenGate": false
+  },
+  "bsgi": {
+   "name": "BsgI",
+   "site": "gtgcag",
+   "forwardRegex": "gtgcag",
+   "reverseRegex": "ctgcac",
+   "topSnipOffset": 22,
+   "bottomSnipOffset": 20,
+   "isType2S": true,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [],
+   "goldenGate": false
+  },
+  "bsiei": {
+   "name": "BsiEI",
+   "site": "cgrycg",
+   "forwardRegex": "cg[ag][ct]cg",
+   "reverseRegex": "cg[ag][ct]cg",
+   "topSnipOffset": 4,
+   "bottomSnipOffset": 2,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "Bsh1285I",
+    "BstMCI"
+   ],
+   "goldenGate": false
+  },
+  "bsihkai": {
+   "name": "BsiHKAI",
+   "site": "gwgcwc",
+   "forwardRegex": "g[at]gc[at]c",
+   "reverseRegex": "g[at]gc[at]c",
+   "topSnipOffset": 5,
+   "bottomSnipOffset": 1,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "Alw21I",
+    "Bbv12I"
+   ],
+   "goldenGate": false
+  },
+  "bsiwi": {
+   "name": "BsiWI",
+   "site": "cgtacg",
+   "forwardRegex": "cgtacg",
+   "reverseRegex": "cgtacg",
+   "topSnipOffset": 1,
+   "bottomSnipOffset": 5,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "Pfl23II",
+    "PspLI"
+   ],
+   "goldenGate": false
+  },
+  "bsli": {
+   "name": "BslI",
+   "site": "ccnnnnnnngg",
+   "forwardRegex": "cc[acgt][acgt][acgt][acgt][acgt][acgt][acgt]gg",
+   "reverseRegex": "cc[acgt][acgt][acgt][acgt][acgt][acgt][acgt]gg",
+   "topSnipOffset": 7,
+   "bottomSnipOffset": 4,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "AfiI",
+    "Bsc4I",
+    "BseLI"
+   ],
+   "goldenGate": false
+  },
+  "bsmbi": {
+   "name": "BsmBI",
+   "site": "cgtctc",
+   "forwardRegex": "cgtctc",
+   "reverseRegex": "gagacg",
+   "topSnipOffset": 7,
+   "bottomSnipOffset": 11,
+   "isType2S": true,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "Esp3I"
+   ],
+   "goldenGate": true
+  },
+  "bsmfi": {
+   "name": "BsmFI",
+   "site": "gggac",
+   "forwardRegex": "gggac",
+   "reverseRegex": "gtccc",
+   "topSnipOffset": 15,
+   "bottomSnipOffset": 19,
+   "isType2S": true,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "BslFI",
+    "FaqI"
+   ],
+   "goldenGate": false
+  },
+  "bsmi": {
+   "name": "BsmI",
+   "site": "gaatgc",
+   "forwardRegex": "gaatgc",
+   "reverseRegex": "gcattc",
+   "topSnipOffset": 7,
+   "bottomSnipOffset": 5,
+   "isType2S": true,
+   "suppliers": [
+    "New England Biolabs",
+    "Nippon Gene Co., Ltd.",
+    "Roche Applied Science",
+    "Sigma Chemical Corporation"
+   ],
+   "isoschizomers": [
+    "Mva1269I",
+    "PctI"
+   ],
+   "goldenGate": false
+  },
+  "bsp1286i": {
+   "name": "Bsp1286I",
+   "site": "gdgchc",
+   "forwardRegex": "g[agt]gc[act]c",
+   "reverseRegex": "g[agt]gc[act]c",
+   "topSnipOffset": 5,
+   "bottomSnipOffset": 1,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs",
+    "Nippon Gene Co., Ltd.",
+    "Takara Bio Inc."
+   ],
+   "isoschizomers": [
+    "MhlI",
+    "SduI"
+   ],
+   "goldenGate": false
+  },
+  "bspcni": {
+   "name": "BspCNI",
+   "site": "ctcag",
+   "forwardRegex": "ctcag",
+   "reverseRegex": "ctgag",
+   "topSnipOffset": 14,
+   "bottomSnipOffset": 12,
+   "isType2S": true,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [],
+   "goldenGate": false
+  },
+  "bspei": {
+   "name": "BspEI",
+   "site": "tccgga",
+   "forwardRegex": "tccgga",
+   "reverseRegex": "tccgga",
+   "topSnipOffset": 1,
+   "bottomSnipOffset": 5,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "AccIII",
+    "Aor13HI",
+    "BseAI",
+    "Bsp13I",
+    "Kpn2I",
+    "MroI"
+   ],
+   "goldenGate": false
+  },
+  "bsphi": {
+   "name": "BspHI",
+   "site": "tcatga",
+   "forwardRegex": "tcatga",
+   "reverseRegex": "tcatga",
+   "topSnipOffset": 1,
+   "bottomSnipOffset": 5,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "CciI",
+    "PagI"
+   ],
+   "goldenGate": false
+  },
+  "bsrbi": {
+   "name": "BsrBI",
+   "site": "ccgctc",
+   "forwardRegex": "ccgctc",
+   "reverseRegex": "gagcgg",
+   "topSnipOffset": 3,
+   "bottomSnipOffset": 3,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "AccBSI",
+    "MbiI"
+   ],
+   "goldenGate": false
+  },
+  "bsrdi": {
+   "name": "BsrDI",
+   "site": "gcaatg",
+   "forwardRegex": "gcaatg",
+   "reverseRegex": "cattgc",
+   "topSnipOffset": 8,
+   "bottomSnipOffset": 6,
+   "isType2S": true,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "Bse3DI",
+    "BseMI"
+   ],
+   "goldenGate": false
+  },
+  "bsrfi": {
+   "name": "BsrFI",
+   "site": "rccggy",
+   "forwardRegex": "[ag]ccgg[ct]",
+   "reverseRegex": "[ag]ccgg[ct]",
+   "topSnipOffset": 1,
+   "bottomSnipOffset": 5,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "Bse118I",
+    "BssAI",
+    "Cfr10I"
+   ],
+   "goldenGate": false
+  },
+  "bsrgi": {
+   "name": "BsrGI",
+   "site": "tgtaca",
+   "forwardRegex": "tgtaca",
+   "reverseRegex": "tgtaca",
+   "topSnipOffset": 1,
+   "bottomSnipOffset": 5,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "Bsp1407I",
+    "BstAUI"
+   ],
+   "goldenGate": false
+  },
+  "bsri": {
+   "name": "BsrI",
+   "site": "actgg",
+   "forwardRegex": "actgg",
+   "reverseRegex": "ccagt",
+   "topSnipOffset": 6,
+   "bottomSnipOffset": 4,
+   "isType2S": true,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "Bse1I",
+    "BseNI"
+   ],
+   "goldenGate": false
+  },
+  "bsshii": {
+   "name": "BssHII",
+   "site": "gcgcgc",
+   "forwardRegex": "gcgcgc",
+   "reverseRegex": "gcgcgc",
+   "topSnipOffset": 1,
+   "bottomSnipOffset": 5,
+   "isType2S": false,
+   "suppliers": [
+    "EURx Ltd.",
+    "Molecular Biology Resources - CHIMERx",
+    "New England Biolabs",
+    "Nippon Gene Co., Ltd.",
+    "Roche Applied Science",
+    "Takara Bio Inc."
+   ],
+   "isoschizomers": [
+    "BsePI",
+    "PauI",
+    "PteI"
+   ],
+   "goldenGate": false
+  },
+  "bsssi": {
+   "name": "BssSI",
+   "site": "cacgag",
+   "forwardRegex": "cacgag",
+   "reverseRegex": "ctcgtg",
+   "topSnipOffset": 1,
+   "bottomSnipOffset": 5,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "BauI",
+    "Bst2BI"
+   ],
+   "goldenGate": false
+  },
+  "bstapi": {
+   "name": "BstAPI",
+   "site": "gcannnnntgc",
+   "forwardRegex": "gca[acgt][acgt][acgt][acgt][acgt]tgc",
+   "reverseRegex": "gca[acgt][acgt][acgt][acgt][acgt]tgc",
+   "topSnipOffset": 7,
+   "bottomSnipOffset": 4,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs",
+    "SibEnzyme Ltd."
+   ],
+   "isoschizomers": [],
+   "goldenGate": false
+  },
+  "bstbi": {
+   "name": "BstBI",
+   "site": "ttcgaa",
+   "forwardRegex": "ttcgaa",
+   "reverseRegex": "ttcgaa",
+   "topSnipOffset": 2,
+   "bottomSnipOffset": 4,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "AsuII",
+    "Bpu14I",
+    "Bsp119I",
+    "BspT104I",
+    "NspV",
+    "SfuI"
+   ],
+   "goldenGate": false
+  },
+  "bsteii": {
+   "name": "BstEII",
+   "site": "ggtnacc",
+   "forwardRegex": "ggt[acgt]acc",
+   "reverseRegex": "ggt[acgt]acc",
+   "topSnipOffset": 1,
+   "bottomSnipOffset": 6,
+   "isType2S": false,
+   "suppliers": [
+    "Minotech Biotechnology",
+    "New England Biolabs",
+    "Nippon Gene Co., Ltd."
+   ],
+   "isoschizomers": [
+    "BstPI",
+    "Eco91I",
+    "EcoO65I",
+    "PspEI"
+   ],
+   "goldenGate": false
+  },
+  "bstkti": {
+   "name": "BstKTI",
+   "site": "gatc",
+   "forwardRegex": "gatc",
+   "reverseRegex": "gatc",
+   "topSnipOffset": 3,
+   "bottomSnipOffset": 1,
+   "isType2S": false,
+   "suppliers": [
+    "SibEnzyme Ltd."
+   ],
+   "isoschizomers": [],
+   "goldenGate": false
+  },
+  "bstni": {
+   "name": "BstNI",
+   "site": "ccwgg",
+   "forwardRegex": "cc[at]gg",
+   "reverseRegex": "cc[at]gg",
+   "topSnipOffset": 2,
+   "bottomSnipOffset": 3,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "BciT130I",
+    "BseBI",
+    "Bst2UI",
+    "MvaI"
+   ],
+   "goldenGate": false
+  },
+  "bstui": {
+   "name": "BstUI",
+   "site": "cgcg",
+   "forwardRegex": "cgcg",
+   "reverseRegex": "cgcg",
+   "topSnipOffset": 2,
+   "bottomSnipOffset": 2,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "AccII",
+    "Bsh1236I",
+    "BspFNI",
+    "BstFNI",
+    "MvnI"
+   ],
+   "goldenGate": false
+  },
+  "bstxi": {
+   "name": "BstXI",
+   "site": "ccannnnnntgg",
+   "forwardRegex": "cca[acgt][acgt][acgt][acgt][acgt][acgt]tgg",
+   "reverseRegex": "cca[acgt][acgt][acgt][acgt][acgt][acgt]tgg",
+   "topSnipOffset": 8,
+   "bottomSnipOffset": 4,
+   "isType2S": false,
+   "suppliers": [
+    "EURx Ltd.",
+    "Molecular Biology Resources - CHIMERx",
+    "New England Biolabs",
+    "Nippon Gene Co., Ltd.",
+    "Roche Applied Science",
+    "SibEnzyme Ltd.",
+    "SinaClon BioScience Co.",
+    "Takara Bio Inc.",
+    "Thermo Fisher Scientific",
+    "Vivantis Technologies"
+   ],
+   "isoschizomers": [],
+   "goldenGate": false
+  },
+  "bstyi": {
+   "name": "BstYI",
+   "site": "rgatcy",
+   "forwardRegex": "[ag]gatc[ct]",
+   "reverseRegex": "[ag]gatc[ct]",
+   "topSnipOffset": 1,
+   "bottomSnipOffset": 5,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "BstX2I",
+    "MflI",
+    "PsuI"
+   ],
+   "goldenGate": false
+  },
+  "bstz17i": {
+   "name": "BstZ17I",
+   "site": "gtatac",
+   "forwardRegex": "gtatac",
+   "reverseRegex": "gtatac",
+   "topSnipOffset": 3,
+   "bottomSnipOffset": 3,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "BssNAI",
+    "Bst1107I"
+   ],
+   "goldenGate": false
+  },
+  "bsu36i": {
+   "name": "Bsu36I",
+   "site": "cctnagg",
+   "forwardRegex": "cct[acgt]agg",
+   "reverseRegex": "cct[acgt]agg",
+   "topSnipOffset": 2,
+   "bottomSnipOffset": 5,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "AxyI",
+    "Bse21I",
+    "Eco81I"
+   ],
+   "goldenGate": false
+  },
+  "btgi": {
+   "name": "BtgI",
+   "site": "ccrygg",
+   "forwardRegex": "cc[ag][ct]gg",
+   "reverseRegex": "cc[ag][ct]gg",
+   "topSnipOffset": 1,
+   "bottomSnipOffset": 5,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "BstDSI"
+   ],
+   "goldenGate": false
+  },
+  "btgzi": {
+   "name": "BtgZI",
+   "site": "gcgatg",
+   "forwardRegex": "gcgatg",
+   "reverseRegex": "catcgc",
+   "topSnipOffset": 16,
+   "bottomSnipOffset": 20,
+   "isType2S": true,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [],
+   "goldenGate": true
+  },
+  "btsci": {
+   "name": "BtsCI",
+   "site": "ggatg",
+   "forwardRegex": "ggatg",
+   "reverseRegex": "catcc",
+   "topSnipOffset": 7,
+   "bottomSnipOffset": 5,
+   "isType2S": true,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "BseGI",
+    "BstF5I"
+   ],
+   "goldenGate": false
+  },
+  "btsi": {
+   "name": "BtsI",
+   "site": "gcagtg",
+   "forwardRegex": "gcagtg",
+   "reverseRegex": "cactgc",
+   "topSnipOffset": 8,
+   "bottomSnipOffset": 6,
+   "isType2S": true,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [],
+   "goldenGate": false
+  },
+  "btsimuti": {
+   "name": "BtsIMutI",
+   "site": "cagtg",
+   "forwardRegex": "cagtg",
+   "reverseRegex": "cactg",
+   "topSnipOffset": 7,
+   "bottomSnipOffset": 5,
+   "isType2S": true,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [],
+   "goldenGate": false
+  },
+  "cac8i": {
+   "name": "Cac8I",
+   "site": "gcnngc",
+   "forwardRegex": "gc[acgt][acgt]gc",
+   "reverseRegex": "gc[acgt][acgt]gc",
+   "topSnipOffset": 3,
+   "bottomSnipOffset": 3,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "BstC8I"
+   ],
+   "goldenGate": false
+  },
+  "clai": {
+   "name": "ClaI",
+   "site": "atcgat",
+   "forwardRegex": "atcgat",
+   "reverseRegex": "atcgat",
+   "topSnipOffset": 2,
+   "bottomSnipOffset": 4,
+   "isType2S": false,
+   "suppliers": [
+    "EURx Ltd.",
+    "Molecular Biology Resources - CHIMERx",
+    "New England Biolabs",
+    "Promega Corporation",
+    "Roche Applied Science",
+    "Sigma Chemical Corporation",
+    "Takara Bio Inc.",
+    "Thermo Fisher Scientific"
+   ],
+   "isoschizomers": [
+    "Bsa29I",
+    "BseCI",
+    "BshVI",
+    "BspDI",
+    "Bsu15I",
+    "BsuTUI"
+   ],
+   "goldenGate": false
+  },
+  "cviaii": {
+   "name": "CviAII",
+   "site": "catg",
+   "forwardRegex": "catg",
+   "reverseRegex": "catg",
+   "topSnipOffset": 1,
+   "bottomSnipOffset": 3,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [],
+   "goldenGate": false
+  },
+  "cviki_1": {
+   "name": "CviKI_1",
+   "site": "rgcy",
+   "forwardRegex": "[ag]gc[ct]",
+   "reverseRegex": "[ag]gc[ct]",
+   "topSnipOffset": 2,
+   "bottomSnipOffset": 2,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "CviJI"
+   ],
+   "goldenGate": false
+  },
+  "cviqi": {
+   "name": "CviQI",
+   "site": "gtac",
+   "forwardRegex": "gtac",
+   "reverseRegex": "gtac",
+   "topSnipOffset": 1,
+   "bottomSnipOffset": 3,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "Csp6I",
+    "RsaNI"
+   ],
+   "goldenGate": false
+  },
+  "ddei": {
+   "name": "DdeI",
+   "site": "ctnag",
+   "forwardRegex": "ct[acgt]ag",
+   "reverseRegex": "ct[acgt]ag",
+   "topSnipOffset": 1,
+   "bottomSnipOffset": 4,
+   "isType2S": false,
+   "suppliers": [
+    "EURx Ltd.",
+    "Molecular Biology Resources - CHIMERx",
+    "New England Biolabs",
+    "Promega Corporation",
+    "Roche Applied Science",
+    "Sigma Chemical Corporation",
+    "Takara Bio Inc.",
+    "Toyobo Biochemicals"
+   ],
+   "isoschizomers": [
+    "BstDEI",
+    "HpyF3I"
+   ],
+   "goldenGate": false
+  },
+  "dpni": {
+   "name": "DpnI",
+   "site": "gatc",
+   "forwardRegex": "gatc",
+   "reverseRegex": "gatc",
+   "topSnipOffset": 2,
+   "bottomSnipOffset": 2,
+   "isType2S": false,
+   "suppliers": [
+    "Agilent Technologies",
+    "EURx Ltd.",
+    "Molecular Biology Resources - CHIMERx",
+    "New England Biolabs",
+    "Promega Corporation",
+    "Roche Applied Science",
+    "Sigma Chemical Corporation",
+    "Takara Bio Inc.",
+    "Thermo Fisher Scientific",
+    "Toyobo Biochemicals"
+   ],
+   "isoschizomers": [
+    "MalI"
+   ],
+   "goldenGate": false
+  },
+  "drai": {
+   "name": "DraI",
+   "site": "tttaaa",
+   "forwardRegex": "tttaaa",
+   "reverseRegex": "tttaaa",
+   "topSnipOffset": 3,
+   "bottomSnipOffset": 3,
+   "isType2S": false,
+   "suppliers": [
+    "EURx Ltd.",
+    "Molecular Biology Resources - CHIMERx",
+    "New England Biolabs",
+    "Nippon Gene Co., Ltd.",
+    "Roche Applied Science",
+    "SibEnzyme Ltd.",
+    "Sigma Chemical Corporation",
+    "Takara Bio Inc.",
+    "Thermo Fisher Scientific",
+    "Vivantis Technologies"
+   ],
+   "isoschizomers": [],
+   "goldenGate": false
+  },
+  "draiii": {
+   "name": "DraIII",
+   "site": "cacnnngtg",
+   "forwardRegex": "cac[acgt][acgt][acgt]gtg",
+   "reverseRegex": "cac[acgt][acgt][acgt]gtg",
+   "topSnipOffset": 6,
+   "bottomSnipOffset": 3,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs",
+    "Roche Applied Science",
+    "SibEnzyme Ltd.",
+    "Vivantis Technologies"
+   ],
+   "isoschizomers": [
+    "AdeI"
+   ],
+   "goldenGate": false
+  },
+  "drdi": {
+   "name": "DrdI",
+   "site": "gacnnnnnngtc",
+   "forwardRegex": "gac[acgt][acgt][acgt][acgt][acgt][acgt]gtc",
+   "reverseRegex": "gac[acgt][acgt][acgt][acgt][acgt][acgt]gtc",
+   "topSnipOffset": 7,
+   "bottomSnipOffset": 5,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "AasI",
+    "DseDI"
+   ],
+   "goldenGate": false
+  },
+  "eaei": {
+   "name": "EaeI",
+   "site": "yggccr",
+   "forwardRegex": "[ct]ggcc[ag]",
+   "reverseRegex": "[ct]ggcc[ag]",
+   "topSnipOffset": 1,
+   "bottomSnipOffset": 5,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs",
+    "Takara Bio Inc."
+   ],
+   "isoschizomers": [
+    "AcoI"
+   ],
+   "goldenGate": false
+  },
+  "eagi": {
+   "name": "EagI",
+   "site": "cggccg",
+   "forwardRegex": "cggccg",
+   "reverseRegex": "cggccg",
+   "topSnipOffset": 1,
+   "bottomSnipOffset": 5,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "BseX3I",
+    "BstZI",
+    "EclXI",
+    "Eco52I"
+   ],
+   "goldenGate": false
+  },
+  "eari": {
+   "name": "EarI",
+   "site": "ctcttc",
+   "forwardRegex": "ctcttc",
+   "reverseRegex": "gaagag",
+   "topSnipOffset": 7,
+   "bottomSnipOffset": 10,
+   "isType2S": true,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "Bst6I",
+    "Eam1104I"
+   ],
+   "goldenGate": false
+  },
+  "ecii": {
+   "name": "EciI",
+   "site": "ggcgga",
+   "forwardRegex": "ggcgga",
+   "reverseRegex": "tccgcc",
+   "topSnipOffset": 17,
+   "bottomSnipOffset": 15,
+   "isType2S": true,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [],
+   "goldenGate": false
+  },
+  "eco53ki": {
+   "name": "Eco53kI",
+   "site": "gagctc",
+   "forwardRegex": "gagctc",
+   "reverseRegex": "gagctc",
+   "topSnipOffset": 3,
+   "bottomSnipOffset": 3,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "Ecl136II",
+    "EcoICRI"
+   ],
+   "goldenGate": false
+  },
+  "econi": {
+   "name": "EcoNI",
+   "site": "cctnnnnnagg",
+   "forwardRegex": "cct[acgt][acgt][acgt][acgt][acgt]agg",
+   "reverseRegex": "cct[acgt][acgt][acgt][acgt][acgt]agg",
+   "topSnipOffset": 5,
+   "bottomSnipOffset": 6,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "BstENI",
+    "XagI"
+   ],
+   "goldenGate": false
+  },
+  "ecoo109i": {
+   "name": "EcoO109I",
+   "site": "rggnccy",
+   "forwardRegex": "[ag]gg[acgt]cc[ct]",
+   "reverseRegex": "[ag]gg[acgt]cc[ct]",
+   "topSnipOffset": 2,
+   "bottomSnipOffset": 5,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs",
+    "Nippon Gene Co., Ltd.",
+    "Takara Bio Inc.",
+    "Thermo Fisher Scientific"
+   ],
+   "isoschizomers": [],
+   "goldenGate": false
+  },
+  "ecori": {
+   "name": "EcoRI",
+   "site": "gaattc",
+   "forwardRegex": "gaattc",
+   "reverseRegex": "gaattc",
+   "topSnipOffset": 1,
+   "bottomSnipOffset": 5,
+   "isType2S": false,
+   "suppliers": [
+    "EURx Ltd.",
+    "Minotech Biotechnology",
+    "Molecular Biology Resources - CHIMERx",
+    "New England Biolabs",
+    "Nippon Gene Co., Ltd.",
+    "Promega Corporation",
+    "Roche Applied Science",
+    "SibEnzyme Ltd.",
+    "Sigma Chemical Corporation",
+    "SinaClon BioScience Co.",
+    "Takara Bio Inc.",
+    "Thermo Fisher Scientific",
+    "Toyobo Biochemicals",
+    "Vivantis Technologies"
+   ],
+   "isoschizomers": [],
+   "goldenGate": false
+  },
+  "ecorv": {
+   "name": "EcoRV",
+   "site": "gatatc",
+   "forwardRegex": "gatatc",
+   "reverseRegex": "gatatc",
+   "topSnipOffset": 3,
+   "bottomSnipOffset": 3,
+   "isType2S": false,
+   "suppliers": [
+    "EURx Ltd.",
+    "Minotech Biotechnology",
+    "Molecular Biology Resources - CHIMERx",
+    "New England Biolabs",
+    "Nippon Gene Co., Ltd.",
+    "Promega Corporation",
+    "Roche Applied Science",
+    "SibEnzyme Ltd.",
+    "Sigma Chemical Corporation",
+    "Takara Bio Inc.",
+    "Thermo Fisher Scientific",
+    "Toyobo Biochemicals",
+    "Vivantis Technologies"
+   ],
+   "isoschizomers": [
+    "Eco32I"
+   ],
+   "goldenGate": false
+  },
+  "faii": {
+   "name": "FaiI",
+   "site": "yatr",
+   "forwardRegex": "[ct]at[ag]",
+   "reverseRegex": "[ct]at[ag]",
+   "topSnipOffset": 2,
+   "bottomSnipOffset": 2,
+   "isType2S": false,
+   "suppliers": [
+    "SibEnzyme Ltd."
+   ],
+   "isoschizomers": [],
+   "goldenGate": false
+  },
+  "fati": {
+   "name": "FatI",
+   "site": "catg",
+   "forwardRegex": "catg",
+   "reverseRegex": "catg",
+   "topSnipOffset": 0,
+   "bottomSnipOffset": 4,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs",
+    "SibEnzyme Ltd."
+   ],
+   "isoschizomers": [],
+   "goldenGate": false
+  },
+  "faui": {
+   "name": "FauI",
+   "site": "cccgc",
+   "forwardRegex": "cccgc",
+   "reverseRegex": "gcggg",
+   "topSnipOffset": 9,
+   "bottomSnipOffset": 11,
+   "isType2S": true,
+   "suppliers": [
+    "New England Biolabs",
+    "SibEnzyme Ltd."
+   ],
+   "isoschizomers": [],
+   "goldenGate": false
+  },
+  "fnu4hi": {
+   "name": "Fnu4HI",
+   "site": "gcngc",
+   "forwardRegex": "gc[acgt]gc",
+   "reverseRegex": "gc[acgt]gc",
+   "topSnipOffset": 2,
+   "bottomSnipOffset": 3,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "BisI",
+    "Fsp4HI",
+    "GluI",
+    "SatI"
+   ],
+   "goldenGate": false
+  },
+  "foki": {
+   "name": "FokI",
+   "site": "ggatg",
+   "forwardRegex": "ggatg",
+   "reverseRegex": "catcc",
+   "topSnipOffset": 14,
+   "bottomSnipOffset": 18,
+   "isType2S": true,
+   "suppliers": [
+    "EURx Ltd.",
+    "New England Biolabs",
+    "Nippon Gene Co., Ltd.",
+    "Roche Applied Science",
+    "SibEnzyme Ltd.",
+    "SinaClon BioScience Co.",
+    "Takara Bio Inc.",
+    "Thermo Fisher Scientific",
+    "Vivantis Technologies"
+   ],
+   "isoschizomers": [],
+   "goldenGate": false
+  },
+  "fsei": {
+   "name": "FseI",
+   "site": "ggccggcc",
+   "forwardRegex": "ggccggcc",
+   "reverseRegex": "ggccggcc",
+   "topSnipOffset": 6,
+   "bottomSnipOffset": 2,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "RigI"
+   ],
+   "goldenGate": false
+  },
+  "fspai": {
+   "name": "FspAI",
+   "site": "rtgcgcay",
+   "forwardRegex": "[ag]tgcgca[ct]",
+   "reverseRegex": "[ag]tgcgca[ct]",
+   "topSnipOffset": 4,
+   "bottomSnipOffset": 4,
+   "isType2S": false,
+   "suppliers": [
+    "Thermo Fisher Scientific"
+   ],
+   "isoschizomers": [],
+   "goldenGate": false
+  },
+  "fspi": {
+   "name": "FspI",
+   "site": "tgcgca",
+   "forwardRegex": "tgcgca",
+   "reverseRegex": "tgcgca",
+   "topSnipOffset": 3,
+   "bottomSnipOffset": 3,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs",
+    "Nippon Gene Co., Ltd."
+   ],
+   "isoschizomers": [
+    "Acc16I",
+    "NsbI"
+   ],
+   "goldenGate": false
+  },
+  "glai": {
+   "name": "GlaI",
+   "site": "gcgc",
+   "forwardRegex": "gcgc",
+   "reverseRegex": "gcgc",
+   "topSnipOffset": 2,
+   "bottomSnipOffset": 2,
+   "isType2S": false,
+   "suppliers": [
+    "SibEnzyme Ltd."
+   ],
+   "isoschizomers": [],
+   "goldenGate": false
+  },
+  "gsai": {
+   "name": "GsaI",
+   "site": "cccagc",
+   "forwardRegex": "cccagc",
+   "reverseRegex": "gctggg",
+   "topSnipOffset": 5,
+   "bottomSnipOffset": 1,
+   "isType2S": false,
+   "suppliers": [
+    "SibEnzyme Ltd."
+   ],
+   "isoschizomers": [],
+   "goldenGate": false
+  },
+  "haeii": {
+   "name": "HaeII",
+   "site": "rgcgcy",
+   "forwardRegex": "[ag]gcgc[ct]",
+   "reverseRegex": "[ag]gcgc[ct]",
+   "topSnipOffset": 5,
+   "bottomSnipOffset": 1,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs",
+    "Nippon Gene Co., Ltd.",
+    "Takara Bio Inc."
+   ],
+   "isoschizomers": [
+    "BfoI",
+    "BstH2I"
+   ],
+   "goldenGate": false
+  },
+  "haeiii": {
+   "name": "HaeIII",
+   "site": "ggcc",
+   "forwardRegex": "ggcc",
+   "reverseRegex": "ggcc",
+   "topSnipOffset": 2,
+   "bottomSnipOffset": 2,
+   "isType2S": false,
+   "suppliers": [
+    "EURx Ltd.",
+    "Molecular Biology Resources - CHIMERx",
+    "New England Biolabs",
+    "Nippon Gene Co., Ltd.",
+    "Promega Corporation",
+    "Roche Applied Science",
+    "SibEnzyme Ltd.",
+    "Sigma Chemical Corporation",
+    "Takara Bio Inc.",
+    "Thermo Fisher Scientific",
+    "Toyobo Biochemicals"
+   ],
+   "isoschizomers": [
+    "BshFI",
+    "BsnI",
+    "BspANI",
+    "BsuRI"
+   ],
+   "goldenGate": false
+  },
+  "hgai": {
+   "name": "HgaI",
+   "site": "gacgc",
+   "forwardRegex": "gacgc",
+   "reverseRegex": "gcgtc",
+   "topSnipOffset": 10,
+   "bottomSnipOffset": 15,
+   "isType2S": true,
+   "suppliers": [
+    "New England Biolabs",
+    "SibEnzyme Ltd."
+   ],
+   "isoschizomers": [
+    "CseI"
+   ],
+   "goldenGate": false
+  },
+  "hhai": {
+   "name": "HhaI",
+   "site": "gcgc",
+   "forwardRegex": "gcgc",
+   "reverseRegex": "gcgc",
+   "topSnipOffset": 3,
+   "bottomSnipOffset": 1,
+   "isType2S": false,
+   "suppliers": [
+    "EURx Ltd.",
+    "Molecular Biology Resources - CHIMERx",
+    "New England Biolabs",
+    "Nippon Gene Co., Ltd.",
+    "Promega Corporation",
+    "Takara Bio Inc.",
+    "Thermo Fisher Scientific"
+   ],
+   "isoschizomers": [
+    "AspLEI",
+    "BstHHI",
+    "CfoI"
+   ],
+   "goldenGate": false
+  },
+  "hincii": {
+   "name": "HincII",
+   "site": "gtyrac",
+   "forwardRegex": "gt[ct][ag]ac",
+   "reverseRegex": "gt[ct][ag]ac",
+   "topSnipOffset": 3,
+   "bottomSnipOffset": 3,
+   "isType2S": false,
+   "suppliers": [
+    "EURx Ltd.",
+    "Molecular Biology Resources - CHIMERx",
+    "New England Biolabs",
+    "Nippon Gene Co., Ltd.",
+    "Takara Bio Inc.",
+    "Thermo Fisher Scientific",
+    "Toyobo Biochemicals"
+   ],
+   "isoschizomers": [
+    "HindII"
+   ],
+   "goldenGate": false
+  },
+  "hindiii": {
+   "name": "HindIII",
+   "site": "aagctt",
+   "forwardRegex": "aagctt",
+   "reverseRegex": "aagctt",
+   "topSnipOffset": 1,
+   "bottomSnipOffset": 5,
+   "isType2S": false,
+   "suppliers": [
+    "EURx Ltd.",
+    "Minotech Biotechnology",
+    "Molecular Biology Resources - CHIMERx",
+    "New England Biolabs",
+    "Nippon Gene Co., Ltd.",
+    "Promega Corporation",
+    "Roche Applied Science",
+    "SibEnzyme Ltd.",
+    "Sigma Chemical Corporation",
+    "SinaClon BioScience Co.",
+    "Takara Bio Inc.",
+    "Thermo Fisher Scientific",
+    "Toyobo Biochemicals",
+    "Vivantis Technologies"
+   ],
+   "isoschizomers": [],
+   "goldenGate": false
+  },
+  "hinfi": {
+   "name": "HinfI",
+   "site": "gantc",
+   "forwardRegex": "ga[acgt]tc",
+   "reverseRegex": "ga[acgt]tc",
+   "topSnipOffset": 1,
+   "bottomSnipOffset": 4,
+   "isType2S": false,
+   "suppliers": [
+    "EURx Ltd.",
+    "Minotech Biotechnology",
+    "Molecular Biology Resources - CHIMERx",
+    "New England Biolabs",
+    "Nippon Gene Co., Ltd.",
+    "Promega Corporation",
+    "Roche Applied Science",
+    "SibEnzyme Ltd.",
+    "SinaClon BioScience Co.",
+    "Takara Bio Inc.",
+    "Thermo Fisher Scientific",
+    "Toyobo Biochemicals",
+    "Vivantis Technologies"
+   ],
+   "isoschizomers": [],
+   "goldenGate": false
+  },
+  "hinp1i": {
+   "name": "HinP1I",
+   "site": "gcgc",
+   "forwardRegex": "gcgc",
+   "reverseRegex": "gcgc",
+   "topSnipOffset": 1,
+   "bottomSnipOffset": 3,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "Hin6I",
+    "HspAI"
+   ],
+   "goldenGate": false
+  },
+  "hpai": {
+   "name": "HpaI",
+   "site": "gttaac",
+   "forwardRegex": "gttaac",
+   "reverseRegex": "gttaac",
+   "topSnipOffset": 3,
+   "bottomSnipOffset": 3,
+   "isType2S": false,
+   "suppliers": [
+    "EURx Ltd.",
+    "Minotech Biotechnology",
+    "Molecular Biology Resources - CHIMERx",
+    "New England Biolabs",
+    "Nippon Gene Co., Ltd.",
+    "Roche Applied Science",
+    "SibEnzyme Ltd.",
+    "Sigma Chemical Corporation",
+    "Takara Bio Inc.",
+    "Thermo Fisher Scientific",
+    "Vivantis Technologies"
+   ],
+   "isoschizomers": [
+    "KspAI"
+   ],
+   "goldenGate": false
+  },
+  "hphi": {
+   "name": "HphI",
+   "site": "ggtga",
+   "forwardRegex": "ggtga",
+   "reverseRegex": "tcacc",
+   "topSnipOffset": 13,
+   "bottomSnipOffset": 12,
+   "isType2S": true,
+   "suppliers": [
+    "New England Biolabs",
+    "Thermo Fisher Scientific"
+   ],
+   "isoschizomers": [
+    "AsuHPI"
+   ],
+   "goldenGate": false
+  },
+  "hpy166ii": {
+   "name": "Hpy166II",
+   "site": "gtnnac",
+   "forwardRegex": "gt[acgt][acgt]ac",
+   "reverseRegex": "gt[acgt][acgt]ac",
+   "topSnipOffset": 3,
+   "bottomSnipOffset": 3,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "Hpy8I"
+   ],
+   "goldenGate": false
+  },
+  "hpy188i": {
+   "name": "Hpy188I",
+   "site": "tcnga",
+   "forwardRegex": "tc[acgt]ga",
+   "reverseRegex": "tc[acgt]ga",
+   "topSnipOffset": 3,
+   "bottomSnipOffset": 2,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [],
+   "goldenGate": false
+  },
+  "hpy188iii": {
+   "name": "Hpy188III",
+   "site": "tcnnga",
+   "forwardRegex": "tc[acgt][acgt]ga",
+   "reverseRegex": "tc[acgt][acgt]ga",
+   "topSnipOffset": 2,
+   "bottomSnipOffset": 4,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [],
+   "goldenGate": false
+  },
+  "hpy99i": {
+   "name": "Hpy99I",
+   "site": "cgwcg",
+   "forwardRegex": "cg[at]cg",
+   "reverseRegex": "cg[at]cg",
+   "topSnipOffset": 5,
+   "bottomSnipOffset": 0,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [],
+   "goldenGate": false
+  },
+  "hpyav": {
+   "name": "HpyAV",
+   "site": "ccttc",
+   "forwardRegex": "ccttc",
+   "reverseRegex": "gaagg",
+   "topSnipOffset": 11,
+   "bottomSnipOffset": 10,
+   "isType2S": true,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [],
+   "goldenGate": false
+  },
+  "hpych4iii": {
+   "name": "HpyCH4III",
+   "site": "acngt",
+   "forwardRegex": "ac[acgt]gt",
+   "reverseRegex": "ac[acgt]gt",
+   "topSnipOffset": 3,
+   "bottomSnipOffset": 2,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "Bst4CI",
+    "TaaI"
+   ],
+   "goldenGate": false
+  },
+  "hpych4iv": {
+   "name": "HpyCH4IV",
+   "site": "acgt",
+   "forwardRegex": "acgt",
+   "reverseRegex": "acgt",
+   "topSnipOffset": 1,
+   "bottomSnipOffset": 3,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "HpySE526I",
+    "MaeII"
+   ],
+   "goldenGate": false
+  },
+  "hpych4v": {
+   "name": "HpyCH4V",
+   "site": "tgca",
+   "forwardRegex": "tgca",
+   "reverseRegex": "tgca",
+   "topSnipOffset": 2,
+   "bottomSnipOffset": 2,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [],
+   "goldenGate": false
+  },
+  "kasi": {
+   "name": "KasI",
+   "site": "ggcgcc",
+   "forwardRegex": "ggcgcc",
+   "reverseRegex": "ggcgcc",
+   "topSnipOffset": 1,
+   "bottomSnipOffset": 5,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "SspDI"
+   ],
+   "goldenGate": false
+  },
+  "kfli": {
+   "name": "KflI",
+   "site": "gggwccc",
+   "forwardRegex": "ggg[at]ccc",
+   "reverseRegex": "ggg[at]ccc",
+   "topSnipOffset": 2,
+   "bottomSnipOffset": 5,
+   "isType2S": false,
+   "suppliers": [
+    "Thermo Fisher Scientific"
+   ],
+   "isoschizomers": [],
+   "goldenGate": false
+  },
+  "kpni": {
+   "name": "KpnI",
+   "site": "ggtacc",
+   "forwardRegex": "ggtacc",
+   "reverseRegex": "ggtacc",
+   "topSnipOffset": 5,
+   "bottomSnipOffset": 1,
+   "isType2S": false,
+   "suppliers": [
+    "EURx Ltd.",
+    "Minotech Biotechnology",
+    "Molecular Biology Resources - CHIMERx",
+    "New England Biolabs",
+    "Nippon Gene Co., Ltd.",
+    "Promega Corporation",
+    "Roche Applied Science",
+    "SibEnzyme Ltd.",
+    "Sigma Chemical Corporation",
+    "SinaClon BioScience Co.",
+    "Takara Bio Inc.",
+    "Thermo Fisher Scientific",
+    "Toyobo Biochemicals",
+    "Vivantis Technologies"
+   ],
+   "isoschizomers": [],
+   "goldenGate": false
+  },
+  "lmni": {
+   "name": "LmnI",
+   "site": "gctcc",
+   "forwardRegex": "gctcc",
+   "reverseRegex": "ggagc",
+   "topSnipOffset": 6,
+   "bottomSnipOffset": 4,
+   "isType2S": true,
+   "suppliers": [
+    "SibEnzyme Ltd."
+   ],
+   "isoschizomers": [],
+   "goldenGate": false
+  },
+  "maeiii": {
+   "name": "MaeIII",
+   "site": "gtnac",
+   "forwardRegex": "gt[acgt]ac",
+   "reverseRegex": "gt[acgt]ac",
+   "topSnipOffset": 0,
+   "bottomSnipOffset": 5,
+   "isType2S": false,
+   "suppliers": [
+    "Roche Applied Science",
+    "Sigma Chemical Corporation"
+   ],
+   "isoschizomers": [],
+   "goldenGate": false
+  },
+  "maubi": {
+   "name": "MauBI",
+   "site": "cgcgcgcg",
+   "forwardRegex": "cgcgcgcg",
+   "reverseRegex": "cgcgcgcg",
+   "topSnipOffset": 2,
+   "bottomSnipOffset": 6,
+   "isType2S": false,
+   "suppliers": [
+    "Thermo Fisher Scientific"
+   ],
+   "isoschizomers": [],
+   "goldenGate": false
+  },
+  "mboi": {
+   "name": "MboI",
+   "site": "gatc",
+   "forwardRegex": "gatc",
+   "reverseRegex": "gatc",
+   "topSnipOffset": 0,
+   "bottomSnipOffset": 4,
+   "isType2S": false,
+   "suppliers": [
+    "EURx Ltd.",
+    "Minotech Biotechnology",
+    "Molecular Biology Resources - CHIMERx",
+    "New England Biolabs",
+    "Promega Corporation",
+    "SinaClon BioScience Co.",
+    "Takara Bio Inc.",
+    "Thermo Fisher Scientific"
+   ],
+   "isoschizomers": [
+    "Bsp143I",
+    "BssMI",
+    "BstMBI",
+    "DpnII",
+    "Kzo9I",
+    "NdeII",
+    "Sau3AI"
+   ],
+   "goldenGate": false
+  },
+  "mboii": {
+   "name": "MboII",
+   "site": "gaaga",
+   "forwardRegex": "gaaga",
+   "reverseRegex": "tcttc",
+   "topSnipOffset": 13,
+   "bottomSnipOffset": 12,
+   "isType2S": true,
+   "suppliers": [
+    "EURx Ltd.",
+    "Molecular Biology Resources - CHIMERx",
+    "New England Biolabs",
+    "Nippon Gene Co., Ltd.",
+    "SibEnzyme Ltd.",
+    "Takara Bio Inc.",
+    "Thermo Fisher Scientific",
+    "Vivantis Technologies"
+   ],
+   "isoschizomers": [],
+   "goldenGate": false
+  },
+  "mfei": {
+   "name": "MfeI",
+   "site": "caattg",
+   "forwardRegex": "caattg",
+   "reverseRegex": "caattg",
+   "topSnipOffset": 1,
+   "bottomSnipOffset": 5,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs",
+    "SibEnzyme Ltd."
+   ],
+   "isoschizomers": [
+    "MunI"
+   ],
+   "goldenGate": false
+  },
+  "mluci": {
+   "name": "MluCI",
+   "site": "aatt",
+   "forwardRegex": "aatt",
+   "reverseRegex": "aatt",
+   "topSnipOffset": 0,
+   "bottomSnipOffset": 4,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "Sse9I",
+    "TasI"
+   ],
+   "goldenGate": false
+  },
+  "mlui": {
+   "name": "MluI",
+   "site": "acgcgt",
+   "forwardRegex": "acgcgt",
+   "reverseRegex": "acgcgt",
+   "topSnipOffset": 1,
+   "bottomSnipOffset": 5,
+   "isType2S": false,
+   "suppliers": [
+    "Molecular Biology Resources - CHIMERx",
+    "New England Biolabs",
+    "Nippon Gene Co., Ltd.",
+    "Promega Corporation",
+    "Roche Applied Science",
+    "SibEnzyme Ltd.",
+    "Sigma Chemical Corporation",
+    "Takara Bio Inc.",
+    "Thermo Fisher Scientific",
+    "Toyobo Biochemicals",
+    "Vivantis Technologies"
+   ],
+   "isoschizomers": [],
+   "goldenGate": false
+  },
+  "mlyi": {
+   "name": "MlyI",
+   "site": "gagtc",
+   "forwardRegex": "gagtc",
+   "reverseRegex": "gactc",
+   "topSnipOffset": 10,
+   "bottomSnipOffset": 10,
+   "isType2S": true,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "SchI"
+   ],
+   "goldenGate": false
+  },
+  "mmei": {
+   "name": "MmeI",
+   "site": "tccrac",
+   "forwardRegex": "tcc[ag]ac",
+   "reverseRegex": "gt[ct]gga",
+   "topSnipOffset": 26,
+   "bottomSnipOffset": 24,
+   "isType2S": true,
+   "suppliers": [
+    "EURx Ltd.",
+    "New England Biolabs"
+   ],
+   "isoschizomers": [],
+   "goldenGate": false
+  },
+  "mnli": {
+   "name": "MnlI",
+   "site": "cctc",
+   "forwardRegex": "cctc",
+   "reverseRegex": "gagg",
+   "topSnipOffset": 11,
+   "bottomSnipOffset": 10,
+   "isType2S": true,
+   "suppliers": [
+    "EURx Ltd.",
+    "Molecular Biology Resources - CHIMERx",
+    "New England Biolabs",
+    "SibEnzyme Ltd.",
+    "Thermo Fisher Scientific",
+    "Vivantis Technologies"
+   ],
+   "isoschizomers": [],
+   "goldenGate": false
+  },
+  "mrei": {
+   "name": "MreI",
+   "site": "cgccggcg",
+   "forwardRegex": "cgccggcg",
+   "reverseRegex": "cgccggcg",
+   "topSnipOffset": 2,
+   "bottomSnipOffset": 6,
+   "isType2S": false,
+   "suppliers": [
+    "Thermo Fisher Scientific"
+   ],
+   "isoschizomers": [],
+   "goldenGate": false
+  },
+  "msci": {
+   "name": "MscI",
+   "site": "tggcca",
+   "forwardRegex": "tggcca",
+   "reverseRegex": "tggcca",
+   "topSnipOffset": 3,
+   "bottomSnipOffset": 3,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs",
+    "Toyobo Biochemicals"
+   ],
+   "isoschizomers": [
+    "BalI",
+    "MlsI",
+    "MluNI",
+    "Mox20I",
+    "Msp20I"
+   ],
+   "goldenGate": false
+  },
+  "msei": {
+   "name": "MseI",
+   "site": "ttaa",
+   "forwardRegex": "ttaa",
+   "reverseRegex": "ttaa",
+   "topSnipOffset": 1,
+   "bottomSnipOffset": 3,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "SaqAI",
+    "Tru1I",
+    "Tru9I"
+   ],
+   "goldenGate": false
+  },
+  "msli": {
+   "name": "MslI",
+   "site": "caynnnnrtg",
+   "forwardRegex": "ca[ct][acgt][acgt][acgt][acgt][ag]tg",
+   "reverseRegex": "ca[ct][acgt][acgt][acgt][acgt][ag]tg",
+   "topSnipOffset": 5,
+   "bottomSnipOffset": 5,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "RseI",
+    "SmiMI"
+   ],
+   "goldenGate": false
+  },
+  "mspa1i": {
+   "name": "MspA1I",
+   "site": "cmgckg",
+   "forwardRegex": "c[ac]gc[gt]g",
+   "reverseRegex": "c[ac]gc[gt]g",
+   "topSnipOffset": 3,
+   "bottomSnipOffset": 3,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs",
+    "SibEnzyme Ltd.",
+    "Vivantis Technologies"
+   ],
+   "isoschizomers": [],
+   "goldenGate": false
+  },
+  "mspi": {
+   "name": "MspI",
+   "site": "ccgg",
+   "forwardRegex": "ccgg",
+   "reverseRegex": "ccgg",
+   "topSnipOffset": 1,
+   "bottomSnipOffset": 3,
+   "isType2S": false,
+   "suppliers": [
+    "EURx Ltd.",
+    "Molecular Biology Resources - CHIMERx",
+    "New England Biolabs",
+    "Nippon Gene Co., Ltd.",
+    "Promega Corporation",
+    "SibEnzyme Ltd.",
+    "Takara Bio Inc.",
+    "Thermo Fisher Scientific",
+    "Vivantis Technologies"
+   ],
+   "isoschizomers": [
+    "BsiSI",
+    "HapII",
+    "HpaII"
+   ],
+   "goldenGate": false
+  },
+  "mtei": {
+   "name": "MteI",
+   "site": "gcgcngcgc",
+   "forwardRegex": "gcgc[acgt]gcgc",
+   "reverseRegex": "gcgc[acgt]gcgc",
+   "topSnipOffset": 4,
+   "bottomSnipOffset": 5,
+   "isType2S": false,
+   "suppliers": [
+    "SibEnzyme Ltd."
+   ],
+   "isoschizomers": [],
+   "goldenGate": false
+  },
+  "mwoi": {
+   "name": "MwoI",
+   "site": "gcnnnnnnngc",
+   "forwardRegex": "gc[acgt][acgt][acgt][acgt][acgt][acgt][acgt]gc",
+   "reverseRegex": "gc[acgt][acgt][acgt][acgt][acgt][acgt][acgt]gc",
+   "topSnipOffset": 7,
+   "bottomSnipOffset": 4,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "BstMWI",
+    "HpyF10VI"
+   ],
+   "goldenGate": false
+  },
+  "naei": {
+   "name": "NaeI",
+   "site": "gccggc",
+   "forwardRegex": "gccggc",
+   "reverseRegex": "gccggc",
+   "topSnipOffset": 3,
+   "bottomSnipOffset": 3,
+   "isType2S": false,
+   "suppliers": [
+    "Minotech Biotechnology",
+    "New England Biolabs",
+    "Takara Bio Inc."
+   ],
+   "isoschizomers": [
+    "KroNI",
+    "PdiI"
+   ],
+   "goldenGate": false
+  },
+  "nari": {
+   "name": "NarI",
+   "site": "ggcgcc",
+   "forwardRegex": "ggcgcc",
+   "reverseRegex": "ggcgcc",
+   "topSnipOffset": 2,
+   "bottomSnipOffset": 4,
+   "isType2S": false,
+   "suppliers": [
+    "EURx Ltd.",
+    "Molecular Biology Resources - CHIMERx",
+    "New England Biolabs",
+    "Nippon Gene Co., Ltd.",
+    "Roche Applied Science"
+   ],
+   "isoschizomers": [
+    "Mly113I"
+   ],
+   "goldenGate": false
+  },
+  "ncii": {
+   "name": "NciI",
+   "site": "ccsgg",
+   "forwardRegex": "cc[cg]gg",
+   "reverseRegex": "cc[cg]gg",
+   "topSnipOffset": 2,
+   "bottomSnipOffset": 3,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs",
+    "Nippon Gene Co., Ltd."
+   ],
+   "isoschizomers": [
+    "AsuC2I",
+    "BcnI",
+    "BpuMI"
+   ],
+   "goldenGate": false
+  },
+  "ncoi": {
+   "name": "NcoI",
+   "site": "ccatgg",
+   "forwardRegex": "ccatgg",
+   "reverseRegex": "ccatgg",
+   "topSnipOffset": 1,
+   "bottomSnipOffset": 5,
+   "isType2S": false,
+   "suppliers": [
+    "EURx Ltd.",
+    "Minotech Biotechnology",
+    "Molecular Biology Resources - CHIMERx",
+    "New England Biolabs",
+    "Nippon Gene Co., Ltd.",
+    "Promega Corporation",
+    "Roche Applied Science",
+    "Sigma Chemical Corporation",
+    "SinaClon BioScience Co.",
+    "Takara Bio Inc.",
+    "Thermo Fisher Scientific",
+    "Toyobo Biochemicals"
+   ],
+   "isoschizomers": [
+    "Bsp19I"
+   ],
+   "goldenGate": false
+  },
+  "ndei": {
+   "name": "NdeI",
+   "site": "catatg",
+   "forwardRegex": "catatg",
+   "reverseRegex": "catatg",
+   "topSnipOffset": 2,
+   "bottomSnipOffset": 4,
+   "isType2S": false,
+   "suppliers": [
+    "EURx Ltd.",
+    "Molecular Biology Resources - CHIMERx",
+    "New England Biolabs",
+    "Nippon Gene Co., Ltd.",
+    "Promega Corporation",
+    "Roche Applied Science",
+    "Sigma Chemical Corporation",
+    "Takara Bio Inc.",
+    "Thermo Fisher Scientific"
+   ],
+   "isoschizomers": [
+    "FauNDI"
+   ],
+   "goldenGate": false
+  },
+  "ngomiv": {
+   "name": "NgoMIV",
+   "site": "gccggc",
+   "forwardRegex": "gccggc",
+   "reverseRegex": "gccggc",
+   "topSnipOffset": 1,
+   "bottomSnipOffset": 5,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "KroI",
+    "MroNI"
+   ],
+   "goldenGate": false
+  },
+  "nhei": {
+   "name": "NheI",
+   "site": "gctagc",
+   "forwardRegex": "gctagc",
+   "reverseRegex": "gctagc",
+   "topSnipOffset": 1,
+   "bottomSnipOffset": 5,
+   "isType2S": false,
+   "suppliers": [
+    "EURx Ltd.",
+    "Minotech Biotechnology",
+    "Molecular Biology Resources - CHIMERx",
+    "New England Biolabs",
+    "Nippon Gene Co., Ltd.",
+    "Promega Corporation",
+    "Roche Applied Science",
+    "Sigma Chemical Corporation",
+    "Takara Bio Inc.",
+    "Thermo Fisher Scientific",
+    "Toyobo Biochemicals"
+   ],
+   "isoschizomers": [
+    "AsuNHI"
+   ],
+   "goldenGate": false
+  },
+  "nlaiii": {
+   "name": "NlaIII",
+   "site": "catg",
+   "forwardRegex": "catg",
+   "reverseRegex": "catg",
+   "topSnipOffset": 4,
+   "bottomSnipOffset": 0,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "FaeI",
+    "Hin1II",
+    "Hsp92II"
+   ],
+   "goldenGate": false
+  },
+  "nlaiv": {
+   "name": "NlaIV",
+   "site": "ggnncc",
+   "forwardRegex": "gg[acgt][acgt]cc",
+   "reverseRegex": "gg[acgt][acgt]cc",
+   "topSnipOffset": 3,
+   "bottomSnipOffset": 3,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "BmiI",
+    "BspLI",
+    "PspN4I"
+   ],
+   "goldenGate": false
+  },
+  "nmeaiii": {
+   "name": "NmeAIII",
+   "site": "gccgag",
+   "forwardRegex": "gccgag",
+   "reverseRegex": "ctcggc",
+   "topSnipOffset": 27,
+   "bottomSnipOffset": 25,
+   "isType2S": true,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [],
+   "goldenGate": false
+  },
+  "noti": {
+   "name": "NotI",
+   "site": "gcggccgc",
+   "forwardRegex": "gcggccgc",
+   "reverseRegex": "gcggccgc",
+   "topSnipOffset": 2,
+   "bottomSnipOffset": 6,
+   "isType2S": false,
+   "suppliers": [
+    "EURx Ltd.",
+    "Minotech Biotechnology",
+    "Molecular Biology Resources - CHIMERx",
+    "New England Biolabs",
+    "Nippon Gene Co., Ltd.",
+    "Promega Corporation",
+    "Roche Applied Science",
+    "Sigma Chemical Corporation",
+    "Takara Bio Inc.",
+    "Thermo Fisher Scientific",
+    "Toyobo Biochemicals"
+   ],
+   "isoschizomers": [
+    "CciNI"
+   ],
+   "goldenGate": false
+  },
+  "nrui": {
+   "name": "NruI",
+   "site": "tcgcga",
+   "forwardRegex": "tcgcga",
+   "reverseRegex": "tcgcga",
+   "topSnipOffset": 3,
+   "bottomSnipOffset": 3,
+   "isType2S": false,
+   "suppliers": [
+    "EURx Ltd.",
+    "Minotech Biotechnology",
+    "Molecular Biology Resources - CHIMERx",
+    "New England Biolabs",
+    "Nippon Gene Co., Ltd.",
+    "Roche Applied Science",
+    "SibEnzyme Ltd.",
+    "Sigma Chemical Corporation",
+    "Takara Bio Inc.",
+    "Thermo Fisher Scientific"
+   ],
+   "isoschizomers": [
+    "Bsp68I",
+    "BtuMI",
+    "RruI"
+   ],
+   "goldenGate": false
+  },
+  "nsii": {
+   "name": "NsiI",
+   "site": "atgcat",
+   "forwardRegex": "atgcat",
+   "reverseRegex": "atgcat",
+   "topSnipOffset": 5,
+   "bottomSnipOffset": 1,
+   "isType2S": false,
+   "suppliers": [
+    "EURx Ltd.",
+    "Molecular Biology Resources - CHIMERx",
+    "New England Biolabs",
+    "Nippon Gene Co., Ltd.",
+    "Roche Applied Science",
+    "Sigma Chemical Corporation"
+   ],
+   "isoschizomers": [
+    "EcoT22I",
+    "Mph1103I",
+    "Zsp2I"
+   ],
+   "goldenGate": false
+  },
+  "nspi": {
+   "name": "NspI",
+   "site": "rcatgy",
+   "forwardRegex": "[ag]catg[ct]",
+   "reverseRegex": "[ag]catg[ct]",
+   "topSnipOffset": 5,
+   "bottomSnipOffset": 1,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "BstNSI",
+    "XceI"
+   ],
+   "goldenGate": false
+  },
+  "paci": {
+   "name": "PacI",
+   "site": "ttaattaa",
+   "forwardRegex": "ttaattaa",
+   "reverseRegex": "ttaattaa",
+   "topSnipOffset": 5,
+   "bottomSnipOffset": 3,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs",
+    "Thermo Fisher Scientific",
+    "Toyobo Biochemicals"
+   ],
+   "isoschizomers": [],
+   "goldenGate": false
+  },
+  "paqci": {
+   "name": "PaqCI",
+   "site": "cacctgc",
+   "forwardRegex": "cacctgc",
+   "reverseRegex": "gcaggtg",
+   "topSnipOffset": 11,
+   "bottomSnipOffset": 15,
+   "isType2S": true,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "AarI"
+   ],
+   "goldenGate": true
+  },
+  "pasi": {
+   "name": "PasI",
+   "site": "cccwggg",
+   "forwardRegex": "ccc[at]ggg",
+   "reverseRegex": "ccc[at]ggg",
+   "topSnipOffset": 2,
+   "bottomSnipOffset": 5,
+   "isType2S": false,
+   "suppliers": [
+    "Thermo Fisher Scientific"
+   ],
+   "isoschizomers": [],
+   "goldenGate": false
+  },
+  "pcii": {
+   "name": "PciI",
+   "site": "acatgt",
+   "forwardRegex": "acatgt",
+   "reverseRegex": "acatgt",
+   "topSnipOffset": 1,
+   "bottomSnipOffset": 5,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs",
+    "SibEnzyme Ltd."
+   ],
+   "isoschizomers": [
+    "PscI"
+   ],
+   "goldenGate": false
+  },
+  "pcsi": {
+   "name": "PcsI",
+   "site": "wcgnnnnnnncgw",
+   "forwardRegex": "[at]cg[acgt][acgt][acgt][acgt][acgt][acgt][acgt]cg[at]",
+   "reverseRegex": "[at]cg[acgt][acgt][acgt][acgt][acgt][acgt][acgt]cg[at]",
+   "topSnipOffset": 7,
+   "bottomSnipOffset": 6,
+   "isType2S": false,
+   "suppliers": [
+    "SibEnzyme Ltd."
+   ],
+   "isoschizomers": [],
+   "goldenGate": false
+  },
+  "pflmi": {
+   "name": "PflMI",
+   "site": "ccannnnntgg",
+   "forwardRegex": "cca[acgt][acgt][acgt][acgt][acgt]tgg",
+   "reverseRegex": "cca[acgt][acgt][acgt][acgt][acgt]tgg",
+   "topSnipOffset": 7,
+   "bottomSnipOffset": 4,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "AccB7I",
+    "Van91I"
+   ],
+   "goldenGate": false
+  },
+  "pfoi": {
+   "name": "PfoI",
+   "site": "tccngga",
+   "forwardRegex": "tcc[acgt]gga",
+   "reverseRegex": "tcc[acgt]gga",
+   "topSnipOffset": 1,
+   "bottomSnipOffset": 6,
+   "isType2S": false,
+   "suppliers": [
+    "Thermo Fisher Scientific"
+   ],
+   "isoschizomers": [],
+   "goldenGate": false
+  },
+  "plei": {
+   "name": "PleI",
+   "site": "gagtc",
+   "forwardRegex": "gagtc",
+   "reverseRegex": "gactc",
+   "topSnipOffset": 9,
+   "bottomSnipOffset": 10,
+   "isType2S": true,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "PpsI"
+   ],
+   "goldenGate": false
+  },
+  "pluti": {
+   "name": "PluTI",
+   "site": "ggcgcc",
+   "forwardRegex": "ggcgcc",
+   "reverseRegex": "ggcgcc",
+   "topSnipOffset": 5,
+   "bottomSnipOffset": 1,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [],
+   "goldenGate": false
+  },
+  "pmei": {
+   "name": "PmeI",
+   "site": "gtttaaac",
+   "forwardRegex": "gtttaaac",
+   "reverseRegex": "gtttaaac",
+   "topSnipOffset": 4,
+   "bottomSnipOffset": 4,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "MssI"
+   ],
+   "goldenGate": false
+  },
+  "pmli": {
+   "name": "PmlI",
+   "site": "cacgtg",
+   "forwardRegex": "cacgtg",
+   "reverseRegex": "cacgtg",
+   "topSnipOffset": 3,
+   "bottomSnipOffset": 3,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "AcvI",
+    "BbrPI",
+    "Eco72I",
+    "PmaCI",
+    "PspCI"
+   ],
+   "goldenGate": false
+  },
+  "ppumi": {
+   "name": "PpuMI",
+   "site": "rggwccy",
+   "forwardRegex": "[ag]gg[at]cc[ct]",
+   "reverseRegex": "[ag]gg[at]cc[ct]",
+   "topSnipOffset": 2,
+   "bottomSnipOffset": 5,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "Psp5II",
+    "PspPPI"
+   ],
+   "goldenGate": false
+  },
+  "pshai": {
+   "name": "PshAI",
+   "site": "gacnnnngtc",
+   "forwardRegex": "gac[acgt][acgt][acgt][acgt]gtc",
+   "reverseRegex": "gac[acgt][acgt][acgt][acgt]gtc",
+   "topSnipOffset": 5,
+   "bottomSnipOffset": 5,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs",
+    "Takara Bio Inc."
+   ],
+   "isoschizomers": [
+    "BoxI",
+    "BstPAI"
+   ],
+   "goldenGate": false
+  },
+  "psii": {
+   "name": "PsiI",
+   "site": "ttataa",
+   "forwardRegex": "ttataa",
+   "reverseRegex": "ttataa",
+   "topSnipOffset": 3,
+   "bottomSnipOffset": 3,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs",
+    "SibEnzyme Ltd."
+   ],
+   "isoschizomers": [
+    "AanI"
+   ],
+   "goldenGate": false
+  },
+  "pspgi": {
+   "name": "PspGI",
+   "site": "ccwgg",
+   "forwardRegex": "cc[at]gg",
+   "reverseRegex": "cc[at]gg",
+   "topSnipOffset": 0,
+   "bottomSnipOffset": 5,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "AjnI",
+    "EcoRII",
+    "Psp6I"
+   ],
+   "goldenGate": false
+  },
+  "pspomi": {
+   "name": "PspOMI",
+   "site": "gggccc",
+   "forwardRegex": "gggccc",
+   "reverseRegex": "gggccc",
+   "topSnipOffset": 1,
+   "bottomSnipOffset": 5,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs",
+    "SibEnzyme Ltd.",
+    "Vivantis Technologies"
+   ],
+   "isoschizomers": [
+    "Bsp120I"
+   ],
+   "goldenGate": false
+  },
+  "pspxi": {
+   "name": "PspXI",
+   "site": "vctcgagb",
+   "forwardRegex": "[acg]ctcgag[cgt]",
+   "reverseRegex": "[acg]ctcgag[cgt]",
+   "topSnipOffset": 2,
+   "bottomSnipOffset": 6,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs",
+    "SibEnzyme Ltd."
+   ],
+   "isoschizomers": [],
+   "goldenGate": false
+  },
+  "psti": {
+   "name": "PstI",
+   "site": "ctgcag",
+   "forwardRegex": "ctgcag",
+   "reverseRegex": "ctgcag",
+   "topSnipOffset": 5,
+   "bottomSnipOffset": 1,
+   "isType2S": false,
+   "suppliers": [
+    "EURx Ltd.",
+    "Minotech Biotechnology",
+    "Molecular Biology Resources - CHIMERx",
+    "New England Biolabs",
+    "Nippon Gene Co., Ltd.",
+    "Promega Corporation",
+    "Roche Applied Science",
+    "SibEnzyme Ltd.",
+    "Sigma Chemical Corporation",
+    "Takara Bio Inc.",
+    "Thermo Fisher Scientific",
+    "Toyobo Biochemicals",
+    "Vivantis Technologies"
+   ],
+   "isoschizomers": [
+    "BspMAI"
+   ],
+   "goldenGate": false
+  },
+  "pvui": {
+   "name": "PvuI",
+   "site": "cgatcg",
+   "forwardRegex": "cgatcg",
+   "reverseRegex": "cgatcg",
+   "topSnipOffset": 4,
+   "bottomSnipOffset": 2,
+   "isType2S": false,
+   "suppliers": [
+    "EURx Ltd.",
+    "Molecular Biology Resources - CHIMERx",
+    "New England Biolabs",
+    "Promega Corporation",
+    "Roche Applied Science",
+    "Sigma Chemical Corporation",
+    "Takara Bio Inc.",
+    "Thermo Fisher Scientific",
+    "Toyobo Biochemicals"
+   ],
+   "isoschizomers": [
+    "Ple19I"
+   ],
+   "goldenGate": false
+  },
+  "pvuii": {
+   "name": "PvuII",
+   "site": "cagctg",
+   "forwardRegex": "cagctg",
+   "reverseRegex": "cagctg",
+   "topSnipOffset": 3,
+   "bottomSnipOffset": 3,
+   "isType2S": false,
+   "suppliers": [
+    "EURx Ltd.",
+    "Minotech Biotechnology",
+    "Molecular Biology Resources - CHIMERx",
+    "New England Biolabs",
+    "Nippon Gene Co., Ltd.",
+    "Roche Applied Science",
+    "SibEnzyme Ltd.",
+    "Sigma Chemical Corporation",
+    "Takara Bio Inc.",
+    "Thermo Fisher Scientific",
+    "Toyobo Biochemicals",
+    "Vivantis Technologies"
+   ],
+   "isoschizomers": [],
+   "goldenGate": false
+  },
+  "rsai": {
+   "name": "RsaI",
+   "site": "gtac",
+   "forwardRegex": "gtac",
+   "reverseRegex": "gtac",
+   "topSnipOffset": 2,
+   "bottomSnipOffset": 2,
+   "isType2S": false,
+   "suppliers": [
+    "EURx Ltd.",
+    "Minotech Biotechnology",
+    "Molecular Biology Resources - CHIMERx",
+    "New England Biolabs",
+    "Nippon Gene Co., Ltd.",
+    "Promega Corporation",
+    "Roche Applied Science",
+    "SibEnzyme Ltd.",
+    "SinaClon BioScience Co.",
+    "Thermo Fisher Scientific",
+    "Vivantis Technologies"
+   ],
+   "isoschizomers": [
+    "AfaI"
+   ],
+   "goldenGate": false
+  },
+  "rsrii": {
+   "name": "RsrII",
+   "site": "cggwccg",
+   "forwardRegex": "cgg[at]ccg",
+   "reverseRegex": "cgg[at]ccg",
+   "topSnipOffset": 2,
+   "bottomSnipOffset": 5,
+   "isType2S": false,
+   "suppliers": [
+    "EURx Ltd.",
+    "Molecular Biology Resources - CHIMERx",
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "CpoI",
+    "CspI",
+    "Rsr2I"
+   ],
+   "goldenGate": false
+  },
+  "saci": {
+   "name": "SacI",
+   "site": "gagctc",
+   "forwardRegex": "gagctc",
+   "reverseRegex": "gagctc",
+   "topSnipOffset": 5,
+   "bottomSnipOffset": 1,
+   "isType2S": false,
+   "suppliers": [
+    "EURx Ltd.",
+    "Molecular Biology Resources - CHIMERx",
+    "New England Biolabs",
+    "Nippon Gene Co., Ltd.",
+    "Promega Corporation",
+    "Roche Applied Science",
+    "Sigma Chemical Corporation",
+    "Takara Bio Inc.",
+    "Thermo Fisher Scientific",
+    "Toyobo Biochemicals"
+   ],
+   "isoschizomers": [
+    "Psp124BI",
+    "SstI"
+   ],
+   "goldenGate": false
+  },
+  "sacii": {
+   "name": "SacII",
+   "site": "ccgcgg",
+   "forwardRegex": "ccgcgg",
+   "reverseRegex": "ccgcgg",
+   "topSnipOffset": 4,
+   "bottomSnipOffset": 2,
+   "isType2S": false,
+   "suppliers": [
+    "EURx Ltd.",
+    "Molecular Biology Resources - CHIMERx",
+    "New England Biolabs",
+    "Nippon Gene Co., Ltd.",
+    "Promega Corporation",
+    "Takara Bio Inc.",
+    "Thermo Fisher Scientific",
+    "Toyobo Biochemicals"
+   ],
+   "isoschizomers": [
+    "Cfr42I",
+    "KspI",
+    "Sfr303I",
+    "SgrBI"
+   ],
+   "goldenGate": false
+  },
+  "sali": {
+   "name": "SalI",
+   "site": "gtcgac",
+   "forwardRegex": "gtcgac",
+   "reverseRegex": "gtcgac",
+   "topSnipOffset": 1,
+   "bottomSnipOffset": 5,
+   "isType2S": false,
+   "suppliers": [
+    "EURx Ltd.",
+    "Minotech Biotechnology",
+    "Molecular Biology Resources - CHIMERx",
+    "New England Biolabs",
+    "Nippon Gene Co., Ltd.",
+    "Promega Corporation",
+    "Roche Applied Science",
+    "SibEnzyme Ltd.",
+    "Takara Bio Inc.",
+    "Thermo Fisher Scientific",
+    "Toyobo Biochemicals",
+    "Vivantis Technologies"
+   ],
+   "isoschizomers": [],
+   "goldenGate": false
+  },
+  "sapi": {
+   "name": "SapI",
+   "site": "gctcttc",
+   "forwardRegex": "gctcttc",
+   "reverseRegex": "gaagagc",
+   "topSnipOffset": 8,
+   "bottomSnipOffset": 11,
+   "isType2S": true,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "BspQI",
+    "LguI",
+    "PciSI"
+   ],
+   "goldenGate": true
+  },
+  "sau96i": {
+   "name": "Sau96I",
+   "site": "ggncc",
+   "forwardRegex": "gg[acgt]cc",
+   "reverseRegex": "gg[acgt]cc",
+   "topSnipOffset": 1,
+   "bottomSnipOffset": 4,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs",
+    "Nippon Gene Co., Ltd."
+   ],
+   "isoschizomers": [
+    "AspS9I",
+    "BmgT120I",
+    "Cfr13I",
+    "PspPI"
+   ],
+   "goldenGate": false
+  },
+  "sbfi": {
+   "name": "SbfI",
+   "site": "cctgcagg",
+   "forwardRegex": "cctgcagg",
+   "reverseRegex": "cctgcagg",
+   "topSnipOffset": 6,
+   "bottomSnipOffset": 2,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs",
+    "SibEnzyme Ltd.",
+    "Vivantis Technologies"
+   ],
+   "isoschizomers": [
+    "SdaI",
+    "Sse8387I"
+   ],
+   "goldenGate": false
+  },
+  "scai": {
+   "name": "ScaI",
+   "site": "agtact",
+   "forwardRegex": "agtact",
+   "reverseRegex": "agtact",
+   "topSnipOffset": 3,
+   "bottomSnipOffset": 3,
+   "isType2S": false,
+   "suppliers": [
+    "EURx Ltd.",
+    "Minotech Biotechnology",
+    "Molecular Biology Resources - CHIMERx",
+    "New England Biolabs",
+    "Nippon Gene Co., Ltd.",
+    "Promega Corporation",
+    "Roche Applied Science",
+    "Takara Bio Inc.",
+    "Thermo Fisher Scientific",
+    "Toyobo Biochemicals"
+   ],
+   "isoschizomers": [
+    "BmcAI",
+    "ZrmI"
+   ],
+   "goldenGate": false
+  },
+  "scrfi": {
+   "name": "ScrFI",
+   "site": "ccngg",
+   "forwardRegex": "cc[acgt]gg",
+   "reverseRegex": "cc[acgt]gg",
+   "topSnipOffset": 2,
+   "bottomSnipOffset": 3,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs",
+    "Nippon Gene Co., Ltd."
+   ],
+   "isoschizomers": [
+    "Bme1390I",
+    "BmrFI",
+    "MspR9I"
+   ],
+   "goldenGate": false
+  },
+  "seti": {
+   "name": "SetI",
+   "site": "asst",
+   "forwardRegex": "a[cg][cg]t",
+   "reverseRegex": "a[cg][cg]t",
+   "topSnipOffset": 4,
+   "bottomSnipOffset": 0,
+   "isType2S": false,
+   "suppliers": [
+    "SibEnzyme Ltd."
+   ],
+   "isoschizomers": [],
+   "goldenGate": false
+  },
+  "sexai": {
+   "name": "SexAI",
+   "site": "accwggt",
+   "forwardRegex": "acc[at]ggt",
+   "reverseRegex": "acc[at]ggt",
+   "topSnipOffset": 1,
+   "bottomSnipOffset": 6,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs",
+    "Roche Applied Science"
+   ],
+   "isoschizomers": [
+    "CsiI",
+    "MabI"
+   ],
+   "goldenGate": false
+  },
+  "sfani": {
+   "name": "SfaNI",
+   "site": "gcatc",
+   "forwardRegex": "gcatc",
+   "reverseRegex": "gatgc",
+   "topSnipOffset": 10,
+   "bottomSnipOffset": 14,
+   "isType2S": true,
+   "suppliers": [
+    "New England Biolabs",
+    "SibEnzyme Ltd.",
+    "Vivantis Technologies"
+   ],
+   "isoschizomers": [
+    "BmsI",
+    "LweI"
+   ],
+   "goldenGate": false
+  },
+  "sfci": {
+   "name": "SfcI",
+   "site": "ctryag",
+   "forwardRegex": "ct[ag][ct]ag",
+   "reverseRegex": "ct[ag][ct]ag",
+   "topSnipOffset": 1,
+   "bottomSnipOffset": 5,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "BfmI",
+    "BstSFI"
+   ],
+   "goldenGate": false
+  },
+  "sfii": {
+   "name": "SfiI",
+   "site": "ggccnnnnnggcc",
+   "forwardRegex": "ggcc[acgt][acgt][acgt][acgt][acgt]ggcc",
+   "reverseRegex": "ggcc[acgt][acgt][acgt][acgt][acgt]ggcc",
+   "topSnipOffset": 8,
+   "bottomSnipOffset": 5,
+   "isType2S": false,
+   "suppliers": [
+    "EURx Ltd.",
+    "Minotech Biotechnology",
+    "Molecular Biology Resources - CHIMERx",
+    "New England Biolabs",
+    "Nippon Gene Co., Ltd.",
+    "Roche Applied Science",
+    "SibEnzyme Ltd.",
+    "Takara Bio Inc.",
+    "Thermo Fisher Scientific",
+    "Toyobo Biochemicals",
+    "Vivantis Technologies"
+   ],
+   "isoschizomers": [],
+   "goldenGate": false
+  },
+  "sfoi": {
+   "name": "SfoI",
+   "site": "ggcgcc",
+   "forwardRegex": "ggcgcc",
+   "reverseRegex": "ggcgcc",
+   "topSnipOffset": 3,
+   "bottomSnipOffset": 3,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "DinI",
+    "EgeI",
+    "EheI"
+   ],
+   "goldenGate": false
+  },
+  "sgei": {
+   "name": "SgeI",
+   "site": "cnng",
+   "forwardRegex": "c[acgt][acgt]g",
+   "reverseRegex": "c[acgt][acgt]g",
+   "topSnipOffset": 13,
+   "bottomSnipOffset": 17,
+   "isType2S": true,
+   "suppliers": [
+    "Thermo Fisher Scientific"
+   ],
+   "isoschizomers": [],
+   "goldenGate": false
+  },
+  "sgrai": {
+   "name": "SgrAI",
+   "site": "crccggyg",
+   "forwardRegex": "c[ag]ccgg[ct]g",
+   "reverseRegex": "c[ag]ccgg[ct]g",
+   "topSnipOffset": 2,
+   "bottomSnipOffset": 6,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [],
+   "goldenGate": false
+  },
+  "sgrdi": {
+   "name": "SgrDI",
+   "site": "cgtcgacg",
+   "forwardRegex": "cgtcgacg",
+   "reverseRegex": "cgtcgacg",
+   "topSnipOffset": 2,
+   "bottomSnipOffset": 6,
+   "isType2S": false,
+   "suppliers": [
+    "Thermo Fisher Scientific"
+   ],
+   "isoschizomers": [],
+   "goldenGate": false
+  },
+  "smai": {
+   "name": "SmaI",
+   "site": "cccggg",
+   "forwardRegex": "cccggg",
+   "reverseRegex": "cccggg",
+   "topSnipOffset": 3,
+   "bottomSnipOffset": 3,
+   "isType2S": false,
+   "suppliers": [
+    "EURx Ltd.",
+    "Minotech Biotechnology",
+    "Molecular Biology Resources - CHIMERx",
+    "New England Biolabs",
+    "Nippon Gene Co., Ltd.",
+    "Promega Corporation",
+    "Roche Applied Science",
+    "SibEnzyme Ltd.",
+    "Sigma Chemical Corporation",
+    "SinaClon BioScience Co.",
+    "Takara Bio Inc.",
+    "Thermo Fisher Scientific",
+    "Toyobo Biochemicals",
+    "Vivantis Technologies"
+   ],
+   "isoschizomers": [],
+   "goldenGate": false
+  },
+  "smli": {
+   "name": "SmlI",
+   "site": "ctyrag",
+   "forwardRegex": "ct[ct][ag]ag",
+   "reverseRegex": "ct[ct][ag]ag",
+   "topSnipOffset": 1,
+   "bottomSnipOffset": 5,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "SmoI"
+   ],
+   "goldenGate": false
+  },
+  "snabi": {
+   "name": "SnaBI",
+   "site": "tacgta",
+   "forwardRegex": "tacgta",
+   "reverseRegex": "tacgta",
+   "topSnipOffset": 3,
+   "bottomSnipOffset": 3,
+   "isType2S": false,
+   "suppliers": [
+    "Minotech Biotechnology",
+    "New England Biolabs",
+    "Roche Applied Science",
+    "Takara Bio Inc."
+   ],
+   "isoschizomers": [
+    "BstSNI",
+    "Eco105I"
+   ],
+   "goldenGate": false
+  },
+  "spei": {
+   "name": "SpeI",
+   "site": "actagt",
+   "forwardRegex": "actagt",
+   "reverseRegex": "actagt",
+   "topSnipOffset": 1,
+   "bottomSnipOffset": 5,
+   "isType2S": false,
+   "suppliers": [
+    "EURx Ltd.",
+    "Molecular Biology Resources - CHIMERx",
+    "New England Biolabs",
+    "Nippon Gene Co., Ltd.",
+    "Promega Corporation",
+    "Roche Applied Science",
+    "Sigma Chemical Corporation",
+    "Takara Bio Inc.",
+    "Thermo Fisher Scientific",
+    "Toyobo Biochemicals"
+   ],
+   "isoschizomers": [
+    "AhlI",
+    "BcuI"
+   ],
+   "goldenGate": false
+  },
+  "sphi": {
+   "name": "SphI",
+   "site": "gcatgc",
+   "forwardRegex": "gcatgc",
+   "reverseRegex": "gcatgc",
+   "topSnipOffset": 5,
+   "bottomSnipOffset": 1,
+   "isType2S": false,
+   "suppliers": [
+    "EURx Ltd.",
+    "Minotech Biotechnology",
+    "Molecular Biology Resources - CHIMERx",
+    "New England Biolabs",
+    "Nippon Gene Co., Ltd.",
+    "Promega Corporation",
+    "Roche Applied Science",
+    "SibEnzyme Ltd.",
+    "Takara Bio Inc.",
+    "Thermo Fisher Scientific",
+    "Toyobo Biochemicals",
+    "Vivantis Technologies"
+   ],
+   "isoschizomers": [
+    "PaeI"
+   ],
+   "goldenGate": false
+  },
+  "srfi": {
+   "name": "SrfI",
+   "site": "gcccgggc",
+   "forwardRegex": "gcccgggc",
+   "reverseRegex": "gcccgggc",
+   "topSnipOffset": 4,
+   "bottomSnipOffset": 4,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [],
+   "goldenGate": false
+  },
+  "sspi": {
+   "name": "SspI",
+   "site": "aatatt",
+   "forwardRegex": "aatatt",
+   "reverseRegex": "aatatt",
+   "topSnipOffset": 3,
+   "bottomSnipOffset": 3,
+   "isType2S": false,
+   "suppliers": [
+    "EURx Ltd.",
+    "Minotech Biotechnology",
+    "Molecular Biology Resources - CHIMERx",
+    "New England Biolabs",
+    "Nippon Gene Co., Ltd.",
+    "SibEnzyme Ltd.",
+    "Takara Bio Inc.",
+    "Thermo Fisher Scientific",
+    "Vivantis Technologies"
+   ],
+   "isoschizomers": [],
+   "goldenGate": false
+  },
+  "stui": {
+   "name": "StuI",
+   "site": "aggcct",
+   "forwardRegex": "aggcct",
+   "reverseRegex": "aggcct",
+   "topSnipOffset": 3,
+   "bottomSnipOffset": 3,
+   "isType2S": false,
+   "suppliers": [
+    "EURx Ltd.",
+    "Molecular Biology Resources - CHIMERx",
+    "New England Biolabs",
+    "Nippon Gene Co., Ltd.",
+    "Roche Applied Science",
+    "Takara Bio Inc.",
+    "Thermo Fisher Scientific"
+   ],
+   "isoschizomers": [
+    "Eco147I",
+    "PceI",
+    "SseBI"
+   ],
+   "goldenGate": false
+  },
+  "styd4i": {
+   "name": "StyD4I",
+   "site": "ccngg",
+   "forwardRegex": "cc[acgt]gg",
+   "reverseRegex": "cc[acgt]gg",
+   "topSnipOffset": 0,
+   "bottomSnipOffset": 5,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "BstSCI"
+   ],
+   "goldenGate": false
+  },
+  "styi": {
+   "name": "StyI",
+   "site": "ccwwgg",
+   "forwardRegex": "cc[at][at]gg",
+   "reverseRegex": "cc[at][at]gg",
+   "topSnipOffset": 1,
+   "bottomSnipOffset": 5,
+   "isType2S": false,
+   "suppliers": [
+    "Minotech Biotechnology",
+    "New England Biolabs",
+    "Nippon Gene Co., Ltd."
+   ],
+   "isoschizomers": [
+    "BssT1I",
+    "Eco130I",
+    "EcoT14I",
+    "ErhI"
+   ],
+   "goldenGate": false
+  },
+  "swai": {
+   "name": "SwaI",
+   "site": "atttaaat",
+   "forwardRegex": "atttaaat",
+   "reverseRegex": "atttaaat",
+   "topSnipOffset": 4,
+   "bottomSnipOffset": 4,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs",
+    "Nippon Gene Co., Ltd.",
+    "Roche Applied Science",
+    "Sigma Chemical Corporation"
+   ],
+   "isoschizomers": [
+    "SmiI"
+   ],
+   "goldenGate": false
+  },
+  "taii": {
+   "name": "TaiI",
+   "site": "acgt",
+   "forwardRegex": "acgt",
+   "reverseRegex": "acgt",
+   "topSnipOffset": 4,
+   "bottomSnipOffset": 0,
+   "isType2S": false,
+   "suppliers": [
+    "Thermo Fisher Scientific"
+   ],
+   "isoschizomers": [],
+   "goldenGate": false
+  },
+  "taqi": {
+   "name": "TaqI",
+   "site": "tcga",
+   "forwardRegex": "tcga",
+   "reverseRegex": "tcga",
+   "topSnipOffset": 1,
+   "bottomSnipOffset": 3,
+   "isType2S": false,
+   "suppliers": [
+    "EURx Ltd.",
+    "Minotech Biotechnology",
+    "Molecular Biology Resources - CHIMERx",
+    "New England Biolabs",
+    "Nippon Gene Co., Ltd.",
+    "Promega Corporation",
+    "Roche Applied Science",
+    "SibEnzyme Ltd.",
+    "Takara Bio Inc.",
+    "Thermo Fisher Scientific",
+    "Vivantis Technologies"
+   ],
+   "isoschizomers": [],
+   "goldenGate": false
+  },
+  "taqii": {
+   "name": "TaqII",
+   "site": "gaccga",
+   "forwardRegex": "gaccga",
+   "reverseRegex": "tcggtc",
+   "topSnipOffset": 17,
+   "bottomSnipOffset": 15,
+   "isType2S": true,
+   "suppliers": [
+    "EURx Ltd.",
+    "Molecular Biology Resources - CHIMERx"
+   ],
+   "isoschizomers": [],
+   "goldenGate": false
+  },
+  "tati": {
+   "name": "TatI",
+   "site": "wgtacw",
+   "forwardRegex": "[at]gtac[at]",
+   "reverseRegex": "[at]gtac[at]",
+   "topSnipOffset": 1,
+   "bottomSnipOffset": 5,
+   "isType2S": false,
+   "suppliers": [
+    "Thermo Fisher Scientific"
+   ],
+   "isoschizomers": [],
+   "goldenGate": false
+  },
+  "taui": {
+   "name": "TauI",
+   "site": "gcsgc",
+   "forwardRegex": "gc[cg]gc",
+   "reverseRegex": "gc[cg]gc",
+   "topSnipOffset": 4,
+   "bottomSnipOffset": 1,
+   "isType2S": false,
+   "suppliers": [
+    "Thermo Fisher Scientific"
+   ],
+   "isoschizomers": [],
+   "goldenGate": false
+  },
+  "tfii": {
+   "name": "TfiI",
+   "site": "gawtc",
+   "forwardRegex": "ga[at]tc",
+   "reverseRegex": "ga[at]tc",
+   "topSnipOffset": 1,
+   "bottomSnipOffset": 4,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "PfeI"
+   ],
+   "goldenGate": false
+  },
+  "tsp45i": {
+   "name": "Tsp45I",
+   "site": "gtsac",
+   "forwardRegex": "gt[cg]ac",
+   "reverseRegex": "gt[cg]ac",
+   "topSnipOffset": 0,
+   "bottomSnipOffset": 5,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "NmuCI",
+    "TseFI"
+   ],
+   "goldenGate": false
+  },
+  "tspdti": {
+   "name": "TspDTI",
+   "site": "atgaa",
+   "forwardRegex": "atgaa",
+   "reverseRegex": "ttcat",
+   "topSnipOffset": 16,
+   "bottomSnipOffset": 14,
+   "isType2S": true,
+   "suppliers": [
+    "EURx Ltd.",
+    "Molecular Biology Resources - CHIMERx"
+   ],
+   "isoschizomers": [],
+   "goldenGate": false
+  },
+  "tspgwi": {
+   "name": "TspGWI",
+   "site": "acgga",
+   "forwardRegex": "acgga",
+   "reverseRegex": "tccgt",
+   "topSnipOffset": 16,
+   "bottomSnipOffset": 14,
+   "isType2S": true,
+   "suppliers": [
+    "EURx Ltd.",
+    "Molecular Biology Resources - CHIMERx"
+   ],
+   "isoschizomers": [],
+   "goldenGate": false
+  },
+  "tth111i": {
+   "name": "Tth111I",
+   "site": "gacnnngtc",
+   "forwardRegex": "gac[acgt][acgt][acgt]gtc",
+   "reverseRegex": "gac[acgt][acgt][acgt]gtc",
+   "topSnipOffset": 4,
+   "bottomSnipOffset": 5,
+   "isType2S": false,
+   "suppliers": [
+    "EURx Ltd.",
+    "Molecular Biology Resources - CHIMERx",
+    "New England Biolabs",
+    "SibEnzyme Ltd.",
+    "Takara Bio Inc.",
+    "Vivantis Technologies"
+   ],
+   "isoschizomers": [
+    "PflFI",
+    "PsyI"
+   ],
+   "goldenGate": false
+  },
+  "xbai": {
+   "name": "XbaI",
+   "site": "tctaga",
+   "forwardRegex": "tctaga",
+   "reverseRegex": "tctaga",
+   "topSnipOffset": 1,
+   "bottomSnipOffset": 5,
+   "isType2S": false,
+   "suppliers": [
+    "EURx Ltd.",
+    "Minotech Biotechnology",
+    "Molecular Biology Resources - CHIMERx",
+    "New England Biolabs",
+    "Nippon Gene Co., Ltd.",
+    "Promega Corporation",
+    "Roche Applied Science",
+    "SibEnzyme Ltd.",
+    "Sigma Chemical Corporation",
+    "Takara Bio Inc.",
+    "Thermo Fisher Scientific",
+    "Vivantis Technologies"
+   ],
+   "isoschizomers": [],
+   "goldenGate": false
+  },
+  "xcmi": {
+   "name": "XcmI",
+   "site": "ccannnnnnnnntgg",
+   "forwardRegex": "cca[acgt][acgt][acgt][acgt][acgt][acgt][acgt][acgt][acgt]tgg",
+   "reverseRegex": "cca[acgt][acgt][acgt][acgt][acgt][acgt][acgt][acgt][acgt]tgg",
+   "topSnipOffset": 8,
+   "bottomSnipOffset": 7,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [],
+   "goldenGate": false
+  },
+  "xhoi": {
+   "name": "XhoI",
+   "site": "ctcgag",
+   "forwardRegex": "ctcgag",
+   "reverseRegex": "ctcgag",
+   "topSnipOffset": 1,
+   "bottomSnipOffset": 5,
+   "isType2S": false,
+   "suppliers": [
+    "EURx Ltd.",
+    "Molecular Biology Resources - CHIMERx",
+    "New England Biolabs",
+    "Nippon Gene Co., Ltd.",
+    "Promega Corporation",
+    "Roche Applied Science",
+    "Takara Bio Inc.",
+    "Thermo Fisher Scientific",
+    "Toyobo Biochemicals"
+   ],
+   "isoschizomers": [
+    "PaeR7I",
+    "Sfr274I",
+    "SlaI"
+   ],
+   "goldenGate": false
+  },
+  "xmai": {
+   "name": "XmaI",
+   "site": "cccggg",
+   "forwardRegex": "cccggg",
+   "reverseRegex": "cccggg",
+   "topSnipOffset": 1,
+   "bottomSnipOffset": 5,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs",
+    "SibEnzyme Ltd.",
+    "Vivantis Technologies"
+   ],
+   "isoschizomers": [
+    "Cfr9I",
+    "TspMI"
+   ],
+   "goldenGate": false
+  },
+  "xmni": {
+   "name": "XmnI",
+   "site": "gaannnnttc",
+   "forwardRegex": "gaa[acgt][acgt][acgt][acgt]ttc",
+   "reverseRegex": "gaa[acgt][acgt][acgt][acgt]ttc",
+   "topSnipOffset": 5,
+   "bottomSnipOffset": 5,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs"
+   ],
+   "isoschizomers": [
+    "Asp700I",
+    "MroXI",
+    "PdmI"
+   ],
+   "goldenGate": false
+  },
+  "zrai": {
+   "name": "ZraI",
+   "site": "gacgtc",
+   "forwardRegex": "gacgtc",
+   "reverseRegex": "gacgtc",
+   "topSnipOffset": 3,
+   "bottomSnipOffset": 3,
+   "isType2S": false,
+   "suppliers": [
+    "New England Biolabs",
+    "SibEnzyme Ltd.",
+    "Vivantis Technologies"
+   ],
+   "isoschizomers": [],
+   "goldenGate": false
+  }
+ }
+}

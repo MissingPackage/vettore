@@ -67,17 +67,28 @@ export function whenDesktopReady(timeoutMs = 1500): Promise<DesktopApi | null> {
   });
 }
 
+async function toBase64(blob: Blob): Promise<string> {
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  }
+  return btoa(binary);
+}
+
 export const api = {
+  recent: () => call<{ paths: string[] }>("recent"),
+  tm: (sequence: string) =>
+    call<{ tm: number; method: string; presets: { key: string; label: string; description: string; tm: number }[] }>(
+      "tm",
+      { sequence },
+    ),
+  saveBinary: async (path: string, blob: Blob) =>
+    call<{ path: string }>("save-binary", { path, content_b64: await toBase64(blob) }),
   startupFiles: () => call<{ results: OpenResult[]; errors: string[] }>("startup-files"),
   openPath: (path: string) => call<OpenResult>("open-path", { path }),
-  openContent: async (file: File) => {
-    const bytes = new Uint8Array(await file.arrayBuffer());
-    let binary = "";
-    for (let i = 0; i < bytes.length; i += 0x8000) {
-      binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-    }
-    return call<OpenResult>("open-content", { filename: file.name, content_b64: btoa(binary) });
-  },
+  openContent: async (file: File) =>
+    call<OpenResult>("open-content", { filename: file.name, content_b64: await toBase64(file) }),
   savePath: (path: string, sequenceData: SequenceData) =>
     call<{ path: string }>("save-path", { path, sequenceData }),
   exportText: (sequenceData: SequenceData, format: "genbank" | "fasta") =>

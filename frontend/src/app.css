@@ -1,11 +1,62 @@
 html, body, #root { height: 100%; margin: 0; }
 body { font-family: system-ui, "Segoe UI", sans-serif; font-size: 13px; overflow: hidden; }
 .vt-shell { display: flex; flex-direction: column; height: 100%; }
-.vt-topbar { display: flex; align-items: center; gap: 6px; padding: 4px 8px; border-bottom: 1px solid #d0d4d9; background: #f5f6f8; }
-.vt-topbar button { font: inherit; padding: 3px 10px; }
-.vt-doctabs { display: flex; gap: 2px; margin-left: 12px; overflow-x: auto; }
-.vt-doctab { padding: 3px 10px; border: 1px solid #c8ccd1; border-bottom: none; border-radius: 4px 4px 0 0; background: #e9ebee; cursor: pointer; white-space: nowrap; }
+
+/* document tabs */
+.vt-doctabs { display: flex; align-items: flex-end; gap: 2px; padding: 0 6px; background: #dfe3e8; border-bottom: 1px solid #c3c8cf; overflow-x: auto; box-sizing: border-box; }
+.vt-doctab { display: flex; align-items: center; gap: 6px; padding: 4px 6px 4px 12px; border: 1px solid #c3c8cf; border-bottom: none; border-radius: 6px 6px 0 0; background: #eceff2; cursor: pointer; white-space: nowrap; max-width: 240px; }
+.vt-doctab span { overflow: hidden; text-overflow: ellipsis; }
 .vt-doctab.active { background: #fff; font-weight: 600; }
-.vt-editor { flex: 1; min-height: 0; }
-.vt-empty { display: flex; align-items: center; justify-content: center; height: 100%; color: #6b7280; }
-.vt-error { color: #b42318; margin-left: auto; }
+.vt-doctab-close { border: none; background: transparent; font-size: 15px; line-height: 1; cursor: pointer; color: #6b7280; padding: 0 2px; }
+.vt-doctab-close:hover { color: #111; }
+.vt-brand { align-self: center; font-weight: 700; color: #374151; letter-spacing: 0.04em; }
+.vt-error { align-self: center; margin-left: auto; color: #b42318; background: #fef3f2; border: 1px solid #fecdca; border-radius: 4px; padding: 2px 8px; cursor: pointer; max-width: 50%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* view tabs, at the top of the document area */
+.vt-viewbar { display: flex; align-items: center; justify-content: space-between; padding: 0 8px; background: #f7f8fa; border-bottom: 1px solid #d8dce1; box-sizing: border-box; }
+.vt-viewtabs { display: flex; gap: 2px; }
+.vt-viewtab { font: inherit; padding: 4px 14px; border: 1px solid transparent; border-radius: 4px; background: transparent; cursor: pointer; color: #374151; }
+.vt-viewtab:hover:not(:disabled) { background: #e9edf2; }
+.vt-viewtab.active { background: #fff; border-color: #c3c8cf; font-weight: 600; color: #111827; }
+.vt-viewtab:disabled { color: #9ca3af; cursor: default; }
+.vt-enzyme-set { color: #4b5563; }
+.vt-enzyme-set select { font: inherit; }
+
+.vt-editor { min-height: 0; overflow: hidden; }
+
+/* status bar */
+.vt-status-bar { display: flex; align-items: center; justify-content: space-between; padding: 0 10px; background: #f7f8fa; border-top: 1px solid #d8dce1; color: #374151; box-sizing: border-box; }
+.vt-status { display: flex; gap: 14px; }
+.vt-status-set { color: #6b7280; }
+
+/* welcome screen */
+.vt-welcome { max-width: 760px; margin: 60px auto; color: #374151; }
+.vt-welcome h1 { font-size: 30px; margin: 0 0 6px; color: #111827; }
+.vt-welcome-actions { display: flex; gap: 10px; margin: 18px 0 28px; }
+.vt-welcome-actions button { font: inherit; padding: 8px 16px; border: 1px solid #c3c8cf; border-radius: 6px; background: #fff; cursor: pointer; }
+.vt-welcome-actions button:hover { background: #f3f4f6; }
+.vt-recent ul { list-style: none; padding: 0; margin: 0; }
+.vt-recent li { display: flex; gap: 12px; align-items: baseline; padding: 3px 0; }
+.vt-recent-dir { color: #9ca3af; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* history view */
+.vt-history { padding: 16px 24px; }
+.vt-history h2 { font-size: 16px; margin: 0 0 12px; }
+.vt-history table { width: 100%; }
+
+/* OVE: one view at a time, switched from Vettore's view tabs */
+.veEditor .ve-draggable-tabs, .veEditor .ve-clickable-tabs { display: none !important; }
+.vt-editor-slot { flex: none; }
+/* The Features / Primers / Enzymes views are chosen with Vettore's tabs, not the properties tab row. */
+.ve-propertiesPanel .bp3-tab-list { display: none !important; }
+.vt-editor-overlay { position: absolute; inset: 0; background: #fff; z-index: 30; overflow: auto; }
+.vt-table-view { padding: 10px 16px; }
+.vt-table-toolbar { display: flex; align-items: center; gap: 14px; margin-bottom: 8px; }
+.vt-table-toolbar input { width: 220px; }
+.vt-table { width: 100%; }
+.vt-sortable { cursor: pointer; user-select: none; }
+.vt-row-selected td { background: #e6f0fb !important; }
+.vt-bold { font-weight: 700; }
+.vt-mono { font-family: Menlo, Consolas, monospace; }
+.vt-muted { color: #6b7280; }
+.vt-cut { margin-right: 8px; }

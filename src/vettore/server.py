@@ -12,7 +12,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import fileio
+from . import fileio, settings, tm
 
 TOKEN_HEADER = "X-Vettore-Token"
 ALLOWED_HOSTS = {"127.0.0.1", "localhost"}
@@ -30,6 +30,15 @@ class OpenContent(BaseModel):
 class SavePath(BaseModel):
     path: str
     sequenceData: dict[str, Any]
+
+
+class SaveBinary(BaseModel):
+    path: str
+    content_b64: str
+
+
+class TmRequest(BaseModel):
+    sequence: str
 
 
 class Export(BaseModel):
@@ -87,7 +96,22 @@ def create_app(token: str, static_dir: Path | None,
         path = Path(body.path)
         if not path.is_file():
             raise HTTPException(404, f"File not found: {path}")
-        return {"path": str(path), "documents": _read(path.name, path.read_bytes())}
+        documents = _read(path.name, path.read_bytes())
+        settings.add_recent(path)
+        return {"path": str(path), "documents": documents}
+
+    @app.get("/api/recent")
+    def recent() -> dict[str, list[str]]:
+        return {"paths": settings.recent_files()}
+
+    @app.post("/api/tm")
+    def melting_temperature(body: TmRequest) -> dict[str, Any]:
+        try:
+            presets = tm.all_presets(body.sequence)
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from exc
+        default = next(p for p in presets if p["key"] == tm.DEFAULT_PRESET)
+        return {"tm": default["tm"], "method": default["description"], "presets": presets}
 
     @app.post("/api/open-content")
     def open_content(body: OpenContent) -> dict[str, Any]:
@@ -99,6 +123,14 @@ def create_app(token: str, static_dir: Path | None,
         path = Path(body.path)
         fmt = "fasta" if path.suffix.lower() in {".fa", ".fasta", ".fna", ".fas"} else "genbank"
         path.write_text(_export(body.sequenceData, fmt), encoding="utf-8")
+        if fmt == "genbank":
+            settings.add_recent(path)
+        return {"path": str(path)}
+
+    @app.post("/api/save-binary")
+    def save_binary(body: SaveBinary) -> dict[str, str]:
+        path = Path(body.path)
+        path.write_bytes(base64.b64decode(body.content_b64))
         return {"path": str(path)}
 
     @app.post("/api/export")

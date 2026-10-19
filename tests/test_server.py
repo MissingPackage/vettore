@@ -56,3 +56,36 @@ def test_startup_files_are_served_once(tmp_path):
     assert len(first["errors"]) == 1
     second = c.get("/api/startup-files", headers={TOKEN_HEADER: TOKEN}).json()
     assert second == {"results": [], "errors": []}
+
+
+def test_recent_files_track_open_and_save(tmp_path, monkeypatch):
+    monkeypatch.setenv("VETTORE_HOME", str(tmp_path / "home"))
+    c = client()
+    src = tmp_path / "a.dna"
+    src.write_bytes((DATA / "sample-d.dna").read_bytes())
+    [doc] = c.post("/api/open-path", headers={TOKEN_HEADER: TOKEN},
+                   json={"path": str(src)}).json()["documents"]
+    out = tmp_path / "a.gb"
+    c.post("/api/save-path", headers={TOKEN_HEADER: TOKEN},
+           json={"path": str(out), "sequenceData": doc})
+    paths = c.get("/api/recent", headers={TOKEN_HEADER: TOKEN}).json()["paths"]
+    assert paths == [str(out), str(src)]
+
+
+def test_tm_endpoint():
+    c = client()
+    res = c.post("/api/tm", headers={TOKEN_HEADER: TOKEN}, json={"sequence": "AGCTTGCATGCCTGCAGGTCG"})
+    assert res.status_code == 200
+    assert 60 < res.json()["tm"] < 72
+    assert "SantaLucia" in res.json()["method"]
+    assert {p["key"] for p in res.json()["presets"]} == {"standard", "neb_q5", "neb_taq"}
+    bad = c.post("/api/tm", headers={TOKEN_HEADER: TOKEN}, json={"sequence": "ACGTNNACGT"})
+    assert bad.status_code == 422
+
+
+def test_save_binary(tmp_path):
+    c = client()
+    out = tmp_path / "map.png"
+    res = c.post("/api/save-binary", headers={TOKEN_HEADER: TOKEN},
+                 json={"path": str(out), "content_b64": base64.b64encode(b"\x89PNG").decode()})
+    assert res.status_code == 200 and out.read_bytes() == b"\x89PNG"
