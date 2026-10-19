@@ -1,0 +1,136 @@
+# Vettore — offline plasmid editor and cloning simulator
+
+## Overview
+
+Vettore is for bench scientists who need a plasmid editor without a licence fee. Cloud tools (Benchling, hosted OpenCloning) and Docker-based tools
+are ruled out. Vettore is a desktop application for her personal Windows PC (and Linux) that
+follows the everyday cloning *workflow* — map / sequence / enzymes / features / primers / history
+views, cloning simulations, primer tools, gel simulation, Sanger verification — so she can work
+without retraining.
+
+Clean-room rule: functionality is rebuilt from public documentation and open libraries only.
+No third-party binaries are downloaded, decompiled or inspected; no third-party names, icons, artwork
+or proprietary databases are copied. Familiar layout and terminology of the field are fine.
+
+Correctness rule: every molecular operation (digest, ligation, assembly, PCR, Tm, alignment)
+runs on a published, tested engine (pydna, Biopython, primer3) and is covered by tests against
+known reference results. The UI never computes biology on its own.
+
+## Architecture (decided)
+
+| Layer | Choice | Why |
+|---|---|---|
+| Editor UI | React + TeselaGen Open Vector Editor (`@teselagen/ove` 0.8.42, MIT) | Circular/linear map, sequence rows, cut sites, features, primers, ORFs, digest, alignments with chromatograms already exist and are maintained |
+| App shell | Own React shell around OVE: document tabs, view tabs, menus, dialogs | Familiar layout; OVE stays an embedded component |
+| Biology engine | Python: pydna (BSD), Biopython (BSD-like), primer3-py (GPL-2.0+) | Peer-reviewed, tested simulation of cloning operations |
+| Bridge | Local FastAPI server bound to 127.0.0.1 with a per-session random token; UI talks HTTP JSON | One code path for desktop and browser/test mode |
+| Desktop window | pywebview (Edge WebView2 on Windows, Qt WebEngine on Linux); fallback: open system browser | No Electron, single Python process |
+| Packaging | PyInstaller one-folder build, zipped; built by GitHub Actions on `windows-latest` and `ubuntu-latest` | Unsigned exe acceptable (personal PC) |
+| Native file format | Read `.dna`, `.gb/.gbk/.ape`, `.fasta`, `.ab1`; save GenBank (`.gb`) | Every sequence tool reads GenBank; it is the lossless open standard |
+
+## Slices
+
+Each slice ends with: tests green (unit + e2e), Windows and Linux builds produced by CI, a
+release zip attached to a GitHub Release, and a short "what's new" note.
+
+- **S0 — Spike**: prove OVE in pywebview + Python bridge + Windows build. Open a `.dna` file and see its map.
+- **S1 — Daily driver**: open/view/edit/save, the six views, enzymes, features, primers, find, export images.
+- **S2 — Cloning simulations**: restriction & insertion, Gibson/HiFi/In-Fusion, PCR, mutagenesis, Golden Gate, Gateway, TA/TOPO, ligation; history.
+- **S3 — Verification tools**: simulate agarose gel, align Sanger reads (`.ab1`) to reference, multiple alignment, detect common features, primer design.
+- **S4 — Polish**: history graph, print/PDF, preferences, keyboard-shortcut parity, file associations, AAV helpers (ITR-to-ITR cargo size).
+
+## User stories
+
+### S0 — Spike
+
+**S0.1** As the developer I want the app to start as a native window on Windows and Linux so that the stack is proven before building features.
+- [ ] `vettore` (Linux) and `Vettore.exe` (Windows, built in CI) open a window titled "Vettore".
+- [ ] File → Open on `tests/data/pFA-KanMX4.dna` shows a circular map with 9 features and length 3941 bp.
+- [ ] The server rejects API requests without the session token (HTTP 403).
+- [ ] CI uploads a Windows zip and a Linux zip as workflow artifacts.
+
+### S1 — Daily driver
+
+**S1.1 Open files.** As a bench scientist I want to open my existing `.dna` and GenBank files so that I keep working on them.
+- [ ] Opens `.dna`, `.gb`, `.gbk`, `.ape`, `.fa/.fasta`, `.ab1` (as read-only sequence); features, primers (from `.dna` primer records), topology and name are preserved.
+- [ ] Several files open as tabs; drag-and-drop of a file onto the window opens it.
+- [ ] Recent files list (last 10) in File menu.
+- [ ] Opening a corrupt file shows an error dialog naming the file; the app keeps running.
+
+**S1.2 Views.** As a bench scientist I want the map, sequence, enzyme, feature and primer views I am used to, so that I find everything where I expect it.
+- [ ] View tabs at the bottom: Map, Sequence, Enzymes, Features, Primers, History.
+- [ ] Map: circular for circular molecules, linear otherwise; toggle available.
+- [ ] Sequence: double-strand rows with features, primers, cut sites, translations.
+- [ ] Enzymes: table of enzymes in the current set with number of sites and positions.
+- [ ] Features / Primers: sortable tables; double-click opens the edit dialog.
+- [ ] Selecting any range shows in the status bar: start..end, length, %GC, and Tm when length ≤ 60 nt.
+
+**S1.3 Edit sequence.** As a bench scientist I want to edit the sequence and annotations so that I can design constructs by hand.
+- [ ] Type/paste/delete bases at the cursor; features and primers outside the edit keep their positions; overlapping ones are adjusted as in GenBank semantics.
+- [ ] Reverse-complement whole sequence or selection; change topology (circular/linear); set origin.
+- [ ] Add/edit/delete feature (name, type, strand, color, location); add/edit/delete primer.
+- [ ] Undo/redo (Ctrl+Z / Ctrl+Y or Ctrl+Shift+Z) for every edit.
+- [ ] Unsaved changes mark the tab with "•"; closing asks to save.
+
+**S1.4 Save and export.** As a bench scientist I want to save and share my work so that collaborators can open it in whatever tool they use.
+- [ ] Save / Save As writes GenBank; re-opening the file round-trips sequence, features (type, name, strand, location, color) and primers.
+- [ ] Export FASTA; copy selection as plain sequence; copy reverse complement.
+- [ ] Export the map as SVG and PNG.
+
+**S1.5 Enzymes.** As a bench scientist I want to choose which enzymes are shown so that the map shows the cutters I care about.
+- [ ] Enzyme set chooser with presets: Unique cutters, Unique 6+ cutters, Unique & dual cutters, Commercially available, plus a custom list.
+- [ ] Search enzyme by name; show recognition site and cut position.
+- [ ] Enzyme data comes from REBASE via Biopython.
+
+**S1.6 Find.** As a bench scientist I want to find sequences so that I can locate sites and motifs.
+- [ ] Ctrl+F finds DNA (both strands) and protein (in all 6 frames), with optional mismatches (0–3); results are highlighted and navigable.
+- [ ] Show ORFs with a minimum length setting (default 75 aa [ASSUMED: common default]).
+
+### S2 — Cloning simulations
+
+Each action opens a dialog with the inputs on the left and a live preview of the product on the right,
+creates a new document for the product, and records the operation in the History view.
+
+**S2.1 Restriction & insertion cloning.**
+- [ ] Choose vector + 1–2 enzymes (or one blunt site), choose insert fragment from another document by enzymes or by PCR product; orientation selector; result matches pydna's digest + ligate result base-for-base.
+- [ ] Warns when ends are incompatible, when an enzyme also cuts inside the insert, and when the site is Dam/Dcm blocked [ASSUMED: methylation warnings in S2, not S1].
+
+**S2.2 Gibson / NEBuilder HiFi / In-Fusion.**
+- [ ] Select an opened vector (linearized by enzymes or by PCR) and 1–6 inserts in order; the tool designs primers with overlaps (default 20–30 nt for Gibson/HiFi, 15 nt for In-Fusion) and shows Tm of annealing parts.
+- [ ] Product sequence equals pydna's assembly of the designed PCR products; primers are added to the product's primer list.
+
+**S2.3 PCR.**
+- [ ] Choose template + forward/reverse primers (from the primer list or typed, with 5′ tails); product shown and created; primers with no binding site produce an error message.
+
+**S2.4 Mutagenesis.** Insertion, deletion, replacement via primers (Q5 SDM-style); output primers + product.
+
+**S2.5 Golden Gate.** Type IIS enzyme (BsaI, BsmBI/Esp3I, BbsI, SapI), parts in order, overhang validation (duplicate/palindromic overhangs flagged).
+
+**S2.6 Gateway.** BP and LR reactions (attB/attP/attL/attR) producing entry/expression clones.
+
+**S2.7 TA / TOPO and Ligate fragments.** Simple ligation of selected fragments; TA with A-overhang products.
+
+**S2.8 History.** Every product stores its parents and the operation; History view lists the steps; parents can be reopened.
+
+### S3 — Verification tools
+
+**S3.1 Simulate agarose gel.** Lanes = digests of opened documents with chosen enzymes or uncut; ladders: NEB 1 kb, NEB 1 kb Plus, NEB 100 bp, GeneRuler 1 kb, GeneRuler 1 kb Plus, GeneRuler 100 bp Plus [ASSUMED: these are the ladders she uses]; gel % 0.7–2.0; export PNG.
+
+**S3.2 Align to reference (Sanger).** Import one or more `.ab1` reads, trim low-quality ends, align to the current sequence, show chromatograms, mismatches/indels highlighted, coverage summary.
+
+**S3.3 Multiple alignment** of DNA sequences.
+
+**S3.4 Detect common features** from an offline curated database (AAV-relevant set first: ITRs, CMV/CAG/hSyn/EF1a/CaMKIIa/GFAP, WPRE, polyA signals, AmpR/KanR, ori, f1 ori, fluorescent proteins, tags, lox/FRT, U6, Cas9).
+
+**S3.5 Primer design** (primer3): amplify a selected region with Tm, length and product-size constraints; results ranked, added to the primer list on click.
+
+### S4 — Polish
+
+Print / PDF of map and sequence; preferences (Tm method, default enzyme set, colors); keyboard
+shortcuts aligned with the reference doc; Windows file association for `.dna`/`.gb`;
+AAV helper: ITR-to-ITR cargo size with a warning above 4.7 kb.
+
+## Read first
+
+| What | Where | Why |
+|---|---|---|
