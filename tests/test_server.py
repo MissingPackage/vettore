@@ -96,3 +96,12 @@ def test_unsaved_count_is_forwarded():
     c = TestClient(create_app(TOKEN, None, [], seen.append), base_url="http://127.0.0.1")
     assert c.post("/api/unsaved", headers={TOKEN_HEADER: TOKEN}, json={"count": 2}).status_code == 200
     assert seen == [2]
+
+
+def test_desktop_api_exposes_only_methods_to_javascript():
+    # pywebview walks every public non-callable attribute of the js_api object.
+    from vettore.app import DesktopApi
+
+    api = DesktopApi()
+    public = [n for n in vars(api) if not n.startswith("_")]
+    assert public == []

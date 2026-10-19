@@ -69,17 +69,20 @@ class DesktopApi:
     """Methods exposed to JavaScript as ``window.pywebview.api``."""
 
     def __init__(self) -> None:
-        self.window = None
+        # Private on purpose: pywebview recursively exposes every public attribute of the
+        # js_api object to JavaScript; walking the native window object never terminates on
+        # Windows (Bounds.Empty.Empty...) and blocks the UI thread.
+        self._window = None
 
     def set_unsaved(self, count: int) -> None:
         # pywebview reads confirm_close when the window is about to close.
-        if self.window is not None:
-            self.window.confirm_close = count > 0
+        if self._window is not None:
+            self._window.confirm_close = count > 0
 
     def open_dialog(self) -> list[str]:
         import webview
 
-        paths = self.window.create_file_dialog(
+        paths = self._window.create_file_dialog(
             webview.FileDialog.OPEN, allow_multiple=True, file_types=FILE_TYPES
         )
         return list(paths or [])
@@ -87,7 +90,7 @@ class DesktopApi:
     def save_dialog(self, suggested_name: str) -> str | None:
         import webview
 
-        path = self.window.create_file_dialog(
+        path = self._window.create_file_dialog(
             webview.FileDialog.SAVE, save_filename=suggested_name,
             file_types=("GenBank (*.gb)", "FASTA (*.fasta)"),
         )
@@ -136,7 +139,7 @@ def main(argv: list[str] | None = None) -> None:
         try:
             import webview
 
-            api.window = webview.create_window(
+            api._window = webview.create_window(
                 "Vettore", url, js_api=api, width=1400, height=900, maximized=True,
                 localization={"global.quitConfirmation":
                               "Some documents have unsaved changes. Quit Vettore and discard them?"},
