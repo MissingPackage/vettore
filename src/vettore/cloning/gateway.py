@@ -396,9 +396,16 @@ def gateway(reaction: Reaction, *docs: SequenceDoc,
                         f"of “{vector_doc.name}”: choose the one you want, or run the reaction "
                         "again on the product to fill the other cassette")
     if carriers and _has_counter_selection(carriers[0]):
-        warnings.append("The product still carries a ccdB counter-selection gene, so it would "
-                        "not grow in a standard cloning strain: a vector with a second Gateway "
-                        "cassette needs that cassette replaced as well")
+        from_entry = next((doc.name for doc, record in zip(docs[:-1], records[:-1])
+                           if _has_counter_selection(record)), None)
+        if from_entry and not _has_counter_selection(records[-1]):
+            warnings.append(f"The product still carries the ccdB counter-selection gene of "
+                            f"“{from_entry}”, so it would not grow in a standard cloning "
+                            "strain: clone your insert into that entry clone first")
+        else:
+            warnings.append("The product still carries a ccdB counter-selection gene, so it "
+                            "would not grow in a standard cloning strain: a vector with a "
+                            "second Gateway cassette needs that cassette replaced as well")
     warnings.append("Only products where both att sites recombined are shown; a product from a "
                     "single site is the co-integrate intermediate of the reaction")
 
