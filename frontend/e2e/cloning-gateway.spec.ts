@@ -39,21 +39,7 @@ test("LR reaction between an entry clone and a destination vector", async ({ pag
   await expect(page.getByTestId("history-reopen")).toHaveCount(2);
 });
 
-/**
- * Answer /api/cloning/gateway-sites as the engine does ({"sites": [[...], ...]}, one list per
- * document sent), from the names of the test records: the dialog's choice is tested on its own.
- */
-async function answerGatewaySites(page: Page) {
-  await page.route("**/api/cloning/gateway-sites*", async (route) => {
-    const docs = (route.request().postDataJSON() as { docs: { name: string }[] }).docs;
-    const sites = docs.map((d) => (d.name.includes("entry") ? ["attL1", "attL2"]
-      : d.name.includes("destination") ? ["attR1", "attR2"] : []));
-    await route.fulfill({ json: { sites } });
-  });
-}
-
 test("LR picks the entry clone and the destination vector by their att sites", async ({ page }) => {
-  await answerGatewaySites(page);
   await page.goto(`/?token=${TOKEN}`);
   await page.getByTestId("file-input").setInputFiles([
     data("pFA-KanMX4.dna"),
@@ -74,7 +60,6 @@ test("LR picks the entry clone and the destination vector by their att sites", a
 });
 
 test("when no open file has the att sites, the dialog asks for them instead of guessing", async ({ page }) => {
-  await answerGatewaySites(page);
   await page.goto(`/?token=${TOKEN}`);
   await page.getByTestId("file-input").setInputFiles([data("cloning-gateway-entry.gb"), data("pFA-KanMX4.dna")]);
   await expect(page.locator(".vt-doctab")).toHaveCount(2);

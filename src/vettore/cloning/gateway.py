@@ -420,7 +420,8 @@ def _products(reaction: str, docs: Sequence[SequenceDoc], records: Sequence[Dseq
     entries, vector_doc = list(docs[:-1]), docs[-1]
     entry_names = " + ".join(doc.name for doc in entries)
     base_name = f"{vector_doc.name} + {entry_names}"
-    entry_sites = ", ".join(", ".join(site_names(record)) for record in records[:-1])
+    # "attL4/attR1, attL1/attL2, attL3/attR2": the chain the entry clones recombine through.
+    entry_sites = ", ".join("/".join(site_names(record)) for record in records[:-1])
     products: list[Product] = []
     seen = {True: 0, False: 0}
     for record in ranked:
@@ -432,8 +433,9 @@ def _products(reaction: str, docs: Sequence[SequenceDoc], records: Sequence[Dseq
             name = f"{name}, product {seen[wanted]}"
         topology = "circular" if record.circular else "linear"
         inputs = (f"{entry_names} ({left})" if len(entries) == 1
-                  else f"{len(entries)} entry clones ({entry_sites})")
-        details = (f"{operation}: {inputs} x {vector_doc.name} ({right}) — "
+                  else f"{len(entries)} entry clones, {entry_sites}")
+        vector_side = right if len(entries) == 1 else right.split(" (")[0]
+        details = (f"{operation}: {inputs} x {vector_doc.name} ({vector_side}) — "
                    f"{role.lower()}, {len(record)} bp")
         products.append(Product(
             doc=from_dseqrecord(record, name), operation=operation,

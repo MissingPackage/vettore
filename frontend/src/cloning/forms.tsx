@@ -440,7 +440,11 @@ export function gatewayForm(reaction: "BP" | "LR") {
         return onChange(null, "Looking for att sites in the open files…");
       }
       const empty = chosen.findIndex((d) => !d);
-      if (empty >= 0) return onChange(null, choose(entryLabel(empty), insertKind));
+      if (empty >= 0) {
+        return onChange(null, empty === 0
+          ? choose(labels.first, insertKind)
+          : `Choose entry clone ${empty + 1}, or remove it from the reaction`);
+      }
       if (!db) return onChange(null, choose(labels.second, vectorKind));
       const picked = [...chosen.map((d) => d!), db];
       const names = picked.map((d) => d.editorName);
@@ -468,11 +472,18 @@ export function gatewayForm(reaction: "BP" | "LR") {
       const others = other[d.editorName] ?? [];
       return others.length ? `${others.join(", ")} — not a Gateway site` : null;
     };
+    // The att sites of the chosen file, under its picker: the name of a file is often longer
+    // than the list fits.
+    const hint = (d: OpenDoc | null) => {
+      if (!d || !sites) return undefined;
+      const found = note(d);
+      return found ? `att sites: ${found}` : "No att site found in this file";
+    };
 
     return (
       <>
         {inserts.map((value, i) => (
-          <Field key={i} label={entryLabel(i)}>
+          <Field key={i} label={entryLabel(i)} hint={hint(chosen[i])}>
             <div className="vt-input-row">
               <DocSelect docs={docs} value={value} note={note} testId={i === 0 ? "insert-doc" : `entry-doc-${i + 1}`}
                          onChange={(v) => setInsert(i, v)} />
@@ -508,7 +519,7 @@ export function gatewayForm(reaction: "BP" | "LR") {
             </span>
           </div>
         )}
-        <Field label={labels.second}>
+        <Field label={labels.second} hint={hint(db)}>
           <DocSelect docs={docs} value={b} note={note} testId="vector-doc"
                      onChange={(v) => { chosenByUser.current = true; setB(v); }} />
         </Field>
