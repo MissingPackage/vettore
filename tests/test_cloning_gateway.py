@@ -225,7 +225,8 @@ def test_a_bp_reaction_on_an_lr_pair_is_refused_with_the_sites_found():
     with pytest.raises(CloningError) as err:
         gateway("BP", load("entry"), load("destination"))   # attL x attR is an LR reaction
     message = str(err.value)
-    assert "“destination” has no attP site" in message
+    assert "“entry” has no attB site" in message
+    assert "which recombine in an LR reaction" in message
     assert "attR1" in message and "attL1" in message
 
 
@@ -264,9 +265,10 @@ def test_gateway_sites_route_names_the_sites_of_each_document():
         doc("pUC-like", clean_dna(2000, 301), True),
         {"name": "empty", "sequence": ""}, {"name": "no sequence"}]})
     assert res.status_code == 200
-    assert res.json() == {"sites": [
-        ["attL1", "attL2"], ["attR1", "attR2"], ["attB1", "attB2"], ["attB1", "attB2"],
-        [], [], []]}
+    assert res.json() == {
+        "sites": [["attL1", "attL2"], ["attR1", "attR2"], ["attB1", "attB2"],
+                  ["attB1", "attB2"], [], [], []],
+        "other": [[], [], [], [], [], [], []]}
 
 
 def test_lr_messages_use_the_right_article():
