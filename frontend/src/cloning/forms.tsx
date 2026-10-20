@@ -394,3 +394,68 @@ export function DeleteFragmentForm({ docs, active, onChange }: FormProps) {
     </>
   );
 }
+
+// ---- Anneal oligos -----------------------------------------------------------------------
+export function AnnealOligosForm({ docs, active, onChange }: FormProps) {
+  const [mode, setMode] = useState<"design" | "anneal">("design");
+  const [vector, setVector] = useState<string | null>(active?.editorName ?? null);
+  const [enzymes, setEnzymes] = useState<string[]>([]);
+  const [insert, setInsert] = useState("");
+  const [insertName, setInsertName] = useState("gRNA1");
+  const [top, setTop] = useState("");
+  const [bottom, setBottom] = useState("");
+  const v = findDoc(docs, vector);
+
+  useEffect(() => {
+    if (!v || !enzymes.length) return onChange(null);
+    if (mode === "design") {
+      if (insert.length < 4) return onChange(null);
+      onChange({ mode, insert, insert_name: insertName || "insert", vector: v.data(), enzymes });
+    } else {
+      if (top.length < 10 || bottom.length < 10) return onChange(null);
+      onChange({ mode, top, top_name: `${insertName}_top`, bottom, bottom_name: `${insertName}_bottom`,
+                 vector: v.data(), enzymes });
+    }
+  }, [mode, v, enzymes, insert, insertName, top, bottom]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const dna = (value: string) => value.toUpperCase().replace(/[^ACGT]/g, "");
+  return (
+    <>
+      <Field label="What do you have?">
+        <div className="bp3-html-select">
+          <select data-testid="anneal-mode" value={mode} onChange={(e) => setMode(e.target.value as "design" | "anneal")}>
+            <option value="design">The insert — write the oligos for me</option>
+            <option value="anneal">The two oligos already</option>
+          </select>
+        </div>
+      </Field>
+      <Field label="Vector">
+        <DocSelect docs={docs} value={vector} onChange={setVector} testId="vector-doc" />
+      </Field>
+      <Field label="Cut vector with" hint="The overhangs are taken from the cut vector itself">
+        <EnzymePicker value={enzymes} onChange={setEnzymes} max={2} sequence={v?.data().sequence}
+                      circular={v?.data().circular} testId="vector-enzymes" />
+      </Field>
+      <Field label="Name">
+        <input className="bp3-input bp3-small" value={insertName} onChange={(e) => setInsertName(e.target.value)} />
+      </Field>
+      {mode === "design" ? (
+        <Field label="Insert (5′ → 3′, top strand)" hint="e.g. a 20 nt protospacer with its G">
+          <input className="bp3-input bp3-small vt-mono" data-testid="anneal-insert"
+                 value={insert} onChange={(e) => setInsert(dna(e.target.value))} />
+        </Field>
+      ) : (
+        <>
+          <Field label="Oligo 1 (top strand)">
+            <input className="bp3-input bp3-small vt-mono" data-testid="anneal-top"
+                   value={top} onChange={(e) => setTop(dna(e.target.value))} />
+          </Field>
+          <Field label="Oligo 2 (bottom strand)">
+            <input className="bp3-input bp3-small vt-mono" data-testid="anneal-bottom"
+                   value={bottom} onChange={(e) => setBottom(dna(e.target.value))} />
+          </Field>
+        </>
+      )}
+    </>
+  );
+}

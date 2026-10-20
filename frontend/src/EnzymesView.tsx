@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useSelector } from "react-redux";
 import { actions } from "@teselagen/ove";
-import { ENZYME_SETS, enzymeRows, type EnzymeRow, type EnzymeSetId } from "./enzymeLogic";
+import { ENZYME_SETS, enzymeRows, methylationWarnings, type EnzymeRow, type EnzymeSetId } from "./enzymeLogic";
 import { store } from "./store";
 
 type SortKey = "name" | "sites" | "location";
@@ -20,6 +20,8 @@ export default function EnzymesView({ editorName, set }: { editorName: string; s
   const [selected, setSelected] = useState<string | null>(null);
 
   const rows = useMemo(() => enzymeRows(set, sequence, circular), [set, sequence, circular]);
+  const methylation = useMemo(() => methylationWarnings(sequence, circular, rows),
+                              [sequence, circular, rows]);
   const shown = useMemo(() => {
     const q = query.trim().toLowerCase();
     const filtered = q ? rows.filter((r) => r.name.toLowerCase().includes(q)) : rows;
@@ -73,6 +75,7 @@ export default function EnzymesView({ editorName, set }: { editorName: string; s
             {header("sites", "Sites")}
             {header("location", "Location(s)")}
             <th>Ends</th>
+            <th>Methylation</th>
           </tr>
         </thead>
         <tbody>
@@ -101,11 +104,32 @@ export default function EnzymesView({ editorName, set }: { editorName: string; s
                 {r.ends}
                 {r.overhang ? <span className="vt-mono vt-muted"> {r.overhang}</span> : null}
               </td>
+              <td>
+                {(methylation[r.name] ?? []).map((note) => (
+                  <span
+                    key={note.kind}
+                    className={note.blocking ? "vt-warn" : "vt-muted"}
+                    title={note.blocking
+                      ? `REBASE records this enzyme as "${note.status}" by ${note.kind} methylation, and a ${note.kind} methylated base lies inside this site. Grow the plasmid in a ${note.kind === "Dam" ? "dam⁻" : "dcm⁻"} strain, or pick another enzyme.`
+                      : `A ${note.kind} methylated base lies inside this site, but REBASE records no sensitivity for this enzyme. Check your supplier before relying on the digest.`}
+                  >
+                    {note.kind}: {note.status}{" "}
+                  </span>
+                ))}
+              </td>
             </tr>
           ))}
         </tbody>
       </table>
       {!shown.length && <p className="vt-muted">No enzymes of this set cut the sequence.</p>}
+      {Object.keys(methylation).length > 0 && (
+        <p className="vt-muted" data-testid="methylation-note">
+          A base methylated by Dam (GATC) or Dcm (CCWGG) in the usual cloning strains lies
+          inside these recognition sites, and REBASE records the enzyme as affected. Grow the
+          plasmid in a dam⁻/dcm⁻ strain or choose another enzyme. Entries marked “not recorded”
+          have the overlap but no sensitivity data in REBASE — check your supplier.
+        </p>
+      )}
     </div>
   );
 }

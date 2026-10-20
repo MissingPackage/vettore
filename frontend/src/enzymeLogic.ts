@@ -154,3 +154,86 @@ export function enzymeRows(set: EnzymeSetId, sequence: string, circular: boolean
     })
     .sort((a, b) => a.name.localeCompare(b.name));
 }
+
+/**
+ * Methylation in the usual E. coli cloning strains. Dam methylates the adenine in GATC, Dcm the
+ * inner cytosine in CCWGG (W = A or T). A site is only worth a warning when a methylated base
+ * actually falls inside its recognition sequence *and* REBASE records that methylation as
+ * stopping that enzyme — BamHI's GGATCC always contains a Dam site and is cut regardless.
+ * When REBASE records nothing for an enzyme, the overlap is reported as unknown rather than
+ * passed over in silence.
+ */
+import methylationTable from "./data/methylation.json";
+
+const DAM = /GATC/g;
+const DCM = /CC[AT]GG/g;
+//: offsets of the methylated bases within each motif, on the top and bottom strand
+const DAM_METHYLATED = [1, 2];
+const DCM_METHYLATED = [1, 3];
+
+const STATUSES = methylationTable.statuses as Record<string, Record<string, string>>;
+export const METHYLATION_SOURCE = methylationTable.source;
+
+export interface MethylationNote {
+  kind: "Dam" | "Dcm";
+  status: string;          // REBASE's word, or "not recorded"
+  blocking: boolean;       // worth acting on
+}
+
+function methylatedPositions(sequence: string, circular: boolean): Map<number, "Dam" | "Dcm"> {
+  const scanned = circular ? sequence + sequence.slice(0, 5) : sequence;
+  const positions = new Map<number, "Dam" | "Dcm">();
+  for (const [pattern, offsets, name] of [
+    [DAM, DAM_METHYLATED, "Dam"],
+    [DCM, DCM_METHYLATED, "Dcm"],
+  ] as const) {
+    pattern.lastIndex = 0;
+    let match: RegExpExecArray | null;
+    while ((match = pattern.exec(scanned)) !== null) {
+      for (const offset of offsets) positions.set((match.index + offset) % sequence.length, name);
+      pattern.lastIndex = match.index + 1;
+    }
+  }
+  return positions;
+}
+
+/** Methylation notes per enzyme, e.g. `{ ClaI: [{kind: "Dam", status: "blocked"}] }`. */
+export function methylationWarnings(
+  sequence: string,
+  circular: boolean,
+  rows: EnzymeRow[],
+): Record<string, MethylationNote[]> {
+  const methylated = methylatedPositions(sequence.toUpperCase(), circular);
+  if (!methylated.size) return {};
+  const out: Record<string, MethylationNote[]> = {};
+  for (const row of rows) {
+    const kinds = new Set<"Dam" | "Dcm">();
+    for (const cut of row.cuts) {
+      const span = cut.start <= cut.end
+        ? range(cut.start, cut.end)
+        : [...range(cut.start, sequence.length - 1), ...range(0, cut.end)];
+      for (const position of span) {
+        const kind = methylated.get(position);
+        if (kind) kinds.add(kind);
+      }
+    }
+    const notes: MethylationNote[] = [];
+    for (const kind of [...kinds].sort()) {
+      const status = STATUSES[row.name.toLowerCase()]?.[kind];
+      if (status === "cut") continue;                 // methylation does not stop this enzyme
+      notes.push({
+        kind,
+        status: status ?? "not recorded",
+        blocking: status !== undefined && status !== "cut",
+      });
+    }
+    if (notes.length) out[row.name] = notes;
+  }
+  return out;
+}
+
+function range(from: number, to: number): number[] {
+  const out: number[] = [];
+  for (let i = from; i <= to; i++) out.push(i);
+  return out;
+}

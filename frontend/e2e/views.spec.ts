@@ -27,6 +27,8 @@ test("view tabs switch the document view", async ({ page }) => {
   await expect(page.getByTestId("enzymes-view")).toBeVisible();
   // pFA-KanMX4: NdeI is a unique 6-cutter in the default set.
   await expect(page.getByTestId("enzymes-view").getByRole("cell", { name: "NdeI", exact: true })).toBeVisible();
+  // Methylation is a column of its own; which enzymes it flags is covered by the unit tests.
+  await expect(page.getByTestId("enzymes-view")).toContainText("Methylation");
   await page.screenshot({ path: "test-results/view-enzymes.png" });
   await expect(page.locator(".ve-menu-bar, .tg-menu-bar").first()).toBeVisible();
 

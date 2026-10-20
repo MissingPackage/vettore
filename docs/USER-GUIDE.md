@@ -60,6 +60,12 @@ Type IIS enzymes, Golden Gate enzymes, Nonredundant commercial.
 
 **Enzymes → Choose Enzymes…** opens the full picker for a custom list.
 
+The **Methylation** column warns when a base methylated by Dam (GATC) or Dcm (CCWGG) in the
+usual cloning strains falls inside a recognition site *and* REBASE records that enzyme as
+blocked, impaired or variable — the reason a digest sometimes fails for no visible reason.
+Enzymes that cut regardless, such as BamHI, are left alone; when REBASE has no data the column
+says so rather than staying silent.
+
 ## Primers and Tm
 
 Select any stretch of DNA and the status bar shows its Tm. Because different tools use
@@ -88,6 +94,7 @@ form.
 | Mutagenesis… | Substitution, insertion or deletion with back-to-back Q5-style primers |
 | Gibson Assembly… / NEBuilder HiFi… / In-Fusion… | Inserts one or more fragments into a linearised vector and designs the homology arms |
 | Golden Gate Assembly… | Assembles type IIS parts in order, checking the junction overhangs |
+| Anneal Oligos and Insert… | Clones a short insert (gRNA, shRNA, linker, tag) from two annealed oligos; give it the insert and it writes the two oligos, taking the overhangs from the cut vector itself |
 
 Warnings appear under the product when something deserves a check before you order anything:
 an enzyme that cuts more than once, a vector that can re-ligate without insert, a
@@ -133,8 +140,8 @@ semi-logarithmic migration model: good for predicting the *pattern* of a diagnos
 reading sizes against the ladder, not a physical simulation of your gel rig. Hover a band to
 see its size.
 
-Not implemented yet: Gateway BP/LR and TA/GC/TOPO cloning, annealing oligos, multiple sequence
-alignment, and writing `.dna` files (saving is GenBank).
+Not implemented yet: Gateway BP/LR and TA/GC/TOPO cloning, multiple sequence alignment, and
+writing `.dna` files (saving is GenBank).
 
 ## Saving and sharing
 

@@ -40,9 +40,15 @@ the one published in their source repository, `TeselaGen/tg-oss`.
   REBASE: Roberts RJ, Vincze T, Posfai J, Macelis D. *REBASE — a database for DNA restriction
   and modification: enzymes, genes and genomes.* Nucleic Acids Res. <http://rebase.neb.com>.
   REBASE data may be redistributed free of charge with attribution; Vettore is free of charge.
+  The per-enzyme methylation sensitivities in `frontend/src/data/methylation.json` come from
+  REBASE's `msbuffmore.txt` (see `scripts/build_methylation_table.py`).
 - **DNA ladders** — band sizes taken from the vendors' own public product documentation (New
   England Biolabs, Thermo Fisher, Invitrogen). Product names and trademarks belong to their
   owners and are used only to identify the ladders.
+- **Common features** — `src/vettore/data/common_features.json` holds subsequences of public
+  GenBank/RefSeq records fetched from NCBI, each entry citing its accession and coordinate
+  range (see `scripts/build_feature_database.py`). NCBI places no restriction on reuse of
+  these records.
 - **Test fixtures** in `tests/data/` — copied from the Biopython test suite (Biopython License /
   BSD-3-Clause); see `tests/data/README.md`.
 

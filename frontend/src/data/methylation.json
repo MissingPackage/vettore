@@ -1,0 +1,1563 @@
+{
+ "source": "REBASE ftp://ftp.neb.com/pub/rebase/msbuffmore.txt (http://rebase.neb.com)",
+ "statuses": {
+  "aari": {
+   "CpG": "impaired"
+  },
+  "aasi": {
+   "CpG": "cut"
+  },
+  "aati": {
+   "Dcm": "blocked"
+  },
+  "aatii": {
+   "CpG": "blocked"
+  },
+  "acc65i": {
+   "Dcm": "some blocked",
+   "CpG": "some blocked"
+  },
+  "accb7i": {
+   "Dcm": "some blocked"
+  },
+  "accbsi": {
+   "CpG": "cut"
+  },
+  "acci": {
+   "CpG": "blocked"
+  },
+  "accii": {
+   "CpG": "blocked"
+  },
+  "acciii": {
+   "Dam": "blocked",
+   "CpG": "cut"
+  },
+  "acii": {
+   "CpG": "blocked"
+  },
+  "acli": {
+   "CpG": "blocked"
+  },
+  "adei": {
+   "CpG": "some blocked"
+  },
+  "afai": {
+   "CpG": "some blocked"
+  },
+  "afei": {
+   "CpG": "blocked"
+  },
+  "afli": {
+   "Dcm": "cut",
+   "CpG": "cut"
+  },
+  "agei": {
+   "CpG": "blocked"
+  },
+  "ahaii": {
+   "Dcm": "blocked",
+   "CpG": "blocked"
+  },
+  "ahdi": {
+   "CpG": "variable"
+  },
+  "ajii": {
+   "CpG": "blocked"
+  },
+  "ajni": {
+   "Dcm": "cut"
+  },
+  "ajui": {
+   "CpG": "cut"
+  },
+  "alfi": {
+   "CpG": "cut"
+  },
+  "aloi": {
+   "Dcm": "cut",
+   "CpG": "variable"
+  },
+  "alw21i": {
+   "CpG": "cut"
+  },
+  "alw26i": {
+   "CpG": "variable"
+  },
+  "alw44i": {
+   "CpG": "blocked"
+  },
+  "alwi": {
+   "Dam": "blocked",
+   "Dcm": "cut",
+   "CpG": "cut"
+  },
+  "alwni": {
+   "Dcm": "blocked"
+  },
+  "aor51hi": {
+   "CpG": "blocked"
+  },
+  "aori": {
+   "Dcm": "cut"
+  },
+  "aosii": {
+   "CpG": "blocked"
+  },
+  "apai": {
+   "Dcm": "some blocked",
+   "CpG": "some blocked"
+  },
+  "apali": {
+   "CpG": "blocked"
+  },
+  "apeki": {
+   "CpG": "some blocked"
+  },
+  "apoi": {
+   "CpG": "cut"
+  },
+  "apyi": {
+   "Dcm": "cut"
+  },
+  "asci": {
+   "Dcm": "cut",
+   "CpG": "variable"
+  },
+  "asisi": {
+   "Dam": "cut",
+   "CpG": "variable"
+  },
+  "asp718i": {
+   "Dcm": "blocked",
+   "CpG": "blocked"
+  },
+  "asplei": {
+   "CpG": "blocked"
+  },
+  "aspmdi": {
+   "Dam": "cut"
+  },
+  "aspmi": {
+   "Dcm": "blocked"
+  },
+  "asps9i": {
+   "Dcm": "blocked",
+   "CpG": "blocked"
+  },
+  "asuii": {
+   "CpG": "cut"
+  },
+  "asunhi": {
+   "CpG": "cut"
+  },
+  "avai": {
+   "CpG": "blocked"
+  },
+  "avaii": {
+   "Dcm": "blocked",
+   "CpG": "blocked"
+  },
+  "aviii": {
+   "CpG": "blocked"
+  },
+  "baegi": {
+   "Dcm": "cut",
+   "CpG": "cut"
+  },
+  "baei": {
+   "Dcm": "cut",
+   "CpG": "variable"
+  },
+  "bali": {
+   "Dcm": "impaired"
+  },
+  "bamhi": {
+   "Dam": "cut",
+   "Dcm": "cut",
+   "CpG": "cut"
+  },
+  "bani": {
+   "Dcm": "some blocked",
+   "CpG": "variable"
+  },
+  "banii": {
+   "Dcm": "cut",
+   "CpG": "cut"
+  },
+  "baui": {
+   "CpG": "cut"
+  },
+  "bbei": {
+   "Dcm": "cut",
+   "CpG": "variable"
+  },
+  "bbiii": {
+   "CpG": "blocked"
+  },
+  "bbrpi": {
+   "CpG": "blocked"
+  },
+  "bbsi": {
+   "CpG": "cut"
+  },
+  "bbvci": {
+   "CpG": "impaired"
+  },
+  "bbvi": {
+   "CpG": "cut"
+  },
+  "bca77i": {
+   "CpG": "impaired"
+  },
+  "bcci": {
+   "CpG": "cut"
+  },
+  "bce243i": {
+   "Dam": "cut"
+  },
+  "bceai": {
+   "CpG": "blocked"
+  },
+  "bcit130i": {
+   "Dcm": "cut"
+  },
+  "bcivi": {
+   "Dcm": "cut",
+   "CpG": "cut"
+  },
+  "bcni": {
+   "CpG": "impaired"
+  },
+  "bdai": {
+   "Dam": "blocked"
+  },
+  "bfi57i": {
+   "Dam": "cut"
+  },
+  "bfuai": {
+   "CpG": "impaired"
+  },
+  "bfuci": {
+   "Dam": "cut",
+   "CpG": "blocked"
+  },
+  "bfui": {
+   "Dcm": "cut",
+   "CpG": "cut"
+  },
+  "bgli": {
+   "Dcm": "cut",
+   "CpG": "variable"
+  },
+  "bglii": {
+   "Dam": "cut"
+  },
+  "bini": {
+   "Dam": "blocked"
+  },
+  "blohi": {
+   "Dam": "blocked"
+  },
+  "blpi": {
+   "CpG": "cut"
+  },
+  "bme1390i": {
+   "Dcm": "blocked"
+  },
+  "bme1580i": {
+   "Dcm": "cut",
+   "CpG": "cut"
+  },
+  "bme216i": {
+   "Dcm": "blocked",
+   "CpG": "blocked"
+  },
+  "bmet110i": {
+   "CpG": "cut"
+  },
+  "bmgbi": {
+   "CpG": "some blocked"
+  },
+  "bmgt120i": {
+   "Dcm": "blocked",
+   "CpG": "blocked"
+  },
+  "bmti": {
+   "CpG": "cut"
+  },
+  "bnai": {
+   "Dam": "cut"
+  },
+  "boxi": {
+   "CpG": "variable"
+  },
+  "bpii": {
+   "CpG": "cut"
+  },
+  "bpli": {
+   "CpG": "cut"
+  },
+  "bpmi": {
+   "Dcm": "cut"
+  },
+  "bpu10i": {
+   "CpG": "cut"
+  },
+  "bpu1102i": {
+   "CpG": "cut"
+  },
+  "bsa29i": {
+   "Dam": "blocked"
+  },
+  "bsaai": {
+   "CpG": "blocked"
+  },
+  "bsabi": {
+   "Dam": "blocked",
+   "CpG": "some blocked"
+  },
+  "bsahi": {
+   "Dcm": "variable",
+   "CpG": "variable"
+  },
+  "bsai": {
+   "Dcm": "variable",
+   "CpG": "variable"
+  },
+  "bsaji": {
+   "Dcm": "cut",
+   "CpG": "cut"
+  },
+  "bsawi": {
+   "Dam": "cut",
+   "CpG": "cut"
+  },
+  "bsaxi": {
+   "Dcm": "cut",
+   "CpG": "cut"
+  },
+  "bsc4i": {
+   "Dcm": "blocked",
+   "CpG": "blocked"
+  },
+  "bscfi": {
+   "Dam": "blocked"
+  },
+  "bsci": {
+   "Dam": "blocked"
+  },
+  "bscxii": {
+   "Dam": "cut"
+  },
+  "bse3di": {
+   "CpG": "cut"
+  },
+  "bse634i": {
+   "CpG": "blocked"
+  },
+  "bse8i": {
+   "Dam": "blocked",
+   "CpG": "variable"
+  },
+  "bseai": {
+   "Dam": "blocked",
+   "CpG": "impaired"
+  },
+  "bseci": {
+   "Dam": "blocked",
+   "CpG": "blocked"
+  },
+  "bsedi": {
+   "CpG": "cut"
+  },
+  "bsegi": {
+   "Dcm": "cut",
+   "CpG": "cut"
+  },
+  "bseji": {
+   "Dam": "blocked",
+   "CpG": "cut"
+  },
+  "bseli": {
+   "Dcm": "some blocked",
+   "CpG": "some blocked"
+  },
+  "bsemi": {
+   "CpG": "cut"
+  },
+  "bseri": {
+   "CpG": "cut"
+  },
+  "bsesi": {
+   "Dcm": "cut",
+   "CpG": "cut"
+  },
+  "bsexi": {
+   "CpG": "cut"
+  },
+  "bseyi": {
+   "CpG": "blocked"
+  },
+  "bsgi": {
+   "CpG": "cut"
+  },
+  "bsh1236i": {
+   "CpG": "blocked"
+  },
+  "bsh1285i": {
+   "Dam": "blocked",
+   "CpG": "blocked"
+  },
+  "bsh1365i": {
+   "Dam": "blocked"
+  },
+  "bshfi": {
+   "Dcm": "cut",
+   "CpG": "cut"
+  },
+  "bshgi": {
+   "Dcm": "cut"
+  },
+  "bshni": {
+   "Dcm": "some blocked",
+   "CpG": "some blocked"
+  },
+  "bshti": {
+   "CpG": "blocked"
+  },
+  "bsibi": {
+   "Dam": "blocked"
+  },
+  "bsiei": {
+   "Dam": "cut",
+   "CpG": "some blocked"
+  },
+  "bsihkai": {
+   "CpG": "cut"
+  },
+  "bsili": {
+   "Dcm": "cut"
+  },
+  "bsimi": {
+   "Dam": "blocked"
+  },
+  "bsiqi": {
+   "Dam": "blocked"
+  },
+  "bsisi": {
+   "CpG": "cut"
+  },
+  "bsiwi": {
+   "CpG": "blocked"
+  },
+  "bsixi": {
+   "Dam": "blocked"
+  },
+  "bsli": {
+   "Dcm": "variable",
+   "CpG": "variable"
+  },
+  "bsmai": {
+   "CpG": "variable"
+  },
+  "bsmbi": {
+   "CpG": "some blocked"
+  },
+  "bsmfi": {
+   "Dcm": "blocked",
+   "CpG": "blocked"
+  },
+  "bsmi": {
+   "CpG": "cut"
+  },
+  "bso31i": {
+   "Dcm": "impaired"
+  },
+  "bsobi": {
+   "CpG": "cut"
+  },
+  "bsofi": {
+   "CpG": "variable"
+  },
+  "bsp105i": {
+   "Dam": "blocked"
+  },
+  "bsp119i": {
+   "CpG": "blocked"
+  },
+  "bsp120i": {
+   "Dcm": "blocked",
+   "CpG": "blocked"
+  },
+  "bsp1286i": {
+   "Dcm": "cut",
+   "CpG": "cut"
+  },
+  "bsp143i": {
+   "Dam": "cut",
+   "CpG": "blocked"
+  },
+  "bsp143ii": {
+   "CpG": "blocked"
+  },
+  "bsp1720i": {
+   "CpG": "cut"
+  },
+  "bsp2095i": {
+   "Dam": "cut"
+  },
+  "bsp67i": {
+   "Dam": "cut"
+  },
+  "bsp68i": {
+   "Dam": "cut",
+   "CpG": "blocked"
+  },
+  "bspai": {
+   "Dam": "cut"
+  },
+  "bspdi": {
+   "Dam": "blocked",
+   "CpG": "blocked"
+  },
+  "bspei": {
+   "Dam": "blocked",
+   "CpG": "impaired"
+  },
+  "bspfi": {
+   "Dam": "cut"
+  },
+  "bsphi": {
+   "Dam": "variable"
+  },
+  "bspkt6i": {
+   "Dam": "blocked"
+  },
+  "bspli": {
+   "Dcm": "variable",
+   "CpG": "variable"
+  },
+  "bspmi": {
+   "CpG": "cut"
+  },
+  "bspmii": {
+   "Dam": "cut",
+   "CpG": "blocked"
+  },
+  "bsppi": {
+   "Dam": "blocked",
+   "Dcm": "cut",
+   "CpG": "cut"
+  },
+  "bspqi": {
+   "CpG": "cut"
+  },
+  "bspt104i": {
+   "CpG": "blocked"
+  },
+  "bspxi": {
+   "Dam": "blocked"
+  },
+  "bspxii": {
+   "Dam": "blocked"
+  },
+  "bspzei": {
+   "Dam": "blocked"
+  },
+  "bsrbi": {
+   "CpG": "variable"
+  },
+  "bsrbri": {
+   "Dam": "blocked"
+  },
+  "bsrdi": {
+   "CpG": "cut"
+  },
+  "bsrfi": {
+   "CpG": "variable"
+  },
+  "bssai": {
+   "CpG": "cut"
+  },
+  "bsseci": {
+   "CpG": "cut"
+  },
+  "bsshii": {
+   "CpG": "some blocked"
+  },
+  "bsski": {
+   "Dcm": "blocked",
+   "CpG": "blocked"
+  },
+  "bsssi": {
+   "CpG": "cut"
+  },
+  "bst1107i": {
+   "CpG": "some blocked"
+  },
+  "bst2ui": {
+   "Dcm": "cut"
+  },
+  "bst6i": {
+   "CpG": "blocked"
+  },
+  "bstapi": {
+   "CpG": "variable"
+  },
+  "bstbi": {
+   "CpG": "blocked"
+  },
+  "bstc8i": {
+   "CpG": "blocked"
+  },
+  "bsteii": {
+   "Dcm": "cut",
+   "CpG": "cut"
+  },
+  "bstenii": {
+   "Dam": "impaired"
+  },
+  "bstf5i": {
+   "Dcm": "cut",
+   "CpG": "cut"
+  },
+  "bsthhi": {
+   "CpG": "cut"
+  },
+  "bsti": {
+   "Dam": "cut"
+  },
+  "bstkti": {
+   "Dam": "blocked",
+   "CpG": "cut"
+  },
+  "bstmai": {
+   "CpG": "cut"
+  },
+  "bstmwi": {
+   "CpG": "some blocked"
+  },
+  "bstni": {
+   "Dcm": "cut"
+  },
+  "bstoi": {
+   "Dcm": "cut"
+  },
+  "bstpi": {
+   "Dcm": "cut",
+   "CpG": "cut"
+  },
+  "bstsci": {
+   "Dcm": "blocked"
+  },
+  "bstsli": {
+   "Dcm": "cut",
+   "CpG": "cut"
+  },
+  "bstui": {
+   "CpG": "blocked"
+  },
+  "bstv1i": {
+   "CpG": "cut"
+  },
+  "bstv2i": {
+   "CpG": "cut"
+  },
+  "bstxi": {
+   "Dcm": "variable"
+  },
+  "bstyi": {
+   "Dam": "cut",
+   "Dcm": "cut",
+   "CpG": "cut"
+  },
+  "bstz17i": {
+   "CpG": "some blocked"
+  },
+  "bsu15i": {
+   "Dam": "blocked",
+   "CpG": "blocked"
+  },
+  "bsui": {
+   "CpG": "cut"
+  },
+  "bsuri": {
+   "Dcm": "cut",
+   "CpG": "cut"
+  },
+  "bsutui": {
+   "Dam": "blocked"
+  },
+  "btgi": {
+   "CpG": "cut"
+  },
+  "btri": {
+   "CpG": "variable"
+  },
+  "btsci": {
+   "Dcm": "cut",
+   "CpG": "cut"
+  },
+  "btsi": {
+   "CpG": "cut"
+  },
+  "bvei": {
+   "CpG": "impaired"
+  },
+  "cac8i": {
+   "CpG": "some blocked"
+  },
+  "caii": {
+   "Dcm": "blocked"
+  },
+  "cboi": {
+   "CpG": "impaired"
+  },
+  "cbri": {
+   "Dcm": "blocked"
+  },
+  "ccyi": {
+   "Dam": "cut"
+  },
+  "cfoi": {
+   "CpG": "blocked"
+  },
+  "cfr10i": {
+   "CpG": "blocked"
+  },
+  "cfr13i": {
+   "Dcm": "blocked",
+   "CpG": "blocked"
+  },
+  "cfr42i": {
+   "CpG": "blocked"
+  },
+  "cfr9i": {
+   "CpG": "impaired"
+  },
+  "cfri": {
+   "Dcm": "blocked",
+   "CpG": "blocked"
+  },
+  "clai": {
+   "Dam": "blocked",
+   "CpG": "blocked"
+  },
+  "cpfi": {
+   "Dam": "cut"
+  },
+  "cpoi": {
+   "CpG": "blocked"
+  },
+  "csei": {
+   "CpG": "blocked"
+  },
+  "csp68kii": {
+   "CpG": "blocked"
+  },
+  "csp6i": {
+   "CpG": "cut"
+  },
+  "cspai": {
+   "CpG": "cut"
+  },
+  "cspci": {
+   "CpG": "cut"
+  },
+  "cspi": {
+   "CpG": "blocked"
+  },
+  "cthii": {
+   "Dcm": "cut"
+  },
+  "cviai": {
+   "Dam": "blocked"
+  },
+  "cviki-1": {
+   "Dcm": "cut",
+   "CpG": "cut"
+  },
+  "draii": {
+   "Dcm": "blocked"
+  },
+  "drdi": {
+   "CpG": "variable"
+  },
+  "dsav": {
+   "Dcm": "blocked"
+  },
+  "eaei": {
+   "Dcm": "blocked",
+   "CpG": "blocked"
+  },
+  "eagi": {
+   "CpG": "blocked"
+  },
+  "eam1104i": {
+   "CpG": "cut"
+  },
+  "eam1105i": {
+   "CpG": "cut"
+  },
+  "eari": {
+   "CpG": "impaired"
+  },
+  "ecii": {
+   "Dam": "blocked",
+   "Dcm": "cut",
+   "CpG": "variable"
+  },
+  "ecl136ii": {
+   "CpG": "some blocked"
+  },
+  "ecl18ki": {
+   "Dcm": "blocked"
+  },
+  "eclxi": {
+   "CpG": "blocked"
+  },
+  "eco105i": {
+   "CpG": "blocked"
+  },
+  "eco147i": {
+   "Dcm": "blocked"
+  },
+  "eco24i": {
+   "Dcm": "cut",
+   "CpG": "cut"
+  },
+  "eco31i": {
+   "Dcm": "impaired"
+  },
+  "eco32i": {
+   "CpG": "cut"
+  },
+  "eco47i": {
+   "Dcm": "blocked",
+   "CpG": "blocked"
+  },
+  "eco47iii": {
+   "CpG": "blocked"
+  },
+  "eco52i": {
+   "CpG": "blocked"
+  },
+  "eco53ki": {
+   "CpG": "variable"
+  },
+  "eco57mi": {
+   "Dcm": "blocked"
+  },
+  "eco72i": {
+   "CpG": "blocked"
+  },
+  "eco88i": {
+   "CpG": "impaired"
+  },
+  "eco91i": {
+   "Dcm": "cut",
+   "CpG": "cut"
+  },
+  "econi": {
+   "Dcm": "cut"
+  },
+  "ecoo109i": {
+   "Dcm": "variable",
+   "CpG": "cut"
+  },
+  "ecoo65i": {
+   "Dcm": "cut",
+   "CpG": "cut"
+  },
+  "ecori": {
+   "CpG": "variable"
+  },
+  "ecorii": {
+   "Dcm": "blocked"
+  },
+  "ehei": {
+   "Dcm": "cut",
+   "CpG": "variable"
+  },
+  "esabc3i": {
+   "Dam": "cut",
+   "CpG": "cut"
+  },
+  "esabc4i": {
+   "Dcm": "cut",
+   "CpG": "cut"
+  },
+  "esp1396i": {
+   "Dcm": "blocked"
+  },
+  "esp3i": {
+   "CpG": "variable"
+  },
+  "faqi": {
+   "Dcm": "cut",
+   "CpG": "variable"
+  },
+  "faui": {
+   "CpG": "variable"
+  },
+  "fbai": {
+   "Dam": "blocked"
+  },
+  "fnu4hi": {
+   "CpG": "blocked"
+  },
+  "fnudii": {
+   "CpG": "blocked"
+  },
+  "fnuei": {
+   "Dam": "cut"
+  },
+  "frioi": {
+   "Dcm": "cut",
+   "CpG": "cut"
+  },
+  "fsei": {
+   "CpG": "variable"
+  },
+  "fsp4hi": {
+   "CpG": "blocked"
+  },
+  "fspai": {
+   "CpG": "blocked"
+  },
+  "fspi": {
+   "CpG": "blocked"
+  },
+  "gsai": {
+   "CpG": "blocked"
+  },
+  "gsui": {
+   "Dcm": "blocked"
+  },
+  "haeii": {
+   "Dcm": "cut",
+   "CpG": "variable"
+  },
+  "haeiv": {
+   "Dam": "blocked"
+  },
+  "hapii": {
+   "CpG": "blocked"
+  },
+  "hgai": {
+   "CpG": "variable"
+  },
+  "hgiai": {
+   "CpG": "cut"
+  },
+  "hgicii": {
+   "Dcm": "blocked",
+   "CpG": "blocked"
+  },
+  "hgiei": {
+   "Dcm": "blocked",
+   "CpG": "blocked"
+  },
+  "hgihi": {
+   "Dcm": "blocked",
+   "CpG": "blocked"
+  },
+  "hhai": {
+   "CpG": "variable"
+  },
+  "hhaii": {
+   "CpG": "blocked"
+  },
+  "hin1i": {
+   "Dcm": "impaired",
+   "CpG": "some blocked"
+  },
+  "hin4i": {
+   "Dam": "blocked",
+   "CpG": "impaired"
+  },
+  "hin6i": {
+   "CpG": "blocked"
+  },
+  "hincii": {
+   "CpG": "variable"
+  },
+  "hindii": {
+   "CpG": "blocked"
+  },
+  "hinfi": {
+   "CpG": "variable"
+  },
+  "hinp1i": {
+   "CpG": "variable"
+  },
+  "hpai": {
+   "CpG": "variable"
+  },
+  "hpaii": {
+   "CpG": "blocked"
+  },
+  "hphi": {
+   "Dam": "blocked",
+   "Dcm": "cut",
+   "CpG": "cut"
+  },
+  "hpy166ii": {
+   "CpG": "some blocked"
+  },
+  "hpy188i": {
+   "Dam": "blocked",
+   "CpG": "cut"
+  },
+  "hpy188iii": {
+   "Dam": "blocked",
+   "CpG": "blocked"
+  },
+  "hpy8i": {
+   "CpG": "impaired"
+  },
+  "hpy99i": {
+   "CpG": "some blocked"
+  },
+  "hpyav": {
+   "CpG": "impaired"
+  },
+  "hpych4iii": {
+   "CpG": "cut"
+  },
+  "hpych4iv": {
+   "CpG": "blocked"
+  },
+  "hpyf10vi": {
+   "CpG": "some blocked"
+  },
+  "hpyse526i": {
+   "CpG": "blocked"
+  },
+  "hsoi": {
+   "CpG": "blocked"
+  },
+  "hspai": {
+   "CpG": "cut"
+  },
+  "itai": {
+   "CpG": "variable"
+  },
+  "kasi": {
+   "Dcm": "cut",
+   "CpG": "variable"
+  },
+  "kpn2i": {
+   "Dam": "cut",
+   "CpG": "blocked"
+  },
+  "kpni": {
+   "Dcm": "cut",
+   "CpG": "cut"
+  },
+  "ksp22i": {
+   "Dam": "blocked"
+  },
+  "kspai": {
+   "CpG": "some blocked"
+  },
+  "kzo9i": {
+   "Dam": "cut"
+  },
+  "lgui": {
+   "CpG": "cut"
+  },
+  "llaai": {
+   "Dam": "blocked"
+  },
+  "lwei": {
+   "CpG": "impaired"
+  },
+  "mabi": {
+   "Dcm": "cut"
+  },
+  "maeii": {
+   "CpG": "blocked"
+  },
+  "mami": {
+   "Dam": "blocked"
+  },
+  "mbii": {
+   "CpG": "some blocked"
+  },
+  "mboi": {
+   "Dam": "blocked"
+  },
+  "mboii": {
+   "Dam": "blocked",
+   "CpG": "cut"
+  },
+  "mfli": {
+   "Dam": "blocked"
+  },
+  "mhli": {
+   "Dcm": "cut",
+   "CpG": "cut"
+  },
+  "mlsi": {
+   "Dcm": "blocked"
+  },
+  "mlui": {
+   "CpG": "blocked"
+  },
+  "mlyi": {
+   "CpG": "cut"
+  },
+  "mmei": {
+   "Dam": "cut",
+   "CpG": "variable"
+  },
+  "mnli": {
+   "CpG": "cut"
+  },
+  "mroi": {
+   "Dam": "cut",
+   "CpG": "blocked"
+  },
+  "mroxi": {
+   "CpG": "cut"
+  },
+  "msci": {
+   "Dcm": "blocked"
+  },
+  "msli": {
+   "CpG": "cut"
+  },
+  "mspni": {
+   "Dcm": "cut",
+   "CpG": "cut"
+  },
+  "mspnii": {
+   "Dam": "cut"
+  },
+  "mspr9i": {
+   "Dcm": "blocked"
+  },
+  "mssi": {
+   "CpG": "cut"
+  },
+  "mva1269i": {
+   "CpG": "cut"
+  },
+  "mvai": {
+   "Dcm": "cut"
+  },
+  "mwoi": {
+   "CpG": "variable"
+  },
+  "naei": {
+   "CpG": "some blocked"
+  },
+  "nari": {
+   "Dcm": "cut",
+   "CpG": "variable"
+  },
+  "ncii": {
+   "CpG": "some blocked"
+  },
+  "ncui": {
+   "Dam": "blocked"
+  },
+  "ndeii": {
+   "Dam": "blocked",
+   "CpG": "cut"
+  },
+  "ngomiv": {
+   "CpG": "some blocked"
+  },
+  "ngopii": {
+   "Dcm": "blocked",
+   "CpG": "blocked"
+  },
+  "nhei": {
+   "CpG": "some blocked"
+  },
+  "nlaiv": {
+   "Dcm": "blocked",
+   "CpG": "blocked"
+  },
+  "nmeaiii": {
+   "CpG": "cut"
+  },
+  "nmuci": {
+   "CpG": "impaired"
+  },
+  "noti": {
+   "CpG": "variable"
+  },
+  "nrui": {
+   "Dam": "blocked",
+   "CpG": "blocked"
+  },
+  "nsbi": {
+   "CpG": "blocked"
+  },
+  "nspi": {
+   "CpG": "cut"
+  },
+  "nspv": {
+   "CpG": "blocked"
+  },
+  "olii": {
+   "CpG": "impaired"
+  },
+  "paei": {
+   "CpG": "cut"
+  },
+  "paer7i": {
+   "CpG": "some blocked"
+  },
+  "pagi": {
+   "Dam": "impaired"
+  },
+  "paqci": {
+   "CpG": "impaired"
+  },
+  "pasi": {
+   "Dcm": "cut"
+  },
+  "paui": {
+   "CpG": "blocked"
+  },
+  "pbrti": {
+   "Dam": "cut"
+  },
+  "pcti": {
+   "CpG": "cut"
+  },
+  "pdii": {
+   "CpG": "blocked"
+  },
+  "pdmi": {
+   "CpG": "some blocked"
+  },
+  "pfei": {
+   "CpG": "blocked"
+  },
+  "pfl23ii": {
+   "CpG": "blocked"
+  },
+  "pflfi": {
+   "CpG": "cut"
+  },
+  "pflmi": {
+   "Dcm": "blocked"
+  },
+  "pfoi": {
+   "Dam": "impaired",
+   "Dcm": "blocked",
+   "CpG": "blocked"
+  },
+  "ple19i": {
+   "Dam": "cut"
+  },
+  "plei": {
+   "CpG": "variable"
+  },
+  "pluti": {
+   "Dcm": "cut",
+   "CpG": "variable"
+  },
+  "pmaci": {
+   "CpG": "blocked"
+  },
+  "pmei": {
+   "CpG": "cut"
+  },
+  "pmli": {
+   "CpG": "blocked"
+  },
+  "ppu21i": {
+   "CpG": "blocked"
+  },
+  "ppumi": {
+   "Dcm": "variable",
+   "CpG": "cut"
+  },
+  "pshai": {
+   "CpG": "variable"
+  },
+  "psp1406i": {
+   "CpG": "blocked"
+  },
+  "psp5ii": {
+   "Dcm": "blocked"
+  },
+  "pspgi": {
+   "Dcm": "blocked"
+  },
+  "pspn4i": {
+   "Dcm": "impaired",
+   "CpG": "impaired"
+  },
+  "pspomi": {
+   "Dcm": "blocked",
+   "CpG": "blocked"
+  },
+  "psppi": {
+   "Dcm": "blocked",
+   "CpG": "blocked"
+  },
+  "psri": {
+   "CpG": "impaired"
+  },
+  "psui": {
+   "Dam": "cut",
+   "Dcm": "cut",
+   "CpG": "cut"
+  },
+  "psyi": {
+   "CpG": "cut"
+  },
+  "pvui": {
+   "Dam": "cut",
+   "CpG": "blocked"
+  },
+  "ralf40i": {
+   "Dam": "blocked"
+  },
+  "rigi": {
+   "CpG": "blocked"
+  },
+  "rsai": {
+   "CpG": "variable"
+  },
+  "rsani": {
+   "CpG": "cut"
+  },
+  "rshi": {
+   "Dam": "cut"
+  },
+  "rspxi": {
+   "Dam": "blocked"
+  },
+  "rsrii": {
+   "CpG": "blocked"
+  },
+  "saci": {
+   "CpG": "cut"
+  },
+  "sacii": {
+   "CpG": "blocked"
+  },
+  "sali": {
+   "CpG": "some blocked"
+  },
+  "sapi": {
+   "CpG": "cut"
+  },
+  "sati": {
+   "CpG": "blocked"
+  },
+  "sau3ai": {
+   "Dam": "cut",
+   "CpG": "some blocked"
+  },
+  "sau96i": {
+   "Dcm": "blocked",
+   "CpG": "blocked"
+  },
+  "saumi": {
+   "Dam": "cut"
+  },
+  "sbo13i": {
+   "Dam": "cut"
+  },
+  "schi": {
+   "CpG": "cut"
+  },
+  "scrfi": {
+   "Dcm": "blocked",
+   "CpG": "blocked"
+  },
+  "sdui": {
+   "Dcm": "cut",
+   "CpG": "cut"
+  },
+  "sexai": {
+   "Dcm": "blocked"
+  },
+  "sfii": {
+   "CpG": "variable"
+  },
+  "sfoi": {
+   "Dcm": "variable",
+   "CpG": "variable"
+  },
+  "sfui": {
+   "CpG": "cut"
+  },
+  "sgfi": {
+   "Dam": "cut",
+   "CpG": "blocked"
+  },
+  "sgrai": {
+   "CpG": "variable"
+  },
+  "sgrbi": {
+   "CpG": "blocked"
+  },
+  "sgsi": {
+   "Dcm": "cut",
+   "CpG": "variable"
+  },
+  "slai": {
+   "CpG": "impaired"
+  },
+  "smai": {
+   "CpG": "blocked"
+  },
+  "smli": {
+   "CpG": "cut"
+  },
+  "smoi": {
+   "CpG": "cut"
+  },
+  "smui": {
+   "CpG": "blocked"
+  },
+  "snabi": {
+   "CpG": "blocked"
+  },
+  "soli": {
+   "Dam": "blocked"
+  },
+  "sphi": {
+   "CpG": "cut"
+  },
+  "spoi": {
+   "Dam": "blocked"
+  },
+  "srfi": {
+   "CpG": "variable"
+  },
+  "sru30di": {
+   "Dcm": "blocked"
+  },
+  "ssii": {
+   "CpG": "blocked"
+  },
+  "ssoii": {
+   "Dcm": "blocked",
+   "CpG": "blocked"
+  },
+  "ssti": {
+   "CpG": "cut"
+  },
+  "sth302i": {
+   "Dcm": "cut"
+  },
+  "sth368i": {
+   "Dam": "cut",
+   "CpG": "blocked"
+  },
+  "stui": {
+   "Dcm": "blocked"
+  },
+  "styd4i": {
+   "Dcm": "blocked",
+   "CpG": "impaired"
+  },
+  "suii": {
+   "CpG": "blocked"
+  },
+  "taai": {
+   "CpG": "impaired"
+  },
+  "taii": {
+   "CpG": "blocked"
+  },
+  "taqi": {
+   "Dam": "blocked",
+   "CpG": "cut"
+  },
+  "taqxi": {
+   "Dcm": "cut"
+  },
+  "taui": {
+   "CpG": "blocked"
+  },
+  "tfii": {
+   "CpG": "variable"
+  },
+  "thai": {
+   "CpG": "blocked"
+  },
+  "tlii": {
+   "CpG": "impaired"
+  },
+  "tsei": {
+   "CpG": "variable"
+  },
+  "tsoi": {
+   "Dcm": "cut"
+  },
+  "tsp45i": {
+   "CpG": "cut"
+  },
+  "tspmi": {
+   "CpG": "blocked"
+  },
+  "tsti": {
+   "Dam": "blocked",
+   "Dcm": "cut",
+   "CpG": "cut"
+  },
+  "tth111i": {
+   "CpG": "cut"
+  },
+  "tthhb8i": {
+   "Dam": "blocked"
+  },
+  "van91i": {
+   "Dcm": "blocked"
+  },
+  "vnei": {
+   "CpG": "blocked"
+  },
+  "vpak11bi": {
+   "Dcm": "blocked",
+   "CpG": "blocked"
+  },
+  "xapi": {
+   "CpG": "cut"
+  },
+  "xbai": {
+   "Dam": "blocked"
+  },
+  "xcei": {
+   "CpG": "cut"
+  },
+  "xcmi": {
+   "Dcm": "cut"
+  },
+  "xhoi": {
+   "CpG": "impaired"
+  },
+  "xhoii": {
+   "Dam": "cut"
+  },
+  "xmii": {
+   "CpG": "blocked"
+  },
+  "xmni": {
+   "CpG": "variable"
+  },
+  "xorii": {
+   "Dam": "cut",
+   "CpG": "blocked"
+  },
+  "zani": {
+   "Dcm": "cut"
+  },
+  "zrai": {
+   "CpG": "variable"
+  }
+ }
+}

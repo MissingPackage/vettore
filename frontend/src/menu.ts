@@ -88,6 +88,7 @@ export function buildMenu(ref: MutableRefObject<MenuHandlers>) {
         ...cloningItem("pcr", "PCR"),
         ...cloningItem("design-primers", "Design Primers to Amplify a Region"),
         ...cloningItem("mutagenesis", "Mutagenesis"),
+        ...cloningItem("anneal-oligos", "Anneal Oligos and Insert"),
         "--",
         ...cloningItem("gibson", "Gibson Assembly"),
         ...cloningItem("hifi", "NEBuilder HiFi DNA Assembly"),

@@ -3,6 +3,7 @@ import type { ComponentType } from "react";
 import {
   DeleteFragmentForm,
   DesignPrimersForm,
+  AnnealOligosForm,
   GoldenGateForm,
   MutagenesisForm,
   PcrForm,
@@ -87,6 +88,15 @@ export const CLONING_ACTIONS: CloningAction[] = [
     endpoint: "mutagenesis",
     Form: MutagenesisForm,
     help: "Substitute, insert or delete bases with back-to-back primers, then KLD.",
+  },
+  {
+    id: "anneal-oligos",
+    ready: true,
+    title: "Anneal Oligos and Insert",
+    endpoint: "anneal-oligos",
+    Form: AnnealOligosForm,
+    help: "Clone a short insert (gRNA, shRNA, linker, tag) from two annealed oligos. Vettore "
+      + "reads the overhangs from the cut vector, so the oligos fit any vector and enzyme.",
   },
   {
     id: "golden-gate",

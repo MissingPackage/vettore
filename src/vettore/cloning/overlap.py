@@ -205,7 +205,9 @@ def overlap_route(body: OverlapRequest) -> CloningResult:
 
 
 from .mutagenesis import router as _mutagenesis_router
+from .oligos import router as _oligos_router
 from .pcr import router as _pcr_router
 
 router.include_router(_pcr_router)
 router.include_router(_mutagenesis_router)
+router.include_router(_oligos_router)
