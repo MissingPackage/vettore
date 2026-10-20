@@ -3,7 +3,8 @@ import { useEffect, useRef, useState } from "react";
 import { api } from "../api";
 import { ENZYMES } from "../enzymeLogic";
 import {
-  GATEWAY_SITE_KINDS, defaultInserts, defaultLinear, defaultVector, docData, gatewayDefaults, openingFromSelection,
+  GATEWAY_SITE_KINDS, MAX_ENTRY_CLONES, defaultInserts, defaultLinear, defaultVector, docData, donorPairs,
+  gatewayChain, gatewayDefaults, openingFromSelection,
 } from "./defaults";
 import { FragmentEditor } from "./fragments";
 import { newRow, rowBody, type FragmentRow } from "./fragmentRows";
@@ -368,28 +369,40 @@ export function gatewayForm(reaction: "BP" | "LR") {
   return function GatewayForm({ docs, active, onChange }: FormProps) {
     const labels = GATEWAY_LABELS[reaction];
     const [insertKind, vectorKind] = GATEWAY_SITE_KINDS[reaction];
-    const [a, setA] = useState<string | null>(null);
+    // LR takes one to four entry clones in reaction order (MultiSite); BP one attB molecule.
+    const [inserts, setInserts] = useState<(string | null)[]>([null]);
     const [b, setB] = useState<string | null>(null);
+    const [pair, setPair] = useState<string>("");
     // The att sites of every open file, by editor name; null while the engine is asked, and
-    // left null if it cannot answer (the user then chooses both files).
+    // left null if it cannot answer (the user then chooses the files). `other` lists sites of
+    // recombination systems Gateway cannot use (phiC31), so the dialog can say so.
     const [sites, setSites] = useState<Record<string, string[]> | null>(null);
+    const [other, setOther] = useState<Record<string, string[]>>({});
     const [looking, setLooking] = useState(true);
     const chosenByUser = useRef(false);
-    const da = findDoc(docs, a);
+    const chosen = inserts.map((name) => findDoc(docs, name));
     const db = findDoc(docs, b);
+    const pairs = donorPairs(db ? sites?.[db.editorName] : []);
 
     // Pick the inputs by their att sites once, unless the user has already chosen.
     useEffect(() => {
       let live = true;
       api
-        .cloning<{ sites: string[][] }>("gateway-sites", { docs: docs.map(docData) })
+        .cloning<{ sites: string[][]; other?: string[][] }>("gateway-sites", { docs: docs.map(docData) })
         .then((r) => {
           if (!live || !Array.isArray(r?.sites)) return;
           setSites(Object.fromEntries(docs.map((d, i) => [d.editorName, r.sites[i] ?? []])));
+          setOther(Object.fromEntries(docs.map((d, i) => [d.editorName, r.other?.[i] ?? []])));
           if (chosenByUser.current) return;
-          const [first, second] = gatewayDefaults(reaction, docs, r.sites, active);
-          setA(first);
-          setB(second);
+          if (reaction === "LR") {
+            const chain = gatewayChain(docs, r.sites, active);
+            setInserts(chain.entries.length ? chain.entries : [null]);
+            setB(chain.vector);
+          } else {
+            const [first, second] = gatewayDefaults(reaction, docs, r.sites, active);
+            setInserts([first]);
+            setB(second);
+          }
         })
         .catch(() => undefined)
         .finally(() => live && setLooking(false));
@@ -397,6 +410,12 @@ export function gatewayForm(reaction: "BP" | "LR") {
         live = false;
       };
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+    // The donor decides which att pairs a BP reaction can use; offer the first one by default.
+    useEffect(() => {
+      if (reaction !== "BP") return;
+      setPair(pairs.length ? pairs[0].join("-") : "");
+    }, [b, sites]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const hasKind = (kind: string) => !!sites && Object.values(sites).some((s) => s.some((x) => x.startsWith(kind)));
     // "Entry clone (attL sites)" → "entry clone (attL sites)": site names keep their capitals.
@@ -406,28 +425,116 @@ export function gatewayForm(reaction: "BP" | "LR") {
         ? `Choose the ${what}. None of the open files has ${kind} sites: open it first (File → Open…).`
         : `Choose the ${what}`;
     };
+    const entryLabel = (i: number) =>
+      inserts.length === 1 ? labels.first : `Entry clone ${i + 1} (attL or attR sites)`;
+    // A file whose att sites belong to another recombination system is a mistake the dialog
+    // can name before the engine is asked.
+    const foreign = (d: OpenDoc) =>
+      !(sites?.[d.editorName]?.length) && (other[d.editorName]?.length
+        ? `“${d.name}” carries a ${other[d.editorName].join(" and ")} site, which Gateway clonase `
+          + "does not recombine: choose a file with Gateway att sites."
+        : null);
 
     useEffect(() => {
-      if (looking && (!da || !db)) return onChange(null, "Looking for att sites in the open files…");
-      if (!da) return onChange(null, choose(labels.first, insertKind));
-      if (!db) return onChange(null, choose(labels.second, vectorKind));
-      if (da.editorName === db.editorName) {
-        return onChange(null, "Choose two different files: one carries the insert, the other is the vector");
+      if (looking && (chosen.some((d) => !d) || !db)) {
+        return onChange(null, "Looking for att sites in the open files…");
       }
-      onChange({ reaction, inputs: [docData(da), docData(db)] });
-    }, [da, db, looking, sites]); // eslint-disable-line react-hooks/exhaustive-deps
+      const empty = chosen.findIndex((d) => !d);
+      if (empty >= 0) {
+        return onChange(null, empty === 0
+          ? choose(labels.first, insertKind)
+          : `Choose entry clone ${empty + 1}, or remove it from the reaction`);
+      }
+      if (!db) return onChange(null, choose(labels.second, vectorKind));
+      const picked = [...chosen.map((d) => d!), db];
+      const names = picked.map((d) => d.editorName);
+      if (new Set(names).size !== names.length) {
+        return onChange(null, reaction === "LR" && inserts.length > 1
+          ? "Choose a different file for each input: every entry clone and the destination vector"
+          : "Choose two different files: one carries the insert, the other is the vector");
+      }
+      const wrongSystem = picked.map(foreign).find(Boolean);
+      if (wrongSystem) return onChange(null, wrongSystem);
+      onChange({
+        reaction,
+        inputs: picked.map(docData),
+        ...(reaction === "BP" && pair ? { donor_sites: pair.split("-").map(Number) } : {}),
+      });
+    }, [inserts.join("|"), b, looking, sites, pair]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    const note = (d: OpenDoc) => (sites?.[d.editorName]?.length ? sites[d.editorName].join(", ") : null);
+    const setInsert = (i: number, value: string | null) => {
+      chosenByUser.current = true;
+      setInserts((previous) => previous.map((x, j) => (j === i ? value : x)));
+    };
+    const note = (d: OpenDoc) => {
+      const found = sites?.[d.editorName] ?? [];
+      if (found.length) return found.join(", ");
+      const others = other[d.editorName] ?? [];
+      return others.length ? `${others.join(", ")} — not a Gateway site` : null;
+    };
+    // The att sites of the chosen file, under its picker: the name of a file is often longer
+    // than the list fits.
+    const hint = (d: OpenDoc | null) => {
+      if (!d || !sites) return undefined;
+      const found = note(d);
+      return found ? `att sites: ${found}` : "No att site found in this file";
+    };
+
     return (
       <>
-        <Field label={labels.first}>
-          <DocSelect docs={docs} value={a} note={note} testId="insert-doc"
-                     onChange={(v) => { chosenByUser.current = true; setA(v); }} />
-        </Field>
-        <Field label={labels.second}>
+        {inserts.map((value, i) => (
+          <Field key={i} label={entryLabel(i)} hint={hint(chosen[i])}>
+            <div className="vt-input-row">
+              <DocSelect docs={docs} value={value} note={note} testId={i === 0 ? "insert-doc" : `entry-doc-${i + 1}`}
+                         onChange={(v) => setInsert(i, v)} />
+              {inserts.length > 1 && (
+                <button
+                  className="bp3-button bp3-small"
+                  data-testid={`remove-entry-${i + 1}`}
+                  title="Remove this entry clone from the reaction"
+                  onClick={() => {
+                    chosenByUser.current = true;
+                    setInserts((previous) => previous.filter((_, j) => j !== i));
+                  }}
+                >
+                  Remove
+                </button>
+              )}
+            </div>
+          </Field>
+        ))}
+        {reaction === "LR" && (
+          <div className="vt-add-entry">
+            <button
+              className="bp3-button bp3-small"
+              data-testid="add-entry"
+              disabled={inserts.length >= MAX_ENTRY_CLONES}
+              onClick={() => { chosenByUser.current = true; setInserts((previous) => [...previous, null]); }}
+            >
+              + Add entry clone
+            </button>
+            <span className="vt-field-hint">
+              MultiSite Gateway: up to {MAX_ENTRY_CLONES} entry clones go into one reaction, in the order shown
+              (attL4 - attR1, attL1 - attL2, attR2 - attL3 and so on).
+            </span>
+          </div>
+        )}
+        <Field label={labels.second} hint={hint(db)}>
           <DocSelect docs={docs} value={b} note={note} testId="vector-doc"
                      onChange={(v) => { chosenByUser.current = true; setB(v); }} />
         </Field>
+        {reaction === "BP" && pairs.length > 0 && (
+          <Field label="att sites of the donor"
+                 hint="The pair the donor carries: the entry clone is built on these sites.">
+            <div className="bp3-html-select bp3-fill">
+              <select data-testid="donor-pair" value={pair} onChange={(e) => setPair(e.target.value)}>
+                {pairs.map(([x, y]) => (
+                  <option key={`${x}-${y}`} value={`${x}-${y}`}>attP{x} and attP{y}</option>
+                ))}
+              </select>
+            </div>
+          </Field>
+        )}
       </>
     );
   };

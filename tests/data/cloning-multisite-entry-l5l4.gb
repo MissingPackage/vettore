@@ -1,0 +1,129 @@
+LOCUS       PP281279                4430 bp    DNA     circular SYN 17-APR-2024
+DEFINITION  Genome editing vector pGN1102CK, complete sequence.
+ACCESSION   PP281279
+VERSION     PP281279.1
+KEYWORDS    .
+SOURCE      Genome editing vector pGN1102CK
+  ORGANISM  Genome editing vector pGN1102CK
+            other sequences; artificial sequences; vectors.
+REFERENCE   1  (bases 1 to 4430)
+  AUTHORS   Wu,S., Kyaw,H., Tong,Z., Yang,Y., Wang,Z., Zhang,L., Deng,L.,
+            Zhang,Z., Xiao,B., Quick,W.P., Lu,T., Xiao,G., Qin,G. and Cui,X.
+  TITLE     Direct Submission
+  JOURNAL   Submitted (03-FEB-2024) Biotechnology Research Institute, Chinese
+            Academy of Agricultural Sciences, Zhongguancun South Street No12
+            Haidian District, Beijing 100081, China
+COMMENT     ##Assembly-Data-START##
+            Sequencing Technology :: Sanger dideoxy sequencing
+            ##Assembly-Data-END##
+FEATURES             Location/Qualifiers
+     source          1..4430
+                     /organism="Genome editing vector pGN1102CK"
+                     /mol_type="other DNA"
+                     /db_xref="taxon:3133182"
+     misc_feature    50..709
+                     /product="CmR"
+     regulatory      710..812
+                     /regulatory_class="promoter"
+                     /note="cat promoter"
+     rep_origin      913..1501
+                     /note="ori"
+     regulatory      1931..1949
+                     /regulatory_class="promoter"
+                     /note="SP6 promoter"
+     misc_feature    1996..2091
+                     /note="attL5"
+     regulatory      2094..2476
+                     /regulatory_class="promoter"
+                     /note="POsU3"
+     regulatory      2488..2591
+                     /regulatory_class="promoter"
+                     /note="Pcat"
+     misc_feature    2592..3386
+                     /product="KanR"
+     misc_feature    3728..4033
+                     /product="ccdB"
+     misc_RNA        4081..4156
+                     /note="gRNA scaffold"
+     misc_feature    4187..4282
+                     /note="attL4"
+     regulatory      4351..4369
+                     /regulatory_class="promoter"
+                     /note="T7 promoter"
+ORIGIN      
+        1 catgagtagc accaggcgtt taagggcacc aataactgcc ttaaaaaaat tacgccccgc
+       61 cctgccactc atcgcagtac tgttgtaatt cattaagcat tctgccgaca tggaagccat
+      121 cacaaacggc atgatgaacc tgaatcgcca gcggcatcag caccttgtcg ccttgcgtat
+      181 aatatttgcc catggtgaaa acgggggcga agaagttgtc catattggcc acgtttaaat
+      241 caaaactggt gaaactcacc cagggattgg ctgagacaaa aaacatattc tcaataaacc
+      301 ctttagggaa ataggccagg ttttcaccgt aacacgccac atcttgcgaa tatatgtgta
+      361 gaaactgccg gaaatcgtcg tggtattcac tccagagcga tgaaaacgtt tcagtttgct
+      421 catggaaaac ggtgtaacaa gggtgaacac tatcccatat caccagctca ccgtctttca
+      481 ttgccatacg aaattccgga tgagcattca tcaggcgggc aagaatgtga ataaaggccg
+      541 gataaaactt gtgcttattt ttctttacgg tctttaaaaa ggccgtaata tccagctgaa
+      601 cggtctggtt ataggtacat tgagcaactg actgaaatgc ctcaaaatgt tctttacgat
+      661 gccattggga tatatcaacg gtggtatatc cagtgatttt tttctccatt ttagcttcct
+      721 tagctcctga aaatctcgat aactcaaaaa atacgcccgg tagtgatctt atttcattat
+      781 ggtgaaagtt ggaacctctt acgtgccgat caaagtctca ttttcgccaa aagttgtcat
+      841 gaccaaaatc ccttaacgtg agttttcgtt ccactgagcg tcagaccccg tagaaaagat
+      901 caaaggatct tcttgagatc ctttttttct gcgcgtaatc tgctgcttgc aaacaaaaaa
+      961 accaccgcta ccagcggtgg tttgtttgcc ggatcaagag ctaccaactc tttttccgaa
+     1021 ggtaactggc ttcagcagag cgcagatacc aaatactgtt cttctagtgt agccgtagtt
+     1081 aggccaccac ttcaagaact ctgtagcacc gcctacatac ctcgctctgc taatcctgtt
+     1141 accagtggct gctgccagtg gcgataagtc gtgtcttacc gggttggact caagacgata
+     1201 gttaccggat aaggcgcagc ggtcgggctg aacggggggt tcgtgcacac agcccagctt
+     1261 ggagcgaacg acctacaccg aactgagata cctacagcgt gagctatgag aaagcgccac
+     1321 gcttcccgaa gggagaaagg cggacaggta tccggtaagc ggcagggtcg gaacaggaga
+     1381 gcgcacgagg gagcttccag ggggaaacgc ctggtatctt tatagtcctg tcgggtttcg
+     1441 ccacctctga cttgagcgtc gatttttgtg atgctcgtca ggggggcgga gcctatggaa
+     1501 aaacgccagc aatgcggcct ttttacggtt cctggccttt tgctggcctt ttgctcacat
+     1561 gttctttcct gcgttatccc ctgattctgt ggataaccgt attaccgcct ttgagtgagc
+     1621 tgataccgct cgccgcagcc gaacgaccga gcgcagcgag tcagtgagcg aggaagccga
+     1681 aaaatcaata atcagacaac aagatgtgcg aactcgatat tttacacgac tctctttacc
+     1741 aattctgccc cgaattacac ttaaaacgac tcaacagctt aacgttggct tgccacgcat
+     1801 tacttgactg taaaactctc actcttaccg aacttggccg taacctgcca accaaagcga
+     1861 gaacaaaaca taacatcaaa cgaatcgacc gattgttagg taatcgtcac ctgcaggaag
+     1921 gtttaaacgc atttaggtga cactatagaa gtgtgtatcg ctcgagggat ccgaattcga
+     1981 agtcttggta cggagaaata atgattttat tttgactgat agtgacctgt tcgttgcaac
+     2041 aaattgatga gcaatgcttt tttataatgc caactttgta tacaaaagtt gccaaggaat
+     2101 ctttaaacat acgaacagat cacttaaagt tcttctgaag caacttaaag ttatcaggca
+     2161 tgcatggatc ttggaggaat cagatgtgca gtcagggacc atagcacaag acaggcgtct
+     2221 tctactggtg ctaccagcaa atgctggaag ccgggaacac tgggtacgtt ggaaaccacg
+     2281 tgtgatgtga aggagtaaga taaactgtag gagaaaagca tttcgtagtg ggccatgaag
+     2341 cctttcagga catgtattgc agtatgggcc ggcccattac gcaattggac gacaacaaag
+     2401 actagtatta gtaccacctc ggctatccac atagatcaaa gctggtttaa aagagttgtg
+     2461 cagatgatcc gtggcaagag acccgcatga tcgggcacgt aagaggttcc aactttcacc
+     2521 ataatgaaat aagatcacta ccgggcgtat tttttgagtt atcgagattt tcaggagcta
+     2581 aggaagctaa aatggctaaa atgagaatat caccggaatt gaaaaaactg atcgaaaaat
+     2641 accgctgcgt aaaagatacg gaaggaatgt ctcctgctaa ggtatataag ctggtgggag
+     2701 aaaatgaaaa cctatattta aaaatgacgg acagccggta taaagggacc acctatgatg
+     2761 tggaacggga aaaggacatg atgctatggc tggaaggaaa gctgcctgtt ccaaaggtcc
+     2821 tgcactttga acggcatgat ggctggagca atctgctcat gagtgaggcc gatggcgtcc
+     2881 tttgctcgga agagtatgaa gatgaacaaa gccctgaaaa gattatcgag ctgtatgcgg
+     2941 agtgcatcag gctctttcac tccatcgaca tatcggattg tccctatacg aatagcttag
+     3001 acagccgctt agccgaattg gattacttac tgaataacga tctggccgat gtggattgcg
+     3061 aaaactggga agaggacact ccatttaaag atccgcgcga gctgtatgat tttttaaaga
+     3121 cggaaaagcc cgaagaggaa cttgtctttt cccacggcga cctgggagac agcaacatct
+     3181 ttgtgaaaga tggcaaagta agtggcttta ttgatcttgg gagaagcggc agggcggaca
+     3241 agtggtatga cattgccttc tgcgtccggt cgatcaggga ggatatcggg gaagaacagt
+     3301 atgtcgagct attttttgac ttactgggga tcaagcctga ttgggagaaa ataaaatatt
+     3361 atattttact ggatgagttg ttttagtagc gtggatccgg cttactaaaa gccagataac
+     3421 agtatgcgta tttgcgcgct gatttttgcg gtataagaat atatactgat atgtataccc
+     3481 gaagtatgtc aaaaagaggt atgctatgaa gcagcgtatt acagtgacag ttgacagcga
+     3541 cagctatcag ttgctcaagg catatatgat gtcaatatct ccggtctggt aagcacaacc
+     3601 atgcagaatg aagcccgtcg tctgcgtgcc gaacgctgga aagcggaaaa tcaggaaggg
+     3661 atggctgagg tcgcccggtt tattgaaatg aacggctctt ttgctgacga gaacaggggc
+     3721 tggtgaaatg cagtttaagg tttacaccta taaaagagag agccgttatc gtctgtttgt
+     3781 ggatgtacag agtgatatta ttgacacgcc cgggcgacgg atggtgatcc ccctggccag
+     3841 tgcacgtctg ctgtcagata aagtctcccg tgaactttac ccggtggtgc atatcgggga
+     3901 tgaaagctgg cgcatgatga ccaccgatat ggccagtgtg cctgtaagcg ttatcgggga
+     3961 agaagtggct gatctcagcc accgcgaaaa tgacatcaaa aacgccatta acctgatgtt
+     4021 ctggggaata taaatgtcag gctcccttat acacagccag tctgcaggtc gacggtctcg
+     4081 gtttcagagc tagaaatagc aagttgaaat aaggctagtc cgttatcaac ttgaaaaagt
+     4141 ggcaccgagt cggtgctttt tttcaagagc ttggagtgga tggatacaac ttttctatac
+     4201 aaagttggca ttataagaaa gcattgctta tcaatttgtt gcaacgaaca ggtcactatc
+     4261 agtcaaaata aaatcattat ttcctaggcc attcctgtag acttcttaat taagacgtca
+     4321 gaattctcga ggcggccgca tgtgagtctc cctatagtga gtcgtattaa tttcgcgggc
+     4381 ggaaccccta tttgtttatt tttctaaata cattcaaata tgtatccgct
+//
+

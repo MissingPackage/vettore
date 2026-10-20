@@ -225,7 +225,8 @@ def test_a_bp_reaction_on_an_lr_pair_is_refused_with_the_sites_found():
     with pytest.raises(CloningError) as err:
         gateway("BP", load("entry"), load("destination"))   # attL x attR is an LR reaction
     message = str(err.value)
-    assert "“destination” has no attP site" in message
+    assert "“entry” has no attB site" in message
+    assert "which recombine in an LR reaction" in message
     assert "attR1" in message and "attL1" in message
 
 
@@ -264,9 +265,10 @@ def test_gateway_sites_route_names_the_sites_of_each_document():
         doc("pUC-like", clean_dna(2000, 301), True),
         {"name": "empty", "sequence": ""}, {"name": "no sequence"}]})
     assert res.status_code == 200
-    assert res.json() == {"sites": [
-        ["attL1", "attL2"], ["attR1", "attR2"], ["attB1", "attB2"], ["attB1", "attB2"],
-        [], [], []]}
+    assert res.json() == {
+        "sites": [["attL1", "attL2"], ["attR1", "attR2"], ["attB1", "attB2"],
+                  ["attB1", "attB2"], [], [], []],
+        "other": [[], [], [], [], [], [], []]}
 
 
 def test_lr_messages_use_the_right_article():
@@ -277,3 +279,38 @@ def test_lr_messages_use_the_right_article():
     with pytest.raises(CloningError) as err:
         gateway("BP", plain, load("destination"))
     assert "A BP reaction needs attB sites" in str(err.value)
+
+
+# ---- att sites of other recombination systems ----------------------------------------------
+
+def phic31() -> SequenceDoc:
+    """pUASTattB (GenBank EF362409.1, Bischof et al. 2007, PNAS 104:3312), the Drosophila
+    transgenesis vector that carries the attB site of the phiC31 integrase (Groth et al.
+    2000, PNAS 97:5995). It is an attB vector, but not a Gateway one: the phiC31 attB and
+    attP sequences have nothing in common with the Gateway att sites."""
+    path = DATA / "cloning-phic31-attb.gb"
+    [document] = read_documents(path.name, path.read_bytes())
+    document["name"] = "pUASTattB"
+    return SequenceDoc(**document)
+
+
+def test_a_phic31_attb_vector_is_not_a_gateway_attb_input():
+    """The Gateway dialogs pick their inputs from this route, so a phiC31 attB vector must
+    not be offered as an attB insert; it is reported under its own system instead."""
+    app = FastAPI()
+    app.include_router(router)
+    client = TestClient(app)
+    res = client.post("/api/cloning/gateway-sites",
+                      json={"docs": [phic31().model_dump(), load("expression").model_dump()]})
+    assert res.status_code == 200
+    assert res.json() == {"sites": [[], ["attB1", "attB2"]],
+                          "other": [["phiC31 attB"], []]}
+
+
+def test_a_phic31_attb_vector_used_in_a_bp_reaction_says_why_it_cannot_react():
+    with pytest.raises(CloningError) as err:
+        gateway("BP", phic31(), load("destination"))
+    message = str(err.value)
+    assert "“pUASTattB” has no Gateway att site" in message
+    assert "phiC31 attB site" in message
+    assert "A BP reaction needs attB sites" in message

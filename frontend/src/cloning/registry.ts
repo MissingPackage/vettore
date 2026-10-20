@@ -123,8 +123,9 @@ export const CLONING_ACTIONS: CloningAction[] = [
     endpoint: "gateway",
     Form: gatewayForm("BP"),
     help: "Recombine an attB-flanked insert with a donor vector (attP sites) into an entry clone.",
-    details: "Only products where both att sites recombined are shown. The entry clone is listed "
-      + "first, the attR by-product after it.",
+    details: "The att pair of the donor (attP1/attP2, attP4/attP1r, attP2r/attP3 …) decides which "
+      + "sites the entry clone carries. Only products where both att sites recombined are shown: "
+      + "the entry clone is listed first, the attR by-product after it.",
   },
   {
     id: "gateway-lr",
@@ -132,10 +133,12 @@ export const CLONING_ACTIONS: CloningAction[] = [
     title: "Gateway LR Reaction",
     endpoint: "gateway",
     Form: gatewayForm("LR"),
-    help: "Recombine an entry clone (attL sites) with a destination vector (attR sites) into an expression clone.",
-    details: "Only products where both att sites recombined are shown. The expression clone is "
-      + "listed first, the attP by-product after it; a vector with two Gateway cassettes gives "
-      + "one clone per cassette.",
+    help: "Recombine one to four entry clones (attL sites) with a destination vector (attR sites) "
+      + "into an expression clone.",
+    details: "A MultiSite reaction lines the entry clones up through their numbered att sites "
+      + "(attL4 - attR1, attL1 - attL2, attR2 - attL3). Only products where both att sites of a "
+      + "junction recombined are shown. The expression clone is listed first, the attP by-product "
+      + "after it; a vector with two Gateway cassettes gives one clone per cassette.",
   },
   {
     id: "ta",
