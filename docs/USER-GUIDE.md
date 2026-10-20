@@ -315,8 +315,9 @@ insert will go in backwards.
 Recombination between att sites, with no enzymes to choose:
 
 - **BP** — an attB-flanked insert (a PCR product with attB tails, or a clone carrying attB sites)
-  plus a donor vector with attP sites give the **entry clone**. Under the donor you choose which
-  **att pair** it carries (attP1 and attP2, attP4 and attP1r, attP2r and attP3…); that pair
+  plus a donor vector with attP sites give the **entry clone**. Under the donor, **att sites of the
+  donor** shows the pair it carries by number — attP1 and attP2 for a standard donor, attP1 and
+  attP4 for a P4-P1r donor — and, when a donor carries more than two, lets you choose; that pair
   decides the sites of the entry clone you get.
 - **LR** — one to four entry clones (attL sites) plus a destination vector (attR sites) give the
   **expression clone**.

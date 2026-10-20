@@ -136,7 +136,7 @@ class WindowsAssociations:
         """What :meth:`enable` writes, one line each, under HKEY_CURRENT_USER."""
         progid = rf"{CLASSES}\{PROGID}"
         lines = [rf"{progid} = {PROGID_LABEL}",
-                 rf"{progid}\DefaultIcon = \"{self.executable}\",0",
+                 rf"{progid}\DefaultIcon = " + f'"{self.executable}",0',
                  rf"{progid}\shell\open\command = {self.command}"]
         for ext in EXTENSIONS:
             lines.append(rf"{CLASSES}\{ext} = {PROGID}")

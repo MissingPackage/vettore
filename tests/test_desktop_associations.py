@@ -338,6 +338,10 @@ def test_the_api_switches_the_associations_on_and_off(monkeypatch):
     dry = c.post("/api/desktop/file-associations", headers=H,
                  json={"enabled": True, "dry_run": True}).json()
     assert dry["enabled"] is False and len(dry["plan"]) == 3 + 2 * len(EXTENSIONS)
+    assert rf'{CLASSES}\{PROGID}\DefaultIcon = "{EXE}",0' in dry["plan"]
+    undo = c.post("/api/desktop/file-associations", headers=H,
+                  json={"enabled": False, "dry_run": True}).json()
+    assert undo["plan"] and all(line.startswith("remove ") for line in undo["plan"])
     assert reg.keys == {}
     on = c.post("/api/desktop/file-associations", headers=H, json={"enabled": True}).json()
     assert on["enabled"] is True

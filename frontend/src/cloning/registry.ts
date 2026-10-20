@@ -123,8 +123,8 @@ export const CLONING_ACTIONS: CloningAction[] = [
     endpoint: "gateway",
     Form: gatewayForm("BP"),
     help: "Recombine an attB-flanked insert with a donor vector (attP sites) into an entry clone.",
-    details: "The att pair of the donor (attP1/attP2, attP4/attP1r, attP2r/attP3 …) decides which "
-      + "sites the entry clone carries. Only products where both att sites recombined are shown: "
+    details: "The att sites of the donor (attP1 and attP2, or attP1 and attP4 for a P4-P1r donor …) "
+      + "decide which sites the entry clone carries. Only products where both att sites recombined are shown: "
       + "the entry clone is listed first, the attR by-product after it.",
   },
   {

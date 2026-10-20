@@ -335,7 +335,9 @@ def create_app(token: str, static_dir: Path | None,
         if target is None:
             raise HTTPException(409, associations.unavailable_status()["reason"])
         if body.dry_run:
-            return {**target.status(), "plan": target.plan()}
+            # Turning the option off removes what turning it on writes.
+            plan = target.plan() if body.enabled else [f"remove {line}" for line in target.plan()]
+            return {**target.status(), "plan": plan}
         try:
             if body.enabled:
                 target.enable()
