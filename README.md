@@ -12,7 +12,7 @@ nothing to install.
 
 Unzip anywhere, then run `Vettore.exe` (Windows) or `Vettore` (Linux). On Windows, SmartScreen
 warns about an unsigned app the first time: choose **More info → Run anyway**.
-Start here: **[user guide](docs/USER-GUIDE.md)**.
+Start here: **[user guide](docs/USER-GUIDE.md)** · what changed: [changelog](CHANGELOG.md).
 
 ## What it does
 
