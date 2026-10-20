@@ -159,23 +159,60 @@ def _gapped(target: str, query: str, coordinates) -> tuple[str, str, int, int, i
             int(coordinates[0][-1]), int(coordinates[1][0]), int(coordinates[1][-1]))
 
 
+def _column_qualities(read_gapped: str, quality: list[int]) -> list[int]:
+    """Phred quality behind each alignment column: the read base's own, or, where the read has
+    a gap, the lower of the two read bases around it (the evidence for the missing base)."""
+    own: list[int | None] = []
+    index = 0
+    for base in read_gapped:
+        if base == "-":
+            own.append(None)
+        else:
+            own.append(quality[index])
+            index += 1
+    out: list[int] = []
+    last_seen: int | None = None
+    following: list[int | None] = [None] * len(own)
+    upcoming: int | None = None
+    for i in range(len(own) - 1, -1, -1):
+        following[i] = upcoming
+        if own[i] is not None:
+            upcoming = own[i]
+    for i, value in enumerate(own):
+        if value is not None:
+            out.append(value)
+            last_seen = value
+        else:
+            around = [q for q in (last_seen, following[i]) if q is not None]
+            out.append(min(around) if around else 0)
+    return out
+
+
 def _discrepancies(reference_gapped: str, read_gapped: str, offset: int,
-                   reference_length: int) -> list[dict[str, Any]]:
-    """Differences, with 1-based coordinates on the reference."""
+                   reference_length: int,
+                   qualities: list[int] | None = None) -> list[dict[str, Any]]:
+    """Differences, with 1-based coordinates on the reference. With ``qualities`` (one per
+    column, see ``_column_qualities``) each difference also carries the read's Phred quality
+    there; a merged insertion or deletion carries the lowest."""
     out: list[dict[str, Any]] = []
     position = offset
-    for ref_base, read_base in zip(reference_gapped, read_gapped):
+    for column, (ref_base, read_base) in enumerate(zip(reference_gapped, read_gapped)):
+        item: dict[str, Any] | None = None
         if ref_base == "-":
-            out.append({"kind": "insertion", "position": (position % reference_length) + 1,
-                        "reference": "", "read": read_base})
-            continue
-        if read_base != "-" and read_base != ref_base:
-            out.append({"kind": "mismatch", "position": (position % reference_length) + 1,
-                        "reference": ref_base, "read": read_base})
+            item = {"kind": "insertion", "position": (position % reference_length) + 1,
+                    "reference": "", "read": read_base}
+        elif read_base != "-" and read_base != ref_base:
+            item = {"kind": "mismatch", "position": (position % reference_length) + 1,
+                    "reference": ref_base, "read": read_base}
         elif read_base == "-":
-            out.append({"kind": "deletion", "position": (position % reference_length) + 1,
-                        "reference": ref_base, "read": ""})
-        position += 1
+            item = {"kind": "deletion", "position": (position % reference_length) + 1,
+                    "reference": ref_base, "read": ""}
+        if item is not None:
+            if qualities is not None:
+                item["quality"] = qualities[column]
+            out.append(item)
+        if ref_base != "-":
+            position += 1
     return _merge_runs(out)
 
 
@@ -190,6 +227,8 @@ def _merge_runs(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
             previous["read"] += item["read"]
             if item["kind"] == "deletion":
                 previous["position"] = min(previous["position"], item["position"])
+            if "quality" in item:
+                previous["quality"] = min(previous["quality"], item["quality"])
         else:
             merged.append(dict(item))
     return merged
@@ -242,7 +281,8 @@ def align_trace(reference: str, circular: bool, trace: Trace, cutoff: float = DE
     aligned = candidate.slice(q_start, q_end)
     matches = sum(1 for a, b in zip(ref_mid, read_mid) if a == b and a != "-")
     identity = 100.0 * matches / max(1, len(ref_mid))
-    discrepancies = _discrepancies(ref_mid, read_mid, t_start, length)
+    discrepancies = _discrepancies(ref_mid, read_mid, t_start, length,
+                                   _column_qualities(read_mid, aligned.quality))
     return AlignedRead(trace=aligned, reference_gapped=ref_mid, read_gapped=read_mid,
                        start=t_start % length, end=(t_end - 1) % length, identity=identity,
                        discrepancies=discrepancies, trimmed=(start, end),
@@ -250,12 +290,13 @@ def align_trace(reference: str, circular: bool, trace: Trace, cutoff: float = DE
                        offset=t_start)
 
 
-def _columns(aligned: AlignedRead, length: int) -> tuple[dict[int, str], dict[int, str]]:
+def _columns(reference_gapped: str, read_gapped: str, offset: int,
+             length: int) -> tuple[dict[int, str], dict[int, str]]:
     """Per reference position: the read base aligned to it, and any bases inserted before it."""
     bases: dict[int, str] = {}
     inserts: dict[int, str] = {}
-    position = aligned.offset
-    for ref_base, read_base in zip(aligned.reference_gapped, aligned.read_gapped):
+    position = offset
+    for ref_base, read_base in zip(reference_gapped, read_gapped):
         if ref_base == "-":
             key = position % length
             inserts[key] = inserts.get(key, "") + read_base
@@ -268,10 +309,18 @@ def _columns(aligned: AlignedRead, length: int) -> tuple[dict[int, str], dict[in
 def merge_tracks(reference: str, reads: list[AlignedRead]) -> tuple[str, list[str]]:
     """Put the reference and every read on one coordinate system: an insertion found in any
     read opens a column in all tracks, so the reads can be stacked under the reference."""
+    return merge_gapped(reference, [(r.reference_gapped, r.read_gapped, r.offset) for r in reads])
+
+
+def merge_gapped(reference: str,
+                 alignments: list[tuple[str, str, int]]) -> tuple[str, list[str]]:
+    """``merge_tracks`` for any pairwise alignment to the reference, each given as
+    (gapped reference span, gapped other sequence, first reference position of the span).
+    Spans may run past the end of a circular reference; positions wrap around the origin."""
     length = len(reference)
-    columns = [_columns(read, length) for read in reads]
+    columns = [_columns(ref, other, offset, length) for ref, other, offset in alignments]
     reference_gapped: list[str] = []
-    tracks: list[list[str]] = [[] for _ in reads]
+    tracks: list[list[str]] = [[] for _ in alignments]
     for position in range(length):
         width = max((len(inserts.get(position, "")) for _, inserts in columns), default=0)
         if width:
@@ -308,6 +357,9 @@ def alignment_payload(reference_name: str, reference: str, circular: bool,
             "end": aligned.end + 1,
             "coverage": len(aligned.read_gapped.replace("-", "")),
             "identity": round(aligned.identity, 2),
+            # Phred quality of the aligned bases (Ewing & Green 1998, Genome Res 8:186):
+            # Q = -10 log10(probability that the base call is wrong).
+            "mean_quality": round(sum(aligned.trace.quality) / max(1, len(aligned.trace.quality)), 1),
             "discrepancies": aligned.discrepancies,
             "trimmed_bases": aligned.original_length - (aligned.trimmed[1] - aligned.trimmed[0]),
             "original_length": aligned.original_length,
