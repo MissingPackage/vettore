@@ -55,6 +55,7 @@ class Product(BaseModel):
     parents: list[str]               # names of the input documents
     details: str                     # human-readable parameters for History
     oligos: list[Oligo] = Field(default_factory=list)
+    label: str | None = None         # tells alternative products apart in the product list
 
 
 class CloningResult(BaseModel):

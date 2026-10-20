@@ -1,0 +1,6 @@
+/* History view: wraps long step descriptions and keeps the input buttons together. */
+.vt-history-intro { color: var(--vt-text-muted); margin: 0 0 var(--vt-space-3); max-width: 70ch; }
+.vt-history-detail { max-width: 70ch; }
+.vt-history-inputs { display: flex; flex-wrap: wrap; gap: var(--vt-space-1); align-items: center; }
+.vt-history-none { color: var(--vt-text-faint); }
+.vt-history-copy { white-space: nowrap; }

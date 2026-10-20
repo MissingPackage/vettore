@@ -13,6 +13,8 @@ export interface Product {
   parents: string[];
   details: string;
   oligos: Oligo[];
+  /** Tells alternative products apart (order, orientation), when the engine gives one. */
+  label?: string | null;
 }
 
 export interface CloningResult {
@@ -33,6 +35,9 @@ export interface OpenDoc {
 export interface FormProps {
   docs: OpenDoc[];
   active: OpenDoc | null;
-  /** Report the request body (null while the form is incomplete). */
-  onChange: (body: object | null) => void;
+  /**
+   * Report the request body; while the form is incomplete, report null and optionally what is
+   * still missing ("Choose the enzymes that open the vector"), shown in place of the preview.
+   */
+  onChange: (body: object | null, missing?: string) => void;
 }

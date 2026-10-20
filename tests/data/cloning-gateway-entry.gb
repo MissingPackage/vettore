@@ -1,0 +1,149 @@
+LOCUS       LT726670                3561 bp    DNA     circular SYN 06-FEB-2017
+DEFINITION  Gateway entry vector pENTR207-CATMA5a57070, complete sequence.
+ACCESSION   LT726670
+VERSION     LT726670.1
+KEYWORDS    .
+SOURCE      Gateway entry vector pENTR207-CATMA5a57070
+  ORGANISM  Gateway entry vector pENTR207-CATMA5a57070
+            other sequences; artificial sequences; vectors.
+REFERENCE   1
+  AUTHORS   Hilson,P., Allemeersch,J., Altmann,T., Aubourg,S., Avon,A.,
+            Beynon,J., Bhalerao,R.P., Bitton,F., Caboche,M., Cannoot,B.,
+            Chardakov,V., Cognet-Holliger,C., Colot,V., Crowe,M., Darimont,C.,
+            Durinck,S., Eickhoff,H., de Longevialle,A.F., Farmer,E.E.,
+            Grant,M., Kuiper,M.T., Lehrach,H., Leon,C., Leyva,A., Lundeberg,J.,
+            Lurin,C., Moreau,Y., Nietfeld,W., Paz-Ares,J., Reymond,P.,
+            Rouze,P., Sandberg,G., Segura,M.D., Serizet,C., Tabrett,A.,
+            Taconnat,L., Thareau,V., Van Hummelen,P., Vercruysse,S.,
+            Vuylsteke,M., Weingartner,M., Weisbeek,P.J., Wirta,V.,
+            Wittink,F.R., Zabeau,M. and Small,I.
+  TITLE     Versatile gene-specific sequence tags for Arabidopsis functional
+            genomics: transcript profiling and reverse genetics applications
+  JOURNAL   Genome Res. 14 (10B), 2176-2189 (2004)
+   PUBMED   15489341
+  REMARK    Describes the creation of an Arabidopsis GST plasmid library
+REFERENCE   2
+  AUTHORS   De Schamphelaire,W., Olbrechts,A., Meert,J., Verhelst,K., Roggeman
+            Fonseca,M., Vanhoucke,M. and Beyaert,R.
+  TITLE     BCCM/LMBP Plasmid collection
+  JOURNAL   Unpublished
+REFERENCE   3  (bases 1 to 3561)
+  AUTHORS   De Schamphelaire,W.
+  TITLE     Direct Submission
+  JOURNAL   Submitted (01-FEB-2017) BCCM/LMBP, Universiteit Gent,
+            Technologiepark 927, 9052, BELGIUM
+FEATURES             Location/Qualifiers
+     source          1..3561
+                     /organism="Gateway entry vector pENTR207-CATMA5a57070"
+                     /mol_type="other DNA"
+                     /host="Arabidopsis thaliana"
+                     /db_xref="taxon:1943483"
+                     /note="hairpin RNA;
+                     BCCM/LMBP Plasmid collection (Ghent University,Belgium)
+                     accession number LMBP ENTR00461."
+     regulatory      28..127
+                     /regulatory_class="attenuator"
+                     /note="Gateway recombination site attL1"
+     misc_feature    147..300
+                     /note="CATMA5a57070"
+     regulatory      complement(318..418)
+                     /regulatory_class="attenuator"
+                     /note="Gateway recombination site attL2"
+     CDS             541..>1167
+                     /note="unnamed protein product; kanamycin resistance;
+                     5' fragment of the kanamycin resistance CDS"
+                     /codon_start=1
+                     /transl_table=11
+                     /protein_id="SJL81961.1"
+                     /translation="MSHIQRETSRPRLNSNMDADLYGYKWARDNVGQSGATIYRLYGK
+                     PDAPELFLKHGKGSVANDVTDEMVRLNWLTEFMPLPTIKHFIRTPDDAWLLTTAIPGK
+                     TAFQVLEEYPDSGENIVDALAVFLRRLHSIPVCNCPFNSDRVFRLAQAQSRMNNGLVD
+                     ASDFDDERNGWPVEQVWKEMHKLLPFSPDSVVTHGDFSLDNLIFDEGKL"
+     CDS             complement(1201..1734)
+                     /note="unnamed protein product; gentamycin resistance"
+                     /codon_start=1
+                     /transl_table=11
+                     /protein_id="SJL81962.1"
+                     /translation="MLRSSNDVTQQGSRPKTKLGGSSMGIIRTCRLGPDQVKSMRAAL
+                     DLFGREFGDVATYSQHQPDSDYLGNLLRSKTFIALAAFDQEAVVGALAAYVLPRFEQP
+                     RSEIYIYDLAVSGEHRRQGIATALINLLKHEANALGAYVIYVQADYGDDPAVALYTKL
+                     GIREEVMHFDIDPSTAT"
+     CDS             <2283..2465
+                     /note="unnamed protein product; kanamycin resistance;
+                     3' fragment of the kanamycin resistance CDS"
+                     /codon_start=1
+                     /transl_table=11
+                     /protein_id="SJL81963.1"
+                     /translation="IGCIDVGRVGIADRYQDLAILWNCLGEFSPSLQKRLFQKYGIDN
+                     PDMNKLQFHLMLDEFF"
+     rep_origin      2978..3303
+                     /note="pMB1 ori"
+     regulatory      complement(3341..3358)
+                     /regulatory_class="terminator"
+                     /note="T2 terminator"
+     regulatory      complement(3490..3533)
+                     /regulatory_class="terminator"
+                     /note="T1 terminator"
+ORIGIN      
+        1 gttaacgcta gcatggatct cgggccccaa ataatgattt tattttgact gatagtgacc
+       61 tgttcgttgc aacaaattga tgagcaatgc ttttttataa tgccaacttt gtacaaaaaa
+      121 gcaggcttcg ccaagttgcg tgtctaggat tttgaatttg gtaagagacg gtttgattct
+      181 caagaagatc cgtcttcctc tactggaccg gttgatcttg aacctttctg gaattactga
+      241 agatgattca agattctcat gtccattaat ttactgtggt gtgttaaagt ttgtataggc
+      301 tagtctgtcg aaggcacgac ccagctttct tgtacaaagt tggcattata agaaagcatt
+      361 gcttatcaat ttgttgcaac gaacaggtca ctatcagtca aaataaaatc attatttgcc
+      421 atccagctgc agctctggcc cgtgtctcaa aatctctgat gttacattgc acaagataaa
+      481 aatatatcat catgaacaat aaaactgtct gcttacataa acagtaatac agggggtgtt
+      541 atgagccata ttcaacggga aacgtcgagg ccgcgattaa attccaacat ggatgctgat
+      601 ttatatgggt ataaatgggc tcgcgataat gtcgggcaat caggtgcgac aatctatcgc
+      661 ttgtatggga agcccgatgc gccagagttg tttctgaaac atggcaaagg tagcgttgcc
+      721 aatgatgtta cagatgagat ggtcagacta aactggctga cggaatttat gcctcttccg
+      781 accatcaagc attttatccg tactcctgat gatgcatggt tactcaccac tgcgatcccc
+      841 ggaaaaacag cattccaggt attagaagaa tatcctgatt caggtgaaaa tattgttgat
+      901 gcgctggcag tgttcctgcg ccggttgcat tcgattcctg tttgtaattg tccttttaac
+      961 agcgatcgcg tatttcgtct cgctcaggcg caatcacgaa tgaataacgg tttggttgat
+     1021 gcgagtgatt ttgatgacga gcgtaatggc tggcctgttg aacaagtctg gaaagaaatg
+     1081 cataaacttt tgccattctc accggattca gtcgtcactc atggtgattt ctcacttgat
+     1141 aaccttattt ttgacgaggg gaaattaggc cgggaagccg atctcggctt gaacgaattg
+     1201 ttaggtggcg gtacttgggt cgatatcaaa gtgcatcact tcttcccgta tgcccaactt
+     1261 tgtatagaga gccactgcgg gatcgtcacc gtaatctgct tgcacgtaga tcacataagc
+     1321 accaagcgcg ttggcctcat gcttgaggag attgatgagc gcggtggcaa tgccctgcct
+     1381 ccggtgctcg ccggagactg cgagatcata gatatagatc tcactacgcg gctgctcaaa
+     1441 cctgggcaga acgtaagccg cgagagcgcc aacaaccgct tcttggtcga aggcagcaag
+     1501 cgcgatgaat gtcttactac ggagcaagtt cccgaggtaa tcggagtccg gctgatgttg
+     1561 ggagtaggtg gctacgtctc cgaactcacg accgaaaaga tcaagagcag cccgcatgga
+     1621 tttgacttgg tcagggccga gcctacatgt gcgaatgatg cccatacttg agccacctaa
+     1681 ctttgtttta gggcgactgc cctgctgcgt aacatcgttg ctgctgcgta acatcgttgc
+     1741 tgctccataa catcaaacat cgacccacgg cgtaacgcgc ttgctgcttg gatgcccgag
+     1801 gcatagactg tacaaaaaaa cagtcataac aagccatgaa aaccgccact gcgccgttac
+     1861 caccgctgcg ttcggtcaag gttctggacc agttgcgtga gcgcatacgc tacttgcatt
+     1921 acagtttacg aaccgaacag gcttatgtca actgggttcg tgccttcatc cgtttccacg
+     1981 gtgtgcgtca cccggcaacc ttgggcagca gcgaagtcga ggcatttctg tcctggctgg
+     2041 cgaacgagcg caaggtttcg gtctccacgc atcgtcaggc attggcggcc ttgctgttct
+     2101 tctacggcaa ggtgctgtgc acggatctgc cctggcttca ggagatcgga agacctcggc
+     2161 cgtcgcggcg cttgccggtg gtgctgaccc cggatgaagt ggttcgcatc ctcggttttc
+     2221 tggaaggcga gcatcgtttg ttcgcccagg actctagcta tagttctagt ggttggctac
+     2281 taataggttg tattgatgtt ggacgagtcg gaatcgcaga ccgataccag gatcttgcca
+     2341 tcctatggaa ctgcctcggt gagttttctc cttcattaca gaaacggctt tttcaaaaat
+     2401 atggtattga taatcctgat atgaataaat tgcagtttca tttgatgctc gatgagtttt
+     2461 tctaatcaga attggttaat tggttgtaac actggcagag cattacgctg acttgacggg
+     2521 acggcgcaag ctcatgacca aaatccctta acgtgagttt tcgttccact gagcgtcaga
+     2581 ccccgtagaa aagatcaaag gatcttcttg agatcctttt tttctgcgcg taatctgctg
+     2641 cttgcaaaca aaaaaaccac cgctaccagc ggtggtttgt ttgccggatc aagagctacc
+     2701 aactcttttt ccgaaggtaa ctggcttcag cagagcgcag ataccaaata ctgtccttct
+     2761 agtgtagccg tagttaggcc accacttcaa gaactctgta gcaccgccta catacctcgc
+     2821 tctgctaatc ctgttaccag tggctgctgc cagtggcgat aagtcgtgtc ttaccgggtt
+     2881 ggactcaaga cgatagttac cggataaggc gcagcggtcg ggctgaacgg ggggttcgtg
+     2941 cacacagccc agcttggagc gaacgaccta caccgaactg agatacctac agcgtgagct
+     3001 atgagaaagc gccacgcttc ccgaagggag aaaggcggac aggtatccgg taagcggcag
+     3061 ggtcggaaca ggagagcgca cgagggagct tccaggggga aacgcctggt atctttatag
+     3121 tcctgtcggg tttcgccacc tctgacttga gcgtcgattt ttgtgatgct cgtcaggggg
+     3181 gcggagccta tggaaaaacg ccagcaacgc ggccttttta cggttcctgg ccttttgctg
+     3241 gccttttgct cacatgttct ttcctgcgtt atcccctgat tctgtggata accgtattac
+     3301 cgctagccag gaagagtttg tagaaacgca aaaaggccat ccgtcaggat ggccttctgc
+     3361 ttagtttgat gcctggcagt ttatggcggg cgtcctgccc gccaccctcc gggccgttgc
+     3421 ttcacaacgt tcaaatccgc tcccggcgga tttgtcctac tcaggagagc gttcaccgac
+     3481 aaacaacaga taaaacgaaa ggcccagtct tccgactgag cctttcgttt tatttgatgc
+     3541 ctggcagttc cctactctcg c
+//
+
