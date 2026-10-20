@@ -58,9 +58,18 @@ def _win32_bring_to_front(pid: int, title: str) -> None:
     from ctypes import wintypes
 
     user32 = ctypes.WinDLL("user32", use_last_error=True)
+    enum_proc = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+    # Declared, so window handles above 2**31 are passed as handles, not as C ints.
+    user32.EnumWindows.argtypes = (enum_proc, wintypes.LPARAM)
+    user32.GetWindowThreadProcessId.argtypes = (wintypes.HWND, ctypes.POINTER(wintypes.DWORD))
+    user32.GetWindowThreadProcessId.restype = wintypes.DWORD
+    user32.GetWindowTextW.argtypes = (wintypes.HWND, wintypes.LPWSTR, ctypes.c_int)
+    for name in ("IsWindowVisible", "IsIconic", "SetForegroundWindow"):
+        getattr(user32, name).argtypes = (wintypes.HWND,)
+    user32.ShowWindow.argtypes = (wintypes.HWND, ctypes.c_int)
     found: list[int] = []
 
-    @ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+    @enum_proc
     def visit(hwnd, _lparam):
         owner = wintypes.DWORD()
         user32.GetWindowThreadProcessId(hwnd, ctypes.byref(owner))

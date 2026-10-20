@@ -84,11 +84,20 @@ def register(port: int, token: str) -> Record:
     path = record_path()
     tmp = path.with_name(f".{path.name}.tmp")
     try:
-        # Readable by the user only: the token gives access to the local API.
-        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        # Readable by the user only: the token gives access to the local API. (A leftover
+        # temporary file would keep its own permissions, so it goes first.)
+        tmp.unlink(missing_ok=True)
+        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
         with os.fdopen(fd, "w", encoding="utf-8") as stream:
             json.dump(asdict(record), stream)
-        os.replace(tmp, path)
+        for attempt in range(5):
+            try:
+                os.replace(tmp, path)
+                break
+            except PermissionError:   # Windows: another start is reading the record
+                if attempt == 4:
+                    raise
+                time.sleep(0.05)
     except OSError:
         log.exception("Could not record the running copy; files opened later start a new window")
         with contextlib.suppress(OSError):
