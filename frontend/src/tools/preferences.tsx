@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import * as Blueprint from "@blueprintjs/core";
 import { Button, Classes } from "@blueprintjs/core";
 import { api } from "../api";
+import { messageOf } from "../files/notices";
 import { ENZYME_SETS } from "../enzymeLogic";
 import {
   defaultPreferences,
@@ -26,6 +27,7 @@ function PreferencesDialog(props: ToolProps) {
   const [ladders, setLadders] = useState<{ id: string; label: string }[]>([]);
   const [percentages, setPercentages] = useState<number[]>(PERCENT_FALLBACK);
   const [loading, setLoading] = useState(true);
+  const [ladderError, setLadderError] = useState<string | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
 
   useEffect(() => {
@@ -34,7 +36,7 @@ function PreferencesDialog(props: ToolProps) {
         setLadders(r.ladders);
         setPercentages(r.percentages);
       })
-      .catch(() => undefined)
+      .catch((e) => setLadderError(messageOf(e)))
       .finally(() => setLoading(false));
   }, []);
 
@@ -81,6 +83,12 @@ function PreferencesDialog(props: ToolProps) {
               {ladders.map((l) => <option key={l.id} value={l.id}>{l.label}</option>)}
             </select>
           </div>
+          {ladderError && (
+            <span className="vt-field-error" data-testid="pref-ladder-error">
+              The list of ladders could not be read: {ladderError} Close and reopen Preferences
+              to try again.
+            </span>
+          )}
         </Field>
 
         <Field label="Agarose percentage" hint="The gel you usually pour">

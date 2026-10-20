@@ -1,20 +1,29 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSelector } from "react-redux";
 import { Editor } from "@teselagen/ove";
-import { api, whenDesktopReady, type OpenResult, type SaveResult, type SequenceData } from "./api";
+import {
+  api,
+  EngineError,
+  whenDesktopReady,
+  type OpenResult,
+  type Sample,
+  type SaveResult,
+  type SequenceData,
+} from "./api";
 import {
   baseName,
   canSaveInPlace,
   createDocument,
   editorState,
-  isDirty,
   markSaved,
+  needsSave,
   now,
   removeDocument,
   stem,
+  uniqueName,
   type Doc,
 } from "./documents";
-import { buildMenu } from "./menu";
+import { buildMenu, type MenuHandlers } from "./menu";
 import NewSequenceDialog, { type NewSequence } from "./NewSequenceDialog";
 import CloningDialog from "./cloning/CloningDialog";
 import GelDialog from "./GelDialog";
@@ -31,7 +40,7 @@ import { toolById } from "./tools";
 import { exportMap } from "./mapExport";
 import { applyEnzymeSet, ENZYME_SETS, type EnzymeSetId } from "./enzymeSets";
 import { ENZYMES } from "./enzymeLogic";
-import { showView, VIEWS, type ViewId } from "./views";
+import { OVERLAY_VIEWS, showView, VIEWS, type ViewId } from "./views";
 import { ACCEPT, dirName, SAVE_EXTENSION, safeFileName, type SaveKind } from "./files/formats";
 import { addNotice, dismissNotice, messageOf, type Notice, type NoticeKind } from "./files/notices";
 import NoticeStack from "./files/NoticeStack";
@@ -42,6 +51,7 @@ import { EDITOR_TOOLS, rightClickOverrides } from "./files/editorFiles";
 import PasteDialog from "./files/PasteDialog";
 import CopyTextDialog from "./files/CopyTextDialog";
 import SaveCopyDialog from "./files/SaveCopyDialog";
+import UnsavedDialog, { type UnsavedChoice } from "./files/UnsavedDialog";
 import "./files/busy.css";
 
 const DOCTABS_HEIGHT = 30;
@@ -92,21 +102,24 @@ export default function App() {
   const [paste, setPaste] = useState<{ text: string; reason?: string } | null>(null);
   const [copyText, setCopyText] = useState<{ title: string; text: string } | null>(null);
   const [saveCopy, setSaveCopy] = useState<{ doc: Doc; resolve: (ok: boolean) => void } | null>(null);
+  const [unsaved, setUnsaved] = useState<{ doc: Doc; resolve: (choice: UnsavedChoice) => void } | null>(null);
   const [cloning, setCloning] = useState<CloningAction | null>(null);
   const [gelOpen, setGelOpen] = useState(false);
   const [sangerOpen, setSangerOpen] = useState(false);
   const [detectOpen, setDetectOpen] = useState(false);
   const [toolId, setToolId] = useState<string | null>(null);
   const [recent, setRecent] = useState<string[]>([]);
+  const [samples, setSamples] = useState<Sample[]>([]);
   const fileInput = useRef<HTMLInputElement>(null);
   const height = useWindowHeight();
   const docsRef = useRef(docs);
   docsRef.current = docs;
 
   const activeDoc = docs.find((d) => d.editorName === active) ?? null;
-  const dirtyByEditor = useSelector((state: any) => {
+  // Edited since opened or saved, or never saved at all: the tab shows a dot, closing asks.
+  const unsavedByEditor = useSelector((state: any) => {
     const out: Record<string, boolean> = {};
-    for (const d of docs) out[d.editorName] = isDirty(state.VectorEditor[d.editorName]);
+    for (const d of docs) out[d.editorName] = needsSave(d, state.VectorEditor[d.editorName]);
     return out;
   }, (a, b) => JSON.stringify(a) === JSON.stringify(b));
   const circular = useSelector((state: any) =>
@@ -116,17 +129,29 @@ export default function App() {
     active ? (state.VectorEditor[active]?.sequenceData?.sequence as string | undefined) : undefined,
   );
 
-  const unsavedCount = Object.values(dirtyByEditor).filter(Boolean).length;
-  useEffect(() => {
-    api.unsaved(unsavedCount).catch(() => undefined);
-  }, [unsavedCount]);
-
   // ---- messages --------------------------------------------------------------------------
   const notify = useCallback((kind: NoticeKind, text: string) => {
     setNotices((prev) => addNotice(prev, kind, text));
   }, []);
   const dismiss = useCallback((id: number) => setNotices((prev) => dismissNotice(prev, id)), []);
   const report = useCallback((e: unknown) => notify("error", messageOf(e)), [notify]);
+
+  // An engine error no dialog caught still reaches the message stack instead of the console.
+  useEffect(() => {
+    const onRejection = (e: PromiseRejectionEvent) => {
+      if (!(e.reason instanceof EngineError)) return;
+      e.preventDefault();
+      report(e.reason);
+    };
+    window.addEventListener("unhandledrejection", onRejection);
+    return () => window.removeEventListener("unhandledrejection", onRejection);
+  }, [report]);
+
+  const unsavedCount = Object.values(unsavedByEditor).filter(Boolean).length;
+  useEffect(() => {
+    // The desktop window asks before quitting while this is above zero.
+    api.unsaved(unsavedCount).catch(report);
+  }, [unsavedCount, report]);
 
   // Opening and saving large files takes a moment: show a busy pointer meanwhile.
   const [busy, setBusy] = useState(0);
@@ -154,7 +179,26 @@ export default function App() {
   }, []);
 
   const refreshRecent = useCallback(() => {
-    api.recent().then((r) => setRecent(r.paths)).catch(() => undefined);
+    api.recent().then((r) => setRecent(r.paths)).catch(report);
+  }, [report]);
+
+  /** Add new tabs after the open ones and show the last. */
+  const addDocs = useCallback((created: Doc[]) => {
+    if (!created.length) return;
+    // Updated at once, so a second document added before the next render sees these names.
+    docsRef.current = [...docsRef.current, ...created];
+    setDocs((prev) => [...prev, ...created]);
+    setActive(created[created.length - 1].editorName);
+  }, []);
+
+  /**
+   * A document that is not a file on disk gets a name no open document has ("Pasted sequence 2"),
+   * so tabs and the documents lists in dialogs can tell them apart.
+   */
+  const distinctName = useCallback((data: SequenceData, taken: string[]): SequenceData => {
+    const name = data.name ? uniqueName(data.name, taken) : data.name;
+    taken.push(name);
+    return name === data.name ? data : { ...data, name };
   }, []);
 
   /** Open the documents of a file (or of pasted text, when `origin` is null) in new tabs. */
@@ -165,24 +209,29 @@ export default function App() {
     const source = label && fileName
       ? { label, records, fileName, incomplete: !!result.warnings?.length }
       : null;
-    const created = result.documents.map((sequenceData) =>
-      createDocument(
+    const taken = docsRef.current.map((d) => d.name);
+    const created = result.documents.map((data) => {
+      const sequenceData = result.path ? data : distinctName(data, taken);
+      return createDocument(
         sequenceData,
         result.path,
         origin === null
           ? { time: now(), action: "Created from clipboard", detail: `${label ?? "Text"}, ${sequenceData.sequence.length} bp` }
           : { time: now(), action: "Opened", detail: `${result.path ?? origin}${label ? ` (${label})` : ""}` },
-        source ? { saveInPlace: !!result.path && !!result.writable, source } : undefined,
-      ),
-    );
-    setDocs((prev) => [...prev, ...created]);
-    setActive(created[created.length - 1]?.editorName ?? null);
+        {
+          ...(source ? { saveInPlace: !!result.path && !!result.writable, source } : {}),
+          // Pasted text exists nowhere else; a file or an untouched sample does.
+          neverSaved: origin === null,
+        },
+      );
+    });
+    addDocs(created);
     if (records > 1) {
       const from = origin === null ? "the clipboard" : `“${fileName}”`;
       notify("info", `${records} sequences opened from ${from}, one tab each: ${listNames(created.map((d) => d.name))}.`);
     }
     for (const warning of result.warnings ?? []) notify("warning", warning);
-  }, [notify]);
+  }, [addDocs, distinctName, notify]);
 
   // ---- open ------------------------------------------------------------------------------
   const openPath = useCallback(
@@ -227,6 +276,7 @@ export default function App() {
 
   useEffect(() => {
     refreshRecent();
+    api.samples().then((r) => setSamples(r.samples)).catch(report);
     api
       .startupFiles()
       .then(({ results, errors }) => {
@@ -249,19 +299,19 @@ export default function App() {
 
   /** Open sequence data in a new tab (cloning products, tool results, History snapshots). */
   const openDocument = useCallback((data: SequenceData, action: string, detail?: string) => {
-    const doc = createDocument(data, null, { time: now(), action, detail });
-    setDocs((prev) => [...prev, doc]);
-    setActive(doc.editorName);
-  }, []);
+    const sequenceData = distinctName(data, docsRef.current.map((d) => d.name));
+    addDocs([createDocument(sequenceData, null, { time: now(), action, detail }, { neverSaved: true })]);
+  }, [addDocs, distinctName]);
 
   // ---- new -------------------------------------------------------------------------------
   const createNew = useCallback((seq: NewSequence) => {
     setNewOpen(false);
-    const sequenceData: SequenceData = { ...seq, features: [], primers: [] };
-    const doc = createDocument(sequenceData, null, { time: now(), action: "Created", detail: `${seq.sequence.length} bp` });
-    setDocs((prev) => [...prev, doc]);
-    setActive(doc.editorName);
-  }, []);
+    const sequenceData = distinctName({ ...seq, features: [], primers: [] }, docsRef.current.map((d) => d.name));
+    // An empty new file has nothing to lose yet; once a base is typed it counts as edited.
+    const doc = createDocument(sequenceData, null, { time: now(), action: "Created", detail: `${seq.sequence.length} bp` },
+      { neverSaved: seq.sequence.length > 0 });
+    addDocs([doc]);
+  }, [addDocs, distinctName]);
 
   // ---- clipboard -------------------------------------------------------------------------
   const newFromClipboard = useCallback(async () => {
@@ -322,16 +372,16 @@ export default function App() {
       .filter((d) => product.parents.includes(d.name))
       .map((d) => ({ name: d.name, data: editorState(d.editorName)?.sequenceData as SequenceData }))
       .filter((p) => p.data);
-    const doc = createDocument(product.doc as SequenceData, null, {
+    const sequenceData = distinctName(product.doc as SequenceData, docsRef.current.map((d) => d.name));
+    const doc = createDocument(sequenceData, null, {
       time: now(),
       action: product.operation,
       detail: `${product.details}. From: ${product.parents.join(", ")}.`
         + (oligos ? ` Primers: ${oligos}` : ""),
       parents,
-    });
-    setDocs((prev) => [...prev, doc]);
-    setActive(doc.editorName);
-  }, []);
+    }, { neverSaved: true });
+    addDocs([doc]);
+  }, [addDocs, distinctName]);
 
   // ---- save ------------------------------------------------------------------------------
   /** Ask once whether to save a GenBank copy of a file that cannot be overwritten safely. */
@@ -365,6 +415,7 @@ export default function App() {
           download(filename, content);
           logHistory(current.editorName, "Downloaded", filename);
           markSaved(current.editorName);
+          updateDoc(current.editorName, { neverSaved: false });
           return true;
         }
         let path = !saveAs && canSaveInPlace(current) ? current.path : null;
@@ -386,6 +437,7 @@ export default function App() {
           name: stem(saved.path),
           saveInPlace: true,
           source: { label: saved.format_label, records: 1, fileName: baseName(saved.path), incomplete: false },
+          neverSaved: false,
         });
         logHistory(current.editorName, "Saved", `${saved.path} (${saved.format_label})`);
         markSaved(current.editorName);
@@ -449,15 +501,27 @@ export default function App() {
   );
 
   // ---- close -----------------------------------------------------------------------------
+  /** Save, close without saving, or keep the tab: asked when closing a tab with unsaved work. */
+  const askUnsaved = useCallback(
+    (doc: Doc) => new Promise<UnsavedChoice>((resolve) => setUnsaved({ doc, resolve })),
+    [],
+  );
+  const asking = useRef(false);
+
   const closeDoc = useCallback(
     async (doc: Doc) => {
-      if (isDirty(editorState(doc.editorName))) {
-        const save = window.confirm(`Save changes to "${doc.name}" before closing?\n\nOK = Save, Cancel = more options`);
-        if (save) {
-          if (!(await saveDoc(doc, false))) return;
-        } else if (!window.confirm(`Close "${doc.name}" and discard the changes?`)) {
-          return;
+      if (asking.current) return;   // Ctrl+W again while the question is on screen
+      const current = docsRef.current.find((d) => d.editorName === doc.editorName) ?? doc;
+      if (needsSave(current, editorState(current.editorName))) {
+        asking.current = true;
+        let choice: UnsavedChoice;
+        try {
+          choice = await askUnsaved(current);
+        } finally {
+          asking.current = false;
         }
+        if (choice === "cancel") return;
+        if (choice === "save" && !(await saveDoc(current, false))) return;
       }
       removeDocument(doc.editorName);
       setDocs((prev) => {
@@ -469,7 +533,7 @@ export default function App() {
         return next;
       });
     },
-    [saveDoc],
+    [askUnsaved, saveDoc],
   );
 
   // ---- views -----------------------------------------------------------------------------
@@ -537,6 +601,23 @@ export default function App() {
     return () => window.removeEventListener("keydown", onKey);
   }, [activeDoc, closeDoc, newFromClipboard, openFiles, selectView]);
 
+  // ---- one PCR tool -----------------------------------------------------------------------
+  // The Primers view's "Simulate PCR" button opened the editor's own PCR panel, a second PCR
+  // tool beside Actions → PCR… that replaced the primer list while the Primers tab stayed
+  // selected. It opens Vettore's PCR dialog instead (captured before the editor sees the click).
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      const button = (e.target as Element | null)?.closest?.(".ve-propertiesPanel button");
+      if (!button || button.textContent?.trim() !== "Simulate PCR") return;
+      e.preventDefault();
+      e.stopPropagation();
+      const pcr = actionById("pcr");
+      if (pcr) setCloning(pcr);
+    };
+    document.addEventListener("click", onClick, true);
+    return () => document.removeEventListener("click", onClick, true);
+  }, []);
+
   // ---- paste on the start screen: Ctrl+V with no document open opens what was copied -----
   useEffect(() => {
     if (docs.length) return;
@@ -566,7 +647,9 @@ export default function App() {
   );
 
   // ---- menu ------------------------------------------------------------------------------
-  const handlers = useRef({
+  // Read by the menu through the ref, so the menu always calls the current callbacks.
+  const handlers = useRef<MenuHandlers>(null as unknown as MenuHandlers);
+  handlers.current = {
     newFile: () => setNewOpen(true),
     newFromClipboard,
     open: openFiles,
@@ -587,34 +670,13 @@ export default function App() {
     sanger: () => setSangerOpen(true),
     detectFeatures: () => setDetectOpen(true),
     tool: (id: string) => setToolId(id),
-    recent: [] as string[],
-    hasDocument: false,
-  });
-  Object.assign(handlers.current, {
-    newFromClipboard,
-    open: openFiles,
-    openRecent: openPath,
-    close: () => activeDoc && closeDoc(activeDoc),
-    save: () => activeDoc && saveDoc(activeDoc, false),
-    saveAs: () => activeDoc && saveDoc(activeDoc, true),
-    exportGenbank: () => activeDoc && exportAs(activeDoc, "genbank"),
-    exportFasta: () => activeDoc && exportAs(activeDoc, "fasta"),
-    exportDna: () => activeDoc && exportAs(activeDoc, "dna"),
-    copyAsFasta,
-    exportSvg: () => activeDoc && exportImage(activeDoc, "svg"),
-    exportPng: () => activeDoc && exportImage(activeDoc, "png"),
-    view: selectView,
-    useEnzymeSet,
-    cloning: (id: string) => setCloning(actionById(id)),
-    gel: () => setGelOpen(true),
-    sanger: () => setSangerOpen(true),
-    detectFeatures: () => setDetectOpen(true),
-    tool: (id: string) => setToolId(id),
+    openSample,
     recent,
+    samples,
     hasDocument: !!activeDoc,
-  });
+  };
   // menuFilter must be stable (OVE memoizes on it); handlers are read through the ref.
-  const menuFilter = useMemo(() => buildMenu(handlers), [recent, !!activeDoc]); // eslint-disable-line react-hooks/exhaustive-deps
+  const menuFilter = useMemo(() => buildMenu(handlers), [recent, samples, !!activeDoc]); // eslint-disable-line react-hooks/exhaustive-deps
   const contextMenus = useMemo(() => rightClickOverrides(() => handlers.current.copyAsFasta()), []);
 
   const onSave = useCallback(
@@ -624,18 +686,32 @@ export default function App() {
 
   const editorHeight = height - STATUS_HEIGHT;
 
+  // Each document's editor draws its own tab strip, scrolled to the start: bring the active
+  // tab into sight, or a new product's tab would sit off-screen once a few files are open.
+  // Runs when the tab mounts and whenever another document becomes active.
+  const revealActiveTab = useCallback((tab: HTMLElement | null) => {
+    const strip = tab?.parentElement;
+    if (!tab || !strip) return;
+    const t = tab.getBoundingClientRect();
+    const s = strip.getBoundingClientRect();
+    if (t.left < s.left) strip.scrollLeft -= s.left - t.left + 8;
+    else if (t.right > s.right) strip.scrollLeft += t.right - s.right + 8;
+  }, [active]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const docTabs = (
       <div className="vt-doctabs" style={{ height: DOCTABS_HEIGHT }}>
         {docs.map((d) => (
           <div
             key={d.editorName}
+            ref={d.editorName === active ? revealActiveTab : undefined}
             className={`vt-doctab${d.editorName === active ? " active" : ""}`}
             onClick={() => setActive(d.editorName)}
             onAuxClick={(e) => e.button === 1 && closeDoc(d)}
-            title={d.path ?? d.name}
+            title={d.path ?? (d.neverSaved ? `${d.name} (not saved to a file yet)` : d.name)}
             data-testid="doctab"
+            data-unsaved={unsavedByEditor[d.editorName] ? "true" : undefined}
           >
-            <span>{dirtyByEditor[d.editorName] ? "• " : ""}{d.name}</span>
+            <span>{unsavedByEditor[d.editorName] ? "• " : ""}{d.name}</span>
             <button className="vt-doctab-close" title="Close (Ctrl+W)" onClick={(e) => { e.stopPropagation(); closeDoc(d); }}>×</button>
           </div>
         ))}
@@ -679,7 +755,8 @@ export default function App() {
   );
 
   return (
-    <div className={`vt-shell${busy ? " vt-busy" : ""}`} aria-busy={busy > 0}
+    <div className={`vt-shell${busy ? " vt-shell-busy" : ""}`} aria-busy={busy > 0}
+         data-overlay-view={activeDoc && OVERLAY_VIEWS.includes(activeDoc.view) ? activeDoc.view : undefined}
          onDragOver={(e) => e.preventDefault()} onDropCapture={onDrop}>
       <input
         ref={fileInput}
@@ -730,9 +807,8 @@ export default function App() {
         ) : (
           <>
           {docTabs}
-          <Welcome recent={recent} onOpen={openFiles} onNew={() => setNewOpen(true)} onRecent={openPath}
-                   onPaste={newFromClipboard}
-                   onSample={openSample} />
+          <Welcome recent={recent} samples={samples} onOpen={openFiles} onNew={() => setNewOpen(true)}
+                   onRecent={openPath} onPaste={newFromClipboard} onSample={openSample} />
           </>
         )}
       </div>
@@ -770,6 +846,16 @@ export default function App() {
           onConfirm={() => {
             saveCopy.resolve(true);
             setSaveCopy(null);
+          }}
+        />
+      )}
+      {unsaved && (
+        <UnsavedDialog
+          name={unsaved.doc.name}
+          neverSaved={unsaved.doc.neverSaved}
+          onChoose={(choice) => {
+            unsaved.resolve(choice);
+            setUnsaved(null);
           }}
         />
       )}

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useSelector } from "react-redux";
 import { api } from "./api";
+import { messageOf } from "./files/notices";
 
 const TM_MAX_LENGTH = 100;
 
@@ -23,9 +24,12 @@ export default function StatusLine({ editorName }: { editorName: string }) {
       ? sequence.slice(start, end + 1)
       : sequence.slice(start) + sequence.slice(0, end + 1);
   const [tm, setTm] = useState<{ value: number; tooltip: string } | null>(null);
+  // Why the engine gave no Tm (e.g. the selection holds N or other ambiguous bases).
+  const [tmError, setTmError] = useState<string | null>(null);
 
   useEffect(() => {
     setTm(null);
+    setTmError(null);
     if (!selected || selected.length > TM_MAX_LENGTH || selected.length < 8) return;
     const t = setTimeout(() => {
       api
@@ -36,7 +40,10 @@ export default function StatusLine({ editorName }: { editorName: string }) {
             tooltip: r.presets.map((p) => `${p.label}: ${p.tm.toFixed(1)} °C — ${p.description}`).join("\n"),
           }),
         )
-        .catch(() => setTm(null));
+        .catch((e) => {
+          setTm(null);
+          setTmError(messageOf(e));
+        });
     }, 150);
     return () => clearTimeout(t);
   }, [selected]);
@@ -60,6 +67,11 @@ export default function StatusLine({ editorName }: { editorName: string }) {
           {tm !== null && (
             <span className="vt-tm" title={tm.tooltip} data-testid="selection-tm">
               Tm {tm.value.toFixed(1)} °C
+            </span>
+          )}
+          {tm === null && tmError && (
+            <span className="vt-muted vt-tm" title={tmError} data-testid="selection-tm-error">
+              Tm: not available
             </span>
           )}
           {tm === null && selected.length > TM_MAX_LENGTH && (

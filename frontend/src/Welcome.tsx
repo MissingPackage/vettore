@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { api, type Sample } from "./api";
+import { useState } from "react";
+import type { Sample } from "./api";
 import { baseName } from "./documents";
 import { HelpDialogById } from "./tools/help";
 import "./Welcome.css";
@@ -7,26 +7,25 @@ import "./Welcome.css";
 /** Shown while no document is open: what Vettore is, and the three ways in. */
 export default function Welcome(props: {
   recent: string[];
+  /** The sample constructs that come with Vettore (App lists them for the File menu too). */
+  samples: Sample[];
   onOpen: () => void;
   onNew: () => void;
   onRecent: (path: string) => void;
-  onSample: (id: string) => void;
+  /** Resolves once the sample is open, or once opening it failed (the links come back). */
+  onSample: (id: string) => void | Promise<void>;
   /** Open a sequence copied from an email or a web page. */
   onPaste?: () => void;
 }) {
-  const [samples, setSamples] = useState<Sample[]>([]);
+  const { samples } = props;
   const [opening, setOpening] = useState<string | null>(null);
   // The menu bar belongs to the editor, so it is not on screen here: the help dialogs a
   // first-time user needs are opened from the welcome screen itself.
   const [help, setHelp] = useState<string | null>(null);
 
-  useEffect(() => {
-    api.samples().then((r) => setSamples(r.samples)).catch(() => undefined);
-  }, []);
-
   const openSample = (id: string) => {
     setOpening(id);
-    props.onSample(id);
+    Promise.resolve(props.onSample(id)).finally(() => setOpening(null));
   };
 
   return (

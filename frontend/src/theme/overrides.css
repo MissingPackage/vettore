@@ -34,6 +34,29 @@
 :root .bp3-menu > .bp3-popover-wrapper > .bp3-popover-target {
   display: block;
 }
+/* The editor's menus draw Ctrl, Shift and Alt as ^, ⇧ and ⌥ icons, which Windows and Linux
+   users do not read. Off a Mac (main.tsx sets data-platform) they are written out, as on the
+   welcome screen and in Help: Ctrl+Shift+S. ::after, because Blueprint clears ::before on icons. */
+:root[data-platform="pc"] .bp3-menu .bp3-key-combo > .bp3-icon-key-control > svg,
+:root[data-platform="pc"] .bp3-menu .bp3-key-combo > .bp3-icon-key-shift > svg,
+:root[data-platform="pc"] .bp3-menu .bp3-key-combo > .bp3-icon-key-option > svg {
+  display: none;
+}
+:root[data-platform="pc"] .bp3-menu .bp3-key-combo > .bp3-icon-key-control,
+:root[data-platform="pc"] .bp3-menu .bp3-key-combo > .bp3-icon-key-shift,
+:root[data-platform="pc"] .bp3-menu .bp3-key-combo > .bp3-icon-key-option {
+  margin-right: 0;
+  vertical-align: baseline;
+}
+:root[data-platform="pc"] .bp3-menu .bp3-key-combo > .bp3-icon-key-control::after {
+  content: "Ctrl+";
+}
+:root[data-platform="pc"] .bp3-menu .bp3-key-combo > .bp3-icon-key-shift::after {
+  content: "Shift+";
+}
+:root[data-platform="pc"] .bp3-menu .bp3-key-combo > .bp3-icon-key-option::after {
+  content: "Alt+";
+}
 
 /* ---- links out of the app ---------------------------------------------------------------- */
 /* The digest tool links to the editor component's online documentation. Vettore runs offline,
@@ -107,6 +130,26 @@
 :root .bp3-html-select select:disabled,
 :root .bp3-select select:disabled {
   box-shadow: none;
+}
+/* Blueprint hides the browser's own dropdown arrow and leaves the caret to an icon its
+   HTMLSelect component adds. Vettore's dialogs wrap a plain <select> in .bp3-html-select, so
+   their dropdowns looked like text boxes. The wrapper draws one chevron for every dropdown,
+   with or without the component; the component's icon is hidden so none shows two. */
+:root .bp3-html-select::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  width: 6px;
+  height: 6px;
+  margin-top: -5px;
+  border-right: 2px solid var(--vt-text-muted);
+  border-bottom: 2px solid var(--vt-text-muted);
+  transform: rotate(45deg);
+  pointer-events: none;
+}
+:root .bp3-html-select > .bp3-icon {
+  display: none;
 }
 
 /* Native controls Blueprint does not style. */

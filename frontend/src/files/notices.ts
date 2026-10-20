@@ -1,5 +1,6 @@
 // Messages shown above the editor: errors, warnings and short confirmations.
 // Several can be visible at once; repeating the same message counts it instead of stacking it.
+import { errorText } from "./engineErrors";
 
 export type NoticeKind = "error" | "warning" | "info";
 
@@ -35,8 +36,7 @@ export function dismissNotice(list: Notice[], id: number): Notice[] {
   return list.filter((n) => n.id !== id);
 }
 
-/** The message of anything thrown, without a JavaScript error prefix. */
+/** The message of anything thrown, without a JavaScript error prefix and never "[object Object]". */
 export function messageOf(e: unknown): string {
-  if (e instanceof Error) return e.message;
-  return String(e);
+  return errorText(e);
 }

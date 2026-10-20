@@ -52,7 +52,25 @@ test("Getting Started walks through the day's work", async ({ page }) => {
   await expect(dialog).toContainText("Simulate the cloning");
   await expect(dialog).toContainText("Check the clone");
   await expect(dialog).toContainText("sends nothing anywhere");
+  // The tools of this release are all named.
+  for (const tool of ["Insert Multiple Fragments", "Gateway", "TOPO", "Align Multiple Sequences",
+    "AAV Packaging Check", "New File from Clipboard", "Open Sample Construct", "Design PCR Primers"]) {
+    await expect(dialog).toContainText(tool);
+  }
   await page.screenshot({ path: "test-results/getting-started.png" });
+
+  // Every "Menu → Item…" the guide names is in that menu, under that name.
+  const text = await dialog.innerText();
+  const paths = [...text.matchAll(/\b(File|Edit|View|Enzymes|Features|Primers|Actions|Tools|Help) → ([^.,;:()→]+?…)/g)]
+    .map((m) => [m[1], m[2].replace(/\s+/g, " ").trim()]);
+  expect(paths.length).toBeGreaterThanOrEqual(7);
+  await page.keyboard.press("Escape");
+  for (const [menuName, item] of paths) {
+    await page.locator(".tg-menu-bar").getByText(menuName, { exact: true }).click();
+    await expect(page.locator(".bp3-popover .bp3-menu").first().getByText(item, { exact: true }),
+      `${menuName} → ${item}`).toBeVisible();
+    await page.locator(".tg-menu-bar").getByText(menuName, { exact: true }).click();
+  }
 });
 
 test("About names the version, the licence and the log file", async ({ page }) => {

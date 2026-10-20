@@ -80,8 +80,10 @@ function GettingStarted(props: ToolProps) {
       <ol className="vt-steps">
         <li>
           <b>Open a construct.</b> File → Open… (Ctrl+O), or drag the file onto the window.
-          Vettore reads .dna, GenBank (.gb, .gbk, .ape), FASTA and Sanger .ab1 files. No file to
-          hand? Close every tab and pick one of the sample constructs on the welcome screen.
+          Vettore reads GenBank (.gb, .gbk, .ape), .dna, EMBL, FASTA, .xdna, .gck, Sanger .ab1
+          and plain sequence text. A sequence in an email or on a web page: copy it, then File →
+          New File from Clipboard (Ctrl+Shift+V). No file to hand? File → Open Sample Construct
+          has three public plasmids to try things on.
         </li>
         <li>
           <b>Read the map.</b> The Map view (Ctrl+1) shows features, primers and the cut sites of
@@ -96,23 +98,33 @@ function GettingStarted(props: ToolProps) {
           proteins, tags, lox/FRT sites and Cas9, each traceable to a public GenBank record.
         </li>
         <li>
-          <b>Simulate the cloning.</b> The Actions menu holds restriction and insertion cloning,
-          PCR, primer design, mutagenesis, Gibson / NEBuilder HiFi / In-Fusion, Golden Gate and
-          annealed oligos. Fill in the left side, watch the product on the right, then press
-          Create Product: it opens as a new tab. The primers to order are listed underneath, and
-          Copy all puts them on the clipboard ready for an order form. Warnings above the button
-          are worth reading before you order anything.
+          <b>Simulate the cloning.</b> The Actions menu holds restriction cloning (Insert
+          Fragment, Insert Multiple Fragments, Delete Restriction Fragment), PCR, mutagenesis,
+          annealed oligos and ligation, Gibson / NEBuilder HiFi / In-Fusion, Golden Gate,
+          Gateway BP and LR reactions, and TA / GC and TOPO cloning. Fill in the left side, watch
+          the product on the right, then press Create Product: it opens as a new tab, unsaved
+          until you save it. The primers to order are listed underneath, and Copy all puts them
+          on the clipboard ready for an order form. Warnings above the button are worth reading
+          before you order anything.
+        </li>
+        <li>
+          <b>Design primers.</b> Primers → Design PCR Primers… finds the best pairs around a
+          region or a feature. To put primers exactly on a region's ends for cloning, use Actions
+          → Design Primers to Amplify a Region… instead.
         </li>
         <li>
           <b>Check the clone.</b> Tools → Simulate Agarose Gel… predicts the pattern of a
           diagnostic digest against a ladder. When the sequencing comes back, Tools → Align to
           Reference DNA Sequence… aligns the .ab1 reads to the construct and lists every
-          difference in plasmid coordinates, with the chromatogram under it.
+          difference in plasmid coordinates, with the chromatogram under it. Tools → Align
+          Multiple Sequences… lines up other open sequences against one reference, and Tools →
+          AAV Packaging Check… measures the ITR-to-ITR cargo against what an AAV capsid holds.
         </li>
         <li>
           <b>Keep the result.</b> Ctrl+S saves GenBank, the format every sequence tool reads.
-          File → Export also writes FASTA and the map as SVG or PNG for a figure. The History
-          view (Ctrl+6) keeps where a product came from, down to the parent files and primers.
+          File → Export also writes FASTA, .dna, and the map as SVG or PNG for a figure. A dot
+          before a tab's name means unsaved work: closing it asks first. The History view
+          (Ctrl+6) keeps where a product came from, down to the parent files and primers.
         </li>
       </ol>
       <Callout intent="primary">

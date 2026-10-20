@@ -1,4 +1,5 @@
 // Bridge to the local Python engine (HTTP on 127.0.0.1, guarded by a session token).
+import { engineErrorText } from "./files/engineErrors";
 
 export interface OveAnnotation {
   id?: string;
@@ -68,7 +69,21 @@ const params = new URLSearchParams(window.location.search);
 const token = params.get("token") ?? sessionStorage.getItem("vettore-token") ?? "";
 if (token) sessionStorage.setItem("vettore-token", token);
 
-/** Call an engine endpoint under /api/; throws with the engine's message on error. */
+/**
+ * A failed engine call. The message is always a sentence for people; the app shows any that
+ * no dialog handled in its message stack (App listens for unhandled rejections of this type).
+ */
+export class EngineError extends Error {
+  /** HTTP status, or 0 when the engine did not answer. */
+  readonly status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "EngineError";
+    this.status = status;
+  }
+}
+
+/** Call an engine endpoint under /api/; throws an EngineError with a readable message. */
 export async function call<T>(path: string, body?: unknown): Promise<T> {
   let res: Response;
   try {
@@ -78,16 +93,12 @@ export async function call<T>(path: string, body?: unknown): Promise<T> {
       body: body === undefined ? undefined : JSON.stringify(body),
     });
   } catch {
-    throw new Error("Vettore's engine is not responding. Close Vettore and start it again; "
-      + "your files on disk are not affected.");
+    throw new EngineError("Vettore's engine is not responding. Close Vettore and start it again; "
+      + "your files on disk are not affected.", 0);
   }
   const payload = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    // The engine's messages are written for people; anything else gets a plain fallback.
-    if (typeof payload.detail === "string") throw new Error(payload.detail);
-    throw new Error(`Something went wrong inside Vettore (error ${res.status}). The details were `
-      + "written to Vettore's log file; please send it if this happens again.");
-  }
+  // The engine's messages are written for people; anything else becomes a plain sentence.
+  if (!res.ok) throw new EngineError(engineErrorText(res.status, payload), res.status);
   return payload as T;
 }
 

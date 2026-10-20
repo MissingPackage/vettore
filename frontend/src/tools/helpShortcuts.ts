@@ -4,7 +4,7 @@
 // - Ctrl+O / Ctrl+N / Ctrl+W, Ctrl+Shift+V, Ctrl+Shift+G and Ctrl+1 … Ctrl+6 are bound by
 //   Vettore itself (App.tsx);
 // - the rest are Open Vector Editor commands, read from the editor's own hotkey registry
-//   (Help → View Editor Hotkeys) and checked in the running app (e2e/help.spec.ts).
+//   (its command definitions in @teselagen/ove) and checked in the running app (e2e/help.spec.ts).
 // A shortcut the menus advertise but nothing binds must not be added here.
 
 export interface Shortcut {

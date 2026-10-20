@@ -1,6 +1,7 @@
 // Menu bar built on top of OVE's command system.
 // Items with `cmd` reuse OVE commands (and their hotkeys); items with `onClick` call Vettore.
 import type { MutableRefObject } from "react";
+import type { Sample } from "./api";
 import { baseName } from "./documents";
 import { READY_ACTIONS } from "./cloning/registry";
 import { ENZYME_SETS, type EnzymeSetId } from "./enzymeSets";
@@ -32,7 +33,10 @@ export interface MenuHandlers {
   useEnzymeSet: (set: EnzymeSetId) => void;
   /** Open a dialog from the tool registry (tools/index.ts). */
   tool: (id: string) => void;
+  /** Open one of the sample constructs that come with Vettore, unsaved. */
+  openSample: (id: string) => void;
   recent: string[];
+  samples: Sample[];
   hasDocument: boolean;
 }
 
@@ -41,6 +45,39 @@ type MenuItem = Record<string, unknown> | string;
 const findMenu = (menu: MenuItem[], text: string) =>
   menu.find((m) => typeof m === "object" && m.text === text) as Record<string, unknown> | undefined;
 
+const cmdOf = (item: MenuItem) => (typeof item === "string" ? item : (item.cmd as string | undefined));
+
+/**
+ * Commands the editor's Edit menu repeats under other names: Actions holds them (Change
+ * Topology, Reverse Complement…, Set Origin at Cursor), and Find / Go To stay in Edit only.
+ */
+const MOVED_FROM_EDIT = new Set([
+  "changeCircularityCmd", "reverseComplementSelection", "reverseComplementEntireSequence", "rotateToCaretPosition",
+]);
+
+/** The editor names three commands with "..."; every menu item uses the one character "…". */
+const ELLIPSIS_TEXT: Record<string, string> = { find: "Find…", goTo: "Go To…", select: "Select…" };
+
+function withEllipsis(items: MenuItem[]): MenuItem[] {
+  return items.map((item) => {
+    if (typeof item === "string") return ELLIPSIS_TEXT[item] ? { cmd: item, text: ELLIPSIS_TEXT[item] } : item;
+    const out = { ...item };
+    const cmd = out.cmd as string | undefined;
+    if (cmd && ELLIPSIS_TEXT[cmd] && !out.text) out.text = ELLIPSIS_TEXT[cmd];
+    if (typeof out.text === "string") out.text = out.text.replace(/\.\.\.$/, "…");
+    if (Array.isArray(out.submenu)) out.submenu = withEllipsis(out.submenu as MenuItem[]);
+    return out;
+  });
+}
+
+const isDivider = (item: MenuItem) => typeof item === "string" && item.startsWith("--");
+
+/** No separator at either end of a menu, nor two in a row (left behind by removed items). */
+function tidy(items: MenuItem[]): MenuItem[] {
+  return items.filter((item, i) =>
+    !isDivider(item) || (i > 0 && i < items.length - 1 && !isDivider(items[i - 1])));
+}
+
 export function buildMenu(ref: MutableRefObject<MenuHandlers>) {
   const h = () => ref.current;
   return (defaultMenu: MenuItem[]): MenuItem[] => {
@@ -48,6 +85,7 @@ export function buildMenu(ref: MutableRefObject<MenuHandlers>) {
     const view = findMenu(defaultMenu, "View");
     const help = findMenu(defaultMenu, "Help");
     const recent = h().recent;
+    const samples = h().samples;
     const hasDocument = h().hasDocument;
 
     // Registry tools of one menu, after a separator.
@@ -65,7 +103,7 @@ export function buildMenu(ref: MutableRefObject<MenuHandlers>) {
       menu && { ...menu, submenu: [...((menu.submenu as MenuItem[]) ?? []), ...toolItems(name)] };
 
     // Copy as FASTA sits right after the editor's own Copy.
-    const editItems = [...((edit?.submenu as MenuItem[]) ?? [])];
+    const editItems = ((edit?.submenu as MenuItem[]) ?? []).filter((m) => !MOVED_FROM_EDIT.has(cmdOf(m) ?? ""));
     const copyAt = editItems.findIndex((m) => m === "copy" || (typeof m === "object" && m.cmd === "copy"));
     editItems.splice(copyAt >= 0 ? copyAt + 1 : editItems.length, 0, {
       text: "Copy as FASTA",
@@ -73,7 +111,7 @@ export function buildMenu(ref: MutableRefObject<MenuHandlers>) {
       "data-test": "copy-as-fasta",
       onClick: () => h().copyAsFasta(),
     });
-    const editMenu = edit && { ...edit, submenu: editItems };
+    const editMenu = edit && { ...edit, submenu: tidy(editItems) };
 
     const file = {
       text: "File",
@@ -86,6 +124,18 @@ export function buildMenu(ref: MutableRefObject<MenuHandlers>) {
           text: "Open Recent",
           disabled: recent.length === 0,
           submenu: recent.map((path) => ({ text: baseName(path), label: path, onClick: () => h().openRecent(path) })),
+        },
+        {
+          // The welcome screen lists them too, but only while no file is open.
+          text: "Open Sample Construct",
+          "data-test": "open-sample",
+          disabled: samples.length === 0,
+          submenu: samples.map((s) => ({
+            text: s.label,
+            label: s.accession,
+            "data-test": `open-sample-${s.id}`,
+            onClick: () => h().openSample(s.id),
+          })),
         },
         "--",
         { text: "Close", hotkey: "mod+w", onClick: () => h().close() },
@@ -201,9 +251,6 @@ export function buildMenu(ref: MutableRefObject<MenuHandlers>) {
         { text: "Align to Reference DNA Sequence…", onClick: () => h().sanger() },
         { text: "Simulate Agarose Gel…", hotkey: "mod+shift+g", onClick: () => h().gel() },
         "--",
-        "find",
-        "goTo",
-        "--",
         { text: "Minimum ORF Size…", cmd: "minOrfSizeCmd" },
         "toggleOrfs",
         ...toolItems("Tools"),
@@ -225,10 +272,13 @@ export function buildMenu(ref: MutableRefObject<MenuHandlers>) {
       ],
     };
 
+    // Help keeps the editor's menu search; its About, version and hotkey list described the
+    // embedded editor, not Vettore, and doubled Vettore's own About and Keyboard Shortcuts.
+    const search = ((help?.submenu as MenuItem[]) ?? []).filter((m) => typeof m === "object" && m.isMenuSearch);
+    const helpMenu = { ...help, text: "Help", submenu: tidy([...search, ...toolItems("Help")]) };
+
     // Menu order: File, Edit, View, Enzymes, Features, Primers, Actions, Tools, Help.
-    const helpMenu = withTools(help, "Help") ?? (toolItems("Help").length
-      ? { text: "Help", submenu: toolItems("Help").slice(1) } : undefined);
-    return [file, withTools(editMenu, "Edit"), views, enzymes, features, primers, actions, tools, helpMenu]
-      .filter(Boolean) as MenuItem[];
+    return withEllipsis([file, withTools(editMenu, "Edit"), views, enzymes, features, primers, actions, tools, helpMenu]
+      .filter(Boolean) as MenuItem[]);
   };
 }

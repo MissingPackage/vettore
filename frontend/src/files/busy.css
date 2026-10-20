@@ -1,5 +1,7 @@
 /* While a file is being opened or saved, the pointer says so everywhere in the window. */
-.vt-busy,
-.vt-busy * {
+/* Not .vt-busy: that is the shared "Simulating…" spinner class, which would put a spinner at
+   the top of the window and re-lay it out while the file loads. */
+.vt-shell-busy,
+.vt-shell-busy * {
   cursor: progress !important;
 }

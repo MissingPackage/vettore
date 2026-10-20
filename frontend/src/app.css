@@ -83,7 +83,6 @@ body { overflow: hidden; }
   margin: 0 0 6px; color: var(--vt-text-strong); font-size: var(--vt-font-size-xl);
   font-weight: var(--vt-weight-strong); line-height: var(--vt-line-height-tight);
 }
-.vt-welcome p { margin: 0; }
 .vt-welcome h3 {
   margin: 0 0 var(--vt-space-2); color: var(--vt-text-strong); font-size: var(--vt-font-size-md);
   font-weight: var(--vt-weight-strong); line-height: var(--vt-line-height-tight);
@@ -96,11 +95,6 @@ body { overflow: hidden; }
   transition: background-color var(--vt-duration), border-color var(--vt-duration);
 }
 .vt-welcome-actions button:hover { background: var(--vt-surface-hover); }
-/* Opening a file is what most people came for. */
-.vt-welcome-actions button:first-child {
-  background: var(--vt-accent); border-color: var(--vt-accent); color: var(--vt-text-on-accent);
-}
-.vt-welcome-actions button:first-child:hover { background: var(--vt-accent-hover); border-color: var(--vt-accent-hover); }
 .vt-recent, .vt-samples { margin-bottom: var(--vt-space-5); }
 .vt-recent ul, .vt-samples ul { list-style: none; padding: 0; margin: 0; }
 .vt-recent li, .vt-samples li { display: flex; gap: var(--vt-space-3); align-items: baseline; padding: 3px 0; min-width: 0; }
@@ -124,6 +118,10 @@ body { overflow: hidden; }
 /* The Features / Primers / Enzymes views are chosen with Vettore's tabs, not the properties tab row. */
 .ve-propertiesPanel .bp3-tab-list { display: none !important; }
 .vt-editor-overlay { position: absolute; inset: 0; background: var(--vt-surface); z-index: 30; overflow: auto; }
+/* Under Vettore's own views the editor's panels are covered, but the map's rotate and zoom
+   sliders sit at z-index 900 and were drawn over the Enzymes view's search box, catching its
+   clicks. Hiding the covered panels keeps their layout (and the editor's measurements). */
+.vt-shell[data-overlay-view] .tg-editor-container > .reflex-layout { visibility: hidden; }
 
 /* ---- table views (Enzymes) ------------------------------------------------------------------- */
 .vt-table-view { padding: 10px var(--vt-space-4); }
@@ -169,9 +167,13 @@ body { overflow: hidden; }
 :root .vt-enzyme-picker .bp3-tag { min-height: var(--vt-control-height-sm); font-size: var(--vt-font-size-sm); }
 .vt-region { display: flex; align-items: center; gap: 6px; }
 .vt-region input { width: 90px; }
-.vt-primer-input { display: flex; gap: 6px; }
-.vt-primer-input input:nth-child(1) { width: 110px; }
-.vt-primer-input input:nth-child(2) { flex: 1; min-width: 0; }
+/* Name and "From file…" on the first line, the sequence alone on the second: at the form's
+   width a 35-nt primer (40 with a short tail) is readable whole, so a pasted primer can be
+   checked base by base. */
+.vt-primer-input { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.vt-primer-input input:nth-child(1) { flex: 0 1 180px; min-width: 0; }
+.vt-primer-input .bp3-html-select { order: 2; }
+.vt-primer-input input:nth-child(2) { order: 3; flex: 1 1 100%; min-width: 0; }
 .vt-insert-row, .vt-card {
   display: flex; flex-direction: column; gap: var(--vt-space-2); padding: 10px;
   border: 1px solid var(--vt-border-subtle); border-radius: var(--vt-radius-lg); background: var(--vt-surface);

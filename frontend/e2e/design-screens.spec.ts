@@ -100,6 +100,42 @@ async function contrastOf(locator: Locator): Promise<number> {
   });
 }
 
+/**
+ * Every dropdown in the container shows that it is one: the browser's own arrow, Blueprint's
+ * caret icon, or the chevron Vettore draws on the .bp3-html-select wrapper.
+ */
+async function expectDropdownCarets(container: Locator, what: string) {
+  const missing = await container.locator("select").evaluateAll((els) => els.filter((el) => {
+    if (getComputedStyle(el).appearance !== "none") return false;
+    const wrapper = el.parentElement!;
+    const after = getComputedStyle(wrapper, "::after");
+    const chevron = after.content !== "none" && after.content !== "normal" && parseFloat(after.width) > 0
+      && after.display !== "none";
+    const icon = wrapper.querySelector(":scope > .bp3-icon");
+    return !chevron && !(icon && getComputedStyle(icon).display !== "none");
+  }).map((el) => el.getAttribute("data-testid") ?? el.outerHTML.slice(0, 80)));
+  expect(missing, `${what}: dropdowns without an arrow`).toEqual([]);
+}
+
+/** Nothing is drawn over the element: a click anywhere on it reaches it (or its content). */
+async function expectNotCovered(locator: Locator, what: string) {
+  const covering = await locator.evaluate((el) => {
+    // A grid every 6 px: the map's sliders are thin and only partly overlapped the box.
+    const r = el.getBoundingClientRect();
+    const hits = new Set<string>();
+    for (let x = r.left + 2; x <= r.right - 2; x += 6) {
+      for (let y = r.top + 2; y <= r.bottom - 2; y += 6) {
+        const hit = document.elementFromPoint(x, y);
+        if (hit && hit !== el && !el.contains(hit)) {
+          hits.add(`${hit.tagName}.${typeof hit.className === "string" ? hit.className : ""}`);
+        }
+      }
+    }
+    return [...hits];
+  });
+  expect(covering, `${what} is covered by`).toEqual([]);
+}
+
 /** Text meant to be read passes WCAG AA (4.5:1). */
 async function expectReadable(locator: Locator, what: string) {
   expect(await contrastOf(locator.first()), `${what} contrast`).toBeGreaterThanOrEqual(4.5);
@@ -126,6 +162,21 @@ for (const size of SIZES) {
       expect(fonts.body).not.toContain("Icons16");
       expect(fonts.button).toBe(fonts.body);
       if (await page.locator(".vt-recent-dir").count()) await expectReadable(page.locator(".vt-recent-dir"), "recent file folder");
+      // The filled primary button is the obvious way in: its label and shortcut must stand out
+      // from its fill (two stylesheets once gave the label the fill's own colour).
+      const primary = page.getByTestId("open");
+      const fill = await primary.evaluate((el) => getComputedStyle(el).backgroundColor);
+      expect(fill, "the primary button is filled").not.toBe("rgba(0, 0, 0, 0)");
+      await expectReadable(primary, "welcome primary button label");
+      await expectReadable(primary.locator("span"), "welcome primary button shortcut");
+      await expectReadable(page.getByTestId("new").locator("span"), "welcome button shortcut");
+      // The drop hint keeps its space below: the samples heading does not sit on it.
+      const hint = (await page.getByTestId("drop-hint").boundingBox())!;
+      const samples = page.locator(".vt-samples h3");
+      if (await samples.count()) {
+        const heading = (await samples.boundingBox())!;
+        expect(heading.y - (hint.y + hint.height), "space under the drop hint").toBeGreaterThanOrEqual(16);
+      }
       await shot(page, "01-welcome");
 
       // Keyboard users see where focus is on Vettore's own controls.
@@ -165,9 +216,15 @@ for (const size of SIZES) {
       await shot(page, "04b-find");
       await page.keyboard.press("Escape");
 
+      // From the map, whose rotate and zoom sliders lie under the Enzymes view's toolbar.
+      await page.getByTestId("view-map").click();
+      await expect(page.locator(".veRotateCircularSlider")).toBeVisible();
       await page.getByTestId("view-enzymes").click();
       await expect(page.getByTestId("enzymes-view")).toBeVisible();
       await expectReadable(page.getByTestId("enzymes-view").locator(".vt-table-toolbar .vt-muted"), "enzyme count");
+      // The map's sliders stay under Vettore's own views.
+      await expectNotCovered(page.getByTestId("enzyme-search"), "enzyme search box");
+      await expectNotCovered(page.getByTestId("enzymes-view").locator("thead th").first(), "first column title");
       await shot(page, "05-enzymes");
 
       await page.getByTestId("view-features").click();
@@ -181,6 +238,7 @@ for (const size of SIZES) {
 
       await page.getByTestId("view-history").click();
       await expect(page.locator(".vt-history")).toContainText("Opened");
+      await expectNotCovered(page.locator(".vt-history h2"), "History heading");
       await shot(page, "08-history");
 
       // Several documents: tabs stay readable and the view bar keeps its controls.
@@ -241,6 +299,7 @@ for (const size of SIZES) {
           // offsetHeight ignores the dialog's opening zoom, which scales bounding boxes.
           .evaluateAll((els) => els.map((e) => (e as HTMLElement).offsetHeight));
         expect(new Set(heights), `${name} control heights`).toEqual(new Set([30]));
+        await expectDropdownCarets(dialog, name);
         await shot(page, name);
         await closeDialog(page);
       }
@@ -272,6 +331,10 @@ for (const size of SIZES) {
       await menu(page, "Actions", "PCR…");
       await dialog.getByTestId("template-doc").selectOption({ index: 1 });
       const inputs = dialog.locator(".vt-primer-input input.vt-mono");
+      // A 35-nt primer is readable whole in its field, not scrolled out of sight.
+      await inputs.nth(0).fill("ATGGGTAAGGAAAAGACTCACGTTTCGAGGCCGCG");
+      const fits = await inputs.nth(0).evaluate((el) => el.scrollWidth <= el.clientWidth);
+      expect(fits, "a 35-nt primer fits its field").toBe(true);
       await inputs.nth(0).fill("GGGGGGGGGGGGGGGGGGGG");
       await inputs.nth(1).fill("CCCCCCCCCCCCCCCCCCCC");
       await expect(page.getByTestId("cloning-error")).toBeVisible();
@@ -285,6 +348,8 @@ for (const size of SIZES) {
       await page.getByTestId("new").click();
       await expect(page.locator(".bp3-dialog")).toBeVisible();
       await expectDialogInViewport(page);
+      // Like every dialog, it says in one line what it does.
+      await expectReadable(page.getByTestId("new-seq-intro"), "New DNA File intro");
       await shot(page, "40-new-dna-file");
       await closeDialog(page);
 
@@ -302,6 +367,7 @@ for (const size of SIZES) {
       await gel.getByTestId("gel-enzymes-1").fill("NcoI");
       await expect(page.getByTestId("gel-image")).toBeVisible();
       await expectDialogInViewport(page);
+      await expectDropdownCarets(gel, "gel");
       await shot(page, "42-gel");
       await closeDialog(page);
 
@@ -316,6 +382,7 @@ for (const size of SIZES) {
       await expect(page.getByTestId("sanger-summary")).toBeVisible({ timeout: 30_000 });
       await expect(page.locator(".vt-alignment svg path").first()).toBeVisible({ timeout: 20_000 });
       await expectDialogInViewport(page);
+      await expectDropdownCarets(page.getByTestId("sanger-dialog"), "sanger");
       await shot(page, "44-sanger");
       await closeDialog(page);
 
@@ -323,8 +390,25 @@ for (const size of SIZES) {
       await menu(page, "Features", "Detect Common Features…");
       await expect(page.getByTestId("detect-table")).toBeVisible({ timeout: 30_000 });
       await expectDialogInViewport(page);
+      await expectDropdownCarets(page.locator(".bp3-dialog"), "detect features");
       await shot(page, "45-detect-features");
       await closeDialog(page);
+
+      // The menu tools: every dropdown shows its arrow.
+      const tools: [string, string[]][] = [
+        ["48-preferences", ["File", "Preferences…"]],
+        ["49-design-pcr-primers", ["Primers", "Design PCR Primers…"]],
+        ["50-align-multiple", ["Tools", "Align Multiple Sequences…"]],
+        ["51-aav-packaging", ["Tools", "AAV Packaging Check…"]],
+      ];
+      for (const [name, path] of tools) {
+        await menu(page, ...path);
+        await expect(page.locator(".bp3-dialog")).toBeVisible();
+        await expectDialogInViewport(page);
+        await expectDropdownCarets(page.locator(".bp3-dialog"), name);
+        await shot(page, name);
+        await closeDialog(page);
+      }
 
       await menu(page, "Features", "Add Feature…");
       await expect(page.locator(".bp3-dialog")).toBeVisible();

@@ -30,6 +30,7 @@
   --vt-text-placeholder: #6b7280; /* 4.8:1 on surface; placeholders still name the field */
   --vt-text-faint: #9ca3af;    /* disabled controls and decoration only, never for reading */
   --vt-text-on-accent: #ffffff;
+  --vt-text-on-accent-muted: rgba(255, 255, 255, 0.9); /* secondary text on accent fills: 5.0:1 */
 
   /* ---- surfaces and borders ----------------------------------------------------------------- */
   --vt-surface: #ffffff;
