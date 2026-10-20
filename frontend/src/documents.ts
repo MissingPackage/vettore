@@ -38,6 +38,11 @@ export interface Doc {
   source: DocSource | null;
   /** The "Save a GenBank copy" explanation was already shown for this document. */
   copyNoticeShown: boolean;
+  /**
+   * The document exists only in Vettore and has never been saved: a cloning product, a pasted
+   * sequence, a new file with a sequence, a tool's result. It counts as unsaved until it is.
+   */
+  neverSaved: boolean;
   view: ViewId;
   enzymeSet: EnzymeSetId;
   history: HistoryEntry[];
@@ -57,7 +62,7 @@ export function createDocument(
   sequenceData: SequenceData,
   path: string | null,
   firstEntry: HistoryEntry,
-  file?: { saveInPlace: boolean; source: DocSource },
+  options?: { saveInPlace?: boolean; source?: DocSource; neverSaved?: boolean },
 ): Doc {
   const editorName = `doc-${++counter}`;
   updateEditor(store, editorName, {
@@ -70,9 +75,10 @@ export function createDocument(
     editorName,
     name: sequenceData.name,
     path,
-    saveInPlace: file?.saveInPlace ?? false,
-    source: file?.source ?? null,
+    saveInPlace: options?.saveInPlace ?? false,
+    source: options?.source ?? null,
     copyNoticeShown: false,
+    neverSaved: options?.neverSaved ?? false,
     view: "map",
     enzymeSet: loadPreferences().enzymeSet,
     history: [firstEntry],
@@ -88,10 +94,7 @@ export function editorState(editorName: string) {
   return (store.getState() as { VectorEditor: Record<string, any> }).VectorEditor[editorName];
 }
 
-export function isDirty(editorState: any): boolean {
-  const id = editorState?.sequenceData?.stateTrackingId;
-  return !!id && id !== "initialLoadId" && id !== editorState?.lastSavedId;
-}
+export { isDirty, needsSave, uniqueName } from "./files/unsaved";
 
 export function markSaved(editorName: string) {
   const id = editorState(editorName)?.sequenceData?.stateTrackingId;
