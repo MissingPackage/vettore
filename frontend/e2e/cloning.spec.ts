@@ -21,9 +21,9 @@ async function newSequence(page: Page, name: string, sequence: string, circular:
   await page.getByLabel("Name").fill(name);
   await page.getByTestId("new-seq-text").fill(sequence);
   if (circular) {
-    const radio = page.getByTestId("topology-circular");
-    await radio.waitFor();
-    await radio.check({ force: true });
+    // Click the label: Blueprint covers the radio input with its own indicator.
+    await page.locator("label.bp3-radio", { hasText: "Circular" }).click();
+    await expect(page.getByTestId("topology-circular")).toBeChecked();
   }
   await page.getByTestId("new-seq-create").click();
   await expect(page.locator(".vt-doctab.active")).toContainText(name);

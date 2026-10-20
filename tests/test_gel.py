@@ -1,9 +1,14 @@
-import pytest
+from cloning_helpers import clean_dna, doc
 from fastapi.testclient import TestClient
 
-from cloning_helpers import clean_dna, doc
-from vettore.gel import (DEFAULT_LADDER, LADDERS, lane_bands, ladder_bands, migration,
-                         resolving_range)
+from vettore.gel import (
+    DEFAULT_LADDER,
+    LADDERS,
+    ladder_bands,
+    lane_bands,
+    migration,
+    resolving_range,
+)
 from vettore.server import TOKEN_HEADER, create_app
 
 TOKEN = "t0ken"
