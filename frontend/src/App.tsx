@@ -678,11 +678,24 @@ export default function App() {
 
   const editorHeight = height - STATUS_HEIGHT;
 
+  // Each document's editor draws its own tab strip, scrolled to the start: bring the active
+  // tab into sight, or a new product's tab would sit off-screen once a few files are open.
+  // Runs when the tab mounts and whenever another document becomes active.
+  const revealActiveTab = useCallback((tab: HTMLElement | null) => {
+    const strip = tab?.parentElement;
+    if (!tab || !strip) return;
+    const t = tab.getBoundingClientRect();
+    const s = strip.getBoundingClientRect();
+    if (t.left < s.left) strip.scrollLeft -= s.left - t.left + 8;
+    else if (t.right > s.right) strip.scrollLeft += t.right - s.right + 8;
+  }, [active]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const docTabs = (
       <div className="vt-doctabs" style={{ height: DOCTABS_HEIGHT }}>
         {docs.map((d) => (
           <div
             key={d.editorName}
+            ref={d.editorName === active ? revealActiveTab : undefined}
             className={`vt-doctab${d.editorName === active ? " active" : ""}`}
             onClick={() => setActive(d.editorName)}
             onAuxClick={(e) => e.button === 1 && closeDoc(d)}
