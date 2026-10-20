@@ -93,3 +93,16 @@ test("the Primers view's Simulate PCR button opens Vettore's PCR dialog", async 
   await page.keyboard.press("Escape");
   await expect(page.locator(".ve-propertiesPanel")).toContainText("XhoI-hht2(US)-Fwd");
 });
+
+test("Actions → New File from Selection opens the selected bases as a new linear file", async ({ page }) => {
+  // Clicking a cut position in the Enzymes view selects that site.
+  await page.getByTestId("view-enzymes").click();
+  const site = page.locator(".vt-cut").first();
+  await site.click();
+  const menu = await openMenu(page, "Actions");
+  await menu.getByText("New File from Selection", { exact: true }).click();
+  const tab = page.locator(".vt-doctab.active");
+  await expect(tab).toContainText(/^• pFA-KanMX4 \d+–\d+/);
+  await expect(tab).toContainText("•");
+  await expect(page.getByTestId("status-line")).toContainText("linear");
+});

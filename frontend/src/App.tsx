@@ -804,6 +804,12 @@ export default function App() {
               alwaysAllowSave
               hideStatusBar
               additionalEnzymes={ENZYMES}
+              onCreateNewFromSubsequence={(part: SequenceData) => {
+                const layer = editorState(activeDoc.editorName)?.selectionLayer;
+                const range = layer && layer.start >= 0 ? `${layer.start + 1}–${layer.end + 1}` : "";
+                openDocument({ ...part, name: `${activeDoc.name} ${range}`.trim(), circular: false },
+                  "New file from selection", `From “${activeDoc.name}”${range ? `, bases ${range}` : ""}.`);
+              }}
             />
           </>
         ) : (

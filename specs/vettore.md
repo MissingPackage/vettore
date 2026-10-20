@@ -167,7 +167,7 @@ AAV helper: ITR-to-ITR cargo size with a warning above 4.7 kb.
 | S3 Verification | done: S3.1–S3.5 — gel, Sanger alignment with verdict and read quality, star alignment of several sequences to a reference, common features, primer3 pair design | progressive multiple alignment (sequences are aligned to the reference, not to each other) |
 | S4 Polish | partly: preferences, shortcut list, sample constructs, help, AAV packaging check, consistent look | history graph, print/PDF, file associations |
 
-Tests: TEST_COUNTS, plus a packaging smoke test that runs the packaged binary on both
+Tests: 426 pytest, 100 vitest, 109 Playwright end-to-end, plus a packaging smoke test that runs the packaged binary on both
 platforms in CI (file round trips in every format, cloning, Tm, primer design, alignment,
 Sanger reads, sample constructs, feature detection).
 

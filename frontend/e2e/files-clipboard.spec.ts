@@ -145,5 +145,10 @@ test.describe("when the system refuses the clipboard", () => {
     const dialog = page.getByTestId("copy-text-dialog");
     await expect(dialog).toContainText("did not let Vettore put this on the clipboard");
     await expect(page.getByTestId("copy-text")).toHaveValue(/^>pFA-KanMX4\nGAACGCGGCCGCCAGCTGAAGCTTCGTACGCTGCAGGTCGACGGATCCCCGGGTTAATTA\n/);
+    // The box says the text is already selected: it must be, once the dialog has opened.
+    const text = page.getByTestId("copy-text");
+    await expect(text).toBeFocused();
+    await expect.poll(() => text.evaluate((el: HTMLTextAreaElement) =>
+      el.selectionStart === 0 && el.selectionEnd === el.value.length && el.value.length > 0)).toBe(true);
   });
 });

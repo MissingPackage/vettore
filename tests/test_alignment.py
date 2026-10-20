@@ -341,3 +341,28 @@ def test_rna_letters_are_read_as_dna():
     [s] = payload(doc("ref", REF, False),
                   doc("rna", REF[:500].replace("T", "U").lower(), False))["sequences"]
     assert s["identity"] == 100.0
+
+
+def test_plasmids_that_share_only_a_backbone_are_a_partial_match():
+    # pFA-KanMX4 (a yeast deletion cassette vector) and MT612431.1 (an AAV transfer plasmid)
+    # share the bla/ori backbone and nothing else. Aligned all the way round they gave 48 %
+    # identity with hundreds of invented indels; the answer is the shared backbone.
+    from vettore import fileio
+
+    def opened(name: str) -> dict:
+        return fileio.read_documents(name, (DATA / name).read_bytes())[0]
+
+    [s] = payload(opened("pFA-KanMX4.dna"), opened("MT612431.1.gb"))["sequences"]
+    assert s["mode"] == "local"
+    assert 45 < s["coverage"] < 60 and s["identity"] > 99
+    assert s["counts"]["insertions"] == s["counts"]["deletions"] == 0
+
+
+def test_a_clone_with_a_large_insert_stays_aligned_all_the_way_round():
+    design = clean_dna(3000, 5)
+    insert = clean_dna(1000, 6)
+    clone = design[:1500] + insert + design[1500:]
+    [s] = payload(doc("design", design, True), doc("clone", clone, True))["sequences"]
+    assert (s["mode"], s["coverage"]) == ("global", 100.0)
+    assert s["counts"] == {"mismatches": 0, "insertions": 1, "deletions": 0,
+                           "inserted_bases": 1000, "deleted_bases": 0}

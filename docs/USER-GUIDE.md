@@ -374,7 +374,7 @@ a truncated ITR annotated at its real length gives the real cargo.
 
 ## Comparing several sequences (Tools → Align Multiple Sequences…)
 
-Open the sequences you want to compare: capsid genes of different serotypes, versions of one construct, a clone and its design. Choose **Tools → Align Multiple Sequences…**. The sequence in the active tab is the **reference**, and every other open sequence is ticked under **Compare with**. Change either if you like, then press **Align**.
+Open the sequences you want to compare: capsid genes of different serotypes, versions of one construct, a clone and its design. Choose **Tools → Align Multiple Sequences…**. The sequence in the active tab is the **reference**. Under **Compare with**, tick the sequences to line up against it (when only one other file is open, it is already ticked), then press **Align**.
 
 Each sequence is lined up against the reference on whichever strand fits. A circular sequence is turned so that it starts where the reference starts, so plasmids whose base 1 sits in different places still compare correctly. A fragment that crosses the origin of a circular reference is handled too.
 
@@ -388,7 +388,7 @@ The table gives, for every sequence:
 
 Click a row to list every difference in the reference's numbering, for example `1,204: A → G`, `601–604: 4 bp missing (ACGT)` or `between 1,001 and 1,002: 7 bp extra (GATTACA)`. Bases are always given on the reference strand. **Copy list** puts the differences on the clipboard as columns, ready to paste into a spreadsheet. The view below stacks every sequence under the reference and marks the differences. Reference features can be switched on from the eye menu of the view.
 
-If a sequence resembles the reference only in part (two plasmids that share a backbone), the table says *partial match* and only the best-matching region is shown. A sequence with nothing in common with the reference is left out, with a note saying so.
+If a sequence resembles the reference only in part (two plasmids that share a backbone but carry different cassettes), the table says *partial match* and only the shared region is shown. A sequence that shares nothing with the reference, or only a few bases by chance, is left out, with a note saying so.
 
 Limits: up to 10 sequences at a time (reference included), each up to 15,000 bp. A large comparison takes a few seconds per sequence. To compare part of a bigger sequence, make a new file from that region first (**Actions → New File from Selection**).
 

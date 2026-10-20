@@ -85,6 +85,12 @@ MIN_ALIGNED = 100
 MIN_SHARE = 0.5
 WINDOW_MARGIN = 100          # bp around a run of shared words aligned by the prefilter
 CHANCE_FLOOR = 40            # ... which skips the whole alignment when no run pairs this much
+#: A global or semi-global alignment whose total score is below this fraction of its own
+#: best-scoring stretch runs through sequence that is not homologous: two plasmids that share
+#: only a backbone, forced into one alignment all the way round. Such a pair is aligned
+#: locally instead and reported as a partial match. A real insertion or deletion costs much
+#: less (a clone with a 1 kb insert in a 3 kb vector keeps 0.8; a shared backbone gives < 0).
+FORCED_PATH_RATIO = 0.3
 
 IUPAC_DNA = set("ACGTRYSWKMBDHVN")
 
@@ -287,7 +293,8 @@ def _runs(chain: list[tuple[int, int]]) -> list[tuple[int, int, int, int]]:
 
 
 def place(reference: str, ref_circular: bool, query: str, query_circular: bool,
-          index: dict[str, list[int]] | None = None) -> tuple[Placement, str, str] | None:
+          index: dict[str, list[int]] | None = None,
+          local: bool = False) -> tuple[Placement, str, str] | None:
     """Strand, rotation and mode for one sequence. Returns the placement together with the
     reference and the sequence as they go into the aligner, or None when no diagonal
     collects MIN_VOTES shared words on either strand (what two unrelated sequences share by
@@ -340,6 +347,8 @@ def place(reference: str, ref_circular: bool, query: str, query_circular: bool,
     chain = _chain(points)
     covered = _run_coverage(chain, on_query=query_len <= ref_len)
     mode = "semi-global" if covered >= SEMI_GLOBAL_MIN_CHAIN * min(query_len, ref_len) else "local"
+    if local:
+        mode = "local"
     if mode == "semi-global" and query_circular and ref_circular:
         # Two circles have no ends: cut both inside the same shared word, so that both start
         # and end in homology, and score the ends like any other gap. With free end gaps a
@@ -427,15 +436,35 @@ def differences(columns: list[tuple[str, str, int | None]], ref_len: int) -> lis
     return out
 
 
+def _forced(target: str, query: str, pairs: list[tuple[int | None, int | None]]) -> bool:
+    """Whether an end-to-end alignment drags in sequence that is not homologous: its total
+    score, with the aligner's own blastn scores, falls far below its best-scoring stretch."""
+    total = best = running = 0
+    previous_gap = None
+    for t, q in pairs:
+        if t is None or q is None:
+            side = "target" if t is None else "query"
+            score = -2 if previous_gap == side else -7
+            previous_gap = side
+        else:
+            score = 2 if target[t] == query[q] else -3
+            previous_gap = None
+        total += score
+        running = max(0, running + score)
+        best = max(best, running)
+    return best > 0 and total < FORCED_PATH_RATIO * best
+
+
 def align_pair(reference: str, ref_circular: bool, name: str, sequence: str, circular: bool,
-               index: dict[str, list[int]] | None = None) -> PairResult | Unrelated:
+               index: dict[str, list[int]] | None = None,
+               local: bool = False) -> PairResult | Unrelated:
     """Align one sequence to the reference, or say why the two have nothing in common.
 
     A partly related pair (local mode) is first aligned only around its runs of shared words:
     those small alignments cost milliseconds. When none of them pairs more than unrelated
     sequences do by chance, the pair is left out without the whole alignment, which costs
     seconds on plasmid-sized sequences. Unrelated sequences always end up in local mode."""
-    placed = place(reference, ref_circular, sequence, circular, index)
+    placed = place(reference, ref_circular, sequence, circular, index, local=local)
     if placed is None:
         return Unrelated(0)
     placement, target, query = placed
@@ -455,6 +484,8 @@ def align_pair(reference: str, ref_circular: bool, name: str, sequence: str, cir
     pairs = _columns(target, query, alignment.coordinates)
     if not pairs:
         return Unrelated(0)
+    if placement.mode != "local" and _forced(target, query, pairs):
+        return align_pair(reference, ref_circular, name, sequence, circular, index, local=True)
     paired = sum(1 for t, q in pairs if t is not None and q is not None)
     if not meaningful(paired, shorter):
         return Unrelated(paired)

@@ -7,45 +7,55 @@ biology computed by tested engines (pydna / Biopython / primer3).
 **Repo:** github.com/MissingPackage/vettore · **Guide:** `docs/USER-GUIDE.md` ·
 **Spec:** `specs/vettore.md` · **Research notes:** private repo `MissingPackage/vettore-notes`
 
-## State (2026-10-20) — v0.1.0 released
+## State (2026-10-20) — v0.2.0 released
 
 | Slice | State |
 |---|---|
 | S0 spike | done |
-| S1 daily driver | done — open/edit/save, six views, enzyme sets, Tm presets, map export |
-| S2 cloning | restriction, PCR, primer design, mutagenesis, Gibson/HiFi/In-Fusion, Golden Gate, annealed oligos done; **Gateway and TA/TOPO not implemented** |
-| S3 verification | agarose gel, Sanger alignment, common-feature detection, Dam/Dcm warnings done; multiple alignment missing |
-| S4 polish | not started |
+| S1 daily driver | done — plus EMBL/.xdna/.gck/plain text, content-based format detection, `.dna` writing, clipboard exchange, unsaved-work dialog |
+| S2 cloning | done — restriction (one or several inserts), linear ligation, Gibson/HiFi/In-Fusion, PCR, mutagenesis, Golden Gate, Gateway BP/LR, TA/GC/TOPO, annealed oligos; History reopens inputs |
+| S3 verification | done — gel, Sanger (verdict, read quality, wrong-plasmid detection), star alignment of several sequences, common features, primer3 design |
+| S4 polish | partly — samples, help, preferences, AAV packaging check, design tokens (`docs/DESIGN.md`) |
 
-Evidence: 136 pytest, 20 vitest, 13 Playwright e2e, all green; CI builds Windows and Linux on
-every push, runs a packaging smoke test against the real binary and screenshots the Windows
-window. v0.1.0 is the first public release; every release carries `Vettore-windows-x64.zip` and
-`Vettore-linux-x64.zip`, and the README links `releases/latest/download/...`, so the download
-link never changes. Release notes come from the annotated tag message.
+Evidence for 0.2.0: 426 pytest, 100 vitest, 109 Playwright e2e, all green; CI builds Windows
+and Linux, runs the packaging smoke test against the real binary (file round trips in 8
+formats, cloning, Tm, primer design, alignment, Sanger reads, samples, feature detection) and
+screenshots the Windows window. Release notes come from the annotated tag message; the README
+links `releases/latest/download/...`, so the download link never changes.
+
+**The 0.1.0 download is broken for Sanger alignment and Detect Common Features** (Biopython's
+BLASTN matrix and `vettore/data` were missing from the bundle); 0.2.0 fixes both and the smoke
+test now guards them.
 
 ## Public-surface rule
 
 The repository is public. Nothing in it names or compares Vettore with any commercial tool:
 features are described in domain terms. Before every release, sweep the public files for such
-names (the checklist lives in the private notes repo); the only allowed hit is Biopython's SeqIO
-format identifier in `src/vettore/fileio.py`. Every release lists its new features in the
+names (the checklist lives in the private notes repo; `tests/test_product_names.py` guards the
+sources). The only allowed hits are Biopython's SeqIO format identifier in
+`src/vettore/fileio.py` and the magic header the `.dna` format itself requires inside binary
+`.dna` files (the Biopython test fixtures, and every `.dna` Vettore writes). Every release lists its new features in the
 annotated tag and the GitHub release notes.
 
 ## Next steps, in order of value to a bench user
 
-1. **Multiple sequence alignment** (capsid serotypes, transgene variants).
-2. **Insert multiple fragments / linear ligation** in restriction cloning.
-3. **Gateway BP/LR** and **TA/GC/TOPO**: forms already exist in
-   `frontend/src/cloning/registry.ts` (hidden by the `ready` flag); engines are placeholders in
-   `src/vettore/cloning/gateway_ta.py`. Gateway needs real att sequences verified against a
-   published vector map before trusting the result.
-4. Optional import by accession from NCBI (reachable from the build environment).
-5. Trim the Linux bundle (PyQt6 is most of the 620 MB build).
+1. Open a Vettore-written `.dna` in the program that defines the format (not available here):
+   round trip verified only with Biopython and sgffp.
+2. Quit guard: closing a tab uses the in-app Save / Don't save / Cancel dialog, but closing
+   the window still uses pywebview's native confirm; route it to the same dialog
+   (`src/vettore/app.py`, `closing` event).
+3. The Gateway e2e test mocks `/api/cloning/gateway-sites`; the real path is covered by pytest
+   and was checked by hand in the release verification, but no e2e test exercises it.
+4. Progressive multiple alignment (today: star alignment to a reference); related 15 kb
+   sequences take ~3.5 s each (no banded aligner in Biopython).
+5. MultiSite Gateway (att3–att5) tests; a "create all products" button in cloning dialogs.
+6. Optional import by accession from NCBI; file associations; print/PDF; history graph.
+7. Trim the Linux bundle (PyQt6 is most of the 620 MB build).
 
 ## Decisions (see spec "Architecture")
 
-- UI in English. GenBank is the save format; `.dna` is read-only
-  (Biopython + sgffp for colours, primer tails and description).
+- UI in English. GenBank is the default and recommended save format; `.dna` is written on
+  Save As/Export only (sgffp), and Save never overwrites a file it cannot write back losslessly.
 - Enzymes: nonredundant commercial REBASE set generated by `src/vettore/enzymes.py`,
   cross-checked OVE vs Biopython in `frontend/src/__tests__/enzymeDatabase.test.ts`.
 - Tm presets: Standard (SantaLucia & Hicks 2004, default), NEB Q5, NEB Taq — always shown
@@ -55,8 +65,8 @@ annotated tag and the GitHub release notes.
 
 ## Open questions (also in the spec)
 
-Which cloning methods are used most; whether writing `.dna` matters for exchanging files;
-how important Sanger verification is; whether online import from NCBI/Addgene is acceptable.
+Which cloning methods are used most; whether online import from NCBI/Addgene is acceptable;
+whether Vettore-written `.dna` files open in colleagues' tools.
 
 ## Gotchas
 
@@ -70,3 +80,10 @@ how important Sanger verification is; whether online import from NCBI/Addgene is
   reverse complement (`golden_gate.py`).
 - Parallel background agents hit an account session limit during the first build; the work was
   finished sequentially instead.
+- Workflow worktrees start from the repository's default branch, not the current branch: the
+  agent setup must check out the working branch explicitly.
+- Data files read through `importlib.resources` or by libraries (Biopython's substitution
+  matrices, `vettore/data`) must be listed in `packaging/vettore.spec`; only the smoke test on
+  the packaged binary catches a missing one.
+- Two workstreams styling the same element collide silently (the welcome button became blue
+  on blue): `design-screens.spec.ts` now asserts contrast.
