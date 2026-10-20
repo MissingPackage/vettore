@@ -327,23 +327,36 @@ export function GoldenGateForm({ docs, active, onChange }: FormProps) {
 }
 
 // ---- Gateway -----------------------------------------------------------------------------
+const GATEWAY_LABELS = {
+  BP: { first: "attB-flanked insert (PCR product or clone with attB sites)", second: "Donor vector (attP sites)" },
+  LR: { first: "Entry clone (attL sites)", second: "Destination vector (attR sites)" },
+};
+
 export function gatewayForm(reaction: "BP" | "LR") {
   return function GatewayForm({ docs, active, onChange }: FormProps) {
-    const [a, setA] = useState<string | null>(active?.editorName ?? null);
-    const [b, setB] = useState<string | null>(null);
+    const labels = GATEWAY_LABELS[reaction];
+    const firstDefault = defaultLinear(docs, active, null) ?? active?.editorName ?? null;
+    const [a, setA] = useState<string | null>(firstDefault);
+    const [b, setB] = useState<string | null>(() => defaultVector(docs, null) === firstDefault
+      ? defaultInserts(docs, firstDefault, 1)[0]
+      : defaultVector(docs, null));
     const da = findDoc(docs, a);
     const db = findDoc(docs, b);
     useEffect(() => {
-      if (!da || !db) return onChange(null);
-      onChange({ reaction, inputs: [da.data(), db.data()] });
+      if (!da) return onChange(null, `Choose the ${labels.first.toLowerCase()}`);
+      if (!db) return onChange(null, `Choose the ${labels.second.toLowerCase()}`);
+      if (da.editorName === db.editorName) {
+        return onChange(null, "Choose two different files: one carries the insert, the other is the vector");
+      }
+      onChange({ reaction, inputs: [docData(da), docData(db)] });
     }, [da, db]); // eslint-disable-line react-hooks/exhaustive-deps
     return (
       <>
-        <Field label={reaction === "BP" ? "attB-flanked insert (e.g. PCR product)" : "Entry clone (attL sites)"}>
-          <DocSelect docs={docs} value={a} onChange={setA} />
+        <Field label={labels.first}>
+          <DocSelect docs={docs} value={a} onChange={setA} testId="insert-doc" />
         </Field>
-        <Field label={reaction === "BP" ? "Donor vector (attP sites)" : "Destination vector (attR sites)"}>
-          <DocSelect docs={docs} value={b} onChange={setB} />
+        <Field label={labels.second}>
+          <DocSelect docs={docs} value={b} onChange={setB} testId="vector-doc" />
         </Field>
       </>
     );

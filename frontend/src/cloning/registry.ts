@@ -113,17 +113,24 @@ export const CLONING_ACTIONS: CloningAction[] = [
   },
   {
     id: "gateway-bp",
+    ready: true,
     title: "Gateway BP Reaction",
     endpoint: "gateway",
     Form: gatewayForm("BP"),
-    help: "attB-flanked insert × attP donor vector → entry clone.",
+    help: "Recombine an attB-flanked insert with a donor vector (attP sites) into an entry clone.",
+    details: "Only products where both att sites recombined are shown. The entry clone is listed "
+      + "first, the attR by-product after it.",
   },
   {
     id: "gateway-lr",
+    ready: true,
     title: "Gateway LR Reaction",
     endpoint: "gateway",
     Form: gatewayForm("LR"),
-    help: "Entry clone × attR destination vector → expression clone.",
+    help: "Recombine an entry clone (attL sites) with a destination vector (attR sites) into an expression clone.",
+    details: "Only products where both att sites recombined are shown. The expression clone is "
+      + "listed first, the attP by-product after it; a vector with two Gateway cassettes gives "
+      + "one clone per cassette.",
   },
   {
     id: "ta",
