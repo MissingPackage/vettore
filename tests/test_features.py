@@ -428,10 +428,11 @@ def test_the_truncated_cag_promoter_starts_inside_the_cmv_enhancer():
 
 
 # ---- the promoters the catalogue gained -------------------------------------------------
-# Every entry is a subsequence of the record its ``source`` names. The fixtures below are
-# other records — another laboratory, another vector — that carry the same element, so
-# finding it there tests the sequence rather than the record it was taken from. The
-# provenance of each fixture is in tests/data/README.md.
+# Every entry is a subsequence of the record its ``source`` names, and tests/data carries two
+# records for each: the entry's own, so the cited coordinates can be checked offline, and an
+# independent one — another laboratory, another vector — that holds the same element, so
+# finding it there tests the sequence rather than the record it came from. The provenance of
+# each fixture is in tests/data/README.md.
 
 CROSS_CHECKS = {
     "human PGK promoter": "MT921016.1",
@@ -449,16 +450,33 @@ def entry(name: str):
     return feature
 
 
-def cross_check_sequence(accession: str) -> str:
+def record_sequence(accession: str) -> str:
     record = SeqIO.read(DATA / f"features-{accession}.fasta", "fasta")
     return str(record.seq).upper()
+
+
+@pytest.mark.parametrize("element", sorted(CROSS_CHECKS))
+def test_a_catalogue_promoter_is_its_record_at_the_coordinates_it_cites(element):
+    """The entry's own record is here too, so the claim its ``source`` makes — these are the
+    record's bases at these coordinates — is checked without the network, and the element is
+    found there whole and exact."""
+    feature = entry(element)
+    accession, _, span = feature.source.partition(":")
+    start, _, end = span.partition("..")
+    record = record_sequence(accession)
+    assert record[int(start) - 1 : int(end)] == feature.sequence, element
+    matches = [m for m in detect(record, False) if m.name == element]
+    assert len(matches) == 1, element
+    assert matches[0].identity == 100.0, element
+    assert matches[0].start == int(start) - 1, element
+    assert matches[0].end == int(end) - 1, element
 
 
 @pytest.mark.parametrize(("element", "accession"), sorted(CROSS_CHECKS.items()))
 def test_a_catalogue_promoter_is_found_in_an_independent_record(element, accession):
     feature = entry(element)
     assert not feature.source.startswith(accession), element
-    sequence = cross_check_sequence(accession)
+    sequence = record_sequence(accession)
     matches = [m for m in detect(sequence, False) if m.name == element]
     assert len(matches) == 1, element
     assert matches[0].identity >= 98.0, element
@@ -466,9 +484,9 @@ def test_a_catalogue_promoter_is_found_in_an_independent_record(element, accessi
     assert found >= 0.9 * feature.length, element
 
 
-def test_the_promoters_come_back_whole_from_their_own_sequences():
-    """Each entry is its record's subsequence at the cited coordinates, so a construct that
-    carries the catalogue sequence carries the record's bases: the match must be exact."""
+def test_the_new_promoters_are_all_found_side_by_side_in_one_construct():
+    """Seven promoters in one sequence: each is reported once, whole, at its own position and
+    at full identity, so none of them swallows or hides another."""
     filler = [clean_dna(300, 60 + i) for i in range(len(CROSS_CHECKS) + 1)]
     pieces: list[str] = []
     starts: dict[str, int] = {}

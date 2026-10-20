@@ -55,13 +55,27 @@ attR4/attR3), `cloning-multisite-destination-r4r2.gb` (AP018631.1, R4pMpGWB495, 
 `cloning-multisite-expression.gb` (KC800697.1, a published three-fragment product) and
 `cloning-phic31-attb.gb` (EF362409.1, pUASTattB, phiC31 attB; Bischof et al. 2007).
 
-## Catalogue cross-check records (`features-*`)
+## Catalogue records (`features-*`)
 
 Public NCBI nuccore records downloaded unchanged with E-utilities efetch (rettype=fasta) on
-2026-10-20. Each carries one of the promoters the common-feature catalogue gained, but comes
-from a different laboratory and a different vector than the record the catalogue entry was
-taken from, so `tests/test_features.py` can check the entry against an independent copy of the
-element rather than against its own source.
+2026-10-20, used by `tests/test_features.py`. Two per element: the record a catalogue entry
+was taken from, so the coordinates its `source` cites can be checked without the network, and
+an independent record — another laboratory, another vector — that carries the same element, so
+the entry can be checked against a copy that is not its own source.
+
+The records the entries come from:
+
+| File | Record | Element and the coordinates the entry cites |
+|---|---|---|
+| `features-OQ427862.1.fasta` | OQ427862.1, vector pLKO.1-ZsGreen1 (Tokuma, direct submission) | human PGK promoter, 1..511 |
+| `features-MH325104.1.fasta` | MH325104.1, vector pLVX.TRE3G.eGFP (Berman et al., J Am Chem Soc 2018;140:18093) | mouse PGK promoter, 3321..3820 |
+| `features-OL870463.1.fasta` | OL870463.1, vector pLenti-hACE2 (Katzman et al., Viruses 2021;14:11) | UbC promoter, 1096..2299 |
+| `features-AY640634.1.fasta` | AY640634.1, siRNA vector pAAV9(5)-hSyn-DsRed2N1-EGFP-siRNA (Michel et al., Biochem Biophys Res Commun 2005;326:307) | H1 promoter, 1543..1758 |
+| `features-PY046810.1.fasta` | PY046810.1, sequence 103 from patent US 12370253 B2 (Pauza et al.) | 7SK promoter, 1..243 |
+| `features-KJ697750.1.fasta` | KJ697750.1, cloning vector pRRL-sffv-eGFP-cmv-hsCDNF (Cordero Llana, direct submission) | SFFV promoter, 6155..6637 |
+| `features-ON012604.1.fasta` | ON012604.1, targeting vector AAVS1 CAG iRFP720 (Feher et al., Sci Rep 2022;12:9874) | CAG promoter (full length), 4799..6471 |
+
+The independent records:
 
 | File | Record | Element it cross-checks |
 |---|---|---|
