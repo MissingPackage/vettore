@@ -7,6 +7,7 @@ asks ``/api/startup-files`` every half second.
 
 import json
 import os
+import signal
 import socket
 import subprocess
 import sys
@@ -167,17 +168,19 @@ def _get(port: int, path: str, token: str = TOKEN) -> dict:
         return json.loads(res.read())
 
 
-def _wait_up(proc: subprocess.Popen, port: int, token: str = TOKEN) -> None:
+def _wait_up(proc: subprocess.Popen, port: int, token: str = TOKEN) -> int:
     """Until the server answers and the process has recorded itself as the running copy
-    (right after its server is up)."""
+    (right after its server is up); returns the pid it recorded. The copy is recognised by
+    its port: on Windows a virtual environment's python.exe is a launcher that runs the
+    interpreter as a child process, so the recorded pid is not the launcher's."""
     deadline = time.monotonic() + 90
     while time.monotonic() < deadline:
         assert proc.poll() is None, "the running copy exited early"
         try:
             if _get(port, "health", token) == {"status": "ok"}:
                 record = instance.read_record()
-                if record is not None and record.pid == proc.pid:
-                    return
+                if record is not None and record.port == port:
+                    return record.pid
         except OSError:
             pass
         time.sleep(0.2)
@@ -214,6 +217,7 @@ class Starts:
         self.env = {**os.environ, "VETTORE_HOME": str(home)}
         self.logs = logs
         self.procs: list[tuple[subprocess.Popen, Path]] = []
+        self.real: dict[int, int] = {}      # launcher pid -> the interpreter's own pid
 
     def start(self, *args: str) -> subprocess.Popen:
         # --no-window keeps the test off the display; --single-instance gives it the decision
@@ -231,8 +235,12 @@ class Starts:
         path = next(p for q, p in self.procs if q is proc)
         return path.read_text(encoding="utf-8", errors="replace")
 
-    @staticmethod
-    def stop(proc: subprocess.Popen) -> None:
+    def up(self, proc: subprocess.Popen, port: int, token: str = TOKEN) -> int:
+        pid = _wait_up(proc, port, token)
+        self.real[proc.pid] = pid
+        return pid
+
+    def stop(self, proc: subprocess.Popen) -> None:
         if proc.poll() is None:
             proc.terminate()
             try:
@@ -240,6 +248,14 @@ class Starts:
             except subprocess.TimeoutExpired:
                 proc.kill()
                 proc.wait(timeout=10)
+        # Stopping a launcher does not stop the interpreter it started (Windows virtual
+        # environments): stop the recorded process too.
+        real = self.real.get(proc.pid)
+        if real and real != proc.pid and instance.pid_alive(real):
+            os.kill(real, signal.SIGTERM)
+            deadline = time.monotonic() + 10
+            while instance.pid_alive(real) and time.monotonic() < deadline:
+                time.sleep(0.1)
 
     def stop_all(self) -> None:
         for proc, _ in self.procs:
@@ -258,8 +274,7 @@ def starts(private_home, tmp_path):
 def test_a_second_start_hands_its_file_to_the_running_copy_and_exits(starts, tmp_path):
     port = _free_port()
     first = starts.start("--port", str(port), "--token", TOKEN)
-    _wait_up(first, port)
-    assert instance.read_record().pid == first.pid
+    first_pid = starts.up(first, port)
     page = Page(port)
     try:
         sample = tmp_path / "colleague.dna"
@@ -269,7 +284,7 @@ def test_a_second_start_hands_its_file_to_the_running_copy_and_exits(starts, tmp
         assert "Handed 1 file(s) to the running Vettore" in starts.log(second)
         assert [r["path"] for r in page.results] == [str(sample)]
         assert page.results[0]["documents"][0]["sequence"]
-        assert instance.read_record().pid == first.pid     # still the running copy
+        assert instance.read_record().pid == first_pid     # still the running copy
 
         # Started again with no file: the running copy is shown, no second copy starts.
         third = starts.start()
@@ -285,16 +300,16 @@ def test_a_start_whose_files_the_page_does_not_take_runs_on_its_own(starts, tmp_
     new start does not end in nothing, it runs on its own and becomes the running copy."""
     port = _free_port()
     first = starts.start("--port", str(port), "--token", TOKEN)
-    _wait_up(first, port)
+    starts.up(first, port)
     sample = tmp_path / "plasmid.gb"
     sample.write_bytes((DATA / "MT612431.1.gb").read_bytes())
     port2 = _free_port()
     started = time.monotonic()
     second = starts.start("--port", str(port2), "--token", "other", str(sample))
-    _wait_up(second, port2, "other")
-    assert time.monotonic() - started >= instance.HAND_OVER_WAIT
+    second_pid = starts.up(second, port2, "other")
+    assert time.monotonic() - started >= instance.HAND_OVER_WAIT - 0.05
     assert "did not open the files" in starts.log(second)
-    assert instance.read_record().pid == second.pid
+    assert instance.read_record().pid == second_pid
     assert [r["path"] for r in _get(port2, "startup-files", "other")["results"]] == [str(sample)]
     assert _get(port, "startup-files")["results"] == []   # withdrawn from the first
 
@@ -302,16 +317,16 @@ def test_a_start_whose_files_the_page_does_not_take_runs_on_its_own(starts, tmp_
 def test_a_stale_record_is_replaced_by_the_next_start(starts, tmp_path):
     port = _free_port()
     first = starts.start("--port", str(port), "--token", TOKEN)
-    _wait_up(first, port)
+    first_pid = starts.up(first, port)
     starts.stop(first)                 # killed: its record stays behind, pointing at nothing
-    assert instance.read_record().pid == first.pid
+    assert instance.read_record().pid == first_pid
 
     sample = tmp_path / "plasmid.gb"
     sample.write_bytes((DATA / "MT612431.1.gb").read_bytes())
     port2 = _free_port()
     successor = starts.start("--port", str(port2), "--token", "other", str(sample))
-    _wait_up(successor, port2, "other")
+    successor_pid = starts.up(successor, port2, "other")
     record = instance.read_record()
-    assert (record.pid, record.port) == (successor.pid, port2)
+    assert (record.pid, record.port) == (successor_pid, port2)
     results = _get(port2, "startup-files", "other")["results"]
     assert [r["path"] for r in results] == [str(sample)]

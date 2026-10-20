@@ -118,7 +118,8 @@ def test_a_frozen_page_falls_back_to_the_native_confirm():
     started = time.monotonic()
     assert window.close_button() is False
     assert window.closed.wait(5)
-    assert time.monotonic() - started >= TIMEOUT
+    # Windows timers tick every ~15.6 ms, so a wait can return a few ms before its timeout.
+    assert time.monotonic() - started >= TIMEOUT - 0.05
     assert window.native_confirms == 1     # confirm_close was set: the system dialog asked
     window.release.set()
 
