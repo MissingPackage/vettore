@@ -15,6 +15,12 @@ async function menu(page: Page, ...items: string[]) {
   }
 }
 
+/** Blueprint dialogs open with a zoom: measure only once it is over, or boxes move between reads. */
+async function dialogOpened(page: Page) {
+  await expect(page.locator(".bp3-overlay-appear, .bp3-overlay-appear-active, .bp3-overlay-enter, "
+    + ".bp3-overlay-enter-active")).toHaveCount(0);
+}
+
 /** Every child of `row` sits on the same line, each on a single text line. */
 async function expectOneLine(row: Locator, what: string) {
   const boxes = await row.evaluate((el) => Array.from(el.children).map((c) => {
@@ -41,6 +47,7 @@ test("Design PCR Primers keeps every input inside the form column", async ({ pag
   await menu(page, "Primers", "Design PCR Primers…");
   const dialog = page.getByTestId("primer-design-dialog");
   await expect(dialog).toBeVisible();
+  await dialogOpened(page);
   const column = dialog.locator(".vt-pd-form");
   await expectInside(dialog.getByTestId("pd-maxTmDifference"), column, "Max Tm difference input");
   for (const input of await column.locator("input, select").all()) {
@@ -57,6 +64,7 @@ test("the Gibson insert region stays on one line", async ({ page }) => {
   const dialog = page.getByTestId("cloning-dialog");
   await dialog.getByTestId("insert-doc-0").selectOption({ index: 1 });
   await dialog.getByTestId("insert-region-0-feature").selectOption({ label: "KanR (459–1,268)" });
+  await dialogOpened(page);
   const row = dialog.locator(".vt-insert-row .vt-region");
   await expect(row).toContainText("810 bp");
   await expectOneLine(row, "region row");

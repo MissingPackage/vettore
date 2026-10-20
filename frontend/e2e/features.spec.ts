@@ -101,7 +101,8 @@ test.describe("on a 1366 × 768 screen", () => {
     await menu(page, "Features", "Detect Common Features…");
     const dialog = page.getByTestId("detect-dialog");
     await expect(page.getByTestId("detect-table")).toBeVisible({ timeout: 30_000 });
-    await page.waitForTimeout(400);                     // the dialog's opening zoom moves boxes
+    // The dialog opens with a zoom: measure once it is over.
+    await expect(page.locator(".bp3-overlay-appear-active, .bp3-overlay-enter-active")).toHaveCount(0);
     await page.screenshot({ path: "test-results/detect-features-1366.png" });
     const body = await dialog.boundingBox();
     const select = await page.getByTestId("detect-identity").boundingBox();

@@ -71,7 +71,8 @@ test("the limit caption sits under the limit marker", async ({ page }) => {
   for (const kind of ["ss", "sc"]) {
     await dialog.getByTestId("aav-kind").selectOption(kind);
     await expect(dialog.getByTestId("aav-bar")).toBeVisible();
-    await page.waitForTimeout(400);                     // the dialog's opening zoom moves boxes
+    // The dialog opens with a zoom: measure once it is over.
+    await expect(page.locator(".bp3-overlay-appear-active, .bp3-overlay-enter-active")).toHaveCount(0);
     const bar = await dialog.getByTestId("aav-bar").boundingBox();
     const marker = await dialog.locator(".vt-aav-limit").boundingBox();
     const caption = await dialog.getByTestId("aav-limit-caption").boundingBox();
