@@ -1,8 +1,8 @@
 .vt-paste-intro { margin: 0 0 var(--vt-space-3); color: var(--vt-text); }
 .vt-paste-reason { margin: 0 0 var(--vt-space-3); color: var(--vt-text-muted); }
-.vt-paste-text { height: 200px; font-family: var(--vt-font-mono); }
+.vt-paste-text { font-family: var(--vt-font-mono); }
 .vt-paste-ok { color: var(--vt-success); }
 .vt-paste-error { color: var(--vt-danger); white-space: pre-wrap; overflow-wrap: anywhere; }
 .vt-paste-options { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 0 var(--vt-space-5); }
 .vt-paste-options .bp3-form-group { margin-bottom: var(--vt-space-2); }
-.vt-paste-hint { flex-basis: 100%; color: var(--vt-text-muted); font-size: 12px; }
+.vt-paste-hint { margin-top: calc(-1 * var(--vt-space-1)); color: var(--vt-text-muted); font-size: 12px; }

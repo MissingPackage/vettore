@@ -27,7 +27,7 @@ export default function SaveCopyDialog(props: {
         </p>
         {props.source.label === ".dna" && (
           <p className="vt-paste-reason">
-            A colleague needs a .dna file? Use File → Save As… and choose the “DNA file (.dna)” type.
+            To give a colleague a .dna file, use File → Save As… and choose the “DNA file (.dna)” type.
           </p>
         )}
       </div>

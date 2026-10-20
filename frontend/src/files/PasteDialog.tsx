@@ -96,6 +96,7 @@ export default function PasteDialog(props: {
             fill
             growVertically={false}
             className="vt-paste-text"
+            style={{ height: 200 }}
             intent={check.state === "error" ? "danger" : "none"}
             value={text}
             onChange={(e: any) => setText(e.target.value)}
@@ -107,12 +108,14 @@ export default function PasteDialog(props: {
             <InputGroup id="vt-paste-name" data-testid="paste-name" placeholder="Pasted sequence"
                         value={name} onChange={(e: any) => setName(e.target.value)} />
           </FormGroup>
-          <RadioGroup inline label="Topology" selectedValue={circular ? "circular" : "linear"}
-                      onChange={(e: any) => setCircular(e.currentTarget.value === "circular")}>
-            <Radio label="Linear" value="linear" />
-            <Radio label="Circular" value="circular" data-testid="paste-circular" />
-          </RadioGroup>
-          <span className="vt-paste-hint">GenBank and EMBL records keep their own topology.</span>
+          <div>
+            <RadioGroup inline label="Topology" selectedValue={circular ? "circular" : "linear"}
+                        onChange={(e: any) => setCircular(e.currentTarget.value === "circular")}>
+              <Radio label="Linear" value="linear" />
+              <Radio label="Circular" value="circular" data-testid="paste-circular" />
+            </RadioGroup>
+            <div className="vt-paste-hint">GenBank and EMBL records keep their own topology.</div>
+          </div>
         </div>
       </div>
       <div className={Classes.DIALOG_FOOTER}>

@@ -26,6 +26,7 @@ export default function CopyTextDialog(props: { title: string; text: string; onC
           readOnly
           data-testid="copy-text"
           className={`${Classes.INPUT} ${Classes.FILL} vt-paste-text`}
+          style={{ height: 200 }}
           value={props.text}
         />
       </div>
