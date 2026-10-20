@@ -2,6 +2,8 @@
 
 The download links in the README always point to the latest release.
 
+## Unreleased
+
 ## 0.1.0
 
 First public release.
