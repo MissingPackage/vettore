@@ -331,6 +331,10 @@ for (const size of SIZES) {
       await menu(page, "Actions", "PCR…");
       await dialog.getByTestId("template-doc").selectOption({ index: 1 });
       const inputs = dialog.locator(".vt-primer-input input.vt-mono");
+      // A 35-nt primer is readable whole in its field, not scrolled out of sight.
+      await inputs.nth(0).fill("ATGGGTAAGGAAAAGACTCACGTTTCGAGGCCGCG");
+      const fits = await inputs.nth(0).evaluate((el) => el.scrollWidth <= el.clientWidth);
+      expect(fits, "a 35-nt primer fits its field").toBe(true);
       await inputs.nth(0).fill("GGGGGGGGGGGGGGGGGGGG");
       await inputs.nth(1).fill("CCCCCCCCCCCCCCCCCCCC");
       await expect(page.getByTestId("cloning-error")).toBeVisible();

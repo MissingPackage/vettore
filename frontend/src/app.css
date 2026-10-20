@@ -167,9 +167,13 @@ body { overflow: hidden; }
 :root .vt-enzyme-picker .bp3-tag { min-height: var(--vt-control-height-sm); font-size: var(--vt-font-size-sm); }
 .vt-region { display: flex; align-items: center; gap: 6px; }
 .vt-region input { width: 90px; }
-.vt-primer-input { display: flex; gap: 6px; }
-.vt-primer-input input:nth-child(1) { width: 110px; }
-.vt-primer-input input:nth-child(2) { flex: 1; min-width: 0; }
+/* Name and "From file…" on the first line, the sequence alone on the second: at the form's
+   width a 35-nt primer (40 with a short tail) is readable whole, so a pasted primer can be
+   checked base by base. */
+.vt-primer-input { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.vt-primer-input input:nth-child(1) { flex: 0 1 180px; min-width: 0; }
+.vt-primer-input .bp3-html-select { order: 2; }
+.vt-primer-input input:nth-child(2) { order: 3; flex: 1 1 100%; min-width: 0; }
 .vt-insert-row, .vt-card {
   display: flex; flex-direction: column; gap: var(--vt-space-2); padding: 10px;
   border: 1px solid var(--vt-border-subtle); border-radius: var(--vt-radius-lg); background: var(--vt-surface);
