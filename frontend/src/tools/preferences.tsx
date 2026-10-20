@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import * as Blueprint from "@blueprintjs/core";
 import { Button, Classes } from "@blueprintjs/core";
-import { api } from "../api";
+import { api, type FileAssociations } from "../api";
+import { associationHint, movedNote, overriddenNote } from "../files/associations";
 import { messageOf } from "../files/notices";
 import { ENZYME_SETS } from "../enzymeLogic";
 import {
@@ -21,6 +22,68 @@ import "./preferences.css";
 const { Dialog, Callout } = Blueprint as unknown as Record<string, React.ComponentType<any>>;
 
 const PERCENT_FALLBACK = [0.5, 0.7, 0.8, 1.0, 1.2, 1.5, 2.0, 3.0];
+
+/**
+ * Open sequence files with Vettore on double-click. Shown only by the packaged application
+ * (a copy run from source code has no program to register); applied at once, like the rest.
+ */
+function OpenWithVettore() {
+  const [status, setStatus] = useState<FileAssociations | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState<string | null>(null);
+
+  useEffect(() => {
+    api.fileAssociations().then(setStatus).catch(() => setStatus(null));
+  }, []);
+  if (!status?.available) return null;
+
+  const change = async (enabled: boolean) => {
+    setBusy(true);
+    setError(null);
+    setDone(null);
+    try {
+      setStatus(await api.setFileAssociations(enabled));
+      setDone(enabled
+        ? "Sequence files now open with Vettore when you double-click them."
+        : "Sequence files open as they did before.");
+    } catch (e) {
+      setError(messageOf(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const moved = movedNote(status);
+  const overridden = overriddenNote(status);
+
+  return (
+    <div className="vt-field" data-testid="pref-open-with-field">
+      <span className="vt-field-label">Opening files</span>
+      <label className="bp3-control bp3-checkbox vt-pref-check">
+        <input
+          type="checkbox"
+          data-testid="pref-open-with"
+          checked={status.enabled}
+          disabled={busy}
+          aria-describedby="pref-open-with-hint"
+          onChange={(e) => change(e.target.checked)}
+        />
+        <span className="bp3-control-indicator" />
+        Open sequence files with Vettore when you double-click them
+      </label>
+      <span className="vt-field-hint" id="pref-open-with-hint">{associationHint(status)}</span>
+      {busy && <span className="vt-busy" role="status" data-testid="pref-open-with-busy">Applying…</span>}
+      {moved && <span className="vt-field-hint" data-testid="pref-open-with-moved">{moved}</span>}
+      {overridden && (
+        <div className="vt-notice vt-notice-warning" role="status" data-testid="pref-open-with-overridden">
+          {overridden}
+        </div>
+      )}
+      {error && <span className="vt-field-error" role="alert" data-testid="pref-open-with-error">{error}</span>}
+      {done && !busy && <span className="vt-pref-done" role="status" data-testid="pref-open-with-done">{done}</span>}
+    </div>
+  );
+}
 
 function PreferencesDialog(props: ToolProps) {
   const prefs = usePreferences();
@@ -118,6 +181,8 @@ function PreferencesDialog(props: ToolProps) {
             </select>
           </div>
         </Field>
+
+        <OpenWithVettore />
 
         {saved && (
           <Callout intent="success" data-testid="pref-saved">{saved}.</Callout>

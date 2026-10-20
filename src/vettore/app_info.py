@@ -77,7 +77,7 @@ def app_version() -> str:
 def log_path() -> Path:
     """Where the app writes its log (see vettore.app.main): ~/.vettore/vettore.log, or under
     $VETTORE_HOME when that is set."""
-    return settings.home() / "vettore.log"
+    return settings.log_path()
 
 
 def sample_bytes(sample: Sample) -> bytes:

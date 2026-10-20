@@ -123,7 +123,8 @@ function GettingStarted(props: ToolProps) {
         <li>
           <b>Keep the result.</b> Ctrl+S saves GenBank, the format every sequence tool reads.
           File → Export also writes FASTA, .dna, and the map as SVG or PNG for a figure. A dot
-          before a tab's name means unsaved work: closing it asks first. The History view
+          before a tab's name means unsaved work: closing the tab, or Vettore, asks first and
+          offers to save it. The History view
           (Ctrl+6) keeps where a product came from, down to the parent files and primers.
         </li>
       </ol>

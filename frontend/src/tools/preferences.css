@@ -12,3 +12,19 @@
 .vt-preferences .vt-field-hint {
   color: var(--vt-text-muted);
 }
+
+/* "Open sequence files with Vettore": a checkbox in the body text's size, not a label's. */
+.vt-preferences .vt-pref-check {
+  margin: 0;
+  color: var(--vt-text);
+}
+
+.vt-preferences .vt-notice {
+  margin: var(--vt-space-1) 0 0;
+}
+
+.vt-preferences .vt-pref-done {
+  color: var(--vt-success);
+  font-size: var(--vt-font-size-xs);
+  font-weight: var(--vt-weight-medium);
+}
