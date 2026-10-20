@@ -284,6 +284,9 @@ def design(body: DesignRequest) -> dict[str, Any]:
         raise PrimerDesignError("GC: the minimum must not exceed the maximum.")
 
     target_length = (body.end - body.start) % length + 1
+    if message := _no_room(name, length, circular, body.start, body.end, target_length,
+                           body.size_min):
+        raise PrimerDesignError(message)
     smallest = target_length + 2 * body.size_min
     product_min = body.product_min if body.product_min is not None else smallest
     product_max = body.product_max if body.product_max is not None else product_min + 300
@@ -295,7 +298,8 @@ def design(body: DesignRequest) -> dict[str, Any]:
         raise PrimerDesignError("Product size: the minimum is larger than the maximum.")
     if product_min > length:
         raise PrimerDesignError(f"The smallest product allowed ({product_min:,} bp) is longer "
-                                f"than “{name}” ({length:,} bp).")
+                                f"than “{name}” ({length:,} bp). Lower the minimum product "
+                                "size.")
 
     # A circular template is rotated so that the target sits in the middle: primers can then
     # be placed on either side of it, across the origin if need be.
@@ -386,6 +390,27 @@ def design(body: DesignRequest) -> dict[str, Any]:
         "tm_method": f"{TM_PRESET.description}, {TM_PRESET.label.split(' (')[0]} preset",
         "dg_conditions": "ΔG at 37 °C, Na⁺ 50 mM (primer3 thermodynamic alignment)",
     }
+
+
+def _no_room(name: str, length: int, circular: bool, start: int, end: int,
+             target_length: int, size_min: int) -> str | None:
+    """Why the region leaves no room for a primer on each side of it, with what to do; None
+    when there is room."""
+    whole = ("To amplify the whole region, primers included, use Actions → Design Primers to "
+             "Amplify a Region, which places the primers at the ends of the region itself.")
+    if circular:
+        if target_length + 2 * size_min <= length:
+            return None
+        return (f"The region covers {target_length:,} of the {length:,} bp of “{name}”, which "
+                f"leaves no room for primers: each needs at least {size_min} bases outside the "
+                f"region. Choose a region at least {2 * size_min} bp shorter than the plasmid. "
+                f"{whole}")
+    if start >= size_min and end + size_min <= length - 1:
+        return None
+    return (f"Primers need at least {size_min} bases on each side of the region, outside it, "
+            f"but this region reaches {'the start' if start < size_min else 'the end'} of the "
+            f"linear sequence “{name}”. Choose a region from {size_min + 1:,} to "
+            f"{length - size_min:,}. {whole}")
 
 
 def _primer(sequence: str, start: int, end: int, result: dict[str, Any], key: str) -> dict:

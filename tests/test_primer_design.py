@@ -167,7 +167,9 @@ def test_a_repeated_three_prime_end_is_reported():
 
 
 @pytest.mark.parametrize("kwargs, message", [
-    ({"start": 0, "end": 50}, "too close to the start or the end"),
+    ({"start": 0, "end": 50}, ("reaches the start of the linear sequence “t”. Choose a region "
+                              "from 19 to 1,482.")),
+    ({"start": 600, "end": 1490}, "reaches the end of the linear sequence"),
     ({"start": 900, "end": 800}, "start is after its end"),
     ({"start": 600, "end": 799, "product_max": 230}, "at least 236 bp"),
     ({"start": 600, "end": 799, "product_min": 500, "product_max": 400}, "minimum is larger"),
@@ -179,6 +181,29 @@ def test_impossible_requests_explain_what_to_change(kwargs, message):
     with pytest.raises(PrimerDesignError) as error:
         design(DesignRequest(template=doc("t", TEMPLATE, False), **kwargs))
     assert message in str(error.value)
+
+
+@pytest.mark.parametrize(("start", "end"), [(0, 1499), (100, 99), (10, 1480)])
+def test_a_region_covering_the_plasmid_says_what_to_do(start, end):
+    """The whole plasmid selected (or all but a few bases): no room for a primer outside the
+    region, and the message names the shorter region and the tool that amplifies a region."""
+    with pytest.raises(PrimerDesignError) as error:
+        design(DesignRequest(template=doc("p", TEMPLATE, True), start=start, end=end))
+    message = str(error.value)
+    covered = (end - start) % 1500 + 1
+    assert message.startswith(f"The region covers {covered:,} of the 1,500 bp of “p”, which "
+                              "leaves no room for primers")
+    assert "Choose a region at least 36 bp shorter than the plasmid." in message
+    assert "Actions → Design Primers to Amplify a Region" in message
+
+
+def test_a_region_leaving_room_for_primers_is_designed():
+    """36 bp outside the region is the least that passes the check (primer3 then decides);
+    with 80 bp a pair is found, across the origin."""
+    with pytest.raises(PrimerDesignError, match="primer3 found no primer pair"):
+        design(DesignRequest(template=doc("p", TEMPLATE, True), start=18, end=1481))
+    out = design(DesignRequest(template=doc("p", TEMPLATE, True), start=40, end=1459))
+    assert out["pairs"]
 
 
 def test_ambiguous_bases_are_avoided():
