@@ -1,0 +1,113 @@
+/* Welcome screen, shown while no document is open. Tokens come from theme/tokens.css.
+   The older .vt-welcome rules in app.css set the frame; these style the content. */
+.vt-welcome-lead {
+  max-width: 54ch;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--vt-text);
+  margin: 0 0 var(--vt-space-5);
+}
+
+.vt-welcome-actions button {
+  display: flex;
+  align-items: baseline;
+  gap: var(--vt-space-2);
+}
+
+.vt-welcome-actions button.vt-primary {
+  border-color: var(--vt-accent);
+  color: var(--vt-accent);
+  font-weight: 600;
+}
+
+.vt-welcome-actions button span {
+  color: var(--vt-text-faint);
+  font-size: 12px;
+}
+
+.vt-welcome-drop {
+  margin: calc(-1 * var(--vt-space-4)) 0 var(--vt-space-5);
+  color: var(--vt-text-muted);
+}
+
+.vt-welcome-section {
+  margin-bottom: var(--vt-space-5);
+}
+
+.vt-welcome-section h3 {
+  font-size: 14px;
+  margin: 0 0 var(--vt-space-1);
+  color: var(--vt-text-strong);
+}
+
+.vt-welcome-section p {
+  margin: 0 0 var(--vt-space-2);
+}
+
+.vt-welcome-section ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.vt-welcome-section li {
+  display: flex;
+  gap: var(--vt-space-3);
+  align-items: baseline;
+  padding: var(--vt-space-1) 0;
+}
+
+/* A sample's one-line description wraps instead of being cut off. */
+.vt-samples li {
+  flex-direction: column;
+  gap: 0;
+  padding-bottom: var(--vt-space-2);
+}
+
+.vt-samples .vt-welcome-note {
+  white-space: normal;
+  max-width: 68ch;
+}
+
+/* A link that is really a button: keyboard-reachable, no navigation. */
+.vt-welcome .vt-link {
+  font: inherit;
+  font-weight: 600;
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--vt-accent);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.vt-welcome .vt-link:hover:not(:disabled) {
+  text-decoration: underline;
+}
+
+.vt-welcome .vt-link:disabled {
+  color: var(--vt-text-faint);
+  cursor: default;
+}
+
+.vt-welcome-note {
+  color: var(--vt-text-muted);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vt-welcome-path {
+  color: var(--vt-text-faint);
+}
+
+.vt-welcome-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--vt-space-4);
+  align-items: baseline;
+  color: var(--vt-text-muted);
+  border-top: 1px solid var(--vt-border-subtle);
+  padding-top: var(--vt-space-3);
+}
