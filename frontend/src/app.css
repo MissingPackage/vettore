@@ -83,7 +83,6 @@ body { overflow: hidden; }
   margin: 0 0 6px; color: var(--vt-text-strong); font-size: var(--vt-font-size-xl);
   font-weight: var(--vt-weight-strong); line-height: var(--vt-line-height-tight);
 }
-.vt-welcome p { margin: 0; }
 .vt-welcome h3 {
   margin: 0 0 var(--vt-space-2); color: var(--vt-text-strong); font-size: var(--vt-font-size-md);
   font-weight: var(--vt-weight-strong); line-height: var(--vt-line-height-tight);
@@ -96,11 +95,6 @@ body { overflow: hidden; }
   transition: background-color var(--vt-duration), border-color var(--vt-duration);
 }
 .vt-welcome-actions button:hover { background: var(--vt-surface-hover); }
-/* Opening a file is what most people came for. */
-.vt-welcome-actions button:first-child {
-  background: var(--vt-accent); border-color: var(--vt-accent); color: var(--vt-text-on-accent);
-}
-.vt-welcome-actions button:first-child:hover { background: var(--vt-accent-hover); border-color: var(--vt-accent-hover); }
 .vt-recent, .vt-samples { margin-bottom: var(--vt-space-5); }
 .vt-recent ul, .vt-samples ul { list-style: none; padding: 0; margin: 0; }
 .vt-recent li, .vt-samples li { display: flex; gap: var(--vt-space-3); align-items: baseline; padding: 3px 0; min-width: 0; }

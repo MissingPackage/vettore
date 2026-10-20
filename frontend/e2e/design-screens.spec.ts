@@ -126,6 +126,21 @@ for (const size of SIZES) {
       expect(fonts.body).not.toContain("Icons16");
       expect(fonts.button).toBe(fonts.body);
       if (await page.locator(".vt-recent-dir").count()) await expectReadable(page.locator(".vt-recent-dir"), "recent file folder");
+      // The filled primary button is the obvious way in: its label and shortcut must stand out
+      // from its fill (two stylesheets once gave the label the fill's own colour).
+      const primary = page.getByTestId("open");
+      const fill = await primary.evaluate((el) => getComputedStyle(el).backgroundColor);
+      expect(fill, "the primary button is filled").not.toBe("rgba(0, 0, 0, 0)");
+      await expectReadable(primary, "welcome primary button label");
+      await expectReadable(primary.locator("span"), "welcome primary button shortcut");
+      await expectReadable(page.getByTestId("new").locator("span"), "welcome button shortcut");
+      // The drop hint keeps its space below: the samples heading does not sit on it.
+      const hint = (await page.getByTestId("drop-hint").boundingBox())!;
+      const samples = page.locator(".vt-samples h3");
+      if (await samples.count()) {
+        const heading = (await samples.boundingBox())!;
+        expect(heading.y - (hint.y + hint.height), "space under the drop hint").toBeGreaterThanOrEqual(16);
+      }
       await shot(page, "01-welcome");
 
       // Keyboard users see where focus is on Vettore's own controls.

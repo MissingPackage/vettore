@@ -679,7 +679,7 @@ export default function App() {
   );
 
   return (
-    <div className={`vt-shell${busy ? " vt-busy" : ""}`} aria-busy={busy > 0}
+    <div className={`vt-shell${busy ? " vt-shell-busy" : ""}`} aria-busy={busy > 0}
          onDragOver={(e) => e.preventDefault()} onDropCapture={onDrop}>
       <input
         ref={fileInput}

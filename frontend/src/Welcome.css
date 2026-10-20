@@ -1,6 +1,6 @@
 /* Welcome screen, shown while no document is open. Tokens come from theme/tokens.css.
    The older .vt-welcome rules in app.css set the frame; these style the content. */
-.vt-welcome-lead {
+.vt-welcome .vt-welcome-lead {
   max-width: 54ch;
   font-size: 15px;
   line-height: 1.5;
@@ -14,18 +14,32 @@
   gap: var(--vt-space-2);
 }
 
-.vt-welcome-actions button.vt-primary {
-  border-color: var(--vt-accent);
-  color: var(--vt-accent);
-  font-weight: 600;
-}
-
+/* The shortcut after each label is read, so it uses a text colour, not a decorative one. */
 .vt-welcome-actions button span {
-  color: var(--vt-text-faint);
-  font-size: 12px;
+  color: var(--vt-text-muted);
+  font-size: var(--vt-font-size-xs);
 }
 
-.vt-welcome-drop {
+/* Opening a file is what most people came for: the one filled button on the screen. The
+   frame rules in app.css set the other buttons; this is the only rule for the primary one. */
+.vt-welcome-actions button.vt-primary {
+  background: var(--vt-accent);
+  border-color: var(--vt-accent);
+  color: var(--vt-text-on-accent);
+  font-weight: var(--vt-weight-strong);
+}
+
+.vt-welcome-actions button.vt-primary:hover {
+  background: var(--vt-accent-hover);
+  border-color: var(--vt-accent-hover);
+}
+
+.vt-welcome-actions button.vt-primary span {
+  color: var(--vt-text-on-accent-muted);
+}
+
+/* Prefixed with .vt-welcome: Blueprint and the frame rules both style plain paragraphs. */
+.vt-welcome .vt-welcome-drop {
   margin: calc(-1 * var(--vt-space-4)) 0 var(--vt-space-5);
   color: var(--vt-text-muted);
 }
