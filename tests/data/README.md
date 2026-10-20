@@ -29,3 +29,17 @@ which cites Hilson et al. 2004, Genome Res 14:2176).
 (AAV9 hu.14 VP1 gene) are NCBI nuccore records downloaded unchanged with E-utilities efetch
 (rettype=gbwithparts) on 2026-10-20; used by `tests/test_alignment.py` and
 `frontend/e2e/alignment.spec.ts`.
+
+## Vendor-notation fixtures (`fidelity-*`)
+
+Written for Vettore on 2026-10-20 to reproduce how vector vendors write GenBank files: the
+feature colour in a note (`/note="color: #63b349; direction: RIGHT"`, also `color: Blue` and
+`color: None`) and non-standard feature keys (`ITR`, `Promoter`, `PROMOTER`, `Miscellaneous`,
+`Transcription_t`, `Rep_origin`, `PolyA_signal`, an unknown `sgRNA`). No vendor file was
+copied: sequences come from public records, features were written by hand.
+
+| File | Sequence | Features |
+|---|---|---|
+| `fidelity-notes.gb` | NCBI PZ629150.1, unchanged | at the published record's own coordinates (ITRs 1..131 and 4343..4483, cTNT promoter, Kozak, SaCas9, U6 promoter, sgRNA spacer and scaffold 4228..4323, the TTTTT Pol III terminator 4324..4328, f1 ori, AmpR promoter, AmpR, ori), rewritten in vendor notation |
+| `fidelity-block-cmv.gb` | catalogue entries joined in this order: CMV enhancer + CMV promoter (PV031350.1:96..679), EGFP (U55762.1:679..1398), SV40 polyA (MH282430.1:2999..3230), ori (PZ629150.1:6431..7019), AmpR promoter + AmpR (PV031350.1:2514..3479) | one `Promoter` block “CMV promoter” over the CMV enhancer and promoter (1..584), one feature per other element |
+| `fidelity-mislabelled-cmv.gb` | the same as `fidelity-block-cmv.gb` | the same, with the block labelled “PGK promoter”: a wrong label, as found in a vendor's AAV vector whose own `/official_designation` says CMV |
