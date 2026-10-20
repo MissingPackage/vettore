@@ -120,6 +120,17 @@ def test_pcr_product_with_the_same_site_at_both_ends_is_not_warned_about():
                for w in result.warnings)
 
 
+def test_details_count_inserts_and_fragments_in_plain_words():
+    vec = SequenceDoc(**doc("pE", A + "GAATTC" + B, True))
+    pcr = SequenceDoc(**doc("pcr", "CC" + "GAATTC" + C1 + "GAATTC" + "CC", False))
+    one = insert_multiple(frag(vec, "EcoRI"), [frag(pcr, "EcoRI")]).products[0]
+    assert one.details.startswith("Ligated 1 insert into pE (cut with EcoRI): ")
+    two = insert_multiple(frag(vector(), "EcoRI", "XhoI"),
+                          [frag(ins1(), "EcoRI", "BamHI"), frag(ins2(), "BamHI", "XhoI")])
+    assert two.products[0].details.startswith("Ligated 2 inserts into pVEC")
+    assert "(s)" not in one.details + two.products[0].details
+
+
 def test_directional_insert_with_an_extra_site_is_warned_about():
     """EcoRI–BamHI from a PCR product: one EcoRI end is expected; a second EcoRI site is not
     (the old count of distinct enzymes let it through)."""

@@ -56,7 +56,8 @@ def _backbone(vector_doc: SequenceDoc, enzyme_names: list[str]) -> Fragment:
     pieces = fragments(record, enzymes)
     backbone = max(pieces, key=lambda f: f.length)
     if len(pieces) > 2:
-        raise CloningError(f"{' and '.join(str(e) for e in enzymes)} cut the vector "
+        verb = "cuts" if len(enzymes) == 1 else "cut"
+        raise CloningError(f"{' and '.join(str(e) for e in enzymes)} {verb} the vector "
                            f"{len(pieces)} times; the vector must be cut once or twice")
     return backbone
 

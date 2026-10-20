@@ -65,6 +65,16 @@ class CloningResult(BaseModel):
     oligos: list[Oligo] = Field(default_factory=list)   # primers to order, if any were designed
 
 
+def plural(count: int, noun: str, many: str | None = None) -> str:
+    """'1 insert', '2 inserts' (or the plural given)."""
+    return f"{count} {noun if count == 1 else many or noun + 's'}"
+
+
+def times(count: int) -> str:
+    """'once', '2 times'."""
+    return "once" if count == 1 else f"{count} times"
+
+
 _NOT_DNA = re.compile("[^ACGTURYSWKMBDHVN]", re.IGNORECASE)
 _RNA_TO_DNA = str.maketrans("Uu", "Tt")
 

@@ -76,7 +76,7 @@ def test_a_blunt_cut_vector_is_refused():
 
 def test_a_vector_cut_more_than_twice_is_refused():
     busy = SequenceDoc(**doc("pBusy", VECTOR_SEQ + "GAAGAC" + clean_dna(40, 405), True))
-    with pytest.raises(CloningError, match="cut the vector"):
+    with pytest.raises(CloningError, match="BbsI cuts the vector 3 times; the vector must be cut once or twice"):
         design(CORE, busy, ["BbsI"])
 
 

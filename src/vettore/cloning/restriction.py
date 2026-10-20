@@ -20,7 +20,16 @@ from pydantic import BaseModel
 from pydna.dseqrecord import Dseqrecord
 
 from ..enzymes import build_database
-from .base import CloningError, CloningResult, Product, SequenceDoc, from_dseqrecord, to_dseqrecord
+from .base import (
+    CloningError,
+    CloningResult,
+    Product,
+    SequenceDoc,
+    from_dseqrecord,
+    plural,
+    times,
+    to_dseqrecord,
+)
 
 router = APIRouter()
 
@@ -152,7 +161,7 @@ def _pick_insert(frags: list[Fragment], enzymes: list, circular: bool,
     if index is not None:
         if not 0 <= index < len(frags):
             raise CloningError(f"Insert fragment {index + 1} does not exist "
-                               f"(the digest gives {len(frags)} fragments)")
+                               f"(the digest gives {plural(len(frags), 'fragment')})")
         return frags[index]
     names = {str(e) for e in enzymes}
     flanked = [f for f in frags if f.left_enzyme and f.right_enzyme
@@ -234,7 +243,7 @@ def insert_fragment(vector_doc: SequenceDoc, vector_enzymes: list[str], insert_d
         # One cut per end of the insert is expected: a PCR product with an EcoRI site at each
         # end is cut twice by EcoRI. More cuts mean a site inside the source as well.
         if count > chosen.ends_cut_by(name):
-            warnings.append(f"{name} cuts “{insert_doc.name}” {count} times; check that the "
+            warnings.append(f"{name} cuts “{insert_doc.name}” {times(count)}; check that the "
                             f"insert fragment ({chosen.label()}) is the one you want")
 
     piece = chosen.record if orientation == "forward" else chosen.record.reverse_complement()
@@ -282,7 +291,7 @@ def delete_fragment(doc: SequenceDoc, enzyme_names: list[str],
     frags = fragments(record, enzymes)
     if record.circular:
         if len(frags) != 2:
-            raise CloningError(f"The enzymes cut {len(frags)} times; choose enzymes that cut "
+            raise CloningError(f"The enzymes cut {times(len(frags))}; choose enzymes that cut "
                                "exactly twice in total")
         removed = frags[fragment_index] if fragment_index is not None else min(frags, key=lambda f: f.length)
         kept = next(f for f in frags if f is not removed)

@@ -28,6 +28,7 @@ from .base import (
     Product,
     SequenceDoc,
     from_dseqrecord,
+    plural,
     to_dseqrecord,
 )
 from .pcr import design_amplicon
@@ -172,8 +173,8 @@ def overlap_assembly(method: Method, vector: VectorIn, inserts: list[InsertIn],
             "regions and the homology length (repeated sequences at the junctions can also "
             "prevent a unique assembly)")
     if len(assembled) > len(matching):
-        warnings.append(f"pydna also finds {len(assembled) - len(matching)} alternative "
-                        "assembly product(s); repeated sequences may give wrong clones")
+        extra = plural(len(assembled) - len(matching), "alternative assembly product")
+        warnings.append(f"pydna also finds {extra}; repeated sequences may give wrong clones")
 
     oligos: list[Oligo] = []
     if vector_amplicon:
@@ -182,7 +183,7 @@ def overlap_assembly(method: Method, vector: VectorIn, inserts: list[InsertIn],
         oligos += [amplicon.forward, amplicon.reverse]
 
     name = f"{vector_part.name} + {' + '.join(p.name for p in insert_parts)}"
-    details = (f"{METHOD_NAMES[method]} of {len(insert_parts)} insert(s) into "
+    details = (f"{METHOD_NAMES[method]} of {plural(len(insert_parts), 'insert')} into "
                f"{vector_part.name} ({how}); {homology} bp homology arms")
     return CloningResult(
         products=[Product(doc=from_dseqrecord(product, name), operation=METHOD_NAMES[method],
