@@ -162,33 +162,33 @@ def _pick_insert(frags: list[Fragment], enzymes: list, circular: bool,
     return min(flanked, key=lambda f: f.length) if circular else max(flanked, key=lambda f: f.length)
 
 
-def _ligate(left: Dseqrecord, right: Dseqrecord) -> Dseqrecord:
+def ligate(left: Dseqrecord, right: Dseqrecord) -> Dseqrecord:
     try:
         return left + right
     except TypeError as exc:
-        raise _Incompatible(str(exc)) from exc
+        raise IncompatibleEnds(str(exc)) from exc
 
 
-class _Incompatible(Exception):
+class IncompatibleEnds(Exception):
     pass
 
 
-def _loop(linear: Dseqrecord) -> Dseqrecord:
+def circularise(linear: Dseqrecord) -> Dseqrecord:
     try:
         return linear.looped()
     except TypeError as exc:
-        raise _Incompatible(str(exc)) from exc
+        raise IncompatibleEnds(str(exc)) from exc
 
 
 def _join(backbone: Dseqrecord, insert: Dseqrecord) -> Dseqrecord:
-    return _loop(_ligate(backbone, insert))
+    return circularise(ligate(backbone, insert))
 
 
 def can_join(backbone: Dseqrecord, insert: Dseqrecord) -> bool:
     try:
         _join(backbone, insert)
         return True
-    except _Incompatible:
+    except IncompatibleEnds:
         return False
 
 
@@ -236,7 +236,7 @@ def insert_fragment(vector_doc: SequenceDoc, vector_enzymes: list[str], insert_d
     other = chosen.record.reverse_complement() if orientation == "forward" else chosen.record
     try:
         product = _join(backbone.record, piece)
-    except _Incompatible:
+    except IncompatibleEnds:
         hint = (" The ends are compatible in the other orientation." if can_join(backbone.record, other)
                 else "")
         raise CloningError(
@@ -249,10 +249,10 @@ def insert_fragment(vector_doc: SequenceDoc, vector_enzymes: list[str], insert_d
         warnings.append("Non-directional cloning: the insert can ligate in both orientations; "
                         "screen colonies for the orientation you want")
     try:
-        _loop(backbone.record)
+        circularise(backbone.record)
         warnings.append("The vector ends are compatible with each other: the backbone can "
                         "re-ligate without insert (dephosphorylate the vector)")
-    except _Incompatible:
+    except IncompatibleEnds:
         pass
     if "blunt" in (backbone.left_end[0], backbone.right_end[0]):
         warnings.append("Blunt-end ligation is less efficient than sticky-end ligation")
@@ -282,8 +282,8 @@ def delete_fragment(doc: SequenceDoc, enzyme_names: list[str],
         removed = frags[fragment_index] if fragment_index is not None else min(frags, key=lambda f: f.length)
         kept = next(f for f in frags if f is not removed)
         try:
-            product = _loop(kept.record)
-        except _Incompatible:
+            product = circularise(kept.record)
+        except IncompatibleEnds:
             raise CloningError(
                 f"Incompatible ends ({_end_text(kept.right_end)} / {_end_text(kept.left_end)}) — "
                 "blunting is not supported yet") from None
@@ -301,8 +301,8 @@ def delete_fragment(doc: SequenceDoc, enzyme_names: list[str],
             raise CloningError("The enzymes cut more than twice; choose enzymes that flank only "
                                "the fragment to delete")
         try:
-            product = _ligate(left, right)
-        except _Incompatible:
+            product = ligate(left, right)
+        except IncompatibleEnds:
             raise CloningError("Incompatible ends — blunting is not supported yet") from None
     details = f"Deleted the {removed.label()} fragment of {doc.name}"
     return CloningResult(products=[Product(

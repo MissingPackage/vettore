@@ -90,6 +90,7 @@ export function buildMenu(ref: MutableRefObject<MenuHandlers>) {
         ...cloningItem("gibson", "Gibson Assembly"),
         ...cloningItem("hifi", "NEBuilder HiFi DNA Assembly"),
         ...cloningItem("infusion", "In-Fusion Cloning"),
+        ...cloningItem("golden-gate", "Golden Gate Assembly"),
         "--",
         "reverseComplementEntireSequence",
         "reverseComplementSelection",

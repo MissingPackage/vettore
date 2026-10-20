@@ -90,6 +90,7 @@ export const CLONING_ACTIONS: CloningAction[] = [
   },
   {
     id: "golden-gate",
+    ready: true,
     title: "Golden Gate Assembly",
     endpoint: "golden-gate",
     Form: GoldenGateForm,
