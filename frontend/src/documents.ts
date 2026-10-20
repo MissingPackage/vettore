@@ -14,21 +14,39 @@ export interface HistoryEntry {
   parents?: { name: string; data: SequenceData }[];
 }
 
+/** The file a document was opened from, as the engine described it. */
+export interface DocSource {
+  /** Format label, e.g. "GenBank", ".dna", "EMBL", "plain sequence text". */
+  label: string;
+  /** How many sequences the file held (one tab each). */
+  records: number;
+  fileName: string;
+  /** Some of the file's content (features) could not be shown. */
+  incomplete: boolean;
+}
+
 export interface Doc {
   editorName: string;
   name: string;
   /** File the document was opened from or last saved to. */
   path: string | null;
+  /**
+   * Save may overwrite `path`: Vettore wrote it, or it is a one-record GenBank/FASTA file that
+   * the document holds completely. Otherwise Save makes a GenBank copy.
+   */
+  saveInPlace: boolean;
+  source: DocSource | null;
+  /** The "Save a GenBank copy" explanation was already shown for this document. */
+  copyNoticeShown: boolean;
   view: ViewId;
   enzymeSet: EnzymeSetId;
   history: HistoryEntry[];
 }
 
-const WRITABLE = /\.(gb|gbk|gbff|genbank|ape|fa|fasta|fna|fas)$/i;
 let counter = 0;
 
 export function canSaveInPlace(doc: Doc): boolean {
-  return !!doc.path && WRITABLE.test(doc.path);
+  return !!doc.path && doc.saveInPlace;
 }
 
 export function now(): string {
@@ -39,6 +57,7 @@ export function createDocument(
   sequenceData: SequenceData,
   path: string | null,
   firstEntry: HistoryEntry,
+  file?: { saveInPlace: boolean; source: DocSource },
 ): Doc {
   const editorName = `doc-${++counter}`;
   updateEditor(store, editorName, {
@@ -51,6 +70,9 @@ export function createDocument(
     editorName,
     name: sequenceData.name,
     path,
+    saveInPlace: file?.saveInPlace ?? false,
+    source: file?.source ?? null,
+    copyNoticeShown: false,
     view: "map",
     enzymeSet: loadPreferences().enzymeSet,
     history: [firstEntry],

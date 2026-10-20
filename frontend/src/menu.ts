@@ -10,6 +10,8 @@ import type { ViewId } from "./views";
 
 export interface MenuHandlers {
   newFile: () => void;
+  /** Open what the clipboard holds (sequence, FASTA or GenBank text) as a new document. */
+  newFromClipboard: () => void;
   open: () => void;
   openRecent: (path: string) => void;
   close: () => void;
@@ -17,6 +19,9 @@ export interface MenuHandlers {
   saveAs: () => void;
   exportGenbank: () => void;
   exportFasta: () => void;
+  exportDna: () => void;
+  /** Copy the selection, or the whole sequence, as FASTA text. */
+  copyAsFasta: () => void;
   exportSvg: () => void;
   exportPng: () => void;
   view: (view: ViewId) => void;
@@ -59,11 +64,23 @@ export function buildMenu(ref: MutableRefObject<MenuHandlers>) {
     const withTools = (menu: Record<string, unknown> | undefined, name: MenuName) =>
       menu && { ...menu, submenu: [...((menu.submenu as MenuItem[]) ?? []), ...toolItems(name)] };
 
+    // Copy as FASTA sits right after the editor's own Copy.
+    const editItems = [...((edit?.submenu as MenuItem[]) ?? [])];
+    const copyAt = editItems.findIndex((m) => m === "copy" || (typeof m === "object" && m.cmd === "copy"));
+    editItems.splice(copyAt >= 0 ? copyAt + 1 : editItems.length, 0, {
+      text: "Copy as FASTA",
+      disabled: !hasDocument,
+      "data-test": "copy-as-fasta",
+      onClick: () => h().copyAsFasta(),
+    });
+    const editMenu = edit && { ...edit, submenu: editItems };
+
     const file = {
       text: "File",
       "data-test": "file",
       submenu: [
         { text: "New DNA File…", hotkey: "mod+n", onClick: () => h().newFile() },
+        { text: "New File from Clipboard", "data-test": "new-from-clipboard", onClick: () => h().newFromClipboard() },
         { text: "Open…", hotkey: "mod+o", onClick: () => h().open() },
         {
           text: "Open Recent",
@@ -78,8 +95,9 @@ export function buildMenu(ref: MutableRefObject<MenuHandlers>) {
         {
           text: "Export",
           submenu: [
-            { text: "GenBank…", onClick: () => h().exportGenbank() },
-            { text: "FASTA…", onClick: () => h().exportFasta() },
+            { text: "GenBank (.gb)…", onClick: () => h().exportGenbank() },
+            { text: "FASTA (.fasta)…", onClick: () => h().exportFasta() },
+            { text: "DNA File (.dna)…", onClick: () => h().exportDna() },
             "--",
             { text: "Map as SVG…", onClick: () => h().exportSvg() },
             { text: "Map as PNG…", onClick: () => h().exportPng() },
@@ -204,7 +222,7 @@ export function buildMenu(ref: MutableRefObject<MenuHandlers>) {
     // Menu order: File, Edit, View, Enzymes, Features, Primers, Actions, Tools, Help.
     const helpMenu = withTools(help, "Help") ?? (toolItems("Help").length
       ? { text: "Help", submenu: toolItems("Help").slice(1) } : undefined);
-    return [file, withTools(edit, "Edit"), views, enzymes, features, primers, actions, tools, helpMenu]
+    return [file, withTools(editMenu, "Edit"), views, enzymes, features, primers, actions, tools, helpMenu]
       .filter(Boolean) as MenuItem[];
   };
 }

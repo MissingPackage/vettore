@@ -237,6 +237,14 @@ def test_save_target_follows_the_extension():
     assert fileio.save_target("/x/a.txt") == (Path("/x/a.txt.gb"), "genbank")
 
 
+def test_browser_file_chooser_lists_every_readable_extension():
+    import re
+
+    source = (Path(__file__).parents[1] / "frontend" / "src" / "files" / "formats.ts").read_text()
+    block = source.split("OPEN_EXTENSIONS = [", 1)[1].split("]", 1)[0]
+    assert set(re.findall(r'"(\.[a-z0-9]+)"', block)) == set(fileio.FORMATS)
+
+
 def test_fasta_keeps_the_whole_name():
     text = fileio.write_fasta({"name": "pAAV CAG GFP WPRE bGH", "sequence": "ACGT",
                                "circular": False, "features": [], "primers": []})
