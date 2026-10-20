@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import fs from "node:fs";
 import path from "node:path";
 import { TOKEN } from "../playwright.config";
 
@@ -11,9 +12,26 @@ async function menu(page: Page, ...items: string[]) {
   }
 }
 
+/** The bases of a GenBank record, from its ORIGIN section. */
+function genbankSequence(name: string): string {
+  const text = fs.readFileSync(data(name), "utf-8");
+  return text.split(/\nORIGIN[^\n]*\n/)[1].split("\n//")[0].replace(/[^a-z]/gi, "").toUpperCase();
+}
+
+/** A new circular document with these bases and no features. */
+async function newPlasmid(page: Page, name: string, sequence: string) {
+  await page.getByTestId("new").click();
+  await page.getByLabel("Name").fill(name);
+  await page.getByTestId("new-seq-text").fill(sequence);
+  await page.locator("label.bp3-radio", { hasText: "Circular" }).click();
+  await page.getByTestId("new-seq-create").click();
+  await expect(page.locator(".vt-doctab.active")).toContainText(name);
+}
+
 test("detect common features on a real AAV plasmid and add them to the map", async ({ page }) => {
   await page.goto(`/?token=${TOKEN}`);
-  await page.getByTestId("file-input").setInputFiles(data("PZ629150.1.gb"));
+  // The published record already annotates what the catalogue finds; its bases alone do not.
+  await newPlasmid(page, "pAAV-cTNT-SaCas9-U6", genbankSequence("PZ629150.1.gb"));
   await expect(page.locator(".veCircularView")).toBeVisible();
 
   await menu(page, "Features", "Detect Common Features…");
@@ -39,4 +57,54 @@ test("detect common features on a real AAV plasmid and add them to the map", asy
   await page.getByTestId("view-map").click();
   await expect(page.locator(".veCircularView")).toContainText("SaCas9");
   await page.screenshot({ path: "test-results/detect-map.png" });
+});
+
+type Row = { name: string; start: number; end: number; isNew: boolean; annotatedAs?: string | null };
+type Existing = { name: string; start: number; end: number };
+
+test("an element already annotated under another name is shown as such and not ticked", async ({ page }) => {
+  // The engine names the existing feature that covers a match (annotatedAs). An engine that
+  // does not yet is given the same answer here, from the features the dialog sent.
+  await page.route("**/api/features/detect", async (route) => {
+    const sent = route.request().postDataJSON().sequenceData.features as Existing[] | Record<string, Existing>;
+    const existing = Array.isArray(sent) ? sent : Object.values(sent);
+    const response = await route.fetch();
+    const json = await response.json() as { features: Row[]; new_count: number };
+    if (json.features.every((f) => !("annotatedAs" in f))) {
+      for (const f of json.features) {
+        const cover = existing.find((e) => e.start <= f.start && f.end <= e.end && f.end - f.start >= (e.end - e.start) / 2);
+        f.annotatedAs = cover?.name ?? null;
+        f.isNew = !cover;
+      }
+      json.new_count = json.features.filter((f) => f.isNew).length;
+    }
+    await route.fulfill({ response, json });
+  });
+  await page.goto(`/?token=${TOKEN}`);
+  // nptI (kanamycin resistance) is annotated at complement(820..1635), which the catalogue calls KanR.
+  await page.getByTestId("file-input").setInputFiles(data("cloning-gateway-destination.gb"));
+  await expect(page.locator(".veCircularView")).toBeVisible();
+  await menu(page, "Features", "Detect Common Features…");
+  const row = page.getByTestId("detect-row").filter({ hasText: "KanR" });
+  await expect(row).toBeVisible({ timeout: 30_000 });
+  await expect(row.getByTestId("detect-annotated")).toHaveText("· annotated as “nptI”");
+  await expect(row.locator("input[type=checkbox]")).not.toBeChecked();
+});
+
+test.describe("on a 1366 × 768 screen", () => {
+  test.use({ viewport: { width: 1366, height: 768 } });
+
+  test("the minimum identity control stays inside the dialog", async ({ page }) => {
+    await page.goto(`/?token=${TOKEN}`);
+    await page.getByTestId("file-input").setInputFiles(data("cloning-gateway-destination.gb"));
+    await expect(page.locator(".veCircularView")).toBeVisible();
+    await menu(page, "Features", "Detect Common Features…");
+    const dialog = page.getByTestId("detect-dialog");
+    await expect(page.getByTestId("detect-table")).toBeVisible({ timeout: 30_000 });
+    await page.waitForTimeout(400);                     // the dialog's opening zoom moves boxes
+    await page.screenshot({ path: "test-results/detect-features-1366.png" });
+    const body = await dialog.boundingBox();
+    const select = await page.getByTestId("detect-identity").boundingBox();
+    expect(select!.x + select!.width).toBeLessThanOrEqual(body!.x + body!.width + 1);
+  });
 });

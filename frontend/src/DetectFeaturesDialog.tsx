@@ -21,7 +21,19 @@ interface Detected {
   source: string;
   length: number;
   isNew: boolean;
+  /** The existing feature that already covers this match, under whatever name. */
+  annotatedAs?: string | null;
 }
+
+/** "already annotated", or "annotated as “nptI”" when the map uses another name for it. */
+function annotatedText(f: Detected): string {
+  return f.annotatedAs && f.annotatedAs.toLowerCase() !== f.name.toLowerCase()
+    ? `annotated as “${f.annotatedAs}”`
+    : "already annotated";
+}
+
+/** A message as a sentence, so another sentence can follow it. */
+const sentence = (text: string) => (/[.!?]$/.test(text.trim()) ? text.trim() : `${text.trim()}.`);
 
 interface DetectResult {
   features: Detected[];
@@ -110,17 +122,19 @@ export default function DetectFeaturesDialog(props: { doc: OpenDoc; onClose: () 
   return (
     <Dialog isOpen onClose={props.onClose} title="Detect Common Features" style={{ width: 920 }}>
       <div className={Classes.DIALOG_BODY} data-testid="detect-dialog">
+        {/* Wraps on a narrow screen: the identity control moves under the text, never off the edge. */}
         <div
           className="vt-row"
-          style={{ alignItems: "flex-start", justifyContent: "space-between",
-                   gap: "var(--vt-space-4)" }}
+          style={{ alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap",
+                   gap: "var(--vt-space-2) var(--vt-space-4)" }}
         >
-          <p className="vt-muted">
+          <p className="vt-muted" style={{ flex: "1 1 420px", margin: 0 }}>
             Searches both strands for the elements AAV and everyday cloning work use: ITRs,
             promoters, WPRE, polyA signals, markers, origins, fluorescent proteins, tags,
             lox/FRT sites and Cas9. Tick what you want and it is added to the map.
           </p>
-          <label style={{ whiteSpace: "nowrap" }} title="How close a match has to be to count">
+          <label style={{ whiteSpace: "nowrap", flex: "none" }} title="How close a match has to be to count"
+                 data-testid="detect-identity-control">
             Minimum identity&nbsp;
             <div className="bp3-html-select bp3-small">
               <select
@@ -137,7 +151,7 @@ export default function DetectFeaturesDialog(props: { doc: OpenDoc; onClose: () 
         {busy && <p className="vt-muted" data-testid="detect-busy">Searching the sequence…</p>}
         {error && (
           <Callout intent="danger" title="Could not search">
-            {error}. Try again, or lower the minimum identity above.
+            {sentence(error)} Try again, or lower the minimum identity above.
           </Callout>
         )}
         {result && !busy && result.features.length === 0 && (
@@ -174,14 +188,17 @@ export default function DetectFeaturesDialog(props: { doc: OpenDoc; onClose: () 
               </thead>
               <tbody>
                 {result.features.map((f) => (
-                  <tr key={key(f)} className={f.isNew ? "" : "vt-muted"}>
+                  <tr key={key(f)} className={f.isNew ? "" : "vt-muted"} data-testid="detect-row">
                     <td>
-                      <input type="checkbox" checked={chosen.has(key(f))} onChange={() => toggle(f)} />
+                      <input type="checkbox" checked={chosen.has(key(f))} onChange={() => toggle(f)}
+                             aria-label={`Add ${f.name}`} />
                     </td>
                     <td>
                       <span className="vt-swatch" style={{ background: COLOR[f.type] ?? COLOR.misc_feature }} />
                       {f.name}
-                      {!f.isNew && <span className="vt-muted"> · already annotated</span>}
+                      {!f.isNew && (
+                        <span className="vt-muted" data-testid="detect-annotated"> · {annotatedText(f)}</span>
+                      )}
                     </td>
                     <td>{f.type}</td>
                     <td>
