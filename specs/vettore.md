@@ -130,7 +130,7 @@ creates a new document for the product, and records the operation in the History
 ### S4 — Polish
 
 Print / PDF of map and sequence; preferences (Tm method, default enzyme set, colors); keyboard
-shortcuts aligned with the reference doc; Windows file association for `.dna`/`.gb`;
+shortcuts for the common actions; Windows file association for `.dna`/`.gb`;
 AAV helper: ITR-to-ITR cargo size with a warning above 4.7 kb.
 
 ## Read first
@@ -158,24 +158,22 @@ AAV helper: ITR-to-ITR cargo size with a warning above 4.7 kb.
 - Deadline: S1 ships as soon as it is green, without waiting for S2 — the editor is useful on its own.
 - Biology results must match the reference engine; any operation without tests is not shipped.
 
-## Status (2026-10-20)
+## Status (2026-10-20) — v0.1.0, first public release
 
-- **S0 done**: Windows and Linux builds from CI; the Windows native window is verified by a
-  screenshot taken in CI on every build.
-- **S1 done**: shell, views, editing, save/export, enzymes, Tm. Released as v0.1.0.
-- **S2 mostly done**: restriction cloning (insert/delete fragment, digest), PCR, primer design,
-  mutagenesis, Gibson/NEBuilder HiFi/In-Fusion, Golden Gate. Released as v0.2.0 (without
-  Golden Gate). **Not implemented: Gateway BP/LR and TA/GC/TOPO** — the forms exist but are
-  hidden from the menu (`ready` flag in `frontend/src/cloning/registry.ts`). Gateway needs
-  real att-site sequences that nobody has verified yet, and shipping unverified recombination
-  would be worse than not shipping it.
-- **S3 in progress**: agarose gel simulation, Sanger (.ab1) alignment to a reference and
-  detection of common features are done. Still missing: multiple sequence alignment and
-  annealing oligos.
-- **S4 not started**.
+| Slice | State | Missing |
+|---|---|---|
+| S0 Spike | done | — |
+| S1 Daily driver | done (S1.1–S1.6) | — |
+| S2 Cloning | done: S2.1 restriction, S2.2 Gibson/HiFi/In-Fusion, S2.3 PCR, S2.4 mutagenesis, S2.5 Golden Gate; plus annealed-oligo cloning | S2.6 Gateway, S2.7 TA/TOPO and linear ligation of selected fragments; S2.8 History records parents and operations, but parents cannot be reopened from it yet |
+| S3 Verification | done: S3.1 gel, S3.2 Sanger alignment, S3.4 common features; plus Dam/Dcm methylation warnings | S3.3 multiple alignment; S3.5 primer3 design with size constraints and ranked pairs (design to a target Tm already exists) |
+| S4 Polish | not started | everything |
 
-Tests at this point: 126 pytest, 13 vitest, 12 Playwright end-to-end, plus a packaging smoke
-test that runs the packaged binary on both platforms in CI.
+Gateway and TA/TOPO forms exist but are hidden from the menu (`ready` flag in
+`frontend/src/cloning/registry.ts`); Gateway needs att-site sequences verified against a
+published vector map before it can ship.
+
+Tests: 136 pytest, 20 vitest, 13 Playwright end-to-end, plus a packaging smoke test that runs
+the packaged binary on both platforms in CI.
 
 ## Resolved
 
@@ -185,8 +183,8 @@ test that runs the packaged binary on both platforms in CI.
 
 1. (resolved — see above)
 2. [ASSUMED: save as GenBank `.gb`; `.dna` is read-only] — writing `.dna` is technically possible with sgffp (MIT), but nobody has verified that sgffp-written files reopen correctly in other tools. Is writing `.dna` important for exchanging files with colleagues? If yes: add `.dna` export and verify the round trip first.
-3. [ASSUMED: S2 priority order = restriction cloning, Gibson/HiFi, PCR, mutagenesis, Golden Gate, Gateway, In-Fusion, TA/TOPO] — which methods are used most?
-4. [ASSUMED: Sanger `.ab1` verification is high priority] — confirm.
+3. [ASSUMED: S2 priority order = restriction cloning, Gibson/HiFi, PCR, mutagenesis, Golden Gate, Gateway, In-Fusion, TA/TOPO] — which methods are used most? (All but Gateway and TA/TOPO are done.)
+4. (resolved — Sanger verification shipped)
 5. [ASSUMED: ladders listed in S3.1] — which ladder brands are used in the lab?
 6. [ASSUMED: optional online import from NCBI/Addgene by accession is welcome — only public data is downloaded, nothing is uploaded] — or strictly no network at all?
 7. [ASSUMED: delivery = the zip from the GitHub Releases page] — fine?
