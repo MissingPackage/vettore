@@ -100,6 +100,23 @@ async function contrastOf(locator: Locator): Promise<number> {
   });
 }
 
+/**
+ * Every dropdown in the container shows that it is one: the browser's own arrow, Blueprint's
+ * caret icon, or the chevron Vettore draws on the .bp3-html-select wrapper.
+ */
+async function expectDropdownCarets(container: Locator, what: string) {
+  const missing = await container.locator("select").evaluateAll((els) => els.filter((el) => {
+    if (getComputedStyle(el).appearance !== "none") return false;
+    const wrapper = el.parentElement!;
+    const after = getComputedStyle(wrapper, "::after");
+    const chevron = after.content !== "none" && after.content !== "normal" && parseFloat(after.width) > 0
+      && after.display !== "none";
+    const icon = wrapper.querySelector(":scope > .bp3-icon");
+    return !chevron && !(icon && getComputedStyle(icon).display !== "none");
+  }).map((el) => el.getAttribute("data-testid") ?? el.outerHTML.slice(0, 80)));
+  expect(missing, `${what}: dropdowns without an arrow`).toEqual([]);
+}
+
 /** Text meant to be read passes WCAG AA (4.5:1). */
 async function expectReadable(locator: Locator, what: string) {
   expect(await contrastOf(locator.first()), `${what} contrast`).toBeGreaterThanOrEqual(4.5);
@@ -256,6 +273,7 @@ for (const size of SIZES) {
           // offsetHeight ignores the dialog's opening zoom, which scales bounding boxes.
           .evaluateAll((els) => els.map((e) => (e as HTMLElement).offsetHeight));
         expect(new Set(heights), `${name} control heights`).toEqual(new Set([30]));
+        await expectDropdownCarets(dialog, name);
         await shot(page, name);
         await closeDialog(page);
       }
@@ -317,6 +335,7 @@ for (const size of SIZES) {
       await gel.getByTestId("gel-enzymes-1").fill("NcoI");
       await expect(page.getByTestId("gel-image")).toBeVisible();
       await expectDialogInViewport(page);
+      await expectDropdownCarets(gel, "gel");
       await shot(page, "42-gel");
       await closeDialog(page);
 
@@ -331,6 +350,7 @@ for (const size of SIZES) {
       await expect(page.getByTestId("sanger-summary")).toBeVisible({ timeout: 30_000 });
       await expect(page.locator(".vt-alignment svg path").first()).toBeVisible({ timeout: 20_000 });
       await expectDialogInViewport(page);
+      await expectDropdownCarets(page.getByTestId("sanger-dialog"), "sanger");
       await shot(page, "44-sanger");
       await closeDialog(page);
 
@@ -338,8 +358,25 @@ for (const size of SIZES) {
       await menu(page, "Features", "Detect Common Features…");
       await expect(page.getByTestId("detect-table")).toBeVisible({ timeout: 30_000 });
       await expectDialogInViewport(page);
+      await expectDropdownCarets(page.locator(".bp3-dialog"), "detect features");
       await shot(page, "45-detect-features");
       await closeDialog(page);
+
+      // The menu tools: every dropdown shows its arrow.
+      const tools: [string, string[]][] = [
+        ["48-preferences", ["File", "Preferences…"]],
+        ["49-design-pcr-primers", ["Primers", "Design PCR Primers…"]],
+        ["50-align-multiple", ["Tools", "Align Multiple Sequences…"]],
+        ["51-aav-packaging", ["Tools", "AAV Packaging Check…"]],
+      ];
+      for (const [name, path] of tools) {
+        await menu(page, ...path);
+        await expect(page.locator(".bp3-dialog")).toBeVisible();
+        await expectDialogInViewport(page);
+        await expectDropdownCarets(page.locator(".bp3-dialog"), name);
+        await shot(page, name);
+        await closeDialog(page);
+      }
 
       await menu(page, "Features", "Add Feature…");
       await expect(page.locator(".bp3-dialog")).toBeVisible();

@@ -108,6 +108,26 @@
 :root .bp3-select select:disabled {
   box-shadow: none;
 }
+/* Blueprint hides the browser's own dropdown arrow and leaves the caret to an icon its
+   HTMLSelect component adds. Vettore's dialogs wrap a plain <select> in .bp3-html-select, so
+   their dropdowns looked like text boxes. The wrapper draws one chevron for every dropdown,
+   with or without the component; the component's icon is hidden so none shows two. */
+:root .bp3-html-select::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  width: 6px;
+  height: 6px;
+  margin-top: -5px;
+  border-right: 2px solid var(--vt-text-muted);
+  border-bottom: 2px solid var(--vt-text-muted);
+  transform: rotate(45deg);
+  pointer-events: none;
+}
+:root .bp3-html-select > .bp3-icon {
+  display: none;
+}
 
 /* Native controls Blueprint does not style. */
 :root input[type="checkbox"],
