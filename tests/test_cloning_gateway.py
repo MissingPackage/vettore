@@ -22,7 +22,7 @@ from pathlib import Path
 
 import pytest
 from Bio import SeqIO
-from cloning_helpers import clean_dna, doc
+from cloning_helpers import clean_dna, doc, rc, same_circular
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from pydna.dseqrecord import Dseqrecord
@@ -165,6 +165,53 @@ def test_bp_product_carries_the_attl_sites():
     assert sites.get("attL1") and sites.get("attL2")
 
 
+def test_bp_with_a_linear_attb_pcr_product_gives_the_entry_clone():
+    """The textbook BP reaction: a linear PCR product with attB tails. Its only piece between
+    the two sites is the insert; nothing may be read through its ends as if it were circular.
+    attB1-tag-attB2 cut from the published expression clone, with 10 bp of primer overhang on
+    each side, recombined into the attP donor, must give back the published entry clone."""
+    amplicon = "GGGGCCCCGG" + cassette(record("expression"), "attB1", "attB2") + "CCGGGGCCCC"
+    pcr = SequenceDoc(name="attB PCR product", sequence=amplicon, circular=False)
+    lr = gateway("LR", load("entry"), load("destination"))
+    result = gateway("BP", pcr, by_product(lr))
+    entry_clone = result.products[0]
+    assert entry_clone.label == "Entry clone — 3561 bp circular"
+    assert entry_clone.doc["name"] == "attP by-product + attB PCR product"
+    assert product_record(entry_clone).seguid() == record("entry").seguid()
+    assert not any("right way round" in w for w in result.warnings)
+
+
+def test_lr_with_an_insert_longer_than_the_entry_backbone():
+    """A 5 kb ORF in a 3.2 kb entry backbone: the insert is the piece the att sites face, not
+    the shorter piece. Expected product: the expression clone of the published entry clone
+    with the same 5 kb inserted at the same place in its insert."""
+    entry = load("entry")
+    sequence = entry.sequence.upper()
+    insert = cassette(record("entry"), "attL1", "attL2")[96:-96]   # between attL1 and attL2
+    assert len(insert) == 197
+    filler = clean_dna(5000, 2024)
+    at = sequence.index(insert) + 100
+    big = SequenceDoc(name="entry-big", sequence=sequence[:at] + filler + sequence[at:],
+                      circular=True)
+    big_insert = insert[:100] + filler + insert[100:]
+
+    normal = product_record(gateway("LR", entry, load("destination")).products[0])
+    text = str(normal.seq).upper()
+    assert text.count(insert) + text.count(rc(insert)) == 1
+    expected = (text.replace(insert, big_insert) if insert in text
+                else text.replace(rc(insert), rc(big_insert)))
+
+    result = gateway("LR", big, load("destination"))
+    clone = result.products[0]
+    assert clone.label == f"Expression clone — {len(expected)} bp circular"
+    assert clone.doc["name"] == "destination + entry-big"
+    assert same_circular(clone.doc["sequence"], expected)
+    assert not any("right way round" in w for w in result.warnings)
+    assert any("ccdB" in w for w in result.warnings)     # the second cassette is still there
+    assert [p.label.split(" — ")[0] for p in result.products] == [
+        "Expression clone", "Expression clone", "attP by-product", "attP by-product"]
+
+
 # ---- errors a user can act on --------------------------------------------------------------
 
 def test_molecule_without_att_sites_names_what_is_missing():
@@ -201,3 +248,32 @@ def test_http_route():
     payload = res.json()
     assert payload["products"][0]["label"].startswith("Expression clone")
     assert payload["products"][0]["doc"]["name"] == "destination + entry"
+
+
+def test_gateway_sites_route_names_the_sites_of_each_document():
+    """The Gateway dialogs use this to pick their default inputs. attB is the core of attL and
+    attR, so an entry clone reads attL1, attL2 only."""
+    app = FastAPI()
+    app.include_router(router)
+    client = TestClient(app)
+    amplicon = "GGGGCCCCGG" + cassette(record("expression"), "attB1", "attB2") + "CCGGGGCCCC"
+    res = client.post("/api/cloning/gateway-sites", json={"docs": [
+        load("entry").model_dump(), load("destination").model_dump(),
+        load("expression").model_dump(),
+        {"name": "attB PCR product", "sequence": amplicon, "circular": False},
+        doc("pUC-like", clean_dna(2000, 301), True),
+        {"name": "empty", "sequence": ""}, {"name": "no sequence"}]})
+    assert res.status_code == 200
+    assert res.json() == {"sites": [
+        ["attL1", "attL2"], ["attR1", "attR2"], ["attB1", "attB2"], ["attB1", "attB2"],
+        [], [], []]}
+
+
+def test_lr_messages_use_the_right_article():
+    plain = SequenceDoc(**doc("pUC-like", clean_dna(2000, 301), True))
+    with pytest.raises(CloningError) as err:
+        gateway("LR", plain, load("destination"))
+    assert "An LR reaction needs attL sites" in str(err.value)
+    with pytest.raises(CloningError) as err:
+        gateway("BP", plain, load("destination"))
+    assert "A BP reaction needs attB sites" in str(err.value)
