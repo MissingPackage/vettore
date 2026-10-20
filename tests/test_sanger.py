@@ -186,6 +186,34 @@ def test_an_unreadable_file_is_reported_as_a_warning_not_a_crash():
     assert "broken.ab1" in payload["warnings"][0]
 
 
+def test_a_read_from_another_plasmid_is_refused_not_given_a_verdict():
+    """3730.ab1 against an unrelated 10 kb plasmid: the best local alignment is a chance match
+    of a few dozen bases, which must not be reported as a read with differences."""
+    from vettore.fileio import read_documents
+
+    path = DATA / "cloning-gateway-destination.gb"
+    [plasmid] = read_documents(path.name, path.read_bytes())
+    payload = alignment_payload("pAGRIKOLA", plasmid["sequence"].upper(), True,
+                                [(AB1.name, AB1.read_bytes())])
+    assert payload["reads"] == [] and payload["alignmentTracks"] == []
+    [warning] = payload["warnings"]
+    assert warning.startswith("Only ")
+    assert "good-quality bases of" in warning and "match “pAGRIKOLA”" in warning
+    assert "probably comes from another plasmid" in warning
+    assert "active tab" in warning
+
+
+def test_a_read_running_past_the_end_of_a_short_linear_reference_is_kept():
+    """A linear reference shorter than the read (an insert on its own): the read bases past its
+    ends are not evidence against it."""
+    t = trace()
+    start, _ = mott_trim(t.quality)
+    core = t.sequence[start + 300: start + 380]          # 80 bases, inside the read
+    aligned = align_trace(core, False, t)
+    assert aligned.identity == 100.0
+    assert (aligned.start, aligned.end) == (0, 79)
+
+
 def test_reading_a_non_trace_file_raises():
     with pytest.raises(TraceError):
         read_trace("x.ab1", b"not a trace")
