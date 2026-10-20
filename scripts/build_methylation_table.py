@@ -26,7 +26,7 @@ KNOWN = {"blocked", "some blocked", "impaired", "variable", "cut"}
 
 
 def main() -> None:
-    with urllib.request.urlopen(URL, timeout=120) as response:  # noqa: S310 (fixed ftp host)
+    with urllib.request.urlopen(URL, timeout=120) as response:
         text = response.read().decode("latin-1")
 
     table: dict[str, dict[str, str]] = {}
