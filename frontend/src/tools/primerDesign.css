@@ -1,0 +1,22 @@
+/* Primers → Design PCR Primers. Colours and spacing come from theme/tokens.css. */
+.vt-pd { display: grid; grid-template-columns: 340px 1fr; gap: var(--vt-space-4); max-height: 74vh; overflow: auto; }
+.vt-pd-form { display: flex; flex-direction: column; gap: var(--vt-space-3); }
+.vt-pd-intro { margin: 0; color: var(--vt-text); }
+.vt-pd-inline { display: flex; align-items: center; gap: var(--vt-space-2); }
+.vt-pd-inline input { width: 72px; }
+.vt-pd-pair { display: flex; gap: var(--vt-space-4); }
+.vt-pd-muted { color: var(--vt-text-muted); font-size: 12px; }
+.vt-pd-invalid { color: var(--vt-danger); font-size: 12px; }
+.vt-pd-result {
+  border-left: 1px solid var(--vt-border-subtle); padding-left: var(--vt-space-4); min-width: 0;
+  display: flex; flex-direction: column; gap: var(--vt-space-2);
+}
+.vt-pd-table-wrap { overflow-x: auto; }
+.vt-pd-table td { white-space: nowrap; }
+.vt-pd-table th { vertical-align: bottom; }
+.vt-pd-pair-rows { cursor: pointer; }
+.vt-pd-pair-rows + .vt-pd-pair-rows tr:first-child td { border-top: 2px solid var(--vt-border); }
+.vt-pd-pair-rows.is-selected td { background: var(--vt-selection); }
+.vt-pd-rank { vertical-align: top; }
+.vt-pd-seq { font-family: var(--vt-font-mono); }
+.vt-pd-warnings { color: var(--vt-warning); white-space: normal !important; font-size: 12px; }

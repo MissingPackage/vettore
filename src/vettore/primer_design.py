@@ -382,7 +382,8 @@ def design(body: DesignRequest) -> dict[str, Any]:
         "template": {"name": name, "length": length, "circular": circular},
         "target": {"start": body.start, "end": body.end, "length": target_length},
         "product_range": [product_min, product_max],
-        "tm_method": f"{TM_PRESET.label}: {TM_PRESET.description}",
+        # e.g. "SantaLucia & Hicks 2004; Na⁺ 50 mM; primer 250 nM, Standard preset"
+        "tm_method": f"{TM_PRESET.description}, {TM_PRESET.label.split(' (')[0]} preset",
         "dg_conditions": "ΔG at 37 °C, Na⁺ 50 mM (primer3 thermodynamic alignment)",
     }
 
