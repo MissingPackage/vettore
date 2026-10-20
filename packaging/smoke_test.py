@@ -51,7 +51,22 @@ def main() -> int:
         assert len(doc["features"]) == 9, len(doc["features"])
         with urllib.request.urlopen(f"http://127.0.0.1:{PORT}/index.html", timeout=10) as res:
             assert b'id="root"' in res.read()
-        print("smoke test passed: server up, .dna parsed (3941 bp, 9 features), UI served")
+
+        # The cloning engine pulls in pydna/primer3, whose packaging is easy to get wrong.
+        vector = "AAAA" + "GAATTC" + "CCCC" * 50 + "GGATCC" + "TTTT" * 50
+        insert = "GG" + "GAATTC" + "ACGT" * 25 + "GGATCC" + "GG"
+        cloned = call("cloning/restriction-insert", {
+            "vector": {"name": "pV", "sequence": vector, "circular": True},
+            "vector_enzymes": ["EcoRI", "BamHI"],
+            "insert": {"name": "ins", "sequence": insert, "circular": False},
+            "insert_enzymes": ["EcoRI", "BamHI"],
+        })
+        product = cloned["products"][0]["doc"]
+        assert product["circular"] and len(product["sequence"]) == 316, len(product["sequence"])
+        tm = call("tm", {"sequence": "AGCTTGCATGCCTGCAGGTCG"})["tm"]
+        assert 55 < tm < 70, tm
+        print("smoke test passed: server up, .dna parsed (3941 bp, 9 features), UI served, "
+              "restriction cloning and Tm work")
         return 0
     finally:
         proc.terminate()

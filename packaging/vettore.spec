@@ -3,7 +3,7 @@
 import sys
 from pathlib import Path
 
-from PyInstaller.utils.hooks import collect_all, collect_submodules
+from PyInstaller.utils.hooks import collect_all, collect_submodules, copy_metadata
 
 root = Path(SPECPATH).parent
 static = root / "src" / "vettore" / "static"
@@ -13,7 +13,15 @@ if not (static / "index.html").is_file():
 datas = [(str(static), "vettore/static")]
 binaries = []
 hiddenimports = collect_submodules("uvicorn") + collect_submodules("Bio")
-for package in ("pydna", "primer3"):
+
+# pydna reads these distributions' metadata at import time (importlib.metadata.version).
+for distribution in ("seguid", "pydna", "biopython", "primer3-py", "sgffp", "pydivsufsort",
+                     "networkx", "fastapi", "uvicorn", "pywebview"):
+    try:
+        datas += copy_metadata(distribution)
+    except Exception as exc:  # a distribution that is not installed is not needed either
+        print(f"vettore.spec: no metadata for {distribution}: {exc}")
+for package in ("pydna", "primer3", "sgffp"):
     d, b, h = collect_all(package)
     datas += d
     binaries += b
