@@ -1,5 +1,6 @@
 // Messages between the page and the desktop window (src/vettore/desktop/): closing the window
-// with unsaved work, and files handed over by a second start of Vettore.
+// with unsaved work, files handed over by a second start of Vettore, print requests the
+// window cannot serve.
 
 /**
  * Dispatched on `window` by the desktop window when it is closed while documents have unsaved
@@ -13,6 +14,17 @@ export const FILES_EVENT = "vettore:files-handed-over";
 
 /** How often the page asks the engine for files handed over by a second start (ms). */
 export const STARTUP_POLL_MS = 500;
+
+/**
+ * Dispatched on `window` when the desktop window dropped a print request: the Linux window
+ * (Qt WebEngine) does not print (src/vettore/desktop/printing.py).
+ */
+export const PRINT_EVENT = "vettore:print-unavailable";
+
+/** What to do instead of printing from the Linux window. */
+export const PRINT_UNAVAILABLE = "Vettore's window cannot print on Linux yet, so nothing was sent "
+  + "to the printer. To print the map, use File → Export → Map as PNG… and print the image from "
+  + "your image viewer, or save it as a PDF from there.";
 
 /** What the window's unsaved-changes dialog says about each document. */
 export interface QuitDoc {

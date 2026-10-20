@@ -145,6 +145,17 @@ def drive():
         window.destroy()
         wait_for(window, f"!!{q('quit-dialog')}")
         window.evaluate_js(f"{q('quit-discard')}.click()")
+    elif scenario == "print":
+        # What File → Print… does in the end: print() on a frame holding the map.
+        window.evaluate_js("(() => { const f = document.createElement('iframe');"
+                           " document.body.appendChild(f);"
+                           " setTimeout(() => f.contentWindow.print(), 10); return true; })()")
+        wait_for(window, "[...document.querySelectorAll('[data-testid=notice]')]"
+                         ".some(n => n.innerText.includes('cannot print on Linux'))")
+        out("PRINT_EXPLAINED")
+        window.destroy()
+        wait_for(window, f"!!{q('quit-dialog')}")
+        window.evaluate_js(f"{q('quit-discard')}.click()")
 
 
 threading.Thread(target=drive, daemon=True).start()
@@ -198,3 +209,10 @@ def test_a_second_start_opens_its_file_in_the_qt_window(tmp_path):
     sample.write_bytes((DATA / "MT612431.1.gb").read_bytes())
     lines = run("handover", tmp_path, str(sample))
     assert lines == ["UNSAVED 1", "SECOND_EXIT 0", "TAB_OPENED", "EXITED"]
+
+
+def test_printing_in_the_qt_window_explains_what_to_do_instead(tmp_path):
+    """Qt WebEngine drops print requests that the application does not handle; without the
+    message, File → Print… did nothing at all."""
+    lines = run("print", tmp_path)
+    assert lines == ["UNSAVED 1", "PRINT_EXPLAINED", "EXITED"]

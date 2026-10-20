@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { notSavedMessage, quitDetail, quitHeadline } from "./quit";
+import { notSavedMessage, quitDetail, quitHeadline } from "./desktop";
 
 const doc = (name: string, path: string | null, saveInPlace = false) =>
   ({ editorName: name, name, path, saveInPlace });

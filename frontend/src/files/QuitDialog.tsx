@@ -1,6 +1,6 @@
 import * as Blueprint from "@blueprintjs/core";
 import { Button, Classes } from "@blueprintjs/core";
-import { quitDetail, quitHeadline, type QuitDoc } from "./quit";
+import { quitDetail, quitHeadline, type QuitDoc } from "./desktop";
 import "./PasteDialog.css";
 import "./QuitDialog.css";
 

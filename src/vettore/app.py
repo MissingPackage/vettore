@@ -23,7 +23,7 @@ from pathlib import Path
 from typing import Any
 
 from . import settings
-from .desktop import close_guard, instance
+from .desktop import close_guard, instance, printing
 from .desktop.window import WindowPresence
 
 log = logging.getLogger("vettore")
@@ -317,6 +317,8 @@ def _run_ui(api: DesktopApi, url: str, args: argparse.Namespace) -> None:
             storage.mkdir(parents=True, exist_ok=True)
             # On Linux the bundled Qt WebEngine is used (GTK bindings are not shipped).
             gui = "qt" if sys.platform.startswith("linux") else None
+            if gui == "qt":   # it drops print requests: let File → Print… say so
+                window.events.before_show += lambda: printing.watch_print_requests(window)
             # The window icon option is honoured by the Qt backend only; on Windows the window
             # takes the executable's icon (packaging/vettore.spec).
             static = static_dir()

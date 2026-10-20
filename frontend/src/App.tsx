@@ -53,7 +53,14 @@ import CopyTextDialog from "./files/CopyTextDialog";
 import SaveCopyDialog from "./files/SaveCopyDialog";
 import UnsavedDialog, { type UnsavedChoice } from "./files/UnsavedDialog";
 import QuitDialog from "./files/QuitDialog";
-import { FILES_EVENT, notSavedMessage, QUIT_EVENT, STARTUP_POLL_MS } from "./files/quit";
+import {
+  FILES_EVENT,
+  notSavedMessage,
+  PRINT_EVENT,
+  PRINT_UNAVAILABLE,
+  QUIT_EVENT,
+  STARTUP_POLL_MS,
+} from "./files/desktop";
 import "./files/busy.css";
 
 const DOCTABS_HEIGHT = 30;
@@ -137,6 +144,13 @@ export default function App() {
   }, []);
   const dismiss = useCallback((id: number) => setNotices((prev) => dismissNotice(prev, id)), []);
   const report = useCallback((e: unknown) => notify("error", messageOf(e)), [notify]);
+
+  // The Linux window drops print requests (src/vettore/desktop/printing.py): say what to do.
+  useEffect(() => {
+    const onPrintUnavailable = () => notify("warning", PRINT_UNAVAILABLE);
+    window.addEventListener(PRINT_EVENT, onPrintUnavailable);
+    return () => window.removeEventListener(PRINT_EVENT, onPrintUnavailable);
+  }, [notify]);
 
   // An engine error no dialog caught still reaches the message stack instead of the console.
   useEffect(() => {
