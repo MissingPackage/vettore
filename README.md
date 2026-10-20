@@ -8,14 +8,17 @@ tested libraries — [Open Vector Editor](https://github.com/TeselaGen/tg-oss) f
 [pydna](https://github.com/pydna-group/pydna), [Biopython](https://biopython.org) and
 [primer3-py](https://github.com/libnano/primer3-py) for the biology.
 
-Status and roadmap: see [`specs/vettore.md`](specs/vettore.md).
+**[User guide](docs/USER-GUIDE.md)** · status and roadmap: [`specs/vettore.md`](specs/vettore.md).
 
 ## Install (users)
 
-Download the zip for your system from the latest GitHub Release (or the latest `build` workflow
-run), unzip it anywhere and run `Vettore.exe` (Windows) or `Vettore` (Linux). No installation or
-admin rights are needed. On Windows, SmartScreen may warn about an unsigned app: choose
-*More info → Run anyway*.
+Download the zip for your system from the latest [Release](../../releases), unzip it anywhere
+and run `Vettore.exe` (Windows) or `Vettore` (Linux). No installation or admin rights are
+needed. On Windows, SmartScreen may warn about an unsigned app: choose *More info → Run anyway*.
+
+What it does: opens `.dna`, GenBank, FASTA and `.ab1` files; map, sequence, enzymes,
+features, primers and history views; restriction cloning, PCR, primer design, mutagenesis and
+Gibson/HiFi/In-Fusion assembly; saves GenBank and exports maps as SVG/PNG.
 
 Logs are written to `~/.vettore/vettore.log` (`%USERPROFILE%\.vettore\vettore.log` on Windows).
 
