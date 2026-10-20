@@ -194,6 +194,36 @@ def test_protein_and_alignment_gaps_are_explained():
         fileio.read_file("a.fasta", b">aln\nAC--GT\n")
 
 
+@pytest.mark.parametrize(("name", "content", "pasted"), [
+    ("m.fasta", b">mRNA fragment\nAUGGCUAGCUAGGGAUCCAAGCUU\n", False),
+    ("m.gb", (b"LOCUS       m   24 bp    mRNA     linear   SYN 01-JAN-2020\n"
+              b"ORIGIN\n        1 auggcuagcu agggauccaa gcuu\n//\n"), False),
+    ("m.txt", b"AUGGCUAGCUAGGGAUCCAAGCUU\n", False),
+    ("Pasted sequence", b"AUGGCUAGCUAGGGAUCCAAGCUU", True),
+])
+def test_rna_letters_are_read_as_dna_and_the_user_is_told(name, content, pasted):
+    """An mRNA pasted from a paper: U becomes T (case kept), so enzymes cut it. Hand-worked:
+    ATGGCTAGCTAG GGATCC AAGCTT has BamHI at 13..18 and HindIII at 19..24 (1-based)."""
+    from vettore.cloning.base import SequenceDoc
+    from vettore.cloning.restriction import digest
+
+    result = fileio.read_file(name, content, pasted=pasted)
+    doc = only(result)
+    assert doc["sequence"].upper() == "ATGGCTAGCTAGGGATCCAAGCTT"
+    assert "u" not in doc["sequence"].lower()
+    [warning] = result.warnings
+    assert "RNA letters" in warning and "every U was read as T" in warning
+    assert result.writable is False      # saving would not give back the same letters
+    cut = digest(SequenceDoc(**doc), ["BamHI"])
+    assert [f["length"] for f in cut] == [13, 11]
+    assert [f["length"] for f in digest(SequenceDoc(**doc), ["HindIII"])] == [19, 5]
+
+
+def test_rna_case_is_kept():
+    doc = only(fileio.read_file("m.fasta", b">m\nauggCUAG\n"))
+    assert doc["sequence"] == "atggCTAG"
+
+
 def test_good_records_open_when_one_record_is_bad():
     result = fileio.read_file("mixed.fasta", b">good\nACGT\n>bad\nAC-GT\n")
     assert [d["name"] for d in result.documents] == ["good"]

@@ -97,6 +97,7 @@ SUPPORTED_SUMMARY = (
 
 # IUPAC nucleotide codes (Cornish-Bowden 1985, NC-IUB recommendations), plus U for RNA.
 DNA_LETTERS = frozenset("ACGTURYSWKMBDHVN")
+_RNA_TO_DNA = str.maketrans("Uu", "Tt")
 # Letters that occur in protein sequences but are not nucleotide codes.
 PROTEIN_ONLY = frozenset("EFILPQXZJO*")
 
@@ -395,6 +396,7 @@ def read_file(filename: str, content: bytes, *, pasted: bool = False) -> ReadRes
             f"be damaged or cut short. {advice}") from exc
 
     problems: list[str] = []
+    rna: list[str] = []
     usable: list[tuple[SeqRecord, str]] = []
     for record in records:
         if record.annotations.get("molecule_type") == "protein":
@@ -409,6 +411,11 @@ def read_file(filename: str, content: bytes, *, pasted: bool = False) -> ReadRes
         if bad := _check_letters(record, sequence):
             problems.append(bad)
             continue
+        if "U" in sequence or "u" in sequence:
+            # An mRNA or a cDNA copied from a paper: every tool works on DNA, so U is read as T
+            # (enzymes cut, primers bind) and the user is told.
+            record.seq = Seq(sequence.translate(_RNA_TO_DNA))
+            rna.append(_record_label(record))
         usable.append((record, sequence))
     if not usable:
         detail = problems[0] if problems else "No DNA sequence was found in it."
@@ -418,6 +425,11 @@ def read_file(filename: str, content: bytes, *, pasted: bool = False) -> ReadRes
     if problems:
         result.warnings.append(f"{display}: {len(problems)} of {len(records)} sequences could "
                                f"not be opened. {' '.join(problems)}")
+    if rna:
+        which = display if len(records) == 1 else ", ".join(rna)
+        result.warnings.append(f"{which}: the sequence is written in RNA letters, so every U was "
+                               "read as T. Enzymes and primers now work on it as they would on "
+                               "its cDNA.")
     names: dict[str, int] = {}
     for i, (record, _sequence) in enumerate(usable):
         dropped, trimmed = _clean_features(record)

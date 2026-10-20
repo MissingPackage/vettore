@@ -87,6 +87,23 @@ def test_unknown_enzyme_is_an_error():
         digest(vector_doc(), ["NotAnEnzyme"])
 
 
+def test_rna_letters_in_a_document_are_cut_as_dna():
+    """A document typed with U (an mRNA) is cut as its cDNA: AUGGCUAGCUAG|GAUCC... has BamHI
+    G^GATCC after base 13 of 24."""
+    mrna = SequenceDoc(**doc("mRNA", "AUGGCUAGCUAGGGAUCCAAGCUU", False))
+    assert [f["length"] for f in digest(mrna, ["BamHI"])] == [13, 11]
+
+
+def test_a_character_that_is_not_dna_is_named():
+    bad = SequenceDoc(**doc("notes", "ACGTACGTAC GT!", False))
+    with pytest.raises(CloningError) as err:
+        digest(bad, ["EcoRI"])
+    assert str(err.value).startswith("“notes” has a space at position 11, which is not a DNA "
+                                     "letter")
+    with pytest.raises(CloningError, match="“notes” has “E” at position 2"):
+        digest(SequenceDoc(**doc("notes", "HELLO", False)), ["EcoRI"])
+
+
 def test_double_cutter_in_vector_is_warned():
     vec = SequenceDoc(**doc("pDUP", A + MCS + B[:500] + "GGATCC" + B[500:], True))
     result = insert_fragment(vec, ["EcoRI", "BamHI"], insert_doc(), ["EcoRI", "BamHI"])
