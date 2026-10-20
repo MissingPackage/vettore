@@ -245,25 +245,12 @@ def create_app(token: str, static_dir: Path | None,
 
     @app.post("/api/gel")
     def simulate_gel(body: GelRequest) -> dict[str, Any]:
-        from .cloning.base import SequenceDoc
-        from .cloning.restriction import digest
-
-        lanes = []
-        for lane in body.lanes:
-            doc = SequenceDoc(**lane.sequenceData)
-            if lane.enzymes:
-                sizes = [f["length"] for f in digest(doc, lane.enzymes)]
-                supercoiled = False
-                title = f"{lane.name} / {' + '.join(lane.enzymes)}"
-            else:
-                sizes = [len(doc.sequence)]
-                supercoiled = bool(doc.circular)
-                title = f"{lane.name} / uncut"
-            bands = gel.lane_bands(sizes, body.percent, supercoiled)
-            lanes.append({"name": title, "bands": [b.as_dict() for b in bands],
-                          "sizes": sorted(sizes, reverse=True)})
-        return {"lanes": lanes, "ladder": gel.ladder_bands(body.ladder, body.percent),
-                "ladder_label": gel.LADDERS[body.ladder]["label"], "percent": body.percent}
+        """Each lane digested, or drawn uncut with a note (``lanes[i].note``) when its enzyme
+        does not cut: a non-cutter is a normal control, not a reason to fail the gel."""
+        if body.ladder not in gel.LADDERS:
+            raise HTTPException(422, gel.unknown_ladder(body.ladder))
+        return gel.simulate([(lane.name, lane.sequenceData, lane.enzymes) for lane in body.lanes],
+                            body.ladder, body.percent)
 
     @app.get("/api/recent")
     def recent() -> dict[str, list[str]]:
