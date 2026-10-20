@@ -158,3 +158,23 @@ def test_primer_sequence_survives_genbank_round_trip():
     [again] = fileio.read_documents("x.gb", fileio.write_genbank(doc).encode())
     primers = {p["name"]: p.get("bases") for p in again["primers"]}
     assert primers["XmaI-hht2(Cter)-Rev"] == "AAAAAACCCGGGAGAACGCTCACCACG"
+
+
+def test_regulatory_features_open_as_their_class_and_save_in_their_own_form():
+    # Current NCBI records write promoters as `regulatory` + /regulatory_class="promoter"
+    # (PZ629150.1); the editor colours them as promoters, and saving keeps the record's form.
+    from pathlib import Path
+
+    from vettore import fileio
+
+    data = Path(__file__).parent / "data" / "PZ629150.1.gb"
+    doc = fileio.read_file(data.name, data.read_bytes()).documents[0]
+    by_name = {f["name"]: f for f in doc["features"]}
+    ctnt = next(f for name, f in by_name.items() if name.startswith("cardiac troponin T"))
+    kozak = by_name["Kozak sequence"]
+    assert ctnt["type"] == "promoter" and kozak["type"] == "regulatory"
+    saved = fileio.write_genbank(doc)
+    assert "     regulatory      144..556" in saved
+    assert "original_type" not in saved
+    again = fileio.read_file("again.gb", saved.encode()).documents[0]
+    assert [f["type"] for f in again["features"]] == [f["type"] for f in doc["features"]]

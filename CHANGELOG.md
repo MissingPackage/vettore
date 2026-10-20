@@ -2,6 +2,27 @@
 
 The download links in the README always point to the latest release.
 
+## 0.3.0 — files from vendors, MultiSite Gateway, a real desktop app
+
+**Files from vendors and labs**
+- Feature colours written in a note (`color: #63b349`, or a colour name) colour the map, so vendor files look as their authors drew them; saving writes each colour once.
+- Feature types spelled the vendors' way (Promoter, PolyA_signal, Rep_origin, ITR, Transcription_t, Miscellaneous, any letter case) and the `regulatory` features of current NCBI records open as standard types, so they are coloured and grouped like any other file; the original type is kept and `regulatory` features are saved back in their own form.
+- Detect Common Features flags labels that may be wrong: when most of a feature is a nearly exact match for a different element than its name says — a CMV promoter labelled "PGK promoter", found in a real vendor file — the row is marked in amber and a notice counts the labels to check.
+- Detect Common Features counts an element inside a larger feature named after it as already annotated (a "CMV promoter" block over the CMV enhancer and promoter is not offered again).
+
+**Gateway**
+- MultiSite Gateway: an LR reaction with up to four entry clones chained through att1–att5, filled in from the open files when they fit together; the att sites of each file are shown under its picker. Checked against published MultiSite vectors and a published three-fragment clone.
+- BP shows and checks which att pair of the donor vector the reaction uses.
+- When inputs cannot recombine, the message lists the att sites of each file and names the missing junction.
+- phiC31 attB/attP sites (fly landing-site vectors) are recognised as not Gateway sites, and said so.
+- Create All (N): every product of a simulation opens in its own tab, each with its History entry.
+
+**Desktop**
+- Closing the window with unsaved work asks in Vettore's own dialog — Save All, Don't Save or Cancel — listing the documents; a frozen window can still be closed.
+- Double-clicking a sequence file while Vettore is open opens it in the window you already have, not in a second copy.
+- File → Preferences can make double-clicking `.dna`, `.gb`, `.fasta`, `.ab1` and the other sequence files open them in Vettore, for your user account only and without administrator rights; untick to undo.
+- On Linux, File → Print… explains how to print the exported map instead of silently doing nothing.
+
 ## 0.2.0 — Files from colleagues, more cloning, primer design and alignment
 
 **Files from colleagues**

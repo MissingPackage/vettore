@@ -20,6 +20,9 @@ Start here: **[user guide](docs/USER-GUIDE.md)** · what changed: [changelog](CH
 - Opens `.dna`, GenBank (`.gb`, `.gbk`, `.ape`), EMBL, FASTA, `.xdna`, `.gck`, `.ab1` and plain
   sequence text, recognising the format from the content — a GenBank file saved as `.txt` opens
   too — and keeping features, colours, primers (with their 5′ tails) and topology.
+- Keeps vendor conventions: feature colours written in notes and non-standard feature types
+  open as their authors drew them, and annotations whose label does not match their sequence
+  are flagged.
 - Saves GenBank, FASTA or `.dna`; never overwrites a file it cannot write back without losing
   something, and says so in plain words. Paste a sequence from an email as a new file, copy a
   selection as FASTA, export maps as SVG or PNG for figures.
@@ -37,9 +40,9 @@ Start here: **[user guide](docs/USER-GUIDE.md)** · what changed: [changelog](CH
   fragments into a linear or circular molecule; directionality and self-ligation checks.
 - Gibson, NEBuilder HiFi and In-Fusion assembly of one or more inserts, with the homology arms
   designed for you.
-- Golden Gate with junction-overhang checks; Gateway BP and LR reactions; TA, GC and TOPO
-  cloning (with the CACC check for directional TOPO); annealed-oligo cloning for gRNAs, shRNAs
-  and linkers.
+- Golden Gate with junction-overhang checks; Gateway BP and LR reactions, including MultiSite
+  LR with up to four entry clones; TA, GC and TOPO cloning (with the CACC check for directional
+  TOPO); annealed-oligo cloning for gRNAs, shRNAs and linkers.
 - PCR (tailed primers, amplicons across the origin), site-directed mutagenesis with back-to-back
   primers, primers placed on a region at a target Tm, and primer3 design of the best pairs
   around a region with hairpin and dimer checks.
@@ -52,6 +55,9 @@ Start here: **[user guide](docs/USER-GUIDE.md)** · what changed: [changelog](CH
 - Automatic annotation of AAV ITRs, common promoters, WPRE, polyA signals, markers, origins,
   fluorescent proteins, lox/FRT sites, Cas9 and epitope tags — each traceable to a public
   GenBank record — and an AAV packaging check of the cargo between the ITRs.
+
+It behaves like a desktop application: double-clicking a sequence file opens it in the running
+window (and, if you choose, in Vettore at all), and closing with unsaved work asks first.
 
 Primer Tm is always shown with the model and conditions behind it, with presets matching NEB's
 calculator for Q5 and Taq. Three public sample constructs (pUC19 and two AAV transfer plasmids)

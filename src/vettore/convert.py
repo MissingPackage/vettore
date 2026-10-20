@@ -200,9 +200,26 @@ def _parts_to_ranges(feature: SeqFeature, seq_len: int, circular: bool) -> list[
     return ranges
 
 
+#: INSDC ``regulatory`` features name their kind in /regulatory_class (the form current NCBI
+#: records use since 2014); the classes the editor draws with a type of their own.
+REGULATORY_CLASSES = {
+    "promoter": "promoter",
+    "enhancer": "enhancer",
+    "polya_signal_sequence": "polyA_signal",
+    "terminator": "terminator",
+    "ribosome_binding_site": "RBS",
+    "gc_signal": "GC_signal",
+}
+
+
 def _type_and_notes(key: str, notes: dict[str, list[str]]) -> str:
     """The editor's type for a feature key. A key the editor would show under another type
     (a vendor's "ITR", or a key it does not know) is kept in the notes, so it is not lost."""
+    if key.strip().lower() == "regulatory":
+        kind = REGULATORY_CLASSES.get((notes.get("regulatory_class") or [""])[0].strip().lower())
+        if kind:
+            notes.setdefault(ORIGINAL_TYPE, [key])
+            return kind
     standard = standard_type(key)
     if standard and standard.lower() == key.strip().lower():
         return standard                  # the same key, perhaps in other letter case
@@ -401,6 +418,12 @@ def ove_to_record(data: dict[str, Any]) -> SeqRecord:
                 continue
             feature_type = str(ann.get("type") or default_type)
             qualifiers = annotation_qualifiers(ann, feature_type)
+            if (qualifiers.get(ORIGINAL_TYPE) == ["regulatory"] and qualifiers.get("regulatory_class")
+                    and REGULATORY_CLASSES.get(qualifiers["regulatory_class"][0].strip().lower())
+                    == feature_type):
+                # Write the record back in its own INSDC form: regulatory + /regulatory_class.
+                feature_type = "regulatory"
+                del qualifiers[ORIGINAL_TYPE]
             qualifiers["label"] = [str(ann.get("name") or default_type)]
             if ann.get("color"):
                 qualifiers["ApEinfo_fwdcolor"] = [str(ann["color"])]

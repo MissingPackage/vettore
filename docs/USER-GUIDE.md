@@ -79,12 +79,31 @@ open the same help you find in the Help menu once a file is open.
   accented letters, features drawn across the origin. Vettore opens them anyway. A feature that
   cannot be placed on the sequence (between two bases, beyond the end, or in another record) is
   left out, and a message lists it by name.
+- Files from vector vendors keep their look. A feature colour written in a note, such as
+  `color: #63b349; direction: RIGHT` or a colour name like `color: Blue`, colours that feature on
+  the map. When you save, the colour is written once, in the standard colour field.
+- Feature types spelled in other ways — `Promoter`, `PolyA_signal`, `Rep_origin`, `ITR`,
+  `Transcription_t`, `Miscellaneous`, in any letter case, or the `regulatory` features of
+  current NCBI records with their class (promoter, enhancer, terminator…) — are shown as the
+  standard types, so the map colours and groups them like any other file. The type written in
+  the file is kept in the feature's notes, and a `regulatory` feature is saved back in its own
+  form.
 - If a file cannot be opened, the message names the file, says what is wrong and what to try.
   For a plain sequence it points to the line and column of the first character that is not a
   DNA letter.
 - Several files stay open as tabs. A dot (•) on a tab means unsaved changes — including a
   new product of a cloning simulation or a pasted sequence that has never been saved. Closing
   such a tab asks whether to **Save**, **Don't save** or **Cancel**.
+- **Closing Vettore** with unsaved documents lists them all in one question. **Save All**
+  saves each one the way **File → Save** does: it asks where to put a document that was never
+  saved, and it makes a GenBank copy of a `.dna` file. Then Vettore closes. **Don't Save**
+  closes and discards the changes. **Cancel** keeps everything open. If a save is cancelled or
+  fails, Vettore stays open and says which document was not saved.
+- **Double-click a sequence file while Vettore is open** and it opens as a new tab in the
+  window you already have; no second Vettore starts. A file that is already open is brought to
+  the front instead of being opened twice, and starting Vettore again just brings its window
+  back. To make double-clicking open sequence files in Vettore at all, see
+  [Preferences](#preferences-file--preferences).
 
 Your `.dna` files open with their features, colours, primers (including 5′ tails) and topology.
 
@@ -203,7 +222,7 @@ their length, annealing length and Tm, and **Copy all** puts them on the clipboa
 | Ligate Fragments… | Joins fragments end to end into a linear molecule, or closes them into a circle |
 | Gibson Assembly… / NEBuilder HiFi… / In-Fusion… | Inserts one or more fragments into a linearised vector and designs the homology arms |
 | Golden Gate Assembly… | Assembles type IIS parts in order, checking the junction overhangs |
-| Gateway BP Reaction… / Gateway LR Reaction… | att site recombination into an entry or expression clone |
+| Gateway BP Reaction… / Gateway LR Reaction… | att site recombination into an entry or expression clone; LR takes up to four entry clones (MultiSite) |
 | TA or GC Cloning… | A PCR product into a T-vector or C-vector, both orientations |
 | TOPO Cloning… | TA, blunt or directional TOPO; directional checks the CACC on the forward primer |
 
@@ -296,22 +315,41 @@ insert will go in backwards.
 Recombination between att sites, with no enzymes to choose:
 
 - **BP** — an attB-flanked insert (a PCR product with attB tails, or a clone carrying attB sites)
-  plus a donor vector with attP sites give the **entry clone**.
-- **LR** — an entry clone (attL sites) plus a destination vector (attR sites) give the
+  plus a donor vector with attP sites give the **entry clone**. Under the donor you choose which
+  **att pair** it carries (attP1 and attP2, attP4 and attP1r, attP2r and attP3…); that pair
+  decides the sites of the entry clone you get.
+- **LR** — one to four entry clones (attL sites) plus a destination vector (attR sites) give the
   **expression clone**.
 
-Only reactions where **both** att sites recombined are shown; a product from a single site is the
-intermediate of the reaction, not what grows on the plates. The clone you are after is listed
-first and the by-product after it, each with its size, so you can create either one.
+**MultiSite reactions (two, three or four fragments).** Use **+ Add entry clone** to put a
+second, third or fourth entry clone into the same reaction, and **Remove** to take one out. The
+entry clones are listed in the order they will appear in the product. When the open files fit
+together — a destination vector with attR4 and attR3, a 5′ entry clone with attL4 and attR1, a
+middle clone with attL1 and attL2, a 3′ clone with attR2 and attL3 — the dialog fills them in,
+in that order, as soon as it opens. Under each file you see the att sites found in it, so you
+can check the chain at a glance: attL4, attR1 → attL1, attL2 → attL3, attR2.
+
+Only reactions where **both** att sites of a junction recombined are shown; a product from a
+single site is the intermediate of the reaction, not what grows on the plates. The clone you are
+after is listed first and the by-product after it, each with its size, so you can create either
+one — or both at once with **Create All**.
 
 Two warnings are worth knowing. If the product still carries a **ccdB** gene it would not grow in
-a normal cloning strain — that happens with a vector built from two Gateway cassettes, where the
-second cassette has still to be filled: run the reaction again on the product. And when a vector
-has more than one cassette, you are told that one clone per cassette is possible, so you can pick
-the one you want.
+a normal cloning strain: that happens with a vector built from two Gateway cassettes, where the
+second cassette has still to be filled (run the reaction again on the product), and with an empty
+entry clone that still carries its ccdB stuffer — the warning names the file it came from. And
+when a vector has more than one cassette, you are told that one clone per cassette is possible,
+so you can pick the one you want.
 
 A molecule with no att sites, or with the wrong ones for the reaction, is refused with a message
-that names the file and lists the sites found in each input.
+that names the file and lists the sites found in each input. When the sites are right but do not
+pair up, the message says which junction is missing — "attR1 in “p5E-CAGGS” has no attL1 in the
+other molecules" — so you can see which entry clone is not there.
+
+**att sites that are not Gateway sites.** The attB and attP sites of the phiC31 integrase, used
+by fly landing-site vectors such as pUASTattB, look like att sites but no Gateway clonase
+recombines them. Such a file is never chosen for you, is listed as "phiC31 attB — not a Gateway
+site", and if you pick it anyway the dialog says so instead of letting the reaction fail.
 
 ### Choosing between possible products
 
@@ -321,6 +359,9 @@ orders of fragments, a clone and its by-product. They are listed above the previ
 of the fragments, whether the insert is forward or reversed, or whether it is the clone or the
 by-product. Selecting one updates the map, the description and the warnings below it. **Create
 Product** creates the one selected; run the dialog again to create another.
+**Create All (N)** creates every product at once, each in its own tab with its own History
+entry — useful when you want to keep both the clone and its by-product, or both orientations of
+an insert.
 
 You can also change **Name of the new file** before creating it: the name is what the History of
 every later step will use to refer to this file.
@@ -333,12 +374,25 @@ found in real vectors), CMV, CAG, hSyn, EF-1α, CaMKIIα, GFAP and U6 promoters,
 SV40 polyA, AmpR and KanR, pUC and f1 origins, EGFP, mCherry, tdTomato, loxP, lox2272, FRT,
 SpCas9, SaCas9 and the FLAG and HA tags.
 
-Every entry in the catalogue is a real subsequence of a public GenBank record, and the table
-shows which one it came from along with the percent identity of the match, so you can judge a
-hit yourself. Tick the ones you want and they are added to the map, coloured by type, with
-their provenance kept in the feature's notes. Features already annotated are shown greyed and
-left unticked. When a promoter or an ITR is a few bases off, loosen the identity threshold for
-one run; the default is a preference.
+Every entry in the catalogue is a real subsequence of a public GenBank record. The table shows
+which record it came from and the percent identity of the match, so you can judge a hit
+yourself. Tick the ones you want and they are added to the map, coloured by type, with their
+provenance kept in the feature's notes.
+
+Features already annotated are shown greyed and left unticked. This includes elements inside a
+larger feature named after them, however long that feature is: vendors often draw one "CMV
+promoter" block over both the CMV enhancer and the CMV promoter, and neither is offered again.
+
+**Labels that may be wrong.** Sometimes most of an existing feature is a nearly exact match
+(98 % identity or more) for a different element than its name says. Its rows are then marked in
+amber, for example: “Annotated as “PGK promoter”, but the sequence is the CMV enhancer (100 %
+identity). Check the label.” A notice at the top says how many labels to check. These rows are
+not ticked, so nothing changes unless you tick one: the element is then added under its
+catalogue name, and you can rename or delete the old feature in the Features view. A feature
+whose name is not an element, such as "my insert", is never questioned.
+
+When a promoter or an ITR is a few bases off, loosen the identity threshold for one run; the
+default is a preference.
 
 ## Checking what an AAV capsid can carry (Tools → AAV Packaging Check…)
 
@@ -434,6 +488,9 @@ Shortcut: Ctrl+Shift+G.
 - FASTA keeps only the sequence. If you save as FASTA a document that has features or primers, a message reminds you that they are not in that file.
 - A `.dna` file written by Vettore contains the sequence, its topology, the features with their colours, the primers with their 5′ tails, and the description. Editing history and notes kept by other programs are not written.
 - **File → Export** writes a GenBank, FASTA or `.dna` copy without changing which file the document is saved to. It also exports the map as **SVG** (for figures) or **PNG**.
+- **File → Print…** (Ctrl+P) prints the map. In Vettore's window on Linux printing is not
+  available yet: Vettore says so instead of printing. Export the map with
+  **File → Export → Map as PNG…** and print the image from your image viewer.
 
 ## History of a file
 
@@ -454,7 +511,18 @@ What Vettore starts from, kept between sessions:
 - **Minimum identity when detecting common features** — 95 % by default. Lower it to catch
   variants (a promoter a few bases off), raise it to 100 % to accept exact matches only.
 
-Every change applies at once and is saved; **Restore defaults** puts everything back.
+- **Open sequence files with Vettore when you double-click them** — only in the Vettore you
+  downloaded. Tick it and `.dna`, `.gb`, `.gbk`, `.gbff`, `.ape`, `.embl`, `.fa`, `.fasta`,
+  `.xdna`, `.gck` and `.ab1` files open in Vettore when you double-click them. It applies to
+  your user account only and needs no administrator rights. Untick it to undo: the files open
+  as they did before. If you move the Vettore folder or download a new version, tick it again
+  so files open with the copy you use now; Preferences says when they still point at another
+  copy. If you once told Windows to **Always** open, say, `.dna` files with another program,
+  Windows keeps that choice and Preferences says so. To change it, right-click such a file,
+  choose **Open with → Choose another app**, pick Vettore and tick **Always use this app**.
+
+Every change applies at once and is saved; **Restore defaults** puts everything back (it does
+not change which program opens your files).
 
 ## Help menu
 
@@ -510,6 +578,9 @@ On a Mac keyboard, use ⌘ instead of Ctrl.
   for example a primer that does not bind the template. Change the input it names and the
   result updates at once.
 - **Things to check before ordering primers** appear in an amber box under the product.
+- **The window stops responding and you close it**: Vettore cannot offer to save your work,
+  so after a few seconds the system asks whether to quit and discard the unsaved changes.
+  Answer No to keep the window open.
 - All dialogs fit a 1366×768 screen. If a form is longer than the window (for example a gel
   with several lanes), scroll inside the dialog: the Cancel and Create buttons stay at the
   bottom.

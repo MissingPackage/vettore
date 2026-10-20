@@ -43,3 +43,14 @@ copied: sequences come from public records, features were written by hand.
 | `fidelity-notes.gb` | NCBI PZ629150.1, unchanged | at the published record's own coordinates (ITRs 1..131 and 4343..4483, cTNT promoter, Kozak, SaCas9, U6 promoter, sgRNA spacer and scaffold 4228..4323, the TTTTT Pol III terminator 4324..4328, f1 ori, AmpR promoter, AmpR, ori), rewritten in vendor notation |
 | `fidelity-block-cmv.gb` | catalogue entries joined in this order: CMV enhancer + CMV promoter (PV031350.1:96..679), EGFP (U55762.1:679..1398), SV40 polyA (MH282430.1:2999..3230), ori (PZ629150.1:6431..7019), AmpR promoter + AmpR (PV031350.1:2514..3479) | one `Promoter` block “CMV promoter” over the CMV enhancer and promoter (1..584), one feature per other element |
 | `fidelity-mislabelled-cmv.gb` | the same as `fidelity-block-cmv.gb` | the same, with the block labelled “PGK promoter”: a wrong label, as found in a vendor's AAV vector whose own `/official_designation` says CMV |
+
+MultiSite Gateway fixtures, public NCBI records fetched unchanged with E-utilities on
+2026-10-20 (`tests/test_cloning_multisite.py`, `tests/test_cloning_gateway.py`):
+`cloning-multisite-5prime.gb` (LT726877.1, attL4/attR1), `cloning-multisite-3prime.gb`
+(LT726875.1, attR2/attL3), `cloning-multisite-destination.gb` (LT726807.1, pdcDNA-R4R3-dhCMV,
+attR4/attR3), `cloning-multisite-destination-r4r2.gb` (AP018631.1, R4pMpGWB495, attR4/attR2),
+`cloning-multisite-entry-l1r5.gb` (PP281278.1, pGN1101CK), `cloning-multisite-entry-l5l4.gb`
+(PP281279.1, pGN1102CK), `cloning-multisite-entry-l4r1.gb` (LC477681.1, pCas9_P4P1r),
+`cloning-multisite-donor.gb` (HM623915.1, pA-hyg-OSCAR, attP4/attP1r),
+`cloning-multisite-expression.gb` (KC800697.1, a published three-fragment product) and
+`cloning-phic31-attb.gb` (EF362409.1, pUASTattB, phiC31 attB; Bischof et al. 2007).

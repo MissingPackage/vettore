@@ -126,7 +126,9 @@ test.describe("when the system refuses the clipboard", () => {
     await menu(page, "File", "New File from Clipboard");
     await page.getByTestId("paste-text").fill("1 ttctcatgtt tgacagctta tcatcgataa\n31 gctttaatgc");
     await page.getByTestId("paste-name").fill("pBR322 start");
-    await page.getByTestId("paste-circular").check({ force: true });
+    // Click the visible label, as a user does: forcing the hidden radio input was flaky under load.
+    await page.getByTestId("paste-dialog").getByText("Circular", { exact: true }).click();
+    await expect(page.getByTestId("paste-circular")).toBeChecked();
     await expect(page.getByTestId("paste-status")).toContainText("Recognised as plain sequence text: 40 bp");
     await page.getByTestId("paste-open").click();
     await expect(page.locator(".vt-doctab.active")).toContainText("pBR322 start");

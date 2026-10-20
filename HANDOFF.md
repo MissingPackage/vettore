@@ -7,25 +7,25 @@ biology computed by tested engines (pydna / Biopython / primer3).
 **Repo:** github.com/MissingPackage/vettore · **Guide:** `docs/USER-GUIDE.md` ·
 **Spec:** `specs/vettore.md` · **Research notes:** private repo `MissingPackage/vettore-notes`
 
-## State (2026-10-20) — v0.2.0 released
+## State (2026-10-20) — v0.3.0
 
 | Slice | State |
 |---|---|
 | S0 spike | done |
-| S1 daily driver | done — plus EMBL/.xdna/.gck/plain text, content-based format detection, `.dna` writing, clipboard exchange, unsaved-work dialog |
-| S2 cloning | done — restriction (one or several inserts), linear ligation, Gibson/HiFi/In-Fusion, PCR, mutagenesis, Golden Gate, Gateway BP/LR, TA/GC/TOPO, annealed oligos; History reopens inputs |
-| S3 verification | done — gel, Sanger (verdict, read quality, wrong-plasmid detection), star alignment of several sequences, common features, primer3 design |
-| S4 polish | partly — samples, help, preferences, AAV packaging check, design tokens (`docs/DESIGN.md`) |
+| S1 daily driver | done — plus EMBL/.xdna/.gck/plain text, content-based format detection, `.dna` writing, clipboard exchange, vendor conventions (colour notes, non-standard and `regulatory` feature types) |
+| S2 cloning | done — restriction (one or several inserts), linear ligation, Gibson/HiFi/In-Fusion, PCR, mutagenesis, Golden Gate, Gateway BP/LR with MultiSite LR (up to four entry clones), TA/GC/TOPO, annealed oligos; Create All; History reopens inputs |
+| S3 verification | done — gel, Sanger (verdict, read quality, wrong-plasmid detection), star alignment, common features with label checks, primer3 design |
+| S4 polish | mostly — samples, help, preferences, AAV check, design tokens, in-app quit dialog, single window for double-clicked files, per-user file associations |
 
-Evidence for 0.2.0: 426 pytest, 100 vitest, 109 Playwright e2e, all green; CI builds Windows
-and Linux, runs the packaging smoke test against the real binary (file round trips in 8
-formats, cloning, Tm, primer design, alignment, Sanger reads, samples, feature detection) and
-screenshots the Windows window. Release notes come from the annotated tag message; the README
-links `releases/latest/download/...`, so the download link never changes.
+Evidence for 0.3.0: 566 pytest, 110 vitest, 130 Playwright e2e, all green; CI builds Windows and Linux, runs the
+packaging smoke test against the real binary (file round trips, cloning, primer design,
+alignment, Sanger, samples, feature detection, file associations in dry run, second-start
+hand-over) and screenshots the Windows window.
 
-**The 0.1.0 download is broken for Sanger alignment and Detect Common Features** (Biopython's
-BLASTN matrix and `vettore/data` were missing from the bundle); 0.2.0 fixes both and the smoke
-test now guards them.
+A field test on five vendor vector files (kept locally, never committed: no redistribution
+licence) found an annotation error in one of them — a CMV enhancer/promoter labelled "PGK
+promoter" — which Detect Common Features now flags. Vendor names and vector IDs stay out of the
+public repository (details in the private notes repo).
 
 ## Public-surface rule
 
@@ -39,18 +39,18 @@ annotated tag and the GitHub release notes.
 
 ## Next steps, in order of value to a bench user
 
-1. Open a Vettore-written `.dna` in the program that defines the format (not available here):
-   round trip verified only with Biopython and sgffp.
-2. Quit guard: closing a tab uses the in-app Save / Don't save / Cancel dialog, but closing
-   the window still uses pywebview's native confirm; route it to the same dialog
-   (`src/vettore/app.py`, `closing` event).
-3. The Gateway e2e test mocks `/api/cloning/gateway-sites`; the real path is covered by pytest
-   and was checked by hand in the release verification, but no e2e test exercises it.
+1. Check by hand on Windows (no Windows machine here): the in-app quit dialog under WebView2,
+   per-user file associations in Explorer (icon, double-click), single-window hand-over, and
+   File → Print… / Save as PDF in the WebView2 window.
+2. Open a Vettore-written `.dna` in the program that defines the format: the round trip is
+   verified only with Biopython and sgffp.
+3. Catalogue: full-length CAG, and sequences for PGK, UbC, H1, 7SK and SFFV (today the label
+   check knows them only by name).
 4. Progressive multiple alignment (today: star alignment to a reference); related 15 kb
-   sequences take ~3.5 s each (no banded aligner in Biopython).
-5. MultiSite Gateway (att3–att5) tests; a "create all products" button in cloning dialogs.
-6. Optional import by accession from NCBI; file associations; print/PDF; history graph.
-7. Trim the Linux bundle (PyQt6 is most of the 620 MB build).
+   sequences take ~3.5 s each.
+5. Printing in the Linux (Qt WebEngine) window; history graph.
+6. Open question for the user: online import by accession from NCBI (needs the network).
+7. Run the opt-in Qt window tests (`VETTORE_QT_TESTS=1`, xvfb) in CI; trim the Linux bundle.
 
 ## Decisions (see spec "Architecture")
 
@@ -87,3 +87,8 @@ whether Vettore-written `.dna` files open in colleagues' tools.
   the packaged binary catches a missing one.
 - Two workstreams styling the same element collide silently (the welcome button became blue
   on blue): `design-screens.spec.ts` now asserts contrast.
+- pywebview runs `closing` handlers on the UI thread: calling `evaluate_js` there deadlocks.
+  Answer from a thread and close with `window.destroy()` (see `src/vettore/desktop/close_guard.py`).
+- Qt WebEngine silently drops `window.print()` unless `printRequested` is connected.
+- The page polls `/api/startup-files` every 500 ms (single-window hand-over): e2e mocks of
+  `**/api/**` also catch that poll.
