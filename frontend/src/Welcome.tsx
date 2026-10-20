@@ -13,6 +13,8 @@ export default function Welcome(props: {
   onSample: (id: string) => void;
   /** Open a sequence copied from an email or a web page. */
   onPaste?: () => void;
+  /** Show an engine error in the message stack (e.g. the samples could not be listed). */
+  onError?: (e: unknown) => void;
 }) {
   const [samples, setSamples] = useState<Sample[]>([]);
   const [opening, setOpening] = useState<string | null>(null);
@@ -21,8 +23,8 @@ export default function Welcome(props: {
   const [help, setHelp] = useState<string | null>(null);
 
   useEffect(() => {
-    api.samples().then((r) => setSamples(r.samples)).catch(() => undefined);
-  }, []);
+    api.samples().then((r) => setSamples(r.samples)).catch((e) => props.onError?.(e));
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const openSample = (id: string) => {
     setOpening(id);

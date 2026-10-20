@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSelector } from "react-redux";
 import { Editor } from "@teselagen/ove";
-import { api, whenDesktopReady, type OpenResult, type SaveResult, type SequenceData } from "./api";
+import { api, EngineError, whenDesktopReady, type OpenResult, type SaveResult, type SequenceData } from "./api";
 import {
   baseName,
   canSaveInPlace,
@@ -116,17 +116,29 @@ export default function App() {
     active ? (state.VectorEditor[active]?.sequenceData?.sequence as string | undefined) : undefined,
   );
 
-  const unsavedCount = Object.values(dirtyByEditor).filter(Boolean).length;
-  useEffect(() => {
-    api.unsaved(unsavedCount).catch(() => undefined);
-  }, [unsavedCount]);
-
   // ---- messages --------------------------------------------------------------------------
   const notify = useCallback((kind: NoticeKind, text: string) => {
     setNotices((prev) => addNotice(prev, kind, text));
   }, []);
   const dismiss = useCallback((id: number) => setNotices((prev) => dismissNotice(prev, id)), []);
   const report = useCallback((e: unknown) => notify("error", messageOf(e)), [notify]);
+
+  // An engine error no dialog caught still reaches the message stack instead of the console.
+  useEffect(() => {
+    const onRejection = (e: PromiseRejectionEvent) => {
+      if (!(e.reason instanceof EngineError)) return;
+      e.preventDefault();
+      report(e.reason);
+    };
+    window.addEventListener("unhandledrejection", onRejection);
+    return () => window.removeEventListener("unhandledrejection", onRejection);
+  }, [report]);
+
+  const unsavedCount = Object.values(dirtyByEditor).filter(Boolean).length;
+  useEffect(() => {
+    // The desktop window asks before quitting while this is above zero.
+    api.unsaved(unsavedCount).catch(report);
+  }, [unsavedCount, report]);
 
   // Opening and saving large files takes a moment: show a busy pointer meanwhile.
   const [busy, setBusy] = useState(0);
@@ -154,8 +166,8 @@ export default function App() {
   }, []);
 
   const refreshRecent = useCallback(() => {
-    api.recent().then((r) => setRecent(r.paths)).catch(() => undefined);
-  }, []);
+    api.recent().then((r) => setRecent(r.paths)).catch(report);
+  }, [report]);
 
   /** Open the documents of a file (or of pasted text, when `origin` is null) in new tabs. */
   const addResult = useCallback((result: OpenResult, origin: string | null) => {
@@ -732,7 +744,7 @@ export default function App() {
           {docTabs}
           <Welcome recent={recent} onOpen={openFiles} onNew={() => setNewOpen(true)} onRecent={openPath}
                    onPaste={newFromClipboard}
-                   onSample={openSample} />
+                   onSample={openSample} onError={report} />
           </>
         )}
       </div>
