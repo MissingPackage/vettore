@@ -68,7 +68,8 @@ export const CLONING_ACTIONS: CloningAction[] = [
     title: "Gibson Assembly",
     endpoint: "overlap-assembly",
     Form: overlapForm("gibson"),
-    help: "Insert fragments into a linearized vector; primers carry the overlaps.",
+    help: "Insert fragments into a linearized vector: Vettore designs primers whose 5′ ends overlap the "
+      + "neighbouring piece, so the pieces join in one reaction.",
   },
   {
     id: "hifi",
@@ -76,7 +77,8 @@ export const CLONING_ACTIONS: CloningAction[] = [
     title: "NEBuilder HiFi DNA Assembly",
     endpoint: "overlap-assembly",
     Form: overlapForm("hifi"),
-    help: "Same design as Gibson; NEB recommends 15–30 bp overlaps.",
+    help: "Insert fragments into a linearized vector, designed as for Gibson Assembly; NEB recommends "
+      + "15–30 bp overlaps.",
   },
   {
     id: "infusion",
@@ -84,7 +86,8 @@ export const CLONING_ACTIONS: CloningAction[] = [
     title: "In-Fusion Cloning",
     endpoint: "overlap-assembly",
     Form: overlapForm("infusion"),
-    help: "15 bp homology to the vector ends on the insert primers.",
+    help: "Insert fragments into a linearized vector: Vettore designs insert primers whose 5′ ends "
+      + "repeat the last 15 bp of each vector end, so the In-Fusion enzyme joins them.",
   },
   {
     id: "mutagenesis",
@@ -92,7 +95,9 @@ export const CLONING_ACTIONS: CloningAction[] = [
     title: "Mutagenesis (Q5 SDM style)",
     endpoint: "mutagenesis",
     Form: MutagenesisForm,
-    help: "Substitute, insert or delete bases with back-to-back primers, then KLD.",
+    help: "Change bases in a plasmid: two back-to-back primers carry the change and copy the whole "
+      + "plasmid by PCR. The linear product is then closed into a circle with the KLD mix (kinase, "
+      + "ligase and DpnI, which also removes the original plasmid).",
   },
   {
     id: "anneal-oligos",

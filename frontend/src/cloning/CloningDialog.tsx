@@ -3,6 +3,7 @@ import * as Blueprint from "@blueprintjs/core";
 import { Button, Classes, Spinner } from "@blueprintjs/core";
 import { SimpleCircularOrLinearView } from "@teselagen/ove";
 import { api } from "../api";
+import { defaultProductName } from "./productName";
 import type { CloningAction } from "./registry";
 import type { CloningResult, Oligo, OpenDoc, Product } from "./types";
 import { useCopyText } from "./useCopyText";
@@ -70,8 +71,10 @@ export default function CloningDialog(props: {
   }, []);
 
   const product = result?.products[chosen] ?? null;
-  const productName = product?.doc.name ?? "";
-  useEffect(() => setName(productName), [productName]);
+  const suggestedName = product
+    ? defaultProductName(product.doc.name, product.operation, props.docs.map((d) => d.name))
+    : "";
+  useEffect(() => setName(suggestedName), [suggestedName]);
   const oligos = result ? (result.oligos.length ? result.oligos : product?.oligos ?? []) : [];
   const oligoText = oligosAsText(oligos);
   // A confirmation belongs to the primers it was given for.
@@ -188,7 +191,7 @@ export default function CloningDialog(props: {
             data-testid="cloning-create"
             disabled={!product || busy}
             onClick={() => product && result
-              && props.onCreate({ ...product, doc: { ...product.doc, name: name.trim() || product.doc.name } }, result)}
+              && props.onCreate({ ...product, doc: { ...product.doc, name: name.trim() || suggestedName } }, result)}
           >
             Create Product
           </Button>
