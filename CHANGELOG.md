@@ -26,6 +26,11 @@ The download links in the README always point to the latest release.
   record; Edit → Copy as FASTA copies the selection with its positions for emails and order
   forms.
 - The Open and Save dialogs start in the folder you used last.
+- Sequences written in RNA letters open as DNA (U read as T), with a note.
+- Saved GenBank files carry the date of the save and the record's division, and a long name is
+  shortened at a word boundary with the full name kept in the definition line.
+- New cloning products, pasted sequences and new files are marked unsaved (•) until you save
+  them; closing a tab with unsaved work asks once: Save, Don't save or Cancel.
 
 **Cloning simulation**
 - Insert Multiple Fragments: a cut vector and two or more inserts in one ligation; every
@@ -40,7 +45,11 @@ The download links in the README always point to the latest release.
   product still carries ccdB; validated against published entry, destination and expression
   clones.
 - Every cloning dialog starts from the files you have open, prefills regions from the editor
-  selection, says which input is still missing, and lets you name the product.
+  selection or a feature you pick by name, says which input is still missing, and names the
+  product after the method ("pUC19 + GFP (Gibson)").
+- Gateway dialogs pick the entry clone, destination, attB insert and donor by their att sites.
+- PCR: a reverse primer copied from the top strand is answered with the reverse complement to
+  order.
 - History keeps a copy of every input of a cloning step: open it again as it was when the step
   ran, or copy the step's parameters and primers for your notebook.
 
@@ -49,20 +58,26 @@ The download links in the README always point to the latest release.
   with Tm, GC, product size and hairpin/dimer ΔG warnings; add a pair to the plasmid or copy it
   for ordering.
 - Tools → Align Multiple Sequences: up to 10 sequences against a reference, on either strand,
-  with coverage, identity and every difference in the reference's numbering.
-- Sanger verification: a one-line verdict, the read quality behind every difference, and
-  low-quality calls flagged.
+  with coverage, identity and every difference in the reference's numbering; sequences that
+  share only a chance match are left out, with the reason.
+- Sanger verification: a one-line verdict that counts a difference once however many reads
+  show it, the read quality behind every difference, low-quality calls flagged, and a clear
+  message when a read comes from another plasmid.
 - Tools → AAV Packaging Check: the cargo between the ITRs and including them, against the
   single-stranded and self-complementary limits, with the sources of the numbers.
 
 **Getting started and everyday comfort**
 - Welcome screen with three sample constructs (pUC19 and two AAV transfer plasmids, public
-  GenBank records), recent files, paste and drop.
+  GenBank records), recent files, paste and drop; the samples are also under File → Open
+  Sample Construct.
 - Help menu: Keyboard Shortcuts, Getting Started, About Vettore — also reachable before any
   file is open.
 - File → Preferences: default enzyme set, gel ladder and agarose percentage, minimum identity
   for feature detection.
-- Ctrl+Shift+G opens the gel simulation.
+- Ctrl+Shift+G opens the gel simulation; menus show their shortcuts as Ctrl+….
+- Detect Common Features does not offer again an element already annotated under another name.
+- The gel draws a lane whose enzyme does not cut as uncut, with a note, instead of failing.
+- Every error is one plain sentence that says what to do next.
 - A calmer, consistent look: one font, one accent colour, readable secondary text, visible
   keyboard focus; every dialog fits a 1366×768 screen with its buttons in view.
 - New app icon.

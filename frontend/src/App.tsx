@@ -443,6 +443,7 @@ export default function App() {
         markSaved(current.editorName);
         refreshRecent();
         notify("info", `Saved “${baseName(saved.path)}”.`);
+        for (const warning of saved.warnings ?? []) notify("warning", warning);
         warnIfAnnotationsLost(saved, sequenceData);
         return true;
       } catch (e) {
@@ -466,6 +467,7 @@ export default function App() {
           const saved = await whileBusy(api.savePath(path, sequenceData, kind));
           logHistory(doc.editorName, "Exported", `${saved.path} (${saved.format_label})`);
           notify("info", `Exported “${baseName(saved.path)}” (${saved.format_label}).`);
+          for (const warning of saved.warnings ?? []) notify("warning", warning);
         } else {
           const file = await api.exportFile(sequenceData, kind);
           download(filename, file.content_b64 ? fromBase64(file.content_b64) : file.content ?? "");

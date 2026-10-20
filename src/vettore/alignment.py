@@ -315,12 +315,24 @@ def place(reference: str, ref_circular: bool, query: str, query_circular: bool,
         oriented = rotate(oriented, rotation)
         points = [((q - rotation) % query_len, r) for q, r in hits]
     elif ref_circular:
-        on_diagonal = [q for q, r in hits
-                       if _near(_diagonal(q, r, ref_len, query_len, True, False), key, modulus)]
+        # Anchor the cut on where the homology starts on the sequence: the first run of the
+        # chain, not the first word on the best diagonal. Indels before the best diagonal move
+        # the earlier words off it, and anchoring on it alone would cut the reference in the
+        # middle of the region the sequence covers.
+        provisional = [(q, (r - key) % ref_len) for q, r in hits]
+        first_runs = sorted(_runs(_chain(provisional)))
+        if first_runs:
+            q0, _, r0, _ = first_runs[0]
+            start = (key + r0 - q0) % ref_len    # reference position opposite the first base
+        else:
+            on_diagonal = [q for q, r in hits
+                           if _near(_diagonal(q, r, ref_len, query_len, True, False), key, modulus)]
+            q0 = min(on_diagonal, default=0)
+            start = key
         if query_len < ref_len:      # centre the fragment in the rotated reference
-            shift = (key - (ref_len - query_len) // 2) % ref_len
+            shift = (start - (ref_len - query_len) // 2) % ref_len
         else:                        # the reference lies inside the fragment
-            shift = (key + min(on_diagonal, default=0)) % ref_len
+            shift = (start + q0) % ref_len
         points = [(q, (r - shift) % ref_len) for q, r in hits]
     else:
         points = hits

@@ -42,6 +42,8 @@ export interface SaveResult {
   path: string;
   format: string;
   format_label: string;
+  /** Features or primers left out because their position is not on the sequence. */
+  warnings?: string[];
 }
 
 /** A sample construct shipped with Vettore (offered on the welcome screen). */

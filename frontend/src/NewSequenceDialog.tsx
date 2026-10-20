@@ -13,15 +13,17 @@ export interface NewSequence {
 
 const IUPAC = /[^ACGTURYSWKMBDHVN]/gi;
 
-/** "New DNA File": paste or type a sequence; whitespace, digits and FASTA headers are stripped. */
-export function cleanSequence(raw: string): { sequence: string; rejected: number } {
+/** "New DNA File": paste or type a sequence; whitespace, digits and FASTA headers are stripped,
+ * and RNA letters are read as DNA (U as T), as when a file is opened. */
+export function cleanSequence(raw: string): { sequence: string; rejected: number; rnaLetters: number } {
   const body = raw
     .split(/\r?\n/)
     .filter((line) => !line.startsWith(">"))
     .join("")
     .replace(/[\s\d]/g, "");
-  const sequence = body.replace(IUPAC, "");
-  return { sequence: sequence.toUpperCase(), rejected: body.length - sequence.length };
+  const sequence = body.replace(IUPAC, "").toUpperCase();
+  const rnaLetters = (sequence.match(/U/g) ?? []).length;
+  return { sequence: sequence.replace(/U/g, "T"), rejected: body.length - sequence.length, rnaLetters };
 }
 
 export default function NewSequenceDialog(props: {
@@ -32,7 +34,7 @@ export default function NewSequenceDialog(props: {
   const [name, setName] = useState("New DNA");
   const [raw, setRaw] = useState("");
   const [circular, setCircular] = useState(false);
-  const { sequence, rejected } = cleanSequence(raw);
+  const { sequence, rejected, rnaLetters } = cleanSequence(raw);
 
   return (
     <Dialog isOpen={props.isOpen} onClose={props.onClose} title="New DNA File" style={{ width: 620 }}>
@@ -44,7 +46,7 @@ export default function NewSequenceDialog(props: {
         <FormGroup label="Name" labelFor="vt-new-name">
           <InputGroup id="vt-new-name" value={name} onChange={(e: any) => setName(e.target.value)} />
         </FormGroup>
-        <FormGroup label="Sequence (paste DNA or FASTA)" helperText={`${sequence.length} bp${rejected ? ` · ${rejected} invalid characters ignored` : ""}`}>
+        <FormGroup label="Sequence (paste DNA or FASTA)" helperText={`${sequence.length} bp${rejected ? ` · ${rejected} invalid characters ignored` : ""}${rnaLetters ? " · RNA letters: U read as T" : ""}`}>
           <TextArea
             data-testid="new-seq-text"
             fill

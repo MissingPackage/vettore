@@ -159,6 +159,20 @@ def test_a_circular_reference_contained_in_a_longer_linear_sequence():
     assert s["differences"] == [] and s["aligned_length"] == 1500
 
 
+def test_a_full_length_linear_copy_with_early_insertions_covers_the_whole_circle():
+    # A colleague's linear, reverse-complemented copy of a circular plasmid, with base 1
+    # elsewhere and two small insertions near its start: the words before them sit off the
+    # best diagonal, and the reference must still be cut where the copy's homology begins.
+    plasmid = clean_dna(4000, 91)
+    variant = plasmid[2500:] + plasmid[:2500]            # base 1 moved
+    variant = variant[:120] + "GATTACA" + variant[120:]  # 7 bp insertion
+    variant = variant[:407] + "CCGGA" + variant[407:]    # 5 bp insertion, 400 bases further
+    [s] = payload(doc("ref", plasmid, True), doc("copy", rc(variant), False))["sequences"]
+    assert (s["start"], s["end"], s["coverage"], s["strand"]) == (1, 4000, 100.0, -1)
+    assert s["counts"] == {"mismatches": 0, "insertions": 2, "deletions": 0,
+                           "inserted_bases": 12, "deleted_bases": 0}
+
+
 def test_a_partly_related_sequence_is_aligned_locally():
     other = REF[200:500] + clean_dna(1200, 999)
     [s] = payload(doc("ref", REF, False), doc("other", other, False))["sequences"]

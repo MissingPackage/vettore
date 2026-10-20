@@ -83,30 +83,31 @@ function randomDna(length: number, seed: number): string {
   return out;
 }
 
-test("files with the same name are told apart by their tab number", async ({ page }) => {
+test("two sequences pasted under the same name are told apart", async ({ page }) => {
   await page.goto(`/?token=${TOKEN}`);
   const reference = randomDna(300, 11);
   const swap = (i: number) => reference.slice(0, i) + (reference[i] === "A" ? "C" : "A") + reference.slice(i + 1);
   await newSequence(page, "pRef", reference);
   await newSequence(page, "Pasted sequence", swap(50));
-  await newSequence(page, "Pasted sequence", swap(200));
+  await newSequence(page, "Pasted sequence", swap(200));   // opens as "Pasted sequence 2"
   await page.getByTestId("doctab").first().click();
 
   await menu(page, "Tools", "Align Multiple Sequences…");
   const dialog = page.getByTestId("msa-dialog");
-  const choices = dialog.getByTestId("msa-choices");
-  await expect(choices).toContainText("Pasted sequence (tab 2)");
-  await expect(choices).toContainText("Pasted sequence (tab 3)");
+  const choices = dialog.getByTestId("msa-choice");
+  await expect(choices).toHaveCount(2);
+  await expect(dialog.getByTestId("msa-choices")).toContainText("Pasted sequence 2");
   await expect(dialog.getByTestId("msa-reference")).toContainText("pRef (300 bp)");
-  for (const box of await dialog.getByTestId("msa-choice").all()) await box.check();
+  for (const box of await choices.all()) await box.check();
   await dialog.getByTestId("msa-align").click();
 
   const rows = dialog.getByTestId("msa-summary").locator("tbody tr");
   await expect(rows).toHaveCount(2, { timeout: 30_000 });
   // Each variant carries its own single mismatch, worked out from the swaps above.
-  await expect(rows.filter({ hasText: "Pasted sequence (tab 2)" })).toContainText("1 mismatch");
-  await rows.filter({ hasText: "Pasted sequence (tab 3)" }).click();
-  await expect(dialog.getByTestId("msa-details")).toContainText("Pasted sequence (tab 3)");
+  const second = rows.filter({ hasText: "Pasted sequence 2" });
+  await expect(rows.filter({ hasNotText: "Pasted sequence 2" })).toContainText("1 mismatch");
+  await second.click();
+  await expect(dialog.getByTestId("msa-details")).toContainText("Pasted sequence 2");
   await expect(dialog.getByTestId("msa-differences")).toContainText(`201: ${reference[200]} → `);
 });
 

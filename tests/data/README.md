@@ -19,3 +19,13 @@ Downloaded on 2026-10-20. INSDC records (GenBank/ENA) are freely available publi
 | `exchange-quirks-header.gb` | NCBI J01749.1 GenBank record | hand-edited: LOCUS line replaced by a long name without topology or date; one `/note="non-ASCII test: 37 °C, 5 µl"` added to the tet CDS; final `//` removed; Windows (CRLF) line endings; encoded as cp1252 |
 | `PZ629150.1-unannotated.gb` | `PZ629150.1.gb` (NCBI PZ629150.1) | every feature except `source` removed with Biopython, so Detect Common Features has everything to add; sequence and header unchanged |
 | `exchange-quirks-features.gb` | NCBI J01749.1 GenBank record | hand-edited: eight `misc_feature` entries labelled `test …` added before the last feature: a region across the origin written as `join(4300..4361,1..50)` and as `4300..50`, a site between two bases (`100^101`), regions beyond (`4400..4500`) and past (`4300..4400`) the end, a location in another record (`J01636.1:1..10`), and two features with the same name and unusual qualifiers. The `test …` features mark positions only and carry no biological meaning |
+
+`cloning-gateway-entry.gb` (GenBank LT726670.1), `cloning-gateway-destination.gb` (AY568055.1)
+and `cloning-gateway-expression.gb` (LT725632.1) are public NCBI records fetched with E-utilities
+and saved unchanged; they validate the Gateway BP and LR reactions (`tests/test_cloning_gateway.py`,
+which cites Hilson et al. 2004, Genome Res 14:2176).
+
+`analysis-NC_001401.2.gb` (adeno-associated virus 2, complete genome) and `analysis-AY530579.1.gb`
+(AAV9 hu.14 VP1 gene) are NCBI nuccore records downloaded unchanged with E-utilities efetch
+(rettype=gbwithparts) on 2026-10-20; used by `tests/test_alignment.py` and
+`frontend/e2e/alignment.spec.ts`.

@@ -7,7 +7,8 @@ count as word breaks, and the words are joined without separators) is hashed and
 The one allowed occurrence is the identifier Biopython gives the binary .dna format
 (``DNA_FILE_FORMAT`` in ``src/vettore/fileio.py``), which that library fixes; its digest is
 taken from that constant. The vendored editor library (``frontend/node_modules``) and the built
-bundle (``frontend/dist``) are third-party code and are not scanned.
+bundle (``frontend/dist`` and its packaging copy ``src/vettore/static``) are third-party code and
+are not scanned.
 """
 
 import hashlib
@@ -64,7 +65,9 @@ def sources() -> list[Path]:
         elif path.is_dir():
             files += [p for p in path.rglob("*")
                       if p.is_file() and p.suffix.lower() in TEXT_SUFFIXES
-                      and "node_modules" not in p.parts]
+                      and "node_modules" not in p.parts
+                      # the packaging copy of the built bundle (third-party code, git-ignored)
+                      and not p.is_relative_to(ROOT / "src" / "vettore" / "static")]
     return sorted(set(files))
 
 

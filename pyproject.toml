@@ -1,6 +1,6 @@
 [project]
 name = "vettore"
-version = "0.1.0"
+version = "0.2.0"
 description = "Offline plasmid editor: maps, cloning simulation, primer design and Sanger verification"
 readme = "README.md"
 license = "GPL-3.0-or-later"

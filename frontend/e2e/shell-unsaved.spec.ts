@@ -161,7 +161,7 @@ test("a cloning product is unsaved: closing it asks instead of dropping it", asy
   await expect(page.locator(".vt-doctab.active")).toContainText("• pVector + Insert");
   await expect(page.locator(".vt-doctab.active")).toHaveAttribute("title", /not saved to a file yet/);
   await page.keyboard.press("Control+w");
-  await expect(page.getByTestId("unsaved-dialog")).toContainText("“pVector + Insert” has changes that are not saved.");
+  await expect(page.getByTestId("unsaved-dialog")).toContainText("“pVector + Insert (restriction cloning)” has changes that are not saved.");
   await page.getByTestId("unsaved-cancel").click();
   await expect(page.locator(".vt-doctab.active")).toContainText("pVector + Insert");
   expect(native).toEqual([]);

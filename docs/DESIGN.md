@@ -45,6 +45,7 @@ Always use a token, never a literal colour. Ratios are WCAG contrast against the
 | `--vt-text-placeholder` | `#6b7280` | Input placeholders (4.8:1 on white) |
 | `--vt-text-faint` | `#9ca3af` | Disabled controls and decoration only, never text to read (2.5:1) |
 | `--vt-text-on-accent` | `#ffffff` | Text on accent or danger fills |
+| `--vt-text-on-accent-muted` | `rgba(255,255,255,0.9)` | Secondary text on accent fills (about 5:1 on `--vt-accent`) |
 | `--vt-surface` | `#ffffff` | Pages, inputs, cards, the active document tab |
 | `--vt-surface-subtle` | `#f7f8fa` | View bar, status bar, dialog bodies |
 | `--vt-surface-sunken` | `#dfe3e8` | Document tab strip |
@@ -190,6 +191,18 @@ the system asks for reduced motion). Pair it with `role="status"` so screen read
 - Do not restyle the editor's map, sequence rows, alignment tracks or chromatograms.
 - Only the page font changes globally; size, line height and colour of the editor's panels stay
   Blueprint's, which those panels are laid out for.
+
+Rules that adapt the editor component and Blueprint to Vettore (in `theme/overrides.css` and
+`app.css`):
+
+- Every `.bp3-html-select` draws its own chevron (`::after`), so plain `<select>` wrappers need
+  no caret icon; do not add Blueprint's icon on top of it.
+- `.vt-shell[data-overlay-view]` hides the editor panels covered by the Enzymes and History
+  views, so their sliders cannot catch clicks meant for Vettore's tables.
+- `html[data-platform]` selects how menu shortcuts are written: `Ctrl+Shift+S` off a Mac, the
+  key symbols on a Mac.
+- Messages from the engine appear in the message stack (`files/NoticeStack`, classes
+  `vt-toast*`); the `vt-notice*` classes are for messages inside dialogs.
 
 ## Dialogs: the pattern
 
