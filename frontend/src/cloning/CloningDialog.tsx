@@ -30,6 +30,9 @@ export default function CloningDialog(props: {
   const [result, setResult] = useState<CloningResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Until the user changes an input, the inputs are Vettore's guesses: a failure then says what
+  // to choose, in the neutral box, rather than showing a red error.
+  const [touched, setTouched] = useState(false);
   const [chosen, setChosen] = useState(0);
   const [copied, setCopied] = useState<string | null>(null);
   const { copy, fallbackDialog } = useCopyText();
@@ -89,7 +92,11 @@ export default function CloningDialog(props: {
   return (
     <Dialog isOpen onClose={props.onClose} title={action.title} style={{ width: 1100, maxWidth: "95vw" }} canOutsideClickClose={false}>
       <div className={`${Classes.DIALOG_BODY} vt-cloning`} data-testid="cloning-dialog">
-        <div className="vt-cloning-form">
+        <div
+          className="vt-cloning-form"
+          onChangeCapture={() => setTouched(true)}
+          onClickCapture={(e) => (e.target as HTMLElement).closest("button") && setTouched(true)}
+        >
           <p className="vt-help" data-testid="cloning-help">{action.help}</p>
           {action.details && <p className="vt-help-more">{action.details}</p>}
           <Form docs={props.docs} active={props.active} onChange={onFormChange} />
@@ -105,10 +112,16 @@ export default function CloningDialog(props: {
               {missing ?? "Fill in the inputs on the left to simulate the product."}
             </p>
           )}
-          {error && (
+          {error && touched && (
             <Callout intent="danger" title="No product" data-testid="cloning-error">
               {error}
             </Callout>
+          )}
+          {error && !touched && (
+            <p className="vt-missing" data-testid="cloning-missing">
+              Choose the inputs on the left: the open files picked for you do not give a product.
+              <span className="vt-missing-why">{error}</span>
+            </p>
           )}
           {result && product && (
             <>

@@ -19,6 +19,8 @@ export function DocSelect(props: {
   value: string | null;
   onChange: (editorName: string) => void;
   testId?: string;
+  /** Extra words after a file's size, e.g. the att sites it carries. */
+  note?: (d: OpenDoc) => string | null;
 }) {
   return (
     <div className="bp3-html-select bp3-fill">
@@ -30,9 +32,10 @@ export function DocSelect(props: {
         <option value="" disabled>Choose an open file…</option>
         {props.docs.map((d) => {
           const data = d.data();
+          const note = props.note?.(d);
           return (
             <option key={d.editorName} value={d.editorName}>
-              {d.name} ({data.sequence.length} bp, {data.circular ? "circular" : "linear"})
+              {d.name} ({data.sequence.length} bp, {data.circular ? "circular" : "linear"}){note ? ` — ${note}` : ""}
             </option>
           );
         })}

@@ -1,7 +1,10 @@
 // One form per cloning action. Each form reports the JSON body of its /api/cloning endpoint.
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { api } from "../api";
 import { ENZYMES } from "../enzymeLogic";
-import { defaultInserts, defaultLinear, defaultVector, docData, openingFromSelection } from "./defaults";
+import {
+  GATEWAY_SITE_KINDS, defaultInserts, defaultLinear, defaultVector, docData, gatewayDefaults, openingFromSelection,
+} from "./defaults";
 import { FragmentEditor } from "./fragments";
 import { newRow, rowBody, type FragmentRow } from "./fragmentRows";
 import { DocSelect, EnzymePicker, Field, RegionInput, findDoc } from "./inputs";
@@ -362,28 +365,66 @@ const GATEWAY_LABELS = {
 export function gatewayForm(reaction: "BP" | "LR") {
   return function GatewayForm({ docs, active, onChange }: FormProps) {
     const labels = GATEWAY_LABELS[reaction];
-    const firstDefault = defaultLinear(docs, active, null) ?? active?.editorName ?? null;
-    const [a, setA] = useState<string | null>(firstDefault);
-    const [b, setB] = useState<string | null>(() => defaultVector(docs, null) === firstDefault
-      ? defaultInserts(docs, firstDefault, 1)[0]
-      : defaultVector(docs, null));
+    const [insertKind, vectorKind] = GATEWAY_SITE_KINDS[reaction];
+    const [a, setA] = useState<string | null>(null);
+    const [b, setB] = useState<string | null>(null);
+    // The att sites of every open file, by editor name; null while the engine is asked, and
+    // left null if it cannot answer (the user then chooses both files).
+    const [sites, setSites] = useState<Record<string, string[]> | null>(null);
+    const [looking, setLooking] = useState(true);
+    const chosenByUser = useRef(false);
     const da = findDoc(docs, a);
     const db = findDoc(docs, b);
+
+    // Pick the inputs by their att sites once, unless the user has already chosen.
     useEffect(() => {
-      if (!da) return onChange(null, `Choose the ${labels.first.toLowerCase()}`);
-      if (!db) return onChange(null, `Choose the ${labels.second.toLowerCase()}`);
+      let live = true;
+      api
+        .cloning<{ sites: string[][] }>("gateway-sites", { docs: docs.map(docData) })
+        .then((r) => {
+          if (!live || !Array.isArray(r?.sites)) return;
+          setSites(Object.fromEntries(docs.map((d, i) => [d.editorName, r.sites[i] ?? []])));
+          if (chosenByUser.current) return;
+          const [first, second] = gatewayDefaults(reaction, docs, r.sites, active);
+          setA(first);
+          setB(second);
+        })
+        .catch(() => undefined)
+        .finally(() => live && setLooking(false));
+      return () => {
+        live = false;
+      };
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+    const hasKind = (kind: string) => !!sites && Object.values(sites).some((s) => s.some((x) => x.startsWith(kind)));
+    // "Entry clone (attL sites)" → "entry clone (attL sites)": site names keep their capitals.
+    const choose = (label: string, kind: string) => {
+      const what = label.charAt(0).toLowerCase() + label.slice(1);
+      return sites && !hasKind(kind)
+        ? `Choose the ${what}. None of the open files has ${kind} sites: open it first (File → Open…).`
+        : `Choose the ${what}`;
+    };
+
+    useEffect(() => {
+      if (looking && (!da || !db)) return onChange(null, "Looking for att sites in the open files…");
+      if (!da) return onChange(null, choose(labels.first, insertKind));
+      if (!db) return onChange(null, choose(labels.second, vectorKind));
       if (da.editorName === db.editorName) {
         return onChange(null, "Choose two different files: one carries the insert, the other is the vector");
       }
       onChange({ reaction, inputs: [docData(da), docData(db)] });
-    }, [da, db]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [da, db, looking, sites]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    const note = (d: OpenDoc) => (sites?.[d.editorName]?.length ? sites[d.editorName].join(", ") : null);
     return (
       <>
         <Field label={labels.first}>
-          <DocSelect docs={docs} value={a} onChange={setA} testId="insert-doc" />
+          <DocSelect docs={docs} value={a} note={note} testId="insert-doc"
+                     onChange={(v) => { chosenByUser.current = true; setA(v); }} />
         </Field>
         <Field label={labels.second}>
-          <DocSelect docs={docs} value={b} onChange={setB} testId="vector-doc" />
+          <DocSelect docs={docs} value={b} note={note} testId="vector-doc"
+                     onChange={(v) => { chosenByUser.current = true; setB(v); }} />
         </Field>
       </>
     );

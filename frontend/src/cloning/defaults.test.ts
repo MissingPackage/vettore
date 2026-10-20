@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { defaultInserts, defaultLinear, defaultVector, docData, openingFromSelection, selectionOf } from "./defaults";
+import {
+  defaultInserts, defaultLinear, defaultVector, docData, gatewayDefaults, openingFromSelection, selectionOf,
+} from "./defaults";
 import { newRow, rowBody } from "./fragmentRows";
 import type { OpenDoc } from "./types";
 
@@ -42,6 +44,32 @@ describe("defaults", () => {
     expect(defaultLinear(docs, pcr1, "d1")).toBe("d2");
     expect(defaultLinear(docs, plasmid, "d1")).toBe("d4");
     expect(defaultLinear([plasmid], plasmid, null)).toBeNull();
+  });
+
+  it("picks Gateway inputs by their att sites, whichever tab is active", () => {
+    const entry = doc("e", "pENTR", true);
+    const dest = doc("x", "pDEST", true);
+    const other = doc("o", "pUC19", true);
+    const attB = doc("b", "attB PCR", false);
+    const expression = doc("c", "pEXP", true);
+    const donor = doc("p", "pDONR", true);
+    const open = [other, dest, entry, attB, expression, donor];
+    const sites = [[], ["attR1", "attR2"], ["attL1", "attL2"], ["attB1", "attB2"], ["attB1", "attB2"], ["attP1", "attP2"]];
+    // The destination tab is active: it still goes to the destination role.
+    expect(gatewayDefaults("LR", open, sites, dest)).toEqual(["e", "x"]);
+    expect(gatewayDefaults("LR", open, sites, entry)).toEqual(["e", "x"]);
+    expect(gatewayDefaults("LR", open, sites, other)).toEqual(["e", "x"]);
+    // BP: the linear attB product before the circular clone with attB sites, unless that is active.
+    expect(gatewayDefaults("BP", open, sites, null)).toEqual(["b", "p"]);
+    expect(gatewayDefaults("BP", open, sites, expression)).toEqual(["c", "p"]);
+  });
+
+  it("leaves a Gateway input empty when no open file has the sites it needs", () => {
+    const entry = doc("e", "pENTR", true);
+    const other = doc("o", "pUC19", true);
+    expect(gatewayDefaults("LR", [entry, other], [["attL1", "attL2"], []], other)).toEqual(["e", null]);
+    expect(gatewayDefaults("LR", [entry, other], [], entry)).toEqual([null, null]);
+    expect(gatewayDefaults("BP", [entry, other], [["attL1", "attL2"], []], null)).toEqual([null, null]);
   });
 
   it("reads regions and opening points from the editor selection", () => {
