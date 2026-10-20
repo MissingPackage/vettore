@@ -37,3 +37,15 @@
 .vt-region-input .vt-region .vt-muted { white-space: nowrap; }
 /* Confirmation next to a copy button, shown only once the text is on the clipboard. */
 .vt-copied { color: var(--vt-success); font-size: var(--vt-font-size-sm); }
+/* A file picker with a button beside it (remove an entry clone from a MultiSite reaction). */
+.vt-input-row { display: flex; align-items: center; gap: var(--vt-space-2); }
+.vt-input-row > .bp3-html-select { flex: 1; min-width: 0; }
+.vt-input-row > .bp3-button { white-space: nowrap; }
+.vt-add-entry {
+  display: flex;
+  align-items: baseline;
+  gap: var(--vt-space-2);
+  margin-bottom: var(--vt-space-2);
+  flex-wrap: wrap;
+}
+.vt-add-entry .vt-field-hint { flex: 1; min-width: 220px; }

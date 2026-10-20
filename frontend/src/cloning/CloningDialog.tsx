@@ -89,6 +89,21 @@ export default function CloningDialog(props: {
   };
   const { Form } = action;
 
+  /**
+   * Open every product of the simulation, each in its own tab with its own History entry: a
+   * clone and its by-product, or the two orientations of an insert. The product the user
+   * named keeps that name, the others take the name they are listed under.
+   */
+  const createAll = (all: CloningResult) => {
+    const taken = props.docs.map((d) => d.name);
+    all.products.forEach((p, i) => {
+      const chosenName = i === chosen ? name.trim() || suggestedName : "";
+      const productName = chosenName || defaultProductName(p.doc.name, p.operation, taken);
+      taken.push(productName);
+      props.onCreate({ ...p, doc: { ...p.doc, name: productName } }, all);
+    });
+  };
+
   return (
     <Dialog isOpen onClose={props.onClose} title={action.title} style={{ width: 1100, maxWidth: "95vw" }} canOutsideClickClose={false}>
       <div className={`${Classes.DIALOG_BODY} vt-cloning`} data-testid="cloning-dialog">
@@ -127,7 +142,10 @@ export default function CloningDialog(props: {
             <>
               {result.products.length > 1 && (
                 <div className="vt-product-choice" data-testid="cloning-products">
-                  <b>{result.products.length} possible products: choose the one to create</b>
+                  <b>
+                    {result.products.length} possible products: choose the one to create, or
+                    create them all in their own tabs
+                  </b>
                   {result.products.map((p, i) => (
                     <label key={i} className="bp3-control bp3-radio">
                       <input type="radio" checked={i === chosen} onChange={() => setChosen(i)} />
@@ -199,6 +217,16 @@ export default function CloningDialog(props: {
       <div className={Classes.DIALOG_FOOTER}>
         <div className={Classes.DIALOG_FOOTER_ACTIONS}>
           <Button onClick={props.onClose}>Cancel</Button>
+          {result && result.products.length > 1 && (
+            <Button
+              data-testid="cloning-create-all"
+              disabled={busy}
+              title="Open every product of this simulation in its own tab"
+              onClick={() => createAll(result)}
+            >
+              Create All ({result.products.length})
+            </Button>
+          )}
           <Button
             intent="primary"
             data-testid="cloning-create"

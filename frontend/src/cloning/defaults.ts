@@ -66,6 +66,78 @@ export function gatewayDefaults(
   return [insert, pick(vectorKind, insert, false)];
 }
 
+interface AttSite {
+  kind: string;
+  n: number;
+}
+
+const attSites = (names: string[]): AttSite[] =>
+  names.filter((s) => /^att[BLPR][1-5]$/.test(s)).map((s) => ({ kind: s.slice(0, 4), n: Number(s.slice(4)) }));
+
+const partner = (kind: string) => (kind === "attL" ? "attR" : "attL");
+
+/** The most entry clones one MultiSite LR reaction takes. */
+export const MAX_ENTRY_CLONES = 4;
+
+/**
+ * Inputs for an LR reaction, chosen by their att sites: the destination vector and the entry
+ * clones that chain through it, in reaction order. A MultiSite reaction lines the molecules up
+ * through the numbered sites (each attL pairs with the attR of the same number), so a
+ * destination with attR4 and attR3 takes, for example, an attL4/attR1 clone, an attL1/attL2
+ * clone and an attR2/attL3 clone. The longest chain the open files allow is offered; when no
+ * chain is found, the single best entry clone and destination vector are (as before).
+ */
+export function gatewayChain(
+  docs: OpenDoc[],
+  sites: string[][],
+  active: OpenDoc | null,
+): { entries: (string | null)[]; vector: string | null } {
+  const found = docs.map((_, i) => attSites(sites[i] ?? []).filter((s) => s.kind === "attL" || s.kind === "attR"));
+  const vectors = docs
+    .map((_, i) => i)
+    .filter((i) => found[i].length >= 2 && found[i].every((s) => s.kind === "attR")
+      && new Set(found[i].map((s) => s.n)).size === 2)
+    .sort((x, y) => Number(docs[y].editorName === active?.editorName) - Number(docs[x].editorName === active?.editorName));
+
+  for (const v of vectors) {
+    // A MultiSite cassette reads 5 - 4 - 1 - 2 - 3, so the entry clones are listed starting
+    // from whichever of the destination's two sites comes first in that order.
+    const [first, second] = [...new Set(found[v].map((s) => s.n))]
+      .sort((x, y) => [5, 4, 1, 2, 3].indexOf(x) - [5, 4, 1, 2, 3].indexOf(y));
+    let best: number[] | null = null;
+    for (const [from, to] of [[first, second], [second, first]]) {
+      const walk = (need: AttSite, used: number[]): number[][] => {
+        const chains: number[][] = [];
+        docs.forEach((_, i) => {
+          if (i === v || used.includes(i) || found[i].length !== 2) return;
+          const match = found[i].find((s) => s.kind === need.kind && s.n === need.n);
+          if (!match) return;
+          const open = found[i].find((s) => s !== match)!;
+          const next = { kind: partner(open.kind), n: open.n };
+          const path = [...used, i];
+          if (next.kind === "attR" && next.n === to) chains.push(path);
+          if (path.length < MAX_ENTRY_CLONES) chains.push(...walk(next, path));
+        });
+        return chains;
+      };
+      for (const chain of walk({ kind: "attL", n: from }, [])) {
+        if (!best || chain.length > best.length) best = chain;
+      }
+    }
+    if (best) return { entries: best.map((i) => docs[i].editorName), vector: docs[v].editorName };
+  }
+  const [entry, vector] = gatewayDefaults("LR", docs, sites, active);
+  return { entries: [entry], vector };
+}
+
+/** The att pairs a donor vector offers a BP reaction: [[1, 2]] for a donor with attP1/attP2. */
+export function donorPairs(sites: string[] | undefined): number[][] {
+  const numbers = [...new Set(attSites(sites ?? []).filter((s) => s.kind === "attP").map((s) => s.n))].sort();
+  const pairs: number[][] = [];
+  numbers.forEach((a, i) => numbers.slice(i + 1).forEach((b) => pairs.push([a, b])));
+  return pairs;
+}
+
 /** The editor selection of a document as a region, or nulls. */
 export function selectionOf(d: OpenDoc | null): { start: number | null; end: number | null } {
   const s = d?.selection() ?? null;

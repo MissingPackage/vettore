@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
-  defaultInserts, defaultLinear, defaultVector, docData, gatewayDefaults, openingFromSelection, selectionOf,
+  defaultInserts, defaultLinear, defaultVector, docData, donorPairs, gatewayChain, gatewayDefaults,
+  openingFromSelection, selectionOf,
 } from "./defaults";
 import { newRow, rowBody } from "./fragmentRows";
 import type { OpenDoc } from "./types";
@@ -70,6 +71,42 @@ describe("defaults", () => {
     expect(gatewayDefaults("LR", [entry, other], [["attL1", "attL2"], []], other)).toEqual(["e", null]);
     expect(gatewayDefaults("LR", [entry, other], [], entry)).toEqual([null, null]);
     expect(gatewayDefaults("BP", [entry, other], [["attL1", "attL2"], []], null)).toEqual([null, null]);
+  });
+
+  it("chains MultiSite entry clones through the att sites of the destination vector", () => {
+    // A three-fragment reaction: attR4/attR3 destination, 5' entry (attL4-attR1), middle
+    // entry (attL1-attL2), 3' entry (attR2-attL3), in any tab order.
+    const dest = doc("x", "pDEST R4-R3", true);
+    const five = doc("p5", "p5E", true);
+    const mid = doc("pm", "pME", true);
+    const three = doc("p3", "p3E", true);
+    const other = doc("o", "pUC19", true);
+    const open = [other, three, dest, five, mid];
+    const sites = [[], ["attL3", "attR2"], ["attR3", "attR4"], ["attL4", "attR1"], ["attL1", "attL2"]];
+    expect(gatewayChain(open, sites, null)).toEqual({ entries: ["p5", "pm", "p3"], vector: "x" });
+    // Two entry clones into a destination for two fragments (attR4/attR2).
+    const dest2 = doc("x2", "pDEST R4-R2", true);
+    const two = [five, mid, dest2];
+    expect(gatewayChain(two, [["attL4", "attR1"], ["attL1", "attL2"], ["attR2", "attR4"]], null))
+      .toEqual({ entries: ["p5", "pm"], vector: "x2" });
+  });
+
+  it("falls back to one entry clone when the open files do not chain", () => {
+    const dest = doc("x", "pDEST", true);
+    const entry = doc("e", "pENTR", true);
+    const stray = doc("s", "p5E", true);
+    const open = [entry, stray, dest];
+    const sites = [["attL1", "attL2"], ["attL4", "attR1"], ["attR1", "attR2"]];
+    expect(gatewayChain(open, sites, null)).toEqual({ entries: ["e"], vector: "x" });
+    expect(gatewayChain([entry], [["attL1", "attL2"]], null)).toEqual({ entries: ["e"], vector: null });
+  });
+
+  it("offers the att pairs a donor vector carries", () => {
+    expect(donorPairs(["attP1", "attP2"])).toEqual([[1, 2]]);
+    expect(donorPairs(["attP1", "attP4"])).toEqual([[1, 4]]);
+    expect(donorPairs(["attP1", "attP2", "attP4"])).toEqual([[1, 2], [1, 4], [2, 4]]);
+    expect(donorPairs(["attL1", "attL2"])).toEqual([]);
+    expect(donorPairs(undefined)).toEqual([]);
   });
 
   it("reads regions and opening points from the editor selection", () => {
