@@ -282,6 +282,11 @@ def test_a_second_start_hands_its_file_to_the_running_copy_and_exits(starts, tmp
         second = starts.start(str(sample))
         assert second.wait(timeout=60) == 0, starts.log(second)
         assert "Handed 1 file(s) to the running Vettore" in starts.log(second)
+        # The page has the files once the hand-over returns; the thread playing the page
+        # records them a moment after it has read the reply.
+        deadline = time.monotonic() + 5
+        while not page.results and time.monotonic() < deadline:
+            time.sleep(0.05)
         assert [r["path"] for r in page.results] == [str(sample)]
         assert page.results[0]["documents"][0]["sequence"]
         assert instance.read_record().pid == first_pid     # still the running copy
