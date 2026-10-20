@@ -70,6 +70,10 @@ class Fragment:
     def right_end(self) -> tuple[str, str]:
         return self.record.seq.three_prime_end()
 
+    def ends_cut_by(self, enzyme: str) -> int:
+        """How many of this fragment's two ends that enzyme made (0, 1 or 2)."""
+        return (self.left_enzyme == enzyme) + (self.right_enzyme == enzyme)
+
     def label(self) -> str:
         left = self.left_enzyme or "end"
         right = self.right_enzyme or "end"
@@ -226,9 +230,10 @@ def insert_fragment(vector_doc: SequenceDoc, vector_enzymes: list[str], insert_d
     backbone = _pick_backbone(v_frags, v_enz)
     i_frags = fragments(insert, i_enz)
     chosen = _pick_insert(i_frags, i_enz, insert.circular, insert_fragment_index)
-    expected_cuts = 2 if insert.circular else len({chosen.left_enzyme, chosen.right_enzyme} - {None})
     for name, count in cut_counts(insert, i_enz).items():
-        if count > expected_cuts:
+        # One cut per end of the insert is expected: a PCR product with an EcoRI site at each
+        # end is cut twice by EcoRI. More cuts mean a site inside the source as well.
+        if count > chosen.ends_cut_by(name):
             warnings.append(f"{name} cuts “{insert_doc.name}” {count} times; check that the "
                             f"insert fragment ({chosen.label()}) is the one you want")
 

@@ -68,6 +68,16 @@ def test_single_enzyme_cloning_is_non_directional_and_both_orientations_work():
     assert rev.products[0].doc["sequence"].upper() == A + "GAATTC" + rc(CORE) + "GAATTC" + rest
     assert any("both orientations" in w for w in fwd.warnings)
     assert any("re-ligate without insert" in w for w in fwd.warnings)
+    # EcoRI cuts the PCR product twice, once per end of the insert: nothing to check.
+    assert not any("times;" in w for w in fwd.warnings)
+
+
+def test_a_second_site_inside_the_insert_source_is_warned_about():
+    ins = SequenceDoc(**doc("frag", "CC" + "GAATTC" + CORE + "GAATTC" + B[:100] + "GAATTC"
+                            + "CC", False))
+    result = insert_fragment(vector_doc(), ["EcoRI"], ins, ["EcoRI"])
+    assert any(w.startswith("EcoRI cuts “frag” 3 times; check that the insert fragment")
+               for w in result.warnings)
 
 
 def test_incompatible_ends_are_reported():

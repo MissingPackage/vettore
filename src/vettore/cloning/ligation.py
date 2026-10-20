@@ -119,9 +119,10 @@ def _digest_piece(item: FragmentIn, role: str, warnings: list[str]) -> Piece:
         chosen = _pick_backbone(frags, enzymes)
     else:
         chosen = _pick_insert(frags, enzymes, record.circular, None)
-    expected = 2 if record.circular else len({chosen.left_enzyme, chosen.right_enzyme} - {None})
     for name, count in counts.items():
-        if count > expected and item.fragment_index is None:
+        # One cut per end of the fragment is expected (EcoRI at both ends of a PCR product cuts
+        # twice); more cuts mean a site inside the molecule as well.
+        if count > chosen.ends_cut_by(name) and item.fragment_index is None:
             warnings.append(f"{name} cuts “{item.doc.name}” {count} times; check that the "
                             f"fragment used ({chosen.label()}) is the one you want")
     label = f"{item.doc.name} {chosen.label()}"
