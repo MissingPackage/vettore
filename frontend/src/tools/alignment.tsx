@@ -10,6 +10,7 @@ import { store } from "../store";
 import { useCopyText } from "../cloning/useCopyText";
 import type { Tool, ToolProps } from "./types";
 import {
+  choicePrompt,
   choiceProblem,
   DEFAULT_LIMITS,
   defaultChoice,
@@ -85,7 +86,8 @@ function AlignMultipleSequences(props: ToolProps) {
   const others = docs.filter((d) => d.editorName !== reference);
   const referenceProblem = referenceDoc ? ineligible(lengths[referenceDoc.editorName], limits) : null;
   const problem = choiceProblem(chosen.length, limits);
-  const ready = !!referenceDoc && !referenceProblem && !problem;
+  const prompt = choicePrompt(chosen.length);
+  const ready = !!referenceDoc && !referenceProblem && !problem && chosen.length > 0;
 
   const changeReference = (editorName: string) => {
     setReference(editorName);
@@ -210,6 +212,7 @@ function AlignMultipleSequences(props: ToolProps) {
               {problem && (
                 <span className="vt-msa-invalid" data-testid="msa-choice-problem">{problem}</span>
               )}
+              {prompt && <span className="vt-msa-meta" data-testid="msa-choice-prompt">{prompt}</span>}
             </div>
 
             <div className="vt-msa-actions">

@@ -42,6 +42,36 @@ test("align a capsid gene of another serotype to the AAV2 genome", async ({ page
   await page.screenshot({ path: "test-results/alignment.png" });
 });
 
+async function newSequence(page: Page, name: string, sequence: string) {
+  const welcome = page.getByTestId("new");
+  if (await welcome.isVisible().catch(() => false)) await welcome.click();
+  else await menu(page, "File", "New DNA File…");
+  await page.getByLabel("Name").fill(name);
+  await page.getByTestId("new-seq-text").fill(sequence);
+  await page.getByTestId("new-seq-create").click();
+  await expect(page.locator(".vt-doctab.active")).toContainText(name);
+}
+
+test("with several files open nothing is ticked until the user chooses", async ({ page }) => {
+  await page.goto(`/?token=${TOKEN}`);
+  await newSequence(page, "pA", "ACGTTGCAAGGCTTACCGATGGCATTCAGGACTTGACCATG".repeat(5));
+  await newSequence(page, "pB", "TTGACCGGATACGATCGGCTAAGCTTGCATGCCTGCAGGTC".repeat(5));
+  await newSequence(page, "pC", "GGCCTTAAGGCTAGCATCGATTACGGATCCAAGCTTGGTAC".repeat(5));
+
+  await menu(page, "Tools", "Align Multiple Sequences…");
+  const dialog = page.getByTestId("msa-dialog");
+  await expect(dialog.getByTestId("msa-choice")).toHaveCount(2);
+  for (const box of await dialog.getByTestId("msa-choice").all()) await expect(box).not.toBeChecked();
+  // A neutral prompt, not an error, says what to do.
+  await expect(dialog.getByTestId("msa-choice-prompt")).toContainText("Tick the sequences to compare");
+  await expect(dialog.getByTestId("msa-choice-problem")).toHaveCount(0);
+  await expect(dialog.getByTestId("msa-align")).toBeDisabled();
+
+  await dialog.getByTestId("msa-choice").first().check();
+  await expect(dialog.getByTestId("msa-choice-prompt")).toHaveCount(0);
+  await expect(dialog.getByTestId("msa-align")).toBeEnabled();
+});
+
 test("explains what to do when only one sequence is open", async ({ page }) => {
   await page.goto(`/?token=${TOKEN}`);
   await page.getByTestId("file-input").setInputFiles(data("analysis-AY530579.1.gb"));
