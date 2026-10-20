@@ -188,9 +188,17 @@ def detect(sequence: str, circular: bool = False, min_identity: float = DEFAULT_
     return _dedupe(found, length)
 
 
+#: Types whose elements are folded into a longer element the catalogue says holds them (see
+#: ``HOLDS``): the CMV enhancer at the head of a full-length CAG promoter is the CAG's own
+#: first third, not a second element. A tag inside a CDS (3×HA in SaCas9) stays a match of its
+#: own, which is why this is a short list rather than the whole of ``HOLDS``.
+PART_OF_TYPES = frozenset({"promoter", "enhancer"})
+
+
 def _dedupe(matches: list[Match], length: int) -> list[Match]:
     """Drop matches that describe the same region: the same feature found twice by different
-    seeds, or two catalogue entries (for example the 5′ and 3′ ITR) that are the same sequence.
+    seeds, or two catalogue entries (for example the 5′ and 3′ ITR) that are the same sequence,
+    or a regulatory element the catalogue lists inside a longer one that was found here too.
     A short feature inside a longer one of a different kind is kept, because a tag inside a CDS
     is worth showing."""
     ordered = sorted(matches, key=lambda m: (-len(m.span(length)), -m.identity, m.name))
@@ -205,7 +213,12 @@ def _dedupe(matches: list[Match], length: int) -> list[Match]:
             # Variants of one feature (a full-length and a truncated ITR, say) are one match.
             variant = (existing.type == candidate.type
                        and overlap >= 0.9 * min(len(span), len(other)))
-            if same_region or variant:
+            # Part of the longer element, by the catalogue's own account.
+            part_of = (candidate.name in HOLDS.get(existing.name, ())
+                       and existing.type in PART_OF_TYPES
+                       and candidate.type in PART_OF_TYPES
+                       and overlap >= 0.9 * len(span))
+            if same_region or variant or part_of:
                 duplicate = True
                 break
         if not duplicate:
@@ -244,22 +257,22 @@ GENERIC_WORDS = frozenset({
 })
 
 #: Other spellings of a word, as found in vendors' and labs' labels.
-WORD_ALIASES = {"hcmv": "cmv", "hef1a": "ef1a", "camkii": "camkiia", "hsyn1": "hsyn"}
-
-#: Elements outside the catalogue that labels often name. A label naming one of them over a
-#: catalogue element points at a wrong label (a CMV promoter labelled "PGK promoter"); none
-#: of them contains a catalogue element.
-OTHER_ELEMENTS = ("PGK promoter", "UbC promoter", "H1 promoter", "7SK promoter",
-                  "SFFV promoter")
+WORD_ALIASES = {"hcmv": "cmv", "hef1a": "ef1a", "camkii": "camkiia", "hsyn1": "hsyn",
+                "hpgk": "pgk"}
 
 #: Catalogue elements that hold another catalogue element, so a block named after the first is
 #: not a wrong label for the second (checked against the catalogue sequences in tests):
 #: - SaCas9: the catalogue entry carries a C-terminal 3×HA tag (PZ629150.1:3842..3922, inside
 #:   581..3925).
-#: - CAG promoter: CMV enhancer, chicken β-actin promoter and rabbit β-globin intron (Niwa H,
-#:   Yamamura K, Miyazaki J, Gene 1991;108:193-199). The catalogue entry (ON785707.1:189..1125)
-#:   starts inside the enhancer; full CAG promoters carry all of it.
-HOLDS = {"SaCas9": frozenset({"3×HA"}), "CAG promoter": frozenset({"CMV enhancer"})}
+#: - CAG promoter: the CMV enhancer, the chicken β-actin promoter and the chimeric chicken
+#:   β-actin/rabbit β-globin intron (Niwa H, Yamamura K, Miyazaki J, Gene 1991;108:193-199).
+#:   The full-length entry (ON012604.1:4799..6471) opens with the whole CMV enhancer; the
+#:   chicken β-actin promoter that follows it is not a catalogue element of its own.
+#: - CAG promoter (truncated): the same elements, but it starts 131 bp inside the enhancer, so
+#:   only part of it is there and a search does not find the enhancer in it.
+HOLDS = {"SaCas9": frozenset({"3×HA"}),
+         "CAG promoter": frozenset({"CMV enhancer"}),
+         "CAG promoter (truncated)": frozenset({"CMV enhancer"})}
 
 _LETTERS = str.maketrans({"α": "a", "β": "b", "γ": "g", "δ": "d", "Δ": "d", "κ": "k",
                           "×": "x", "′": "'", "’": "'"})
@@ -285,8 +298,11 @@ def name_words(name: str, pieces: bool = True) -> frozenset[str]:
 
 @lru_cache(maxsize=1)
 def _element_words() -> tuple[tuple[str, frozenset[str]], ...]:
-    """(element name, its identifying words) for the catalogue and the other known elements."""
-    names = [f.name for f in catalogue()] + list(OTHER_ELEMENTS)
+    """(element name, its identifying words) for every element the check knows. They are the
+    catalogue's own names, so a label that names one is always read against a real sequence:
+    "PGK promoter" over a CMV promoter is doubted because the catalogue carries the two PGK
+    promoters and they are not this sequence."""
+    names = [f.name for f in catalogue()]
     return tuple((name, words) for name in dict.fromkeys(names)
                  if (words := name_words(name, pieces=False)))
 

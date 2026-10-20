@@ -54,3 +54,21 @@ attR4/attR3), `cloning-multisite-destination-r4r2.gb` (AP018631.1, R4pMpGWB495, 
 `cloning-multisite-donor.gb` (HM623915.1, pA-hyg-OSCAR, attP4/attP1r),
 `cloning-multisite-expression.gb` (KC800697.1, a published three-fragment product) and
 `cloning-phic31-attb.gb` (EF362409.1, pUASTattB, phiC31 attB; Bischof et al. 2007).
+
+## Catalogue cross-check records (`features-*`)
+
+Public NCBI nuccore records downloaded unchanged with E-utilities efetch (rettype=fasta) on
+2026-10-20. Each carries one of the promoters the common-feature catalogue gained, but comes
+from a different laboratory and a different vector than the record the catalogue entry was
+taken from, so `tests/test_features.py` can check the entry against an independent copy of the
+element rather than against its own source.
+
+| File | Record | Element it cross-checks |
+|---|---|---|
+| `features-MT921016.1.fasta` | MT921016.1, vector pTTC_FusionRed_eGFP_3UTR (Dolskiy et al., direct submission) | human PGK promoter, annotated there at 3754..4264 |
+| `features-MT891341.1.fasta` | MT891341.1, cloning vector pT-PGK-mCherry (Frei et al., Nat Commun 2020;11:4641) | mouse PGK promoter, annotated there at 345..848 |
+| `features-MN389527.1.fasta` | MN389527.1, cloning vector pMG_DV (Stach et al., ACS Synth Biol 2019) | UbC promoter, annotated there at 583..1799 |
+| `features-FJ687158.1.fasta` | FJ687158.1, RNAi expression vector pUC18-H1 (Mathupala et al., Neurosurgery 2004;55:1410) | H1 promoter, annotated there at complement(414..633) |
+| `features-MQ296444.1.fasta` | MQ296444.1, sequence 123 from patent WO 2021216503 (Kmiec et al.) | 7SK promoter, the record's own 7SK promoter sequence |
+| `features-MP040844.1.fasta` | MP040844.1, sequence 35 from patent WO 2018206791 (Duchateau et al.) | SFFV promoter, the record's own SFFV promoter sequence |
+| `features-HG530138.1.fasta` | HG530138.1, cloning vector pTAL7B (Frank, Skryabin & Greber) | CAG promoter (full length), annotated there at 3272..4948 |

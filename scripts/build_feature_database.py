@@ -47,10 +47,60 @@ ENTRIES: list[Entry] = [
     Entry("CMV enhancer", "enhancer", "PV031350.1", 96, 475, "human cytomegalovirus enhancer"),
     Entry("CMV promoter", "promoter", "PV031350.1", 476, 679,
           "human cytomegalovirus immediate early promoter"),
-    Entry("CAG promoter", "promoter", "ON785707.1", 189, 1125,
-          "CMV enhancer, chicken β-actin promoter and rabbit β-globin intron"),
+    # Full-length CAG (Niwa H, Yamamura K, Miyazaki J, Gene 1991;108:193-199): the whole CMV
+    # enhancer (the catalogue entry matches its first 380 bp exactly), the chicken β-actin
+    # promoter and the chimeric chicken β-actin/rabbit β-globin intron, ending at the splice
+    # acceptor. ON012604.1 (Feher et al., Sci Rep 2022;12:9874) and HG530138.1 (pTAL7B) give
+    # the same boundaries; KM279353.1 and LC169511.1 annotate 26 bp more at one end and
+    # ~30 bp more at the other, so the shared span is the one taken here.
+    Entry("CAG promoter", "promoter", "ON012604.1", 4799, 6471,
+          "CMV enhancer, chicken β-actin promoter and the chimeric chicken β-actin/rabbit "
+          "β-globin intron; cross-check HG530138.1 (99.2 %)"),
+    # The shorter CAG of an AAV vector: it starts 131 bp inside the CMV enhancer and its
+    # intron is ~650 bp shorter than the full-length one, so the two are separate entries
+    # rather than variants of one. ON785707.1 gives the range in the promoter's own note.
+    Entry("CAG promoter (truncated)", "promoter", "ON785707.1", 189, 1125,
+          "shortened CAG: the last 249 bp of the CMV enhancer, the chicken β-actin promoter "
+          "and a shortened intron"),
     Entry("hSyn promoter", "promoter", "MH282430.1", 449, 920,
           "human synapsin I promoter, neuron-specific"),
+    # Human PGK1 promoter, the 511 bp fragment lentiviral vectors use (pLKO.1 and its
+    # derivatives). MT921016.1, from another laboratory and another backbone, differs at one
+    # base; PX675714.1 and PY500167.1 carry it unchanged.
+    Entry("human PGK promoter", "promoter", "OQ427862.1", 1, 511,
+          "human phosphoglycerate kinase 1 promoter; cross-check MT921016.1 (99.8 %)"),
+    # Mouse Pgk-1 promoter, the 500 bp fragment of PGK-neo and PGK-puro selection cassettes.
+    # It is not the human promoter: the two share only ~70 % identity, hence two entries.
+    # MH325104.1 (Berman et al., J Am Chem
+    # Soc 2018;140:18093), LC744045.1 and MT891341.1 (Frei et al., Nat Commun 2020;11:4641)
+    # annotate exactly the same 500 bp.
+    Entry("mouse PGK promoter", "promoter", "MH325104.1", 3321, 3820,
+          "mouse Pgk-1 promoter of PGK-neo/PGK-puro cassettes; "
+          "cross-check MT891341.1 (100 %)"),
+    # Human ubiquitin C promoter with its first exon and intron, as in UbC-driven lentiviral
+    # vectors. OL870463.1 (Katzman et al., Viruses 2021;14:11) is the shared span: MN389527.1,
+    # MK873089.1 and MW987535.2 annotate the same region with a few extra bases at the start
+    # and, in MW987535.2, a polylinker at the end.
+    Entry("UbC promoter", "promoter", "OL870463.1", 1096, 2299,
+          "human ubiquitin C promoter with its first intron; "
+          "cross-check MN389527.1 (99.2 %)"),
+    # Human H1 RNA promoter, the 216 bp of the pSUPER-type shRNA cassette. AY640634.1 is
+    # Michel et al., Biochem Biophys Res Commun 2005;326:307-312; the same 216 bp is annotated
+    # in the pSUPER vectors AY640627.1 and HQ416701.1, and FJ687158.1, from another
+    # laboratory, annotates -230 to -9 of the same promoter.
+    Entry("H1 promoter", "promoter", "AY640634.1", 1543, 1758,
+          "human H1 RNA promoter, RNA polymerase III; cross-check FJ687158.1 (99.5 %)"),
+    # Human 7SK RNA promoter: the 243 bp directly upstream of the 7SK transcription start.
+    # Checked against the human locus as well — the fragment aligns to the 243 bp in front of
+    # RN7SK on NC_000006.12 (98.8 %), where NR_001445.2 starts at the next base. PY046810.1
+    # and MQ296444.1 come from unrelated applicants.
+    Entry("7SK promoter", "promoter", "PY046810.1", 1, 243,
+          "human 7SK RNA promoter, RNA polymerase III; cross-check MQ296444.1 (99.2 %)"),
+    # Spleen focus-forming virus U3 promoter from the viral LTR, the 483 bp lentiviral
+    # vectors use. KJ697750.1 is the pRRL-sffv vector series; MP040844.1 carries the same
+    # fragment with four extra bases at each end.
+    Entry("SFFV promoter", "promoter", "KJ697750.1", 6155, 6637,
+          "spleen focus-forming virus U3 (LTR) promoter; cross-check MP040844.1 (100 %)"),
     Entry("EF-1α promoter", "promoter", "MT612431.1", 174, 1357,
           "human elongation factor 1α promoter with intron A"),
     Entry("CaMKIIα promoter", "promoter", "MW139900.1", 576, 1866,

@@ -407,9 +407,143 @@ def test_holds_lists_every_catalogue_element_found_inside_another():
     assert all(outer in names and inner <= names for outer, inner in HOLDS.items())
 
 
-def test_the_catalogue_cag_promoter_starts_inside_the_cmv_enhancer():
-    """The catalogue's CAG entry (ON785707.1:189..1125) begins with the last 249 bp of the CMV
-    enhancer, so the containment is listed in HOLDS by hand rather than found by search."""
+def test_the_full_length_cag_runs_from_the_cmv_enhancer_to_the_splice_acceptor():
+    """The full-length CAG entry (ON012604.1:4799..6471) starts with the CMV enhancer, which
+    is why a search finds the enhancer inside it and HOLDS lists the pair, and ends at the
+    acceptor of the chimeric intron — about 1.7 kb, the whole promoter."""
     parts = {f.name: f.sequence for f in catalogue()}
-    head, tail = parts["CAG promoter"][:249], parts["CMV enhancer"][-249:]
+    enhancer = parts["CMV enhancer"]
+    cag = parts["CAG promoter"]
+    assert cag[: len(enhancer)] == enhancer
+    assert cag.endswith("CCTACAG")                  # the 3′ splice site of the intron
+    assert 1600 <= len(cag) <= 1700
+
+
+def test_the_truncated_cag_promoter_starts_inside_the_cmv_enhancer():
+    """The truncated entry (ON785707.1:189..1125) begins with the last 249 bp of the CMV
+    enhancer, too little for a search to find: that containment is listed in HOLDS by hand."""
+    parts = {f.name: f.sequence for f in catalogue()}
+    head, tail = parts["CAG promoter (truncated)"][:249], parts["CMV enhancer"][-249:]
     assert sum(a != b for a, b in zip(head, tail, strict=True)) <= 1
+
+
+# ---- the promoters the catalogue gained -------------------------------------------------
+# Every entry is a subsequence of the record its ``source`` names. The fixtures below are
+# other records — another laboratory, another vector — that carry the same element, so
+# finding it there tests the sequence rather than the record it was taken from. The
+# provenance of each fixture is in tests/data/README.md.
+
+CROSS_CHECKS = {
+    "human PGK promoter": "MT921016.1",
+    "mouse PGK promoter": "MT891341.1",
+    "UbC promoter": "MN389527.1",
+    "H1 promoter": "FJ687158.1",
+    "7SK promoter": "MQ296444.1",
+    "SFFV promoter": "MP040844.1",
+    "CAG promoter": "HG530138.1",
+}
+
+
+def entry(name: str):
+    [feature] = [f for f in catalogue() if f.name == name]
+    return feature
+
+
+def cross_check_sequence(accession: str) -> str:
+    record = SeqIO.read(DATA / f"features-{accession}.fasta", "fasta")
+    return str(record.seq).upper()
+
+
+@pytest.mark.parametrize(("element", "accession"), sorted(CROSS_CHECKS.items()))
+def test_a_catalogue_promoter_is_found_in_an_independent_record(element, accession):
+    feature = entry(element)
+    assert not feature.source.startswith(accession), element
+    sequence = cross_check_sequence(accession)
+    matches = [m for m in detect(sequence, False) if m.name == element]
+    assert len(matches) == 1, element
+    assert matches[0].identity >= 98.0, element
+    found = matches[0].end - matches[0].start + 1
+    assert found >= 0.9 * feature.length, element
+
+
+def test_the_promoters_come_back_whole_from_their_own_sequences():
+    """Each entry is its record's subsequence at the cited coordinates, so a construct that
+    carries the catalogue sequence carries the record's bases: the match must be exact."""
+    filler = [clean_dna(300, 60 + i) for i in range(len(CROSS_CHECKS) + 1)]
+    pieces: list[str] = []
+    starts: dict[str, int] = {}
+    for index, name in enumerate(CROSS_CHECKS):
+        pieces.append(filler[index])
+        starts[name] = len("".join(pieces))
+        pieces.append(entry(name).sequence)
+    sequence = "".join(pieces) + filler[-1]
+    found = {m.name: m for m in detect(sequence, False)}
+    for name in CROSS_CHECKS:
+        assert found[name].identity == 100.0, name
+        assert found[name].start == starts[name], name
+        assert found[name].end - found[name].start + 1 == entry(name).length, name
+
+
+def test_a_plasmid_built_from_the_catalogue_shows_one_full_length_cag():
+    """The full-length CAG opens with the whole CMV enhancer, so a search finds both. Only the
+    CAG is reported: the enhancer is part of it, not a second element next to it."""
+    parts = {f.name: f.sequence for f in catalogue()}
+    order = ["AAV2 ITR (truncated)", "CAG promoter", "EGFP", "bGH polyA",
+             "AAV2 ITR (truncated)", "ori"]
+    sequence = "".join(parts[name] for name in order)
+    found = {m.name: m for m in detect(sequence, circular=True)}
+    cag = found["CAG promoter"]
+    assert cag.identity == 100.0
+    assert cag.start == len(parts["AAV2 ITR (truncated)"])
+    assert cag.end - cag.start + 1 == len(parts["CAG promoter"])
+    assert "CMV enhancer" not in found and "CAG promoter (truncated)" not in found
+
+
+def test_a_block_named_cag_already_annotates_the_promoter_under_it():
+    """A vector annotated with one “CAG” block, as vendors write it: the CAG is ticked off as
+    annotated, nothing inside it is offered again and the label is not questioned."""
+    parts = {f.name: f.sequence for f in catalogue()}
+    head = parts["AAV2 ITR (truncated)"]
+    sequence = head + parts["CAG promoter"] + parts["EGFP"] + parts["bGH polyA"]
+    block = [{"name": "CAG", "start": len(head),
+              "end": len(head) + len(parts["CAG promoter"]) - 1}]
+    payload = detect_payload(sequence, True, existing=block)
+    rows = rows_by_name(payload)
+    assert rows["CAG promoter"]["isNew"] is False
+    assert rows["CAG promoter"]["annotatedAs"] == "CAG"
+    assert payload["label_warnings"] == 0
+    assert all(row["labelWarning"] is None for row in payload["features"])
+    assert "CMV enhancer" not in rows
+
+
+def test_a_pgk_promoter_labelled_cmv_is_flagged():
+    """The other way round from the CMV block labelled “PGK promoter”: now the sequence is the
+    PGK promoter and the label names the CMV one."""
+    pgk = entry("human PGK promoter")
+    sequence = pgk.sequence + clean_dna(1500, 44)
+    mislabelled = [{"name": "CMV promoter", "start": 0, "end": pgk.length - 1}]
+    payload = detect_payload(sequence, True, existing=mislabelled)
+    [row] = payload["features"]
+    assert row["name"] == "human PGK promoter"
+    assert row["labelWarning"] == (
+        "Annotated as “CMV promoter”, but the sequence is the human PGK promoter "
+        "(100 % identity). Check the label.")
+    assert row["isNew"] is False and row["annotatedAs"] == "CMV promoter"
+    assert payload["label_warnings"] == 1
+
+
+@pytest.mark.parametrize(("label", "element", "expected"), [
+    ("PGK promoter", "human PGK promoter", True),
+    ("PGK promoter", "mouse PGK promoter", True),
+    ("hPGK promoter", "human PGK promoter", True),
+    ("UBC", "UbC promoter", True), ("UbC-EGFP", "UbC promoter", True),
+    ("H1", "H1 promoter", True), ("H1-shRNA", "H1 promoter", True),
+    ("7SK promoter", "7SK promoter", True), ("SFFV", "SFFV promoter", True),
+    ("CAG", "CAG promoter", True), ("CAG", "CAG promoter (truncated)", True),
+    ("U6 promoter", "H1 promoter", False), ("PGK promoter", "UbC promoter", False),
+    ("SFFV promoter", "CMV promoter", False), ("CMV promoter", "human PGK promoter", False),
+])
+def test_the_new_promoters_are_named_by_the_labels_vectors_use(label, element, expected):
+    from vettore.features import _names_element
+
+    assert _names_element(label, element) is expected
