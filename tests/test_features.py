@@ -132,10 +132,61 @@ def test_payload_flags_which_features_are_new():
     assert payload["catalogue_size"] == len(catalogue())
 
 
+def test_an_element_annotated_under_another_name_is_not_offered_again():
+    """The published destination vector carries CDS “nptI” at 820..1635 (complement) and an
+    undirected rep_origin “colE1” at 18..672: the catalogue's KanR and ori fall on them and
+    must not be offered as new features, which would add overlapping duplicates."""
+    from vettore.fileio import read_documents
+
+    path = Path(__file__).parent / "data" / "cloning-gateway-destination.gb"
+    [document] = read_documents(path.name, path.read_bytes())
+    payload = detect_payload(document["sequence"], True, existing=document["features"])
+    rows = {row["name"]: row for row in payload["features"]}
+    assert rows["KanR"]["isNew"] is False
+    assert rows["KanR"]["annotatedAs"] in {"nptI", "aminoglycoside 3'-phosphotransferase"}
+    assert rows["ori"]["isNew"] is False and rows["ori"]["annotatedAs"] == "colE1"
+    assert payload["new_count"] == sum(1 for row in payload["features"] if row["isNew"])
+
+
+def test_the_unannotated_fixture_is_the_aav_plasmid_without_its_features():
+    """The end-to-end test adds detected features to a plasmid that has none; the published
+    record annotates every element, so it would rightly offer nothing to add."""
+    from vettore.fileio import read_documents
+
+    data = Path(__file__).parent / "data"
+    [bare] = read_documents("x.gb", (data / "PZ629150.1-unannotated.gb").read_bytes())
+    [full] = read_documents("y.gb", (data / "PZ629150.1.gb").read_bytes())
+    assert bare["sequence"] == full["sequence"] and bare["circular"] is True
+    assert bare["features"] == [] and len(full["features"]) == 16
+    payload = detect_payload(bare["sequence"], True, existing=bare["features"])
+    assert payload["new_count"] == len(payload["features"]) == 9
+    annotated = detect_payload(full["sequence"], True, existing=full["features"])
+    assert annotated["new_count"] == 0
+    rows = {row["name"]: row["annotatedAs"] for row in annotated["features"]}
+    assert rows["SaCas9"] == "SaCas9 fusion protein"
+
+
+def test_a_large_feature_does_not_hide_the_elements_inside_it():
+    sequence, circular = plasmid("PZ629150.1")
+    everything = [{"name": "backbone", "start": 0, "end": len(sequence) - 1}]
+    payload = detect_payload(sequence, circular, existing=everything)
+    assert all(row["isNew"] and row["annotatedAs"] is None for row in payload["features"])
+
+
+def test_malformed_existing_features_are_ignored():
+    sequence, circular = plasmid("PZ629150.1")
+    junk = [None, "x", {"start": "a", "end": 3}, {"start": 5}, {"locations": "bad"},
+            {"name": "SaCas9", "start": 580, "end": 3924}, {"start": -4, "end": 10**9}]
+    rows = {row["name"]: row for row in detect_payload(sequence, circular,
+                                                       existing=junk)["features"]}
+    assert rows["SaCas9"]["annotatedAs"] == "SaCas9"
+    assert detect_payload(sequence, circular, existing="bad")["new_count"] > 0
+
+
 def test_the_database_file_is_the_one_the_builder_produces():
     """The builder needs the network, so this only checks the file's own consistency."""
     text = (Path(__file__).resolve().parents[1] / "src" / "vettore" / "data"
-            / "common_features.json").read_text()
+            / "common_features.json").read_text(encoding="utf-8")
     payload = json.loads(text)
     assert payload["source"].startswith("NCBI")
     assert len(payload["features"]) == len(catalogue())

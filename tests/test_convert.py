@@ -113,6 +113,46 @@ def test_white_feature_colours_are_ignored():
     assert colours["ori"] == "#ffff00"
 
 
+def locus_line(text: str) -> list[str]:
+    return text.splitlines()[0].split()
+
+
+def test_saved_genbank_has_todays_date_and_keeps_the_division():
+    from datetime import datetime
+
+    doc = read_doc("MT612431.1.gb")
+    assert doc["division"] == "SYN"
+    locus = locus_line(fileio.write_genbank({**doc, "division": "VRL"}))
+    assert locus[-2:] == ["VRL", fileio.genbank_date(datetime.now())]
+    # A construct made here, or a document whose division is unknown, is synthetic.
+    plain = {"name": "pNew", "sequence": "ACGT" * 10, "circular": True}
+    assert locus_line(fileio.write_genbank(plain))[-2] == "SYN"
+    assert locus_line(fileio.write_genbank({**plain, "division": "UNK"}))[-2] == "SYN"
+
+
+def test_genbank_date_is_the_same_in_every_locale():
+    from datetime import datetime
+
+    assert fileio.genbank_date(datetime(2008, 8, 7)) == "07-AUG-2008"
+    assert fileio.genbank_date(datetime(2026, 10, 20)) == "20-OCT-2026"
+
+
+@pytest.mark.parametrize(("name", "locus"), [
+    ("pUC19", "pUC19"),
+    ("colleague-pFA-KanMX4", "colleague-pFA"),
+    ("pAAV CAG GFP WPRE bGH", "pAAV_CAG_GFP"),
+    ("Abcdefghijklmnopqrstuvwxyz", "Abcdefghijklmnop"),
+    ("tab\tand\nnewline", "tab_and_newline"),
+    ("   ", "Untitled"),
+])
+def test_long_names_are_shortened_at_a_boundary_and_kept_in_the_definition(name, locus):
+    text = fileio.write_genbank({"name": name, "sequence": "ACGT" * 10, "circular": False})
+    assert locus_line(text)[1] == locus
+    definition = text.splitlines()[1]
+    if locus != "_".join(name.split()) and name.strip():
+        assert definition.startswith(f"DEFINITION  {name}")
+
+
 def test_primer_sequence_survives_genbank_round_trip():
     doc = read_doc("sample-hybridization-params.dna")
     [again] = fileio.read_documents("x.gb", fileio.write_genbank(doc).encode())

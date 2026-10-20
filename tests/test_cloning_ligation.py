@@ -104,6 +104,46 @@ def test_one_enzyme_everywhere_gives_every_order_and_orientation():
     assert len({p.label for p in result.products}) == 8
 
 
+def test_pcr_product_with_the_same_site_at_both_ends_is_not_warned_about():
+    """EcoRI at each end of a PCR product cuts it twice, one cut per end: nothing to check.
+    A third EcoRI site inside it is worth a warning."""
+    vec = SequenceDoc(**doc("pE", A + "GAATTC" + B, True))
+    pcr = SequenceDoc(**doc("pcr", "CC" + "GAATTC" + C1 + "GAATTC" + "CC", False))
+    result = insert_multiple(frag(vec, "EcoRI"), [frag(pcr, "EcoRI")])
+    assert result.products[0].doc["sequence"].upper() == A + "GAATTC" + C1 + "GAATTC" + B
+    assert not any("cuts" in w and "times" in w for w in result.warnings)
+
+    inner = SequenceDoc(**doc("pcr", "CC" + "GAATTC" + C1 + "GAATTC" + C2 + "GAATTC" + "CC",
+                              False))
+    result = insert_multiple(frag(vec, "EcoRI"), [frag(inner, "EcoRI")])
+    assert any(w.startswith("EcoRI cuts “pcr” 3 times; check that the fragment used")
+               for w in result.warnings)
+
+
+def test_details_count_inserts_and_fragments_in_plain_words():
+    vec = SequenceDoc(**doc("pE", A + "GAATTC" + B, True))
+    pcr = SequenceDoc(**doc("pcr", "CC" + "GAATTC" + C1 + "GAATTC" + "CC", False))
+    one = insert_multiple(frag(vec, "EcoRI"), [frag(pcr, "EcoRI")]).products[0]
+    assert one.details.startswith("Ligated 1 insert into pE (cut with EcoRI): ")
+    two = insert_multiple(frag(vector(), "EcoRI", "XhoI"),
+                          [frag(ins1(), "EcoRI", "BamHI"), frag(ins2(), "BamHI", "XhoI")])
+    assert two.products[0].details.startswith("Ligated 2 inserts into pVEC")
+    assert "(s)" not in one.details + two.products[0].details
+
+
+def test_directional_insert_with_an_extra_site_is_warned_about():
+    """EcoRI–BamHI from a PCR product: one EcoRI end is expected; a second EcoRI site is not
+    (the old count of distinct enzymes let it through)."""
+    extra = SequenceDoc(**doc("promoter", "CC" + "GAATTC" + C2 + "GAATTC" + C1 + "GGATCC" + "CC",
+                              False))
+    result = insert_multiple(frag(vector(), "EcoRI", "XhoI"),
+                             [frag(extra, "EcoRI", "BamHI"), frag(ins2(), "BamHI", "XhoI")])
+    assert any(w.startswith("EcoRI cuts “promoter” 2 times") for w in result.warnings)
+    clean = insert_multiple(frag(vector(), "EcoRI", "XhoI"),
+                            [frag(ins1(), "EcoRI", "BamHI"), frag(ins2(), "BamHI", "XhoI")])
+    assert not any("times;" in w for w in clean.warnings)
+
+
 def test_blunt_pcr_insert_into_ecorv_cut_vector_both_orientations():
     vec = SequenceDoc(**doc("pBlunt", A + "GATATC" + B, True))
     pcr = SequenceDoc(**doc("amplicon", C1, False))

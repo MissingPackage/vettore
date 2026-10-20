@@ -20,7 +20,16 @@ from pydantic import BaseModel
 from pydna.dseqrecord import Dseqrecord
 
 from ..enzymes import build_database
-from .base import CloningError, CloningResult, Product, SequenceDoc, from_dseqrecord, to_dseqrecord
+from .base import (
+    CloningError,
+    CloningResult,
+    Product,
+    SequenceDoc,
+    from_dseqrecord,
+    plural,
+    times,
+    to_dseqrecord,
+)
 
 router = APIRouter()
 
@@ -69,6 +78,10 @@ class Fragment:
     @property
     def right_end(self) -> tuple[str, str]:
         return self.record.seq.three_prime_end()
+
+    def ends_cut_by(self, enzyme: str) -> int:
+        """How many of this fragment's two ends that enzyme made (0, 1 or 2)."""
+        return (self.left_enzyme == enzyme) + (self.right_enzyme == enzyme)
 
     def label(self) -> str:
         left = self.left_enzyme or "end"
@@ -148,7 +161,7 @@ def _pick_insert(frags: list[Fragment], enzymes: list, circular: bool,
     if index is not None:
         if not 0 <= index < len(frags):
             raise CloningError(f"Insert fragment {index + 1} does not exist "
-                               f"(the digest gives {len(frags)} fragments)")
+                               f"(the digest gives {plural(len(frags), 'fragment')})")
         return frags[index]
     names = {str(e) for e in enzymes}
     flanked = [f for f in frags if f.left_enzyme and f.right_enzyme
@@ -226,10 +239,11 @@ def insert_fragment(vector_doc: SequenceDoc, vector_enzymes: list[str], insert_d
     backbone = _pick_backbone(v_frags, v_enz)
     i_frags = fragments(insert, i_enz)
     chosen = _pick_insert(i_frags, i_enz, insert.circular, insert_fragment_index)
-    expected_cuts = 2 if insert.circular else len({chosen.left_enzyme, chosen.right_enzyme} - {None})
     for name, count in cut_counts(insert, i_enz).items():
-        if count > expected_cuts:
-            warnings.append(f"{name} cuts “{insert_doc.name}” {count} times; check that the "
+        # One cut per end of the insert is expected: a PCR product with an EcoRI site at each
+        # end is cut twice by EcoRI. More cuts mean a site inside the source as well.
+        if count > chosen.ends_cut_by(name):
+            warnings.append(f"{name} cuts “{insert_doc.name}” {times(count)}; check that the "
                             f"insert fragment ({chosen.label()}) is the one you want")
 
     piece = chosen.record if orientation == "forward" else chosen.record.reverse_complement()
@@ -275,9 +289,12 @@ def delete_fragment(doc: SequenceDoc, enzyme_names: list[str],
     record = to_dseqrecord(doc)
     enzymes = enzyme_objects(enzyme_names)
     frags = fragments(record, enzymes)
+    if fragment_index is not None and not 0 <= fragment_index < len(frags):
+        raise CloningError(f"Fragment {fragment_index + 1} does not exist (the digest gives "
+                           f"{plural(len(frags), 'fragment')}); choose one from the list")
     if record.circular:
         if len(frags) != 2:
-            raise CloningError(f"The enzymes cut {len(frags)} times; choose enzymes that cut "
+            raise CloningError(f"The enzymes cut {times(len(frags))}; choose enzymes that cut "
                                "exactly twice in total")
         removed = frags[fragment_index] if fragment_index is not None else min(frags, key=lambda f: f.length)
         kept = next(f for f in frags if f is not removed)

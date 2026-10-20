@@ -18,7 +18,7 @@ from typing import Any
 
 import uvicorn
 
-from . import fileio, settings
+from . import app_info, fileio, settings
 from .server import TOKEN_HEADER, create_app
 
 log = logging.getLogger("vettore")
@@ -166,20 +166,20 @@ class DesktopApi:
         return path if isinstance(path, str) else path[0]
 
 
-def _ensure_streams() -> Path:
-    """Windowed (no-console) builds have no stdout/stderr; send them to a log file."""
-    home = Path.home() / ".vettore"
-    home.mkdir(parents=True, exist_ok=True)
-    log_path = home / "vettore.log"
+def _ensure_streams() -> tuple[Path, bool]:
+    """Windowed (no-console) builds have no stdout/stderr; send them to the log file. Returns
+    the log file and whether stderr now writes to it."""
+    log_path = app_info.log_path()
     if sys.stdout is None or sys.stderr is None:
         stream = open(log_path, "a", encoding="utf-8", buffering=1)  # noqa: SIM115
         sys.stdout = sys.stdout or stream
         sys.stderr = sys.stderr or stream
-    return log_path
+        return log_path, True
+    return log_path, False
 
 
 def main(argv: list[str] | None = None) -> None:
-    _ensure_streams()
+    log_path, redirected = _ensure_streams()
     parser = argparse.ArgumentParser(prog="vettore")
     parser.add_argument("--browser", action="store_true",
                         help="open the UI in the system browser instead of a native window")
@@ -190,7 +190,16 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("files", nargs="*", help="sequence files to open")
     args = parser.parse_args(argv)
 
-    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+    # Messages for unexpected problems tell the user the details are in the log file, so it
+    # is written whether or not there is a console.
+    handlers: list[logging.Handler] = [logging.StreamHandler()]
+    if not redirected:
+        try:
+            handlers.append(logging.FileHandler(log_path, encoding="utf-8"))
+        except OSError:
+            pass
+    logging.basicConfig(level=logging.INFO, handlers=handlers,
+                        format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     token = args.token or secrets.token_urlsafe(24)
     port = args.port or free_port()
     api = DesktopApi()

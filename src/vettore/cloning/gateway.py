@@ -21,7 +21,8 @@ the BP reaction back from it regenerates the published entry clone exactly.
 
 from __future__ import annotations
 
-from typing import Literal
+from itertools import pairwise
+from typing import Any, Literal
 
 from Bio.Seq import Seq
 from fastapi import APIRouter
@@ -73,53 +74,109 @@ def _sites(record: Dseqrecord) -> dict[str, int]:
     return found
 
 
+def _article(reaction: str) -> str:
+    """"An LR reaction" (read "el-ar"), "a BP reaction"."""
+    return "An" if reaction == "LR" else "A"
+
+
+def site_names(record: Dseqrecord) -> list[str]:
+    """The att sites of a molecule, by name, as the reaction sees them. attB is the core of
+    every attL, attR and attP site, so an attB match inside a longer site is not listed: an
+    entry clone reads attL1, attL2, not attB1, attB2, attL1, attL2."""
+    found = [(name, *_bounds(loc)) for name, locations in find_gateway_sites(record, False).items()
+             for loc in locations if _bounds(loc)[2] <= MAX_SITE]
+    n = len(record.seq)
+
+    def inside(start: int, length: int, other_start: int, other_length: int) -> bool:
+        return (start - other_start) % n + length <= other_length
+
+    names = {name for name, start, _, length in found
+             if not (name.startswith("attB") and any(
+                 other_length > length and inside(start, length, other_start, other_length)
+                 for _, other_start, _, other_length in found))}
+    return sorted(names)
+
+
 def _site_text(record: Dseqrecord, doc_name: str) -> str:
-    found = _sites(record)
+    found = site_names(record)
     if not found:
         return f"“{doc_name}”: no att site found"
-    return f"“{doc_name}”: " + ", ".join(sorted(found))
+    return f"“{doc_name}”: " + ", ".join(found)
 
 
-def _arcs(record: Dseqrecord, kind: str) -> list[str]:
-    """The pieces the molecule's att sites cut it into, shortest first."""
-    located = [_bounds(loc)[:2] for name, locations in
-               find_gateway_sites(record, False).items() if name.startswith(kind)
-               for loc in locations if _bounds(loc)[2] <= MAX_SITE]
+def _located(record: Dseqrecord, kind: str) -> list[tuple[int, int, int, int]]:
+    """(start, end, length, strand) of every site of that kind, in order along the top
+    strand."""
+    found = [(*_bounds(loc), loc.strand or 1)
+             for name, locations in find_gateway_sites(record, False).items()
+             if name.startswith(kind)
+             for loc in locations if _bounds(loc)[2] <= MAX_SITE]
+    return sorted(found)
+
+
+def _arcs(record: Dseqrecord, kind: str) -> tuple[list[str], list[str]]:
+    """The pieces between neighbouring att sites, as (cassettes, outside), top strand.
+
+    Every att site faces the DNA it brings into the reaction: a site on the top strand faces
+    the DNA after it, a site on the bottom strand the DNA before it (attX1 on the top strand
+    and attX2 on the bottom strand in a cassette read the usual way round). A piece between two
+    sites that face each other is a cassette (the insert of an entry or expression clone, the
+    ccdB cassette of a donor or destination vector); a piece between two sites that face away
+    is the vector side. A linear molecule has no piece through its ends between the sites, but
+    its two ends are on the vector side."""
+    located = _located(record, kind)
     if len(located) < 2:
-        return []
+        return [], []
     sequence = str(record.seq).upper()
     n = len(sequence)
     doubled = sequence * 2
-    pieces = []
-    for site in located:
-        for other in located:
-            if site is other:
-                continue          # the whole molecule read past its own site is not a piece
-            length = (other[0] - site[1]) % n
-            if 0 < length < n:
-                pieces.append(doubled[site[1]: site[1] + length])
-    return sorted(pieces, key=len)
+    pairs = list(pairwise(located))
+    if record.circular:
+        pairs.append((located[-1], located[0]))
+    cassettes, outside = [], []
+    for (_, end, size, strand), (start, _, next_size, next_strand) in pairs:
+        length = (start - end) % n if record.circular else start - end
+        if not 0 < length <= n - size - next_size:     # overlapping sites have nothing between
+            continue
+        piece = doubled[end: end + length]
+        if strand == 1 and next_strand == -1:
+            cassettes.append(piece)
+        elif strand == -1 and next_strand == 1:
+            outside.append(piece)
+    if not record.circular:
+        outside += [sequence[: located[0][0]], sequence[max(site[1] for site in located):]]
+    return cassettes, outside
 
 
 def _insert_region(record: Dseqrecord, kind: str) -> str | None:
-    """What the reaction moves across: the shorter piece between the att sites — the insert is
-    smaller than the backbone in every entry and expression clone in normal use."""
-    arcs = _arcs(record, kind)
-    return arcs[0] if arcs else None
+    """What the reaction moves across: the piece between two att sites that face each other.
+    The site orientation decides it, not the length: an insert may be longer than the
+    backbone."""
+    cassettes, _ = _arcs(record, kind)
+    return max(cassettes, key=len) if cassettes else None
 
 
 def _backbone_region(record: Dseqrecord, kind: str) -> str | None:
-    """The vector side: the longest piece outside the att cassette (origin, marker)."""
-    arcs = _arcs(record, kind)
-    return arcs[-1] if arcs else None
+    """The vector side: the longest piece between two att sites that face away from each other
+    (origin, marker), or an end of a linear molecule."""
+    _, outside = _arcs(record, kind)
+    return max(outside, key=len) if outside else None
+
+
+def _probe(region: str | None) -> str | None:
+    """A 60 bp piece from the middle of a region, or None when the region is too short to tell
+    molecules apart."""
+    if not region or len(region) < 20:
+        return None
+    middle = max(0, (len(region) - 60) // 2)
+    return region[middle: middle + 60]
 
 
 def _carries(product: Dseqrecord, region: str | None) -> bool:
     """Is that piece of a parent still in the product (either strand)?"""
-    if not region or len(region) < 20:
+    probe = _probe(region)
+    if probe is None:
         return False
-    middle = max(0, (len(region) - 60) // 2)
-    probe = region[middle: middle + 60]
     doubled = (str(product.seq).upper() * 2)
     return probe in doubled or str(Seq(probe).reverse_complement()).upper() in doubled
 
@@ -145,11 +202,11 @@ def gateway(reaction: Reaction, first_doc: SequenceDoc, second_doc: SequenceDoc)
                                      (second, second_doc, right, want_right)):
         if not _sites(record):
             raise CloningError(
-                f"The {label} “{doc.name}” has no Gateway att site. A {reaction} reaction needs "
+                f"The {label} “{doc.name}” has no Gateway att site. {_article(reaction)} {reaction} reaction needs "
                 f"{want_left} sites in the first molecule and {want_right} sites in the second.")
         if not any(name.startswith(kind) for name in _sites(record)):
             raise CloningError(
-                f"The {label} “{doc.name}” has no {kind} site. A {reaction} reaction needs "
+                f"The {label} “{doc.name}” has no {kind} site. {_article(reaction)} {reaction} reaction needs "
                 f"{want_left} sites in the first molecule and {want_right} sites in the second. "
                 f"Sites found — {_site_text(first, first_doc.name)}; "
                 f"{_site_text(second, second_doc.name)}")
@@ -160,7 +217,7 @@ def gateway(reaction: Reaction, first_doc: SequenceDoc, second_doc: SequenceDoc)
         raise CloningError(
             f"No {reaction} product: the att sites of the two molecules do not pair. "
             f"Sites found — {_site_text(first, first_doc.name)}; "
-            f"{_site_text(second, second_doc.name)}. A {reaction} reaction pairs "
+            f"{_site_text(second, second_doc.name)}. {_article(reaction)} {reaction} reaction pairs "
             f"{want_left}1 with {want_right}1 and {want_left}2 with {want_right}2.") from exc
 
     # The clone the user is after carries the insert of the first molecule *and* the backbone
@@ -175,14 +232,17 @@ def gateway(reaction: Reaction, first_doc: SequenceDoc, second_doc: SequenceDoc)
         if key not in seen:
             seen.add(key)
             distinct.append(product)
-    carries = {id(p): _carries(p, region) and _carries(p, backbone) for p in distinct}
+    # A backbone too short to probe (a linear vector cut close to its sites) cannot tell the
+    # products apart, so the insert decides alone.
+    carries = {id(p): _carries(p, region)
+               and (_probe(backbone) is None or _carries(p, backbone)) for p in distinct}
     ranked = sorted(distinct, key=lambda p: (not carries[id(p)], not p.circular, -len(p)))
     if not ranked:
         raise CloningError(f"No {reaction} product uses both att sites")
 
     warnings: list[str] = []
     carriers = [p for p in ranked if carries[id(p)]]
-    if region and not carriers:
+    if not carriers:
         warnings.append("No product carries the sequence between the att sites of "
                         f"“{first_doc.name}”: check that the two molecules are the right way "
                         "round (first the insert or entry clone, then the vector)")
@@ -228,3 +288,23 @@ def gateway_route(body: GatewayRequest) -> CloningResult:
     if len(body.inputs) != 2:
         raise CloningError("Choose both molecules for the reaction")
     return gateway(body.reaction, body.inputs[0], body.inputs[1])
+
+
+class GatewaySitesRequest(BaseModel):
+    docs: list[dict[str, Any]]
+
+
+def _doc_sites(doc: dict[str, Any]) -> list[str]:
+    sequence = doc.get("sequence")
+    if not isinstance(sequence, str) or not sequence.strip():
+        return []
+    letters = "".join(base for base in sequence.upper() if "A" <= base <= "Z")
+    return site_names(Dseqrecord(letters, circular=bool(doc.get("circular"))))
+
+
+@router.post("/gateway-sites")
+def gateway_sites_route(body: GatewaySitesRequest) -> dict[str, list[list[str]]]:
+    """The att sites of each document, so the Gateway dialogs can pick sensible inputs: an
+    entry clone (attL) and a destination vector (attR) for LR, an attB insert and a donor
+    (attP) for BP."""
+    return {"sites": [_doc_sites(doc) for doc in body.docs]}

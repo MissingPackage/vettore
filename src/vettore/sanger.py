@@ -249,8 +249,30 @@ class AlignedRead:
     offset: int = 0            # first reference position of the alignment, before wrapping
 
 
+#: A local alignment this short, covering less than half of what could have aligned, or this
+#: poor, is what any unrelated read finds by chance in a plasmid-sized reference.
+MIN_ALIGNED = 100
+MIN_IDENTITY = 80.0
+
+
+def _unrelated(trace_name: str, reference: str, good: int, aligned: int,
+               alignable: int, identity: float) -> str | None:
+    """Why the best alignment does not show that the read comes from the reference, or None."""
+    advice = ("this read probably comes from another plasmid. Check that the plasmid you "
+              "expect is the active tab, and that the right trace was chosen.")
+    if aligned < MIN_ALIGNED and aligned < alignable / 2:
+        return (f"Only {aligned:,} of the {good:,} good-quality bases of “{trace_name}” match "
+                f"{reference}: {advice}")
+    if identity < MIN_IDENTITY:
+        return (f"“{trace_name}” matches {reference} only at {identity:.0f} % identity: "
+                f"{advice}")
+    return None
+
+
 def align_trace(reference: str, circular: bool, trace: Trace, cutoff: float = DEFAULT_CUTOFF,
-                min_quality_bases: int = MIN_SEGMENT) -> AlignedRead:
+                min_quality_bases: int = MIN_SEGMENT,
+                reference_name: str | None = None) -> AlignedRead:
+    shown = f"“{reference_name}”" if reference_name else "the reference"
     start, end = mott_trim(trace.quality, cutoff, min_quality_bases)
     if end - start < min_quality_bases:
         raise TraceError(f"“{trace.name}” has no stretch of at least {min_quality_bases} bases "
@@ -267,7 +289,9 @@ def align_trace(reference: str, circular: bool, trace: Trace, cutoff: float = DE
         if len(alignments):
             candidates.append((alignments[0].score, candidate, alignments[0]))
     if not candidates:
-        raise TraceError(f"“{trace.name}” does not align to the reference")
+        raise TraceError(f"“{trace.name}” does not align to {shown}: this read probably comes "
+                         "from another plasmid. Check that the plasmid you expect is the active "
+                         "tab.")
     _, candidate, alignment = max(candidates, key=lambda item: item[0])
 
     ref_mid, read_mid, t_start, t_end, q_start, q_end = _gapped(
@@ -281,6 +305,17 @@ def align_trace(reference: str, circular: bool, trace: Trace, cutoff: float = DE
     aligned = candidate.slice(q_start, q_end)
     matches = sum(1 for a, b in zip(ref_mid, read_mid) if a == b and a != "-")
     identity = 100.0 * matches / max(1, len(ref_mid))
+    # Read bases outside the alignment that had reference bases to pair with: on a linear
+    # reference a read may run past either end, and those bases are not evidence against it.
+    good = len(candidate.sequence)
+    before, after = q_start, good - q_end
+    if not circular:
+        before = min(before, t_start)
+        after = min(after, length - t_end)
+    alignable = min(length, (q_end - q_start) + before + after)
+    if reason := _unrelated(trace.name, shown, good, q_end - q_start, alignable,
+                            identity):
+        raise TraceError(reason)
     discrepancies = _discrepancies(ref_mid, read_mid, t_start, length,
                                    _column_qualities(read_mid, aligned.quality))
     return AlignedRead(trace=aligned, reference_gapped=ref_mid, read_gapped=read_mid,
@@ -344,7 +379,8 @@ def alignment_payload(reference_name: str, reference: str, circular: bool,
     for filename, content in reads:
         try:
             trace = read_trace(filename, content)
-            aligned = align_trace(reference, circular, trace, cutoff)
+            aligned = align_trace(reference, circular, trace, cutoff,
+                                  reference_name=reference_name)
         except TraceError as exc:
             warnings.append(str(exc))
             continue

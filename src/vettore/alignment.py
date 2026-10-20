@@ -36,6 +36,12 @@ For each sequence:
      only, and the coverage says how much of the reference it is.
 3. Columns where one sequence runs past the other's end are not part of the comparison: they
    are neither differences nor counted in the identity, and are left out of the view.
+4. **Chance is not homology.** Unrelated plasmid-sized sequences always share a few words,
+   and their best local alignment pairs 15-40 bases at a high identity. An alignment that
+   pairs fewer than ``MIN_ALIGNED`` bases and less than half of the shorter sequence is not
+   reported; the sequence is left out with the reason. In local mode the runs of shared
+   words are aligned first in small windows, and when none pairs more than chance does the
+   whole alignment (seconds per pair at 15 kb) is skipped.
 
 Scores: NCBI BLAST+ ``blastn`` task defaults (reward 2, penalty -3, gap open 5, extend 2;
 BLAST+ user manual, NBK279684), Biopython's ``blastn`` preset. Identity is computed as BLAST
@@ -50,7 +56,7 @@ from __future__ import annotations
 
 from bisect import bisect_left
 from collections import Counter
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from Bio import Align
@@ -72,6 +78,13 @@ MIN_VOTES = 2                # fewer shared words than this on both strands: unr
 SEMI_GLOBAL_MIN_CHAIN = 0.5  # fraction of the shorter sequence the chain must span
 RUN_GAP = 500                # chained words further apart than this start a new run
 RUN_DRIFT = 50               # ... and so does a diagonal shift larger than this (an indel)
+# Two unrelated sequences of plasmid size give a local alignment of 15-40 bp by chance. An
+# alignment that pairs fewer than MIN_ALIGNED bases and less than MIN_SHARE of the shorter
+# sequence is not reported: it would show a high identity over nothing.
+MIN_ALIGNED = 100
+MIN_SHARE = 0.5
+WINDOW_MARGIN = 100          # bp around a run of shared words aligned by the prefilter
+CHANCE_FLOOR = 40            # ... which skips the whole alignment when no run pairs this much
 
 IUPAC_DNA = set("ACGTRYSWKMBDHVN")
 
@@ -87,6 +100,21 @@ class Placement:
     reference_shift: int     # internal rotation of a circular reference (positions map back)
     mode: str                # "global", "semi-global" or "local"
     votes: int
+    # Local mode: (query start, query end, target start, target end) of each run of shared
+    # words, ends exclusive, largest first, in the coordinates of the strings aligned.
+    runs: list[tuple[int, int, int, int]] = field(default_factory=list)
+
+
+@dataclass
+class Unrelated:
+    """A sequence left out: the bases paired by its best alignment with the reference (0 when
+    not even two shared words line up)."""
+    best: int
+
+
+def meaningful(paired: int, shorter: int) -> bool:
+    """Does an alignment pair enough bases to be homology rather than chance?"""
+    return paired >= MIN_ALIGNED or paired >= MIN_SHARE * shorter
 
 
 @dataclass
@@ -241,6 +269,23 @@ def _run_coverage(chain: list[tuple[int, int]], on_query: bool) -> int:
     return covered
 
 
+def _runs(chain: list[tuple[int, int]]) -> list[tuple[int, int, int, int]]:
+    """Runs of the chain (see ``_run_coverage``) as (query start, query end, reference start,
+    reference end), ends exclusive, largest first."""
+    runs = []
+    start = 0
+    for i in range(1, len(chain) + 1):
+        if i < len(chain):
+            (q0, r0), (q1, r1) = chain[i - 1], chain[i]
+            if q1 - q0 <= RUN_GAP and r1 - r0 <= RUN_GAP and abs((r1 - q1) - (r0 - q0)) <= RUN_DRIFT:
+                continue
+        if i - start >= 2:
+            (qa, ra), (qb, rb) = chain[start], chain[i - 1]
+            runs.append((qa, qb + WORD, ra, rb + WORD))
+        start = i
+    return sorted(runs, key=lambda run: run[0] - run[1])
+
+
 def place(reference: str, ref_circular: bool, query: str, query_circular: bool,
           index: dict[str, list[int]] | None = None) -> tuple[Placement, str, str] | None:
     """Strand, rotation and mode for one sequence. Returns the placement together with the
@@ -292,7 +337,8 @@ def place(reference: str, ref_circular: bool, query: str, query_circular: bool,
         shift = cut_reference
         mode = "global"
     target = rotate(reference, shift) if shift else reference
-    return Placement(strand, rotation, shift, mode, votes), target, oriented
+    runs = _runs(chain) if mode == "local" else []
+    return Placement(strand, rotation, shift, mode, votes, runs), target, oriented
 
 
 # ---- step 2: the pairwise alignment ----------------------------------------------------
@@ -306,6 +352,14 @@ def _aligner(mode: str) -> Align.PairwiseAligner:
         if mode == "semi-global":
             aligner.end_gap_score = 0.0  # free end gaps on both sequences
     return aligner
+
+
+def _paired(coordinates) -> int:
+    """Bases paired with each other (not with a gap) in an alignment."""
+    return sum(int(coordinates[0][i + 1]) - int(coordinates[0][i])
+               for i in range(coordinates.shape[1] - 1)
+               if coordinates[0][i + 1] > coordinates[0][i]
+               and coordinates[1][i + 1] > coordinates[1][i])
 
 
 def _columns(target: str, query: str, coordinates) -> list[tuple[int | None, int | None]]:
@@ -362,16 +416,36 @@ def differences(columns: list[tuple[str, str, int | None]], ref_len: int) -> lis
 
 
 def align_pair(reference: str, ref_circular: bool, name: str, sequence: str, circular: bool,
-               index: dict[str, list[int]] | None = None) -> PairResult | None:
-    """Align one sequence to the reference; None when the two have nothing in common."""
+               index: dict[str, list[int]] | None = None) -> PairResult | Unrelated:
+    """Align one sequence to the reference, or say why the two have nothing in common.
+
+    A partly related pair (local mode) is first aligned only around its runs of shared words:
+    those small alignments cost milliseconds. When none of them pairs more than unrelated
+    sequences do by chance, the pair is left out without the whole alignment, which costs
+    seconds on plasmid-sized sequences. Unrelated sequences always end up in local mode."""
     placed = place(reference, ref_circular, sequence, circular, index)
     if placed is None:
-        return None
+        return Unrelated(0)
     placement, target, query = placed
+    shorter = min(len(sequence), len(reference))
+    if placement.mode == "local":
+        best = 0
+        for q0, q1, r0, r1 in placement.runs:
+            window = _aligner("local").align(
+                target[max(0, r0 - WINDOW_MARGIN): r1 + WINDOW_MARGIN],
+                query[max(0, q0 - WINDOW_MARGIN): q1 + WINDOW_MARGIN])[0]
+            best = max(best, _paired(window.coordinates))
+            if best >= CHANCE_FLOOR or meaningful(best, shorter):
+                break
+        else:
+            return Unrelated(best)
     alignment = _aligner(placement.mode).align(target, query)[0]
     pairs = _columns(target, query, alignment.coordinates)
     if not pairs:
-        return None
+        return Unrelated(0)
+    paired = sum(1 for t, q in pairs if t is not None and q is not None)
+    if not meaningful(paired, shorter):
+        return Unrelated(paired)
     ref_len = len(reference)
     shift = placement.reference_shift
     columns: list[tuple[str, str, int | None]] = []
@@ -409,13 +483,21 @@ def _counts(diffs: list[dict[str, Any]]) -> dict[str, int]:
     }
 
 
-def alignment_payload(reference_doc: dict[str, Any], docs: list[dict[str, Any]]) -> dict:
-    reference_name = reference_doc.get("name") or "Reference"
-    reference = clean_sequence(reference_doc.get("sequence") or "", reference_name)
+def _name_and_sequence(doc: Any, fallback: str) -> tuple[str, str]:
+    """A document's name and cleaned sequence; a document without a readable sequence counts
+    as empty (and is then left out, or refused as the reference, with the reason)."""
+    doc = doc if isinstance(doc, dict) else {}
+    name = str(doc.get("name") or fallback)
+    sequence = doc.get("sequence")
+    return name, clean_sequence(sequence if isinstance(sequence, str) else "", name)
+
+
+def alignment_payload(reference_doc: dict[str, Any], docs: list[Any]) -> dict:
+    reference_name, reference = _name_and_sequence(reference_doc, "Reference")
+    reference_doc = reference_doc if isinstance(reference_doc, dict) else {}
     ref_circular = bool(reference_doc.get("circular"))
-    others = [(d.get("name") or f"Sequence {i + 1}",
-               clean_sequence(d.get("sequence") or "", d.get("name") or f"Sequence {i + 1}"))
-              for i, d in enumerate(docs)]
+    others = [_name_and_sequence(d, f"Sequence {i + 1}") for i, d in enumerate(docs)]
+    docs = [d if isinstance(d, dict) else {} for d in docs]
     check_limits(reference_name, reference, others)
 
     index = _reference_index(reference, ref_circular)
@@ -427,11 +509,14 @@ def alignment_payload(reference_doc: dict[str, Any], docs: list[dict[str, Any]])
             continue
         result = align_pair(reference, ref_circular, name, sequence, bool(doc.get("circular")),
                             index)
-        if result is None:
+        if isinstance(result, Unrelated):
+            why = (f"their best match pairs only {result.best} bp, as two unrelated sequences "
+                   "do by chance" if result.best else
+                   f"not even two stretches of {WORD} identical bases in line")
             warnings.append(f"“{name}” was left out: it has nothing recognisably in common "
-                            f"with “{reference_name}” on either strand (not even two stretches "
-                            f"of {WORD} identical bases in line), so the two cannot be aligned "
-                            "meaningfully. Check that it is the sequence you meant.")
+                            f"with “{reference_name}” on either strand ({why}), so the two "
+                            "cannot be aligned meaningfully. Check that it is the sequence you "
+                            "meant.")
             continue
         results.append((i, result))
 

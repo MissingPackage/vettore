@@ -14,6 +14,7 @@ Contract for operation modules (``restriction.py``, ``overlap.py``, ``golden_gat
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from Bio.Seq import Seq
@@ -64,12 +65,43 @@ class CloningResult(BaseModel):
     oligos: list[Oligo] = Field(default_factory=list)   # primers to order, if any were designed
 
 
+def plural(count: int, noun: str, many: str | None = None) -> str:
+    """'1 insert', '2 inserts' (or the plural given)."""
+    return f"{count} {noun if count == 1 else many or noun + 's'}"
+
+
+def times(count: int) -> str:
+    """'once', '2 times'."""
+    return "once" if count == 1 else f"{count} times"
+
+
+_NOT_DNA = re.compile("[^ACGTURYSWKMBDHVN]", re.IGNORECASE)
+_RNA_TO_DNA = str.maketrans("Uu", "Tt")
+
+
+def dna_sequence(name: str, sequence: str) -> str:
+    """The sequence as the engine works on it: an RNA letter U is read as T (so enzymes cut
+    and primers bind), and a character that is not a DNA letter is a mistake the user can fix."""
+    if bad := _NOT_DNA.search(sequence):
+        shown = "a space" if bad.group().isspace() else f"“{bad.group()}”"
+        raise CloningError(
+            f"“{name}” has {shown} at position {bad.start() + 1}, which is not a DNA letter "
+            "(A, C, G, T or an IUPAC ambiguity code such as N). Correct the sequence and try "
+            "again.")
+    return sequence.translate(_RNA_TO_DNA)
+
+
 def to_dseqrecord(doc: SequenceDoc | dict[str, Any]) -> Dseqrecord:
     data = doc.model_dump() if isinstance(doc, SequenceDoc) else doc
-    if not data.get("sequence"):
-        raise CloningError(f"“{data.get('name') or 'Untitled'}” has no sequence")
+    name = str(data.get("name") or "Untitled")
+    sequence = data.get("sequence")
+    if not sequence or not isinstance(sequence, str):
+        raise CloningError(f"“{name}” has no sequence")
+    data = {**data, "sequence": dna_sequence(name, sequence)}
     record: SeqRecord = ove_to_record(data)
-    return Dseqrecord(record, circular=bool(data.get("circular")))
+    molecule = Dseqrecord(record, circular=bool(data.get("circular")))
+    molecule.name = name           # messages name the document as the user sees it
+    return molecule
 
 
 def from_dseqrecord(record: Dseqrecord, name: str) -> dict[str, Any]:

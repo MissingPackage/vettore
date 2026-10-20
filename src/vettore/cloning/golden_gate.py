@@ -15,7 +15,15 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 from pydna.assembly2 import golden_gate_assembly
 
-from .base import CloningError, CloningResult, Product, SequenceDoc, from_dseqrecord, to_dseqrecord
+from .base import (
+    CloningError,
+    CloningResult,
+    Product,
+    SequenceDoc,
+    from_dseqrecord,
+    plural,
+    to_dseqrecord,
+)
 from .restriction import (
     Fragment,
     IncompatibleEnds,
@@ -129,7 +137,7 @@ def golden_gate(vector_doc: SequenceDoc, part_docs: list[SequenceDoc],
                         "these overhangs")
 
     product_name = f"{vector_doc.name} + {' + '.join(d.name for d in part_docs)}"
-    details = (f"Golden Gate assembly of {len(part_docs)} part(s) into {vector_doc.name} with "
+    details = (f"Golden Gate assembly of {plural(len(part_docs), 'part')} into {vector_doc.name} with "
                f"{name}; junction overhangs {', '.join(overhangs)}")
     return CloningResult(
         products=[Product(doc=from_dseqrecord(product, product_name),

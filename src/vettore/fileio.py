@@ -28,7 +28,15 @@ from Bio.Seq import Seq, UndefinedSequenceError, reverse_complement
 from Bio.SeqFeature import SeqFeature, SimpleLocation
 from Bio.SeqRecord import SeqRecord
 
-from .convert import _as_list, ove_to_record, record_to_ove
+from .convert import (
+    DIVISIONS,
+    _as_list,
+    _qualifiers,
+    annotation_ranges,
+    ove_to_record,
+    record_to_ove,
+    unplaceable,
+)
 
 log = logging.getLogger(__name__)
 
@@ -97,6 +105,7 @@ SUPPORTED_SUMMARY = (
 
 # IUPAC nucleotide codes (Cornish-Bowden 1985, NC-IUB recommendations), plus U for RNA.
 DNA_LETTERS = frozenset("ACGTURYSWKMBDHVN")
+_RNA_TO_DNA = str.maketrans("Uu", "Tt")
 # Letters that occur in protein sequences but are not nucleotide codes.
 PROTEIN_ONLY = frozenset("EFILPQXZJO*")
 
@@ -395,6 +404,7 @@ def read_file(filename: str, content: bytes, *, pasted: bool = False) -> ReadRes
             f"be damaged or cut short. {advice}") from exc
 
     problems: list[str] = []
+    rna: list[str] = []
     usable: list[tuple[SeqRecord, str]] = []
     for record in records:
         if record.annotations.get("molecule_type") == "protein":
@@ -409,6 +419,11 @@ def read_file(filename: str, content: bytes, *, pasted: bool = False) -> ReadRes
         if bad := _check_letters(record, sequence):
             problems.append(bad)
             continue
+        if "U" in sequence or "u" in sequence:
+            # An mRNA or a cDNA copied from a paper: every tool works on DNA, so U is read as T
+            # (enzymes cut, primers bind) and the user is told.
+            record.seq = Seq(sequence.translate(_RNA_TO_DNA))
+            rna.append(_record_label(record))
         usable.append((record, sequence))
     if not usable:
         detail = problems[0] if problems else "No DNA sequence was found in it."
@@ -418,6 +433,11 @@ def read_file(filename: str, content: bytes, *, pasted: bool = False) -> ReadRes
     if problems:
         result.warnings.append(f"{display}: {len(problems)} of {len(records)} sequences could "
                                f"not be opened. {' '.join(problems)}")
+    if rna:
+        which = display if len(records) == 1 else ", ".join(rna)
+        result.warnings.append(f"{which}: the sequence is written in RNA letters, so every U was "
+                               "read as T. Enzymes and primers now work on it as they would on "
+                               "its cDNA.")
     names: dict[str, int] = {}
     for i, (record, _sequence) in enumerate(usable):
         dropped, trimmed = _clean_features(record)
@@ -496,9 +516,23 @@ def _enrich_dna_file(doc: dict, content: bytes) -> None:
 
 # ---- writing ----------------------------------------------------------------------------
 
+_MONTHS = ("JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC")
+
+
+def genbank_date(when: datetime) -> str:
+    """GenBank's date, e.g. 07-AUG-2008, the same in every locale."""
+    return f"{when.day:02d}-{_MONTHS[when.month - 1]}-{when.year}"
+
+
 def write_genbank(data: dict) -> str:
+    """GenBank text. The LOCUS line carries the date of the save and the record's division as
+    it was read (SYN, synthetic, for a construct made or edited here)."""
+    record = ove_to_record(data)
+    record.annotations["date"] = genbank_date(datetime.now())
+    division = str(data.get("division") or "").upper()
+    record.annotations["data_file_division"] = division if division in DIVISIONS else "SYN"
     out = io.StringIO()
-    SeqIO.write(ove_to_record(data), out, "genbank")
+    SeqIO.write(record, out, "genbank")
     return out.getvalue()
 
 
@@ -518,12 +552,6 @@ _COLOUR_QUALIFIERS = {"label", "ApEinfo_fwdcolor", "ApEinfo_revcolor", "color"}
 
 def _xml_text(value: Any) -> str:
     return _CONTROL.sub(" ", str(value))
-
-
-def _ranges(ann: dict[str, Any]) -> list[tuple[int, int]]:
-    """OVE inclusive ranges in position order; a range with start > end crosses the origin."""
-    return [(int(loc["start"]), int(loc["end"])) for loc in ann.get("locations") or []] or [
-        (int(ann["start"]), int(ann["end"]))]
 
 
 def _forward(ann: dict[str, Any]) -> bool:
@@ -546,13 +574,15 @@ def write_dna(data: dict) -> bytes:
     sg = SgffObject.new(sequence, topology="circular" if circular else "linear",
                         strandedness="double")
 
-    for index, ann in enumerate(_as_list(data.get("features"))):
+    placed = [(ann, ranges) for ann in _as_list(data.get("features"))
+              if (ranges := annotation_ranges(ann, len(sequence), circular)) is not None]
+    for index, (ann, ranges) in enumerate(placed):
         forward = _forward(ann)
-        color = ann.get("color")
-        segments = [SgffSegment(start=start, end=end + 1, color=color or None)
-                    for start, end in _ranges(ann)]
-        qualifiers = {k: [_xml_text(v) for v in (vals if isinstance(vals, list) else [vals])]
-                      for k, vals in (ann.get("notes") or {}).items()
+        color = str(ann["color"]) if ann.get("color") else None
+        segments = [SgffSegment(start=start, end=end + 1, color=color)
+                    for start, end in ranges]
+        qualifiers = {k: [_xml_text(v) for v in vals]
+                      for k, vals in _qualifiers(ann.get("notes")).items()
                       if k not in _COLOUR_QUALIFIERS}
         extras = {"recentID": str(index), "allowSegmentOverlaps": "0",
                   "consecutiveTranslationNumbering": "1"}
@@ -560,20 +590,23 @@ def write_dna(data: dict) -> bytes:
             extras["swappedSegmentNumbering"] = "1"
         sg.features.add(SgffFeature(
             name=_xml_text(ann.get("name") or ann.get("type") or "feature"),
-            type=ann.get("type") or "misc_feature", strand="+" if forward else "-",
-            segments=segments, qualifiers=qualifiers, color=color or None, extras=extras))
+            type=str(ann.get("type") or "misc_feature"), strand="+" if forward else "-",
+            segments=segments, qualifiers=qualifiers, color=color, extras=extras))
     if sg.has_features:
         sg.features._wrapper_extras = {"nextValidID": str(len(sg.features))}
         sg.features._sync()
 
     for ann in _as_list(data.get("primers")):
-        start, end = _ranges(ann)[0]
+        ranges = annotation_ranges(ann, len(sequence), circular)
+        if ranges is None:
+            continue
+        start, end = ranges[0]
         site = sequence[start:end + 1] if start <= end else sequence[start:] + sequence[:end + 1]
         forward = _forward(ann)
         annealed = site if forward else reverse_complement(site)
         sg.primers.add(SgffPrimer(
             name=_xml_text(ann.get("name") or "primer"),
-            sequence=(ann.get("bases") or annealed).upper(),
+            sequence=str(ann.get("bases") or annealed).upper(),
             binding_sites=[SgffBindingSite(start=start, end=end + 1,
                                            bound_strand="+" if forward else "-",
                                            annealed_bases=annealed.upper())]))
@@ -596,8 +629,43 @@ def write_dna(data: dict) -> bytes:
     return SgffWriter.to_bytes(sg)
 
 
+_NOT_SAVEABLE = re.compile("[^ACGTURYSWKMBDHVN]", re.IGNORECASE)
+
+
+def _check_saveable(data: dict) -> None:
+    """A document whose sequence Vettore could not open again is not written."""
+    sequence = data.get("sequence", "")
+    name = str(data.get("name") or "Untitled")
+    if not isinstance(sequence, str):
+        raise SaveError(f"“{name}” could not be saved: its sequence is missing or damaged. "
+                        "Copy the sequence into a new file and save that.")
+    if bad := _NOT_SAVEABLE.search(sequence):
+        shown = "a space" if bad.group().isspace() else f"“{bad.group()}”"
+        raise SaveError(f"“{name}” has {shown} at position {bad.start() + 1}, which is not a "
+                        "DNA letter, so the file could not be opened again. Correct the "
+                        "sequence and save again.")
+
+
+def save_warnings(data: dict, fmt: str) -> list[str]:
+    """What a saved file leaves out of the document: features or primers whose position is
+    not on the sequence (FASTA keeps no features, so it leaves out nothing it could keep)."""
+    if fmt == "fasta":
+        return []
+    out = []
+    for kind, items in unplaceable(data).items():
+        noun = kind[:-1] if len(items) == 1 else kind
+        names = ", ".join(f"“{_short(item)}”" for item in items[:5])
+        more = f" and {len(items) - 5} more" if len(items) > 5 else ""
+        verb, whose = ("was", "its position is") if len(items) == 1 else ("were",
+                                                                         "their positions are")
+        out.append(f"{len(items)} {noun} {verb} left out of the saved file because {whose} "
+                   f"not on the sequence: {names}{more}.")
+    return out
+
+
 def encode(data: dict, fmt: str) -> bytes:
     """The bytes of a saved document in ``fmt`` (genbank, fasta or the .dna format)."""
+    _check_saveable(data)
     if fmt == "genbank":
         return write_genbank(data).encode("utf-8")
     if fmt == "fasta":

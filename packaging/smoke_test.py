@@ -108,6 +108,14 @@ def main() -> int:
         })
         product = cloned["products"][0]["doc"]
         assert product["circular"] and len(product["sequence"]) == 316, len(product["sequence"])
+        # The Gateway dialogs pick their inputs by the att sites pydna finds in each document.
+        entry = call("open-content", {
+            "filename": "cloning-gateway-entry.gb",
+            "content_b64": base64.b64encode(
+                (FIXTURES / "cloning-gateway-entry.gb").read_bytes()).decode(),
+        })["documents"][0]
+        sites = call("cloning/gateway-sites", {"docs": [entry]})["sites"]
+        assert sites == [["attL1", "attL2"]], sites
         tm = call("tm", {"sequence": "AGCTTGCATGCCTGCAGGTCG"})["tm"]
         assert 55 < tm < 70, tm
         # primer3 reads its thermodynamic tables from files next to its compiled module and
@@ -122,7 +130,7 @@ def main() -> int:
         assert (placed["start"], placed["identity"]) == (1001, 100.0), placed
         # Sanger reads are aligned with Biopython's BLASTN scoring matrix, a data file.
         reference = (FIXTURES.parents[1] / "frontend" / "e2e" / "fixtures"
-                     / "sanger-reference.txt").read_text()
+                     / "sanger-reference.txt").read_text(encoding="utf-8")
         trace = base64.b64encode((FIXTURES / "3730.ab1").read_bytes()).decode()
         sanger = call("sanger/align", {
             "reference": {"name": "ref", "sequence": reference.strip(), "circular": False},

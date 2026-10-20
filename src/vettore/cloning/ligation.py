@@ -37,7 +37,16 @@ from pydna.assembly2 import (
 )
 from pydna.dseqrecord import Dseqrecord
 
-from .base import CloningError, CloningResult, Product, SequenceDoc, from_dseqrecord, to_dseqrecord
+from .base import (
+    CloningError,
+    CloningResult,
+    Product,
+    SequenceDoc,
+    from_dseqrecord,
+    plural,
+    times,
+    to_dseqrecord,
+)
 from .regions import check_region, features_in_region, region_length, region_sequence
 from .restriction import (
     Fragment,
@@ -113,16 +122,17 @@ def _digest_piece(item: FragmentIn, role: str, warnings: list[str]) -> Piece:
     if item.fragment_index is not None:
         if not 0 <= item.fragment_index < len(frags):
             raise CloningError(f"Fragment {item.fragment_index + 1} of “{item.doc.name}” does "
-                               f"not exist (the digest gives {len(frags)} fragments)")
+                               f"not exist (the digest gives {plural(len(frags), 'fragment')})")
         chosen = frags[item.fragment_index]
     elif role == "vector":
         chosen = _pick_backbone(frags, enzymes)
     else:
         chosen = _pick_insert(frags, enzymes, record.circular, None)
-    expected = 2 if record.circular else len({chosen.left_enzyme, chosen.right_enzyme} - {None})
     for name, count in counts.items():
-        if count > expected and item.fragment_index is None:
-            warnings.append(f"{name} cuts “{item.doc.name}” {count} times; check that the "
+        # One cut per end of the fragment is expected (EcoRI at both ends of a PCR product cuts
+        # twice); more cuts mean a site inside the molecule as well.
+        if count > chosen.ends_cut_by(name) and item.fragment_index is None:
+            warnings.append(f"{name} cuts “{item.doc.name}” {times(count)}; check that the "
                             f"fragment used ({chosen.label()}) is the one you want")
     label = f"{item.doc.name} {chosen.label()}"
     return Piece(item.doc.name, label, chosen.record, from_pcr=False, digest=chosen)
@@ -303,7 +313,8 @@ def insert_multiple(vector: FragmentIn, inserts: list[FragmentIn]) -> CloningRes
     warnings: list[str] = []
     vector_record = to_dseqrecord(vector.doc)
     if vector_record.circular and not vector.enzymes:
-        raise CloningError(f"Choose the enzyme(s) that open the vector “{vector.doc.name}”")
+        raise CloningError(f"Choose the enzyme or enzymes that open the vector "
+                           f"“{vector.doc.name}”")
     backbone = make_piece(vector, "vector", warnings)
     pieces = [backbone] + [make_piece(item, "insert", warnings) for item in inserts]
 
@@ -320,8 +331,9 @@ def insert_multiple(vector: FragmentIn, inserts: list[FragmentIn]) -> CloningRes
     try:
         circularise(backbone.record)
         if backbone.from_pcr:
+            which = "the insert" if len(inserts) == 1 else "the inserts"
             warnings.append("The vector's two blunt ends could close on each other: phosphorylate "
-                            "only the insert(s), never the vector PCR product")
+                            f"only {which}, never the vector PCR product")
         else:
             warnings.append(f"The two ends of the cut vector are compatible ({backbone.left} / "
                             f"{backbone.right}): it can close without an insert. Dephosphorylate "
@@ -333,7 +345,7 @@ def insert_multiple(vector: FragmentIn, inserts: list[FragmentIn]) -> CloningRes
     base_name = " + ".join(names)
     how = (f"cut with {' and '.join(vector.enzymes)}" if vector.enzymes
            else "used as a linear fragment")
-    details = (f"Ligated {len(inserts)} insert(s) into {vector.doc.name} ({how}): "
+    details = (f"Ligated {plural(len(inserts), 'insert')} into {vector.doc.name} ({how}): "
                + ", ".join(p.label for p in pieces[1:]))
     return CloningResult(
         products=_products(products, pieces, base_name, "Insert multiple fragments", details,
@@ -367,7 +379,7 @@ def ligate_fragments(items: list[FragmentIn], circular: bool = False) -> Cloning
                             "the same fragments can also close into a circle")
 
     base_name = " + ".join(p.name for p in pieces)
-    details = (f"Ligated {len(pieces)} fragment(s) into {shape}: "
+    details = (f"Ligated {plural(len(pieces), 'fragment')} into {shape}: "
                + ", ".join(p.label for p in pieces))
     return CloningResult(
         products=_products(products, pieces, base_name, "Ligate fragments", details,

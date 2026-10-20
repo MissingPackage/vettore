@@ -16,7 +16,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException
 
-from . import fileio
+from . import fileio, settings
 
 router = APIRouter(prefix="/api/app")
 
@@ -75,8 +75,9 @@ def app_version() -> str:
 
 
 def log_path() -> Path:
-    """Where the desktop app writes its log (see vettore.app._ensure_streams)."""
-    return Path.home() / ".vettore" / "vettore.log"
+    """Where the app writes its log (see vettore.app.main): ~/.vettore/vettore.log, or under
+    $VETTORE_HOME when that is set."""
+    return settings.home() / "vettore.log"
 
 
 def sample_bytes(sample: Sample) -> bytes:

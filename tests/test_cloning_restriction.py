@@ -68,6 +68,16 @@ def test_single_enzyme_cloning_is_non_directional_and_both_orientations_work():
     assert rev.products[0].doc["sequence"].upper() == A + "GAATTC" + rc(CORE) + "GAATTC" + rest
     assert any("both orientations" in w for w in fwd.warnings)
     assert any("re-ligate without insert" in w for w in fwd.warnings)
+    # EcoRI cuts the PCR product twice, once per end of the insert: nothing to check.
+    assert not any("times;" in w for w in fwd.warnings)
+
+
+def test_a_second_site_inside_the_insert_source_is_warned_about():
+    ins = SequenceDoc(**doc("frag", "CC" + "GAATTC" + CORE + "GAATTC" + B[:100] + "GAATTC"
+                            + "CC", False))
+    result = insert_fragment(vector_doc(), ["EcoRI"], ins, ["EcoRI"])
+    assert any(w.startswith("EcoRI cuts “frag” 3 times; check that the insert fragment")
+               for w in result.warnings)
 
 
 def test_incompatible_ends_are_reported():
@@ -85,6 +95,23 @@ def test_enzyme_that_does_not_cut_is_an_error():
 def test_unknown_enzyme_is_an_error():
     with pytest.raises(CloningError, match="Unknown or unsupported enzyme"):
         digest(vector_doc(), ["NotAnEnzyme"])
+
+
+def test_rna_letters_in_a_document_are_cut_as_dna():
+    """A document typed with U (an mRNA) is cut as its cDNA: AUGGCUAGCUAG|GAUCC... has BamHI
+    G^GATCC after base 13 of 24."""
+    mrna = SequenceDoc(**doc("mRNA", "AUGGCUAGCUAGGGAUCCAAGCUU", False))
+    assert [f["length"] for f in digest(mrna, ["BamHI"])] == [13, 11]
+
+
+def test_a_character_that_is_not_dna_is_named():
+    bad = SequenceDoc(**doc("notes", "ACGTACGTAC GT!", False))
+    with pytest.raises(CloningError) as err:
+        digest(bad, ["EcoRI"])
+    assert str(err.value).startswith("“notes” has a space at position 11, which is not a DNA "
+                                     "letter")
+    with pytest.raises(CloningError, match="“notes” has “E” at position 2"):
+        digest(SequenceDoc(**doc("notes", "HELLO", False)), ["EcoRI"])
 
 
 def test_double_cutter_in_vector_is_warned():

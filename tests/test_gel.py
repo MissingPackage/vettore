@@ -79,6 +79,39 @@ def test_gel_endpoint_digests_each_lane():
     assert len(data["ladder"]) == len(LADDERS[DEFAULT_LADDER]["bands"])
 
 
+def test_a_lane_whose_enzyme_does_not_cut_is_drawn_uncut_with_a_note():
+    """A non-cutter is a normal control on a diagnostic gel: its lane shows the uncut
+    (supercoiled) plasmid and says why, and the other lanes are drawn as usual. The 3,012 bp
+    test plasmid has one EcoRI and one BamHI site and no NotI site."""
+    sequence = clean_dna(1500, 61) + "GAATTC" + clean_dna(900, 62) + "GGATCC" + clean_dna(600, 63)
+    plasmid = doc("pTest", sequence, True)
+    client = TestClient(create_app(TOKEN, None), base_url="http://127.0.0.1")
+    body = {"lanes": [{"name": "pTest", "sequenceData": plasmid, "enzymes": ["NotI"]},
+                      {"name": "pTest", "sequenceData": plasmid, "enzymes": ["EcoRI", "NotI"]},
+                      {"name": "pTest", "sequenceData": plasmid, "enzymes": ["EcoRI", "BamHI"]},
+                      {"name": "empty", "sequenceData": {}},
+                      {"name": "text", "sequenceData": doc("text", "HELLO", False)}]}
+    res = client.post("/api/gel", headers={TOKEN_HEADER: TOKEN}, json=body)
+    assert res.status_code == 200
+    noti, eco_noti, eco_bam, empty, text = res.json()["lanes"]
+    assert noti["sizes"] == [3012] and noti["bands"][0]["label"] == "3,012 bp (supercoiled)"
+    assert noti["note"] == "NotI does not cut “pTest”, so the lane shows the uncut plasmid."
+    assert eco_noti["sizes"] == [3012] and "supercoiled" not in eco_noti["bands"][0]["label"]
+    assert eco_noti["note"] == "NotI does not cut “pTest”; the lane shows the EcoRI digest."
+    assert eco_bam["sizes"] == [2106, 906] and eco_bam["note"] is None
+    assert empty["bands"] == [] and "has no sequence" in empty["note"]
+    assert text["bands"] == [] and text["note"].startswith("“text” has “E” at position 2")
+
+
+def test_an_unknown_ladder_is_a_plain_sentence():
+    client = TestClient(create_app(TOKEN, None), base_url="http://127.0.0.1")
+    res = client.post("/api/gel", headers={TOKEN_HEADER: TOKEN},
+                      json={"lanes": [], "ladder": "bogus"})
+    assert res.status_code == 422
+    assert res.json()["detail"] == ("The ladder “bogus” is not one Vettore knows. Choose a "
+                                    "ladder from the list and simulate the gel again.")
+
+
 def test_ladders_endpoint():
     client = TestClient(create_app(TOKEN, None), base_url="http://127.0.0.1")
     data = client.get("/api/gel/ladders", headers={TOKEN_HEADER: TOKEN}).json()

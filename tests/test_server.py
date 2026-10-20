@@ -43,7 +43,7 @@ def test_open_content_and_save(tmp_path):
     res = c.post("/api/save-path", headers={TOKEN_HEADER: TOKEN},
                  json={"path": str(out), "sequenceData": doc})
     assert res.status_code == 200
-    assert out.read_text().startswith("LOCUS")
+    assert out.read_text(encoding="utf-8").startswith("LOCUS")
 
 
 def test_corrupt_file_returns_422():
@@ -138,7 +138,7 @@ def test_open_content_reports_format_warnings_and_writability():
 
 def test_open_text_recognises_pasted_records():
     c = client()
-    genbank = (DATA / "MT612431.1.gb").read_text()
+    genbank = (DATA / "MT612431.1.gb").read_text(encoding="utf-8")
     res = c.post("/api/open-text", headers=H, json={"text": genbank})
     assert res.status_code == 200
     [doc] = res.json()["documents"]
@@ -180,10 +180,10 @@ def test_save_path_picks_the_format_from_the_extension(tmp_path, monkeypatch):
         return res.json()
 
     assert save("a")["path"] == str(tmp_path / "a.gb")  # extension appended
-    assert (tmp_path / "a.gb").read_text().startswith("LOCUS")
+    assert (tmp_path / "a.gb").read_text(encoding="utf-8").startswith("LOCUS")
     assert save("b", "fasta") == {"path": str(tmp_path / "b.fasta"), "format": "fasta",
                                   "format_label": "FASTA"}
-    assert (tmp_path / "b.fasta").read_text().startswith(">pFA-KanMX4")
+    assert (tmp_path / "b.fasta").read_text(encoding="utf-8").startswith(">pFA-KanMX4")
     assert save("c.fa", "genbank")["format"] == "fasta"  # the typed extension wins
     dna = save("d.dna")
     assert dna["format_label"] == ".dna"
@@ -218,7 +218,7 @@ def test_save_failure_is_explained(tmp_path):
 def test_save_never_truncates_an_existing_file(tmp_path, monkeypatch):
     c = client()
     target = tmp_path / "keep.gb"
-    target.write_text("original")
+    target.write_text("original", encoding="utf-8")
     doc = {"name": "x", "sequence": "ACGT", "circular": False, "features": [], "primers": []}
 
     def fail(*_args):
@@ -227,7 +227,7 @@ def test_save_never_truncates_an_existing_file(tmp_path, monkeypatch):
     monkeypatch.setattr("vettore.server.os.replace", fail)
     res = c.post("/api/save-path", headers=H, json={"path": str(target), "sequenceData": doc})
     assert res.status_code == 422 and "disk is full" in res.json()["detail"]
-    assert target.read_text() == "original"
+    assert target.read_text(encoding="utf-8") == "original"
     assert not list(tmp_path.glob(".*vettore-tmp"))
 
 

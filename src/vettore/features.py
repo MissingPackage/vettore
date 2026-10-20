@@ -212,23 +212,57 @@ def _dedupe(matches: list[Match], length: int) -> list[Match]:
     return sorted(kept, key=lambda m: (m.start, -len(m.span(length))))
 
 
+# A match is already annotated when an existing feature covers this much of it, whatever its
+# name or strand (an origin is often annotated without a direction), and the match is at least
+# ANNOTATED_SHARE_OF_EXISTING of that feature (so a feature spanning half the plasmid does not
+# hide the elements inside it).
+ANNOTATED_SHARE_OF_MATCH = 0.9
+ANNOTATED_SHARE_OF_EXISTING = 0.5
+
+
+def _int(value: Any) -> int | None:
+    return value if isinstance(value, int) and not isinstance(value, bool) else None
+
+
+def _existing_spans(existing: Any, length: int) -> list[tuple[str, set[int]]]:
+    """(name, positions) of the document's features; anything malformed is skipped."""
+    items = list(existing.values()) if isinstance(existing, dict) else existing
+    out = []
+    for feature in items if isinstance(items, list) else []:
+        if not isinstance(feature, dict):
+            continue
+        locations = feature.get("locations")
+        ranges = ([(_int(loc.get("start")), _int(loc.get("end"))) for loc in locations
+                   if isinstance(loc, dict)] if isinstance(locations, list) and locations
+                  else [(_int(feature.get("start")), _int(feature.get("end")))])
+        span: set[int] = set()
+        for start, end in ranges:
+            if start is None or end is None or not (0 <= start < length and 0 <= end < length):
+                continue
+            span |= (set(range(start, end + 1)) if start <= end
+                     else set(range(start, length)) | set(range(end + 1)))
+        if span:
+            out.append((str(feature.get("name") or feature.get("type") or "feature"), span))
+    return out
+
+
 def detect_payload(sequence: str, circular: bool, min_identity: float = DEFAULT_MIN_IDENTITY,
-                   existing: list[dict[str, Any]] | None = None) -> dict[str, Any]:
-    """Matches, flagged against the features a document already carries."""
+                   existing: Any = None) -> dict[str, Any]:
+    """Matches, flagged against the features a document already carries: ``isNew`` is false
+    and ``annotatedAs`` names the existing feature when one already covers the match."""
     length = len(sequence)
     matches = detect(sequence, circular, min_identity)
-    already = []
-    for feature in existing or []:
-        start, end = feature.get("start"), feature.get("end")
-        if isinstance(start, int) and isinstance(end, int):
-            already.append((feature.get("name", "").lower(), start, end))
+    already = _existing_spans(existing or [], length)
 
     rows = []
     for match in matches:
         row = match.as_dict(length)
-        row["isNew"] = not any(
-            name == match.name.lower() and abs(start - match.start) <= 5
-            for name, start, _ in already)
+        span = match.span(length)
+        covering = [(name, len(span & other)) for name, other in already
+                    if len(span & other) >= ANNOTATED_SHARE_OF_MATCH * len(span)
+                    and len(span & other) >= ANNOTATED_SHARE_OF_EXISTING * len(other)]
+        row["annotatedAs"] = max(covering, key=lambda item: item[1])[0] if covering else None
+        row["isNew"] = not covering
         rows.append(row)
     return {"features": rows, "catalogue_size": len(catalogue()),
             "new_count": sum(1 for r in rows if r["isNew"])}

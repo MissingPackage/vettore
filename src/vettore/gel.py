@@ -145,7 +145,7 @@ def lane_bands(sizes: list[int], percent: float, supercoiled: bool = False) -> l
 
 def ladder_bands(ladder: str, percent: float) -> list[dict]:
     if ladder not in LADDERS:
-        raise ValueError(f"Unknown ladder: {ladder}")
+        raise ValueError(unknown_ladder(ladder))
     entry = LADDERS[ladder]
     reference = set(entry["reference"])
     return [{"size": size, "rf": migration(size, percent),
@@ -157,3 +157,62 @@ def ladder_bands(ladder: str, percent: float) -> list[dict]:
 def ladders() -> list[dict]:
     return [{"id": key, "label": value["label"], "bands": value["bands"]}
             for key, value in LADDERS.items()]
+
+
+def unknown_ladder(ladder: str) -> str:
+    return (f"The ladder “{ladder}” is not one Vettore knows. Choose a ladder from the list and "
+            "simulate the gel again.")
+
+
+def _lane(name: str, data: object, enzyme_names: list[str], percent: float) -> dict:
+    """One lane: digested, uncut, or empty, with a note saying why when it is not what was
+    asked. A non-cutting enzyme is a normal control on a diagnostic gel, so it never fails the
+    whole gel."""
+    from pydna.dseqrecord import Dseqrecord
+
+    from .cloning.base import CloningError, dna_sequence
+    from .cloning.restriction import cut_counts, enzyme_objects, fragments
+
+    data = data if isinstance(data, dict) else {}
+    label = str(data.get("name") or name or "Untitled")
+    title = f"{name} / {' + '.join(enzyme_names)}" if enzyme_names else f"{name} / uncut"
+    sequence = data.get("sequence")
+    if not isinstance(sequence, str) or not sequence:
+        return {"name": title, "bands": [], "sizes": [],
+                "note": f"“{label}” has no sequence, so its lane is empty."}
+    try:
+        record = Dseqrecord(dna_sequence(label, sequence), circular=bool(data.get("circular")))
+        enzymes = enzyme_objects(enzyme_names) if enzyme_names else []
+    except CloningError as exc:
+        return {"name": title, "bands": [], "sizes": [], "note": f"{exc} Its lane is empty."}
+    record.name = label
+    counts = cut_counts(record, enzymes)
+    cutting = [e for e in enzymes if counts[str(e)]]
+    idle = " and ".join(str(e) for e in enzymes if not counts[str(e)])
+    verb = "does" if " and " not in idle else "do"
+    note = None
+    if cutting:
+        sizes = [f.length for f in fragments(record, cutting)]
+        supercoiled = False
+        if idle:
+            note = (f"{idle} {verb} not cut “{label}”; the lane shows the "
+                    f"{' + '.join(map(str, cutting))} digest.")
+    else:
+        # Incubated with an enzyme that does not cut, a plasmid stays supercoiled.
+        sizes = [len(record)]
+        supercoiled = record.circular
+        if idle:
+            shape = "uncut plasmid" if record.circular else "uncut molecule"
+            note = f"{idle} {verb} not cut “{label}”, so the lane shows the {shape}."
+    bands = lane_bands(sizes, percent, supercoiled)
+    return {"name": title, "bands": [b.as_dict() for b in bands],
+            "sizes": sorted(sizes, reverse=True), "note": note}
+
+
+def simulate(lanes: list[tuple[str, object, list[str]]], ladder: str, percent: float) -> dict:
+    """The whole gel: (lane name, sequenceData, enzyme names) per lane, then the ladder."""
+    if ladder not in LADDERS:
+        raise ValueError(unknown_ladder(ladder))
+    return {"lanes": [_lane(name, data, enzymes, percent) for name, data, enzymes in lanes],
+            "ladder": ladder_bands(ladder, percent), "ladder_label": LADDERS[ladder]["label"],
+            "percent": percent}
