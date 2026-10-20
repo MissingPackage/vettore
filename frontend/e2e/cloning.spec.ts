@@ -79,6 +79,30 @@ test("Gibson assembly designs primers with homology arms", async ({ page }) => {
   await page.screenshot({ path: "test-results/cloning-gibson.png" });
 });
 
+test("a Gibson insert from a plasmid is picked by its feature name", async ({ page }) => {
+  await page.goto(`/?token=${TOKEN}`);
+  await newSequence(page, "pVector", VECTOR, true);
+  await page.getByTestId("file-input").setInputFiles(path.resolve(import.meta.dirname, "../../tests/data/pFA-KanMX4.dna"));
+  await expect(page.locator(".vt-doctab.active")).toContainText("pFA-KanMX4");
+
+  await menu(page, "Actions", "Gibson Assembly…");
+  const dialog = page.getByTestId("cloning-dialog");
+  await dialog.getByTestId("vector-doc").selectOption({ index: 1 });
+  await dialog.getByTestId("vector-enzymes").fill("EcoRI");
+  await dialog.getByTestId("insert-doc-0").selectOption({ index: 2 });
+  // KanR is annotated at 459..1268 in pFA-KanMX4: 1268 − 459 + 1 = 810 bp.
+  await dialog.getByTestId("insert-region-0-feature").selectOption({ label: "KanR (459–1,268)" });
+  await expect(dialog.getByTestId("insert-region-0-start")).toHaveValue("459");
+  await expect(dialog.getByTestId("insert-region-0-end")).toHaveValue("1268");
+  await expect(dialog.locator(".vt-insert-row")).toContainText("810 bp");
+  // The chosen feature stays shown while the positions are its own.
+  await expect(dialog.getByTestId("insert-region-0-feature").locator("option:checked")).toHaveText("KanR (459–1,268)");
+  await expect(page.getByTestId("cloning-oligos").locator("tbody tr")).toHaveCount(2, { timeout: 30_000 });
+  // Typing another position leaves the feature: the picker goes back to its prompt.
+  await dialog.getByTestId("insert-region-0-end").fill("1200");
+  await expect(dialog.getByTestId("insert-region-0-feature")).toHaveValue("");
+});
+
 test("a second product of the same files gets its own name", async ({ page }) => {
   await page.goto(`/?token=${TOKEN}`);
   await newSequence(page, "pVector", VECTOR, true);

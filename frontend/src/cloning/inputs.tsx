@@ -1,6 +1,7 @@
 // Shared form controls for the cloning dialogs. Coordinates are shown 1-based, as biologists count, and
 // converted to the engine's 0-based inclusive coordinates.
 import { useMemo, useState } from "react";
+import type { OveAnnotation } from "../api";
 import { cutsites, ENZYMES } from "../enzymeLogic";
 import type { OpenDoc } from "./types";
 
@@ -112,52 +113,91 @@ export function EnzymePicker(props: {
   );
 }
 
-/** A region as 1-based inclusive start..end; reports 0-based inclusive values. */
+/** The document's features with a position, in map order, for picking a region by name. */
+export function featuresOf(doc: OpenDoc | null): OveAnnotation[] {
+  const raw = doc?.data()?.features ?? [];
+  return (Array.isArray(raw) ? raw : Object.values(raw))
+    .filter((f) => f.start >= 0 && f.end >= 0)
+    .sort((a, b) => a.start - b.start || a.end - b.end);
+}
+
+const position = (value: number) => value.toLocaleString("en-US");
+
+/**
+ * A region as 1-based inclusive start..end; reports 0-based inclusive values. With `features`,
+ * the file's features are offered by name above the positions, as in Design PCR Primers.
+ */
 export function RegionInput(props: {
   doc: OpenDoc | null;
   start: number | null;
   end: number | null;
   onChange: (start: number | null, end: number | null) => void;
   testId?: string;
+  features?: boolean;
 }) {
   const len = props.doc?.data().sequence.length ?? 0;
   const num = (v: string) => (v.trim() === "" ? null : Math.max(1, Math.min(len, Number(v))) - 1);
+  const features = props.features ? featuresOf(props.doc) : [];
+  // The feature stays shown while the positions are its own.
+  const picked = features.findIndex((f) => f.start === props.start && f.end === props.end);
   return (
-    <div className="vt-region">
-      <input
-        className="bp3-input bp3-small"
-        type="number"
-        min={1}
-        max={len}
-        data-testid={props.testId && `${props.testId}-start`}
-        value={props.start === null ? "" : props.start + 1}
-        onChange={(e) => props.onChange(num(e.target.value), props.end)}
-      />
-      <span>…</span>
-      <input
-        className="bp3-input bp3-small"
-        type="number"
-        min={1}
-        max={len}
-        data-testid={props.testId && `${props.testId}-end`}
-        value={props.end === null ? "" : props.end + 1}
-        onChange={(e) => props.onChange(props.start, num(e.target.value))}
-      />
-      <button
-        className="bp3-button bp3-small"
-        disabled={!props.doc?.selection()}
-        onClick={() => {
-          const s = props.doc?.selection();
-          if (s) props.onChange(s.start, s.end);
-        }}
-      >
-        Use selection
-      </button>
-      {props.start !== null && props.end !== null && (
-        <span className="vt-muted">
-          {props.start <= props.end ? props.end - props.start + 1 : len - props.start + props.end + 1} bp
-        </span>
+    <div className="vt-region-input">
+      {features.length > 0 && (
+        <div className="bp3-html-select bp3-fill">
+          <select
+            data-testid={props.testId && `${props.testId}-feature`}
+            value={picked >= 0 ? String(picked) : ""}
+            onChange={(e) => {
+              const f = features[Number(e.target.value)];
+              if (f) props.onChange(f.start, f.end);
+            }}
+          >
+            <option value="">Pick a feature, or type the positions below…</option>
+            {features.map((f, i) => (
+              <option key={i} value={i}>
+                {f.name} ({position(f.start + 1)}–{position(f.end + 1)})
+              </option>
+            ))}
+          </select>
+        </div>
       )}
+      <div className="vt-region">
+        <input
+          className="bp3-input bp3-small"
+          type="number"
+          min={1}
+          max={len}
+          data-testid={props.testId && `${props.testId}-start`}
+          value={props.start === null ? "" : props.start + 1}
+          onChange={(e) => props.onChange(num(e.target.value), props.end)}
+        />
+        <span>…</span>
+        <input
+          className="bp3-input bp3-small"
+          type="number"
+          min={1}
+          max={len}
+          data-testid={props.testId && `${props.testId}-end`}
+          value={props.end === null ? "" : props.end + 1}
+          onChange={(e) => props.onChange(props.start, num(e.target.value))}
+        />
+        <button
+          className="bp3-button bp3-small"
+          disabled={!props.doc?.selection()}
+          title="The region selected in this file's map"
+          onClick={() => {
+            const s = props.doc?.selection();
+            if (s) props.onChange(s.start, s.end);
+          }}
+        >
+          Use selection
+        </button>
+        {props.start !== null && props.end !== null && (
+          <span className="vt-muted">
+            {position(props.start <= props.end ? props.end - props.start + 1 : len - props.start + props.end + 1)} bp
+          </span>
+        )}
+      </div>
     </div>
   );
 }

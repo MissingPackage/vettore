@@ -130,7 +130,7 @@ export function FragmentEditor(props: {
           label="Region"
           hint={data?.circular ? "Required for a circular file" : "Leave empty to use the whole file"}
         >
-          <RegionInput doc={d} start={row.start} end={row.end} onChange={(start, end) => update({ start, end })} testId={`${testId}-region`} />
+          <RegionInput doc={d} start={row.start} end={row.end} onChange={(start, end) => update({ start, end })} testId={`${testId}-region`} features />
         </Field>
       )}
     </div>

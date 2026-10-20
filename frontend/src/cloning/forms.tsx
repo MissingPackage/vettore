@@ -157,7 +157,7 @@ export function DesignPrimersForm({ docs, active, onChange }: FormProps) {
         <DocSelect docs={docs} value={template} onChange={setTemplate} />
       </Field>
       <Field label="Region to amplify">
-        <RegionInput doc={t} start={start} end={end} onChange={(s, e) => { setStart(s); setEnd(e); }} />
+        <RegionInput doc={t} start={start} end={end} onChange={(s, e) => { setStart(s); setEnd(e); }} testId="region" features />
       </Field>
       <Field label="Target Tm of annealing parts (°C)">
         <input className="bp3-input bp3-small" type="number" value={tm} onChange={(e) => setTm(Number(e.target.value))} />
@@ -247,7 +247,8 @@ export function overlapForm(method: "gibson" | "hifi" | "infusion") {
                 <DocSelect docs={docs} value={row.editorName} onChange={(e) => update(i, { editorName: e })} testId={`insert-doc-${i}`} />
               </Field>
               <Field label="Region to amplify" hint={d?.data().circular ? "Required for circular files" : "Empty = whole sequence"}>
-                <RegionInput doc={d} start={row.start} end={row.end} onChange={(s, e) => update(i, { start: s, end: e })} />
+                <RegionInput doc={d} start={row.start} end={row.end} onChange={(s, e) => update(i, { start: s, end: e })}
+                             testId={`insert-region-${i}`} features />
               </Field>
               {inserts.length > 1 && (
                 <button className="bp3-button bp3-small bp3-minimal" onClick={() => setInserts((r) => r.filter((_, j) => j !== i))}>
@@ -302,7 +303,8 @@ export function MutagenesisForm({ docs, active, onChange }: FormProps) {
         </div>
       </Field>
       <Field label={kind === "insertion" ? "Insert after base" : "Region"}>
-        <RegionInput doc={d} start={start} end={end} onChange={(s, e) => { setStart(s); setEnd(e); }} />
+        <RegionInput doc={d} start={start} end={end} onChange={(s, e) => { setStart(s); setEnd(e); }}
+                     testId="region" features={kind !== "insertion"} />
       </Field>
       {kind !== "deletion" && (
         <Field label="New bases (5′ → 3′, top strand)">
