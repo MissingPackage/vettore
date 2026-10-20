@@ -14,6 +14,7 @@ a single wrong base in a loxP site changes its behaviour.
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass
 from functools import lru_cache
 from importlib import resources
@@ -213,11 +214,105 @@ def _dedupe(matches: list[Match], length: int) -> list[Match]:
 
 
 # A match is already annotated when an existing feature covers this much of it, whatever its
-# name or strand (an origin is often annotated without a direction), and the match is at least
-# ANNOTATED_SHARE_OF_EXISTING of that feature (so a feature spanning half the plasmid does not
-# hide the elements inside it).
+# strand (an origin is often annotated without a direction), and either
+# - the match is at least ANNOTATED_SHARE_OF_EXISTING of that feature, whatever its name (so a
+#   feature spanning half the plasmid does not hide the elements inside it), or
+# - the feature's name names the element: vendors annotate one block, "CMV promoter", over the
+#   CMV enhancer and the CMV promoter.
 ANNOTATED_SHARE_OF_MATCH = 0.9
 ANNOTATED_SHARE_OF_EXISTING = 0.5
+
+#: A feature named after one element whose sequence is mostly another (nearly exact matches,
+#: at least LABEL_CHECK_MIN_IDENTITY, covering at least LABEL_CHECK_SHARE_OF_EXISTING of it)
+#: probably carries a wrong label: a CMV enhancer and promoter labelled "PGK promoter". A
+#: short element at the edge of a longer feature (a polyA signal inside an "EGFP" block) is
+#: not enough to doubt the label.
+LABEL_CHECK_MIN_IDENTITY = 98.0
+LABEL_CHECK_SHARE_OF_EXISTING = 0.5
+
+#: Words that do not tell elements apart: "SV40 polyA" and "bGH polyA" share "polyA" but are
+#: different elements. Words of one character and plain numbers ("5'", "3'") never count.
+GENERIC_WORDS = frozenset({
+    "promoter", "enhancer", "polya", "pa", "signal", "ori", "origin", "region", "sequence",
+    "gene", "late", "early", "of", "the", "and", "with", "for", "from", "in", "to",
+    "replication", "polyadenylation", "terminator", "site", "element", "truncated", "partial",
+    "full", "length", "minimal", "core", "fragment", "intron", "exon", "cds", "orf", "protein",
+    "tag", "repeat", "inverted", "terminal", "human", "mouse", "rat", "chicken", "codon",
+    "optimized", "optimised", "resistance", "marker", "cassette", "insert", "left", "right",
+    "forward", "reverse", "fwd", "rev", "start", "stop", "binding", "misc", "feature", "variant",
+    "short", "long", "copy", "upstream", "downstream", "fusion", "wild", "type", "wt", "new",
+})
+
+#: Other spellings of a word, as found in vendors' and labs' labels.
+WORD_ALIASES = {"hcmv": "cmv", "hef1a": "ef1a", "camkii": "camkiia", "hsyn1": "hsyn"}
+
+#: Elements outside the catalogue that labels often name. A label naming one of them over a
+#: catalogue element points at a wrong label (a CMV promoter labelled "PGK promoter"); none
+#: of them contains a catalogue element.
+OTHER_ELEMENTS = ("PGK promoter", "UbC promoter", "H1 promoter", "7SK promoter",
+                  "SFFV promoter")
+
+#: Catalogue elements that hold another catalogue element, so a block named after the first is
+#: not a wrong label for the second (checked against the catalogue sequences in tests):
+#: - SaCas9: the catalogue entry carries a C-terminal 3×HA tag (PZ629150.1:3842..3922, inside
+#:   581..3925).
+#: - CAG promoter: CMV enhancer, chicken β-actin promoter and rabbit β-globin intron (Niwa H,
+#:   Yamamura K, Miyazaki J, Gene 1991;108:193-199). The catalogue entry (ON785707.1:189..1125)
+#:   starts inside the enhancer; full CAG promoters carry all of it.
+HOLDS = {"SaCas9": frozenset({"3×HA"}), "CAG promoter": frozenset({"CMV enhancer"})}
+
+_LETTERS = str.maketrans({"α": "a", "β": "b", "γ": "g", "δ": "d", "Δ": "d", "κ": "k",
+                          "×": "x", "′": "'", "’": "'"})
+
+
+def name_words(name: str, pieces: bool = True) -> frozenset[str]:
+    """The words of a feature name that can identify an element, lower case: "EF-1α
+    promoter" gives "ef1a", "CMV-promoter" gives "cmv". With ``pieces`` the parts of a
+    hyphenated word count too ("cmv" from "CMV-promoter"); catalogue names are read without,
+    so that "EF-1α" is not matched by any "1a"."""
+    text = name.translate(_LETTERS).lower().replace("alpha", "a").replace("beta", "b")
+    words: set[str] = set()
+    for token in re.split(r"[\s/(),;:_\[\]{}|+=]+", text):
+        parts = [p for p in re.split(r"[-.']+", token) if p]
+        for word in {"".join(parts), *(parts if pieces else [])}:
+            word = WORD_ALIASES.get(word, word)
+            words.add(word)
+            if tagged := re.fullmatch(r"\d+x(\D\w*)", word):
+                words.add(tagged.group(1))       # "3×HA" names the HA tag too
+    words = {w for w in words if len(w) > 1 and not w.isdigit() and w not in GENERIC_WORDS}
+    return frozenset(words)
+
+
+@lru_cache(maxsize=1)
+def _element_words() -> tuple[tuple[str, frozenset[str]], ...]:
+    """(element name, its identifying words) for the catalogue and the other known elements."""
+    names = [f.name for f in catalogue()] + list(OTHER_ELEMENTS)
+    return tuple((name, words) for name in dict.fromkeys(names)
+                 if (words := name_words(name, pieces=False)))
+
+
+def named_elements(label: str) -> set[str]:
+    """The known elements a label names: "CMV promoter" names the catalogue's CMV enhancer and
+    CMV promoter; "my insert" names none."""
+    words = name_words(label)
+    return {name for name, element in _element_words() if words & element}
+
+
+def _names_element(label: str, element: str) -> bool:
+    """Whether a feature called ``label`` annotates the catalogue ``element``: the label
+    shares an identifying word with it ("CMV" and "CMV enhancer")."""
+    return bool(name_words(label) & name_words(element, pieces=False))
+
+
+def _names_another_element(label: str, element: str) -> bool:
+    """Whether ``label`` names a known element other than ``element`` and not one that holds
+    it (a "CAG" block holds the CMV enhancer, so that label is right)."""
+    others = named_elements(label)
+    return bool(others) and not any(element in HOLDS.get(name, ()) for name in others)
+
+
+def _identity_text(identity: float) -> str:
+    return "100 %" if round(identity, 1) >= 100 else f"{identity:.1f} %"
 
 
 def _int(value: Any) -> int | None:
@@ -246,23 +341,56 @@ def _existing_spans(existing: Any, length: int) -> list[tuple[str, set[int]]]:
     return out
 
 
+def _label_warning(existing: str, match: Match) -> str:
+    return (f"Annotated as “{existing}”, but the sequence is the {match.name} "
+            f"({_identity_text(match.identity)} identity). Check the label.")
+
+
 def detect_payload(sequence: str, circular: bool, min_identity: float = DEFAULT_MIN_IDENTITY,
                    existing: Any = None) -> dict[str, Any]:
-    """Matches, flagged against the features a document already carries: ``isNew`` is false
-    and ``annotatedAs`` names the existing feature when one already covers the match."""
+    """Matches, flagged against the features a document already carries.
+
+    ``isNew`` is false and ``annotatedAs`` names the existing feature when one already covers
+    the match. ``labelWarning`` says when that feature is named after a different element
+    while its sequence is mostly this one: the label is probably wrong (a CMV promoter
+    labelled "PGK promoter"). ``label_warnings`` counts the existing features concerned.
+    """
     length = len(sequence)
     matches = detect(sequence, circular, min_identity)
     already = _existing_spans(existing or [], length)
 
-    rows = []
+    found = []
+    unexplained: dict[int, set[int]] = {}     # existing feature -> bases of other elements
     for match in matches:
-        row = match.as_dict(length)
         span = match.span(length)
-        covering = [(name, len(span & other)) for name, other in already
-                    if len(span & other) >= ANNOTATED_SHARE_OF_MATCH * len(span)
-                    and len(span & other) >= ANNOTATED_SHARE_OF_EXISTING * len(other)]
-        row["annotatedAs"] = max(covering, key=lambda item: item[1])[0] if covering else None
-        row["isNew"] = not covering
+        covering = [(index, name, len(span & other), len(other))
+                    for index, (name, other) in enumerate(already)
+                    if len(span & other) >= ANNOTATED_SHARE_OF_MATCH * len(span)]
+        named = [item for item in covering if _names_element(item[1], match.name)]
+        sized = [item for item in covering if item[2] >= ANNOTATED_SHARE_OF_EXISTING * item[3]]
+        suspect = ([] if named or match.identity < LABEL_CHECK_MIN_IDENTITY
+                   else [item for item in covering
+                         if _names_another_element(item[1], match.name)])
+        for item in suspect:
+            unexplained.setdefault(item[0], set()).update(span & already[item[0]][1])
+        found.append((match, named, sized, suspect))
+    doubtful = {index for index, bases in unexplained.items()
+                if len(bases) >= LABEL_CHECK_SHARE_OF_EXISTING * len(already[index][1])}
+
+    rows = []
+    flagged: set[int] = set()
+    for match, named, sized, suspect in found:
+        row = match.as_dict(length)
+        mislabelled = [item for item in suspect if item[0] in doubtful]
+        # The feature that covers most of the match and, of those, fits it most closely.
+        best = max(named or mislabelled or sized, key=lambda item: (item[2], -item[3]),
+                   default=None)
+        row["annotatedAs"] = best[1] if best else None
+        row["isNew"] = best is None
+        row["labelWarning"] = _label_warning(best[1], match) if best and mislabelled else None
+        if best and mislabelled:
+            flagged.add(best[0])
         rows.append(row)
     return {"features": rows, "catalogue_size": len(catalogue()),
-            "new_count": sum(1 for r in rows if r["isNew"])}
+            "new_count": sum(1 for r in rows if r["isNew"]),
+            "label_warnings": len(flagged)}

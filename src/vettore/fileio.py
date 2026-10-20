@@ -30,8 +30,9 @@ from Bio.SeqRecord import SeqRecord
 
 from .convert import (
     DIVISIONS,
+    NEAR_WHITE,
     _as_list,
-    _qualifiers,
+    annotation_qualifiers,
     annotation_ranges,
     ove_to_record,
     record_to_ove,
@@ -478,9 +479,6 @@ def read_records(filename: str, content: bytes) -> list[SeqRecord]:
     return records
 
 
-_NEAR_WHITE = re.compile(r"^#?(f[a-f0-9]){3}$", re.IGNORECASE)
-
-
 def _enrich_dna_file(doc: dict, content: bytes) -> None:
     """Add what Biopython does not read from .dna files: feature colours, full primer
     sequences (with 5' tails) and the description. Locations stay Biopython's, which already
@@ -496,7 +494,7 @@ def _enrich_dna_file(doc: dict, content: bytes) -> None:
     colors = {}
     for feature in sg.features:
         color = feature.color or (feature.segments[0].color if feature.segments else None)
-        if feature.segments and color and not _NEAR_WHITE.match(color):
+        if feature.segments and color and not NEAR_WHITE.match(color):
             colors[(feature.name, feature.segments[0].start)] = color
     for ann in doc["features"]:
         start = ann["locations"][0]["start"] if ann.get("locations") else ann["start"]
@@ -581,8 +579,9 @@ def write_dna(data: dict) -> bytes:
         color = str(ann["color"]) if ann.get("color") else None
         segments = [SgffSegment(start=start, end=end + 1, color=color)
                     for start, end in ranges]
+        kind = str(ann.get("type") or "misc_feature")
         qualifiers = {k: [_xml_text(v) for v in vals]
-                      for k, vals in _qualifiers(ann.get("notes")).items()
+                      for k, vals in annotation_qualifiers(ann, kind).items()
                       if k not in _COLOUR_QUALIFIERS}
         extras = {"recentID": str(index), "allowSegmentOverlaps": "0",
                   "consecutiveTranslationNumbering": "1"}
@@ -590,7 +589,7 @@ def write_dna(data: dict) -> bytes:
             extras["swappedSegmentNumbering"] = "1"
         sg.features.add(SgffFeature(
             name=_xml_text(ann.get("name") or ann.get("type") or "feature"),
-            type=str(ann.get("type") or "misc_feature"), strand="+" if forward else "-",
+            type=kind, strand="+" if forward else "-",
             segments=segments, qualifiers=qualifiers, color=color, extras=extras))
     if sg.has_features:
         sg.features._wrapper_extras = {"nextValidID": str(len(sg.features))}

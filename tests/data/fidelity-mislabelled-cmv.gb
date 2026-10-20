@@ -1,0 +1,82 @@
+LOCUS       mislabelled_CMV         3091 bp    DNA     circular SYN 20-OCT-2026
+DEFINITION  CMV-EGFP plasmid assembled from catalogue sequences; the CMV
+            enhancer and promoter are labelled PGK promoter (test fixture).
+ACCESSION   mislabelled_CMV
+VERSION     mislabelled_CMV
+KEYWORDS    .
+SOURCE      .
+  ORGANISM  .
+            .
+FEATURES             Location/Qualifiers
+     Promoter        1..584
+                     /label="PGK promoter"
+                     /note="color: #b5836b; direction: RIGHT"
+     CDS             585..1304
+                     /label="EGFP"
+                     /note="color: #12f548; direction: RIGHT"
+     PolyA_signal    1305..1536
+                     /label="SV40 pA"
+                     /note="color: #0440b2; direction: RIGHT"
+     Rep_origin      1537..2125
+                     /label="pUC ori"
+                     /note="color: #bde475; direction: RIGHT"
+     Promoter        2126..2230
+                     /label="AmpR promoter"
+                     /note="color: #f58600; direction: RIGHT"
+     CDS             2231..3091
+                     /label="Ampicillin"
+                     /note="color: #f60a2d; direction: RIGHT"
+ORIGIN
+        1 gacattgatt attgactagt tattaatagt aatcaattac ggggtcatta gttcatagcc
+       61 catatatgga gttccgcgtt acataactta cggtaaatgg cccgcctggc tgaccgccca
+      121 acgacccccg cccattgacg tcaataatga cgtatgttcc catagtaacg ccaataggga
+      181 ctttccattg acgtcaatgg gtggagtatt tacggtaaac tgcccacttg gcagtacatc
+      241 aagtgtatca tatgccaagt acgcccccta ttgacgtcaa tgacggtaaa tggcccgcct
+      301 ggcattatgc ccagtacatg accttatggg actttcctac ttggcagtac atctacgtat
+      361 tagtcatcgc tattaccatg gtgatgcggt tttggcagta catcaatggg cgtggatagc
+      421 ggtttgactc acggggattt ccaagtctcc accccattga cgtcaatggg agtttgtttt
+      481 ggcaccaaaa tcaacgggac tttccaaaat gtcgtaacaa ctccgcccca ttgacgcaaa
+      541 tgggcggtag gcgtgtacgg tgggaggtct atataagcag agctatggtg agcaagggcg
+      601 aggagctgtt caccggggtg gtgcccatcc tggtcgagct ggacggcgac gtaaacggcc
+      661 acaagttcag cgtgtccggc gagggcgagg gcgatgccac ctacggcaag ctgaccctga
+      721 agttcatctg caccaccggc aagctgcccg tgccctggcc caccctcgtg accaccctga
+      781 cctacggcgt gcagtgcttc agccgctacc ccgaccacat gaagcagcac gacttcttca
+      841 agtccgccat gcccgaaggc tacgtccagg agcgcaccat cttcttcaag gacgacggca
+      901 actacaagac ccgcgccgag gtgaagttcg agggcgacac cctggtgaac cgcatcgagc
+      961 tgaagggcat cgacttcaag gaggacggca acatcctggg gcacaagctg gagtacaact
+     1021 acaacagcca caacgtctat atcatggccg acaagcagaa gaacggcatc aaggtgaact
+     1081 tcaagatccg ccacaacatc gaggacggca gcgtgcagct cgccgaccac taccagcaga
+     1141 acacccccat cggcgacggc cccgtgctgc tgcccgacaa ccactacctg agcacccagt
+     1201 ccgccctgag caaagacccc aacgagaagc gcgatcacat ggtcctgctg gagttcgtga
+     1261 ccgccgccgg gatcactctc ggcatggacg agctgtacaa gtaattcgag cagacatgat
+     1321 aagatacatt gatgagtttg gacaaaccac aactagaatg cagtgaaaaa aatgctttat
+     1381 ttgtgaaatt tgtgatgcta ttgctttatt tgtaaccatt ataagctgca ataaacaagt
+     1441 taacaacaac aattgcattc attttatgtt tcaggttcag ggggagatgt gggaggtttt
+     1501 ttaaagcaag taaaacctct acaaatgtgg taaaatttga gatccttttt ttctgcgcgt
+     1561 aatctgctgc ttgcaaacaa aaaaaccacc gctaccagcg gtggtttgtt tgccggatca
+     1621 agagctacca actctttttc cgaaggtaac tggcttcagc agagcgcaga taccaaatac
+     1681 tgttcttcta gtgtagccgt agttaggcca ccacttcaag aactctgtag caccgcctac
+     1741 atacctcgct ctgctaatcc tgttaccagt ggctgctgcc agtggcgata agtcgtgtct
+     1801 taccgggttg gactcaagac gatagttacc ggataaggcg cagcggtcgg gctgaacggg
+     1861 gggttcgtgc acacagccca gcttggagcg aacgacctac accgaactga gatacctaca
+     1921 gcgtgagcta tgagaaagcg ccacgcttcc cgaagggaga aaggcggaca ggtatccggt
+     1981 aagcggcagg gtcggaacag gagagcgcac gagggagctt ccagggggaa acgcctggta
+     2041 tctttatagt cctgtcgggt ttcgccacct ctgacttgag cgtcgatttt tgtgatgctc
+     2101 gtcagggggg cggagcctat ggaaacgcgg aacccctatt tgtttatttt tctaaataca
+     2161 ttcaaatatg tatccgctca tgagacaata accctgataa atgcttcaat aatattgaaa
+     2221 aaggaagagt atgagtattc aacatttccg tgtcgccctt attccctttt ttgcggcatt
+     2281 ttgccttcct gtttttgctc acccagaaac gctggtgaaa gtaaaagatg ctgaagatca
+     2341 gttgggtgca cgagtgggtt acatcgaact ggatctcaac agcggtaaga tccttgagag
+     2401 ttttcgcccc gaagaacgtt ttccaatgat gagcactttt aaagttctgc tatgtggcgc
+     2461 ggtattatcc cgtattgacg ccgggcaaga gcaactcggt cgccgcatac actattctca
+     2521 gaatgacttg gttgagtact caccagtcac agaaaagcat cttacggatg gcatgacagt
+     2581 aagagaatta tgcagtgctg ccataaccat gagtgataac actgcggcca acttacttct
+     2641 gacaacgatc ggaggaccga aggagctaac cgcttttttg cacaacatgg gggatcatgt
+     2701 aactcgcctt gatcgttggg aaccggagct gaatgaagcc ataccaaacg acgagcgtga
+     2761 caccacgatg cctgtagcaa tggcaacaac gttgcgcaaa ctattaactg gcgaactact
+     2821 tactctagct tcccggcaac aattaataga ctggatggag gcggataaag ttgcaggacc
+     2881 acttctgcgc tcggcccttc cggctggctg gtttattgct gataaatctg gagccggtga
+     2941 gcgtgggtct cgcggtatca ttgcagcact ggggccagat ggtaagccct cccgtatcgt
+     3001 agttatctac acgacgggga gtcaggcaac tatggatgaa cgaaatagac agatcgctga
+     3061 gataggtgcc tcactgatta agcattggta a
+//

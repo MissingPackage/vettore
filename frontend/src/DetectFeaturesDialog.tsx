@@ -6,6 +6,7 @@ import { api, type OveAnnotation, type SequenceData } from "./api";
 import { store } from "./store";
 import { IDENTITY_CHOICES, loadPreferences } from "./preferences";
 import type { OpenDoc } from "./cloning/types";
+import "./DetectFeaturesDialog.css";
 
 const { Dialog, Callout } = Blueprint as unknown as Record<string, React.ComponentType<any>>;
 
@@ -23,6 +24,11 @@ interface Detected {
   isNew: boolean;
   /** The existing feature that already covers this match, under whatever name. */
   annotatedAs?: string | null;
+  /**
+   * Set when that feature is named after a different element although the match is nearly
+   * exact: “Annotated as “PGK promoter”, but the sequence is the CMV enhancer …”.
+   */
+  labelWarning?: string | null;
 }
 
 /** "already annotated", or "annotated as “nptI”" when the map uses another name for it. */
@@ -39,6 +45,14 @@ interface DetectResult {
   features: Detected[];
   catalogue_size: number;
   new_count: number;
+  /** How many existing features carry a label that may be wrong. */
+  label_warnings?: number;
+}
+
+/** Existing features whose label may be wrong, from the engine's count or from the rows. */
+function doubtfulLabels(result: DetectResult): number {
+  return result.label_warnings
+    ?? new Set(result.features.filter((f) => f.labelWarning).map((f) => f.annotatedAs)).size;
 }
 
 /** Colours follow the convention most plasmid maps use, by feature type. */
@@ -161,6 +175,18 @@ export default function DetectFeaturesDialog(props: { doc: OpenDoc; onClose: () 
             catch variants, or annotate the region by hand with Features → Add Feature…
           </Callout>
         )}
+        {result && !busy && doubtfulLabels(result) > 0 && (
+          <div className="vt-notice vt-notice-warning" role="status" data-testid="detect-label-summary">
+            <span className="vt-notice-title">
+              {doubtfulLabels(result)} label{doubtfulLabels(result) === 1 ? "" : "s"} may be wrong
+            </span>
+            {doubtfulLabels(result) === 1
+              ? "The sequence under it is a different element from the one the label names. "
+              : "The sequence under each is a different element from the one its label names. "}
+            The rows marked below say which; they are not ticked, so nothing changes unless you
+            tick one to add the element under its own name.
+          </div>
+        )}
         {result && result.features.length > 0 && (
           <>
             <p className="vt-muted">
@@ -188,7 +214,11 @@ export default function DetectFeaturesDialog(props: { doc: OpenDoc; onClose: () 
               </thead>
               <tbody>
                 {result.features.map((f) => (
-                  <tr key={key(f)} className={f.isNew ? "" : "vt-muted"} data-testid="detect-row">
+                  <tr
+                    key={key(f)}
+                    className={f.labelWarning ? "vt-detect-doubt" : f.isNew ? "" : "vt-muted"}
+                    data-testid="detect-row"
+                  >
                     <td>
                       <input type="checkbox" checked={chosen.has(key(f))} onChange={() => toggle(f)}
                              aria-label={`Add ${f.name}`} />
@@ -196,16 +226,20 @@ export default function DetectFeaturesDialog(props: { doc: OpenDoc; onClose: () 
                     <td>
                       <span className="vt-swatch" style={{ background: COLOR[f.type] ?? COLOR.misc_feature }} />
                       {f.name}
-                      {!f.isNew && (
+                      {f.labelWarning ? (
+                        <span className="vt-warn vt-detect-doubt-text" data-testid="detect-label-warning">
+                          {f.labelWarning}
+                        </span>
+                      ) : !f.isNew && (
                         <span className="vt-muted" data-testid="detect-annotated"> · {annotatedText(f)}</span>
                       )}
                     </td>
                     <td>{f.type}</td>
-                    <td>
+                    <td className="vt-num">
                       {f.start + 1}…{f.end + 1} {f.forward ? "→" : "←"}
                     </td>
-                    <td>{f.length} bp</td>
-                    <td className={f.identity === 100 ? "vt-ok" : ""}>{f.identity.toFixed(1)} %</td>
+                    <td className="vt-num">{f.length} bp</td>
+                    <td className={f.identity === 100 ? "vt-num vt-ok" : "vt-num"}>{f.identity.toFixed(1)} %</td>
                     <td className="vt-muted" title={f.note}>{f.source}</td>
                   </tr>
                 ))}

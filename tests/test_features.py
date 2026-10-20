@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 
+import pytest
 from Bio import SeqIO
 from cloning_helpers import clean_dna, rc
 
@@ -235,3 +236,180 @@ def test_an_unannotated_aav_cassette_gives_the_packaging_check_two_itrs():
     assert matches[1].start == len(itr.sequence) + len(filler)
     # ITR to ITR, ITRs included — the number the check reports.
     assert matches[1].end - matches[0].start + 1 == 2 * len(itr.sequence) + len(filler)
+
+
+# ---- names and labels -------------------------------------------------------------------
+# fidelity-block-cmv.gb and fidelity-mislabelled-cmv.gb are a CMV-EGFP plasmid assembled from
+# catalogue entries, in this order: CMV enhancer (PV031350.1:96..475) and CMV promoter
+# (PV031350.1:476..679), contiguous in that record, EGFP (U55762.1:679..1398), SV40 polyA
+# (MH282430.1:2999..3230), ori (PZ629150.1:6431..7019), AmpR promoter and AmpR
+# (PV031350.1:2514..3479, contiguous). One block annotation covers the CMV enhancer and
+# promoter (1..584), as vector vendors write it: "CMV promoter" in the first file, "PGK
+# promoter" in the second. A real case: a vendor's AAV vector labels its CMV enhancer and
+# promoter "PGK promoter" while its own /official_designation says CMV.
+
+
+def fixture_payload(name: str, existing=None) -> dict:
+    from vettore.fileio import read_documents
+
+    [document] = read_documents(name, (DATA / name).read_bytes())
+    features = document["features"] if existing is None else existing
+    return detect_payload(document["sequence"], document["circular"], existing=features)
+
+
+def rows_by_name(payload: dict) -> dict[str, dict]:
+    return {row["name"]: row for row in payload["features"]}
+
+
+def test_the_cmv_fixtures_are_built_from_the_catalogue():
+    from vettore.fileio import read_documents
+
+    parts = {f.name: f.sequence for f in catalogue()}
+    order = ["CMV enhancer", "CMV promoter", "EGFP", "SV40 polyA", "ori", "AmpR promoter",
+             "AmpR"]
+    for name in ("fidelity-block-cmv.gb", "fidelity-mislabelled-cmv.gb"):
+        [document] = read_documents(name, (DATA / name).read_bytes())
+        assert document["sequence"].upper() == "".join(parts[p] for p in order), name
+        [block] = [f for f in document["features"] if (f["start"], f["end"]) == (0, 583)]
+        assert block["type"] == "promoter"
+
+
+def test_an_element_inside_a_block_named_after_it_is_already_annotated():
+    """The CMV promoter is 204 of the block's 584 bp: by size alone it would be offered again,
+    on top of the block that already annotates it."""
+    payload = fixture_payload("fidelity-block-cmv.gb")
+    rows = rows_by_name(payload)
+    assert payload["new_count"] == 0
+    for element in ("CMV enhancer", "CMV promoter"):
+        assert rows[element]["isNew"] is False, element
+        assert rows[element]["annotatedAs"] == "CMV promoter", element
+        assert rows[element]["labelWarning"] is None, element
+    assert payload["label_warnings"] == 0
+
+
+def test_a_block_named_after_an_element_annotates_it_however_long_it_is():
+    # One block from the CMV enhancer to the end of EGFP: 1304 bp, named after both.
+    block = [{"name": "CMV-EGFP", "start": 0, "end": 1303}]
+    rows = rows_by_name(fixture_payload("fidelity-block-cmv.gb", existing=block))
+    assert rows["CMV promoter"]["annotatedAs"] == "CMV-EGFP"
+    assert rows["EGFP"]["annotatedAs"] == "CMV-EGFP"
+    assert rows["SV40 polyA"]["isNew"] is True
+
+
+def test_a_cmv_promoter_labelled_pgk_is_flagged_and_not_ticked():
+    payload = fixture_payload("fidelity-mislabelled-cmv.gb")
+    rows = rows_by_name(payload)
+    assert rows["CMV enhancer"]["labelWarning"] == (
+        "Annotated as “PGK promoter”, but the sequence is the CMV enhancer (100 % identity). "
+        "Check the label.")
+    assert rows["CMV promoter"]["labelWarning"] == (
+        "Annotated as “PGK promoter”, but the sequence is the CMV promoter (100 % identity). "
+        "Check the label.")
+    for element in ("CMV enhancer", "CMV promoter"):
+        assert rows[element]["isNew"] is False and rows[element]["annotatedAs"] == "PGK promoter"
+    assert [r["name"] for r in payload["features"] if r["labelWarning"]] == [
+        "CMV enhancer", "CMV promoter"]
+    assert payload["label_warnings"] == 1            # one label, two elements under it
+
+
+def test_a_name_that_is_not_an_element_raises_no_label_warning():
+    mine = [{"name": "my insert", "start": 0, "end": 583}]
+    payload = fixture_payload("fidelity-mislabelled-cmv.gb", existing=mine)
+    rows = rows_by_name(payload)
+    assert payload["label_warnings"] == 0
+    assert rows["CMV enhancer"]["annotatedAs"] == "my insert"       # 380 of 584 bp
+    assert rows["CMV promoter"]["isNew"] is True                     # 204 of 584 bp
+
+
+def test_a_short_element_at_the_edge_of_a_named_feature_does_not_cast_doubt():
+    """An "EGFP" feature that runs on over the SV40 polyA (232 of its 952 bp) is still EGFP:
+    the polyA is offered as a new feature, and the label is not questioned."""
+    block = [{"name": "EGFP", "start": 584, "end": 1535}]
+    payload = fixture_payload("fidelity-block-cmv.gb", existing=block)
+    rows = rows_by_name(payload)
+    assert payload["label_warnings"] == 0
+    assert rows["SV40 polyA"]["labelWarning"] is None and rows["SV40 polyA"]["isNew"] is True
+    assert rows["EGFP"]["annotatedAs"] == "EGFP"
+
+
+def test_a_cag_block_is_not_a_wrong_label_for_its_cmv_enhancer():
+    """CAG is the CMV enhancer, the chicken β-actin promoter and the rabbit β-globin intron
+    (Niwa, Yamamura & Miyazaki 1991, Gene 108:193-199)."""
+    [enhancer] = [f for f in catalogue() if f.name == "CMV enhancer"]
+    sequence = enhancer.sequence + clean_dna(1500, 41)
+    cag = [{"name": "CAG", "start": 0, "end": 1599}]
+    [row] = detect_payload(sequence, True, existing=cag)["features"]
+    assert row["name"] == "CMV enhancer" and row["labelWarning"] is None
+
+
+def test_a_label_is_only_doubted_for_a_nearly_exact_match():
+    """At 97.9 % identity a variant is likelier than a wrong label."""
+    [enhancer] = [f for f in catalogue() if f.name == "CMV enhancer"]
+    bases = list(enhancer.sequence)
+    for position in (30, 50, 100, 120, 180, 200, 250, 270):     # away from the search seeds
+        bases[position] = "A" if bases[position] != "A" else "C"
+    sequence = "".join(bases) + clean_dna(1500, 42)
+    pgk = [{"name": "PGK promoter", "start": 0, "end": 379}]
+    [row] = detect_payload(sequence, True, existing=pgk)["features"]
+    assert row["name"] == "CMV enhancer" and 95 <= row["identity"] < 98
+    assert row["labelWarning"] is None and row["annotatedAs"] == "PGK promoter"
+
+
+@pytest.mark.parametrize("name", ["PZ629150.1.gb", "MT612431.1.gb", "cloning-gateway-entry.gb",
+                                  "cloning-gateway-destination.gb",
+                                  "cloning-gateway-expression.gb", "fidelity-notes.gb",
+                                  "fidelity-block-cmv.gb"])
+def test_published_and_correct_labels_raise_no_warning(name):
+    payload = fixture_payload(name)
+    assert payload["label_warnings"] == 0
+    assert all(row["labelWarning"] is None for row in payload["features"])
+
+
+@pytest.mark.parametrize(("label", "element", "expected"), [
+    ("CMV", "CMV enhancer", True), ("CMV promoter", "CMV enhancer", True),
+    ("EF1A", "EF-1α promoter", True), ("EF-1a promoter", "EF-1α promoter", True),
+    ("hEF1a", "EF-1α promoter", True), ("SV40 late pA", "SV40 polyA", True),
+    ("BGH pA", "bGH polyA", True), ("5' ITR", "AAV2 ITR", True),
+    ("hSyn1 promoter", "hSyn promoter", True), ("CMV-promoter", "CMV promoter", True),
+    ("HA tag", "3×HA", True), ("EGFP:T2A:Puro", "EGFP", True),
+    ("CMV promoter", "SV40 polyA", False), ("pUC ori", "f1 ori", False),
+    ("Exon 1a", "EF-1α promoter", False), ("PGK promoter", "CMV promoter", False),
+    ("promoter", "CMV promoter", False), ("my insert", "CMV enhancer", False),
+])
+def test_names_are_matched_on_the_words_that_identify_an_element(label, element, expected):
+    from vettore.features import _names_element
+
+    assert _names_element(label, element) is expected
+
+
+def test_name_words_ignore_generic_words_and_numbers():
+    from vettore.features import name_words
+
+    assert name_words("SV40 late polyA signal") == {"sv40"}
+    assert name_words("EF-1α promoter", pieces=False) == {"ef1a"}
+    assert name_words("5' ITR") == {"itr"}
+    assert name_words("promoter") == set()
+
+
+def test_holds_lists_every_catalogue_element_found_inside_another():
+    """A catalogue element found inside another catalogue entry must be listed in HOLDS, so a
+    block named after the larger one is never reported as a wrong label for the smaller."""
+    from vettore.features import HOLDS
+
+    entries = catalogue()
+    found = set()
+    for outer in entries:
+        others = tuple(f for f in entries if f is not outer)
+        found |= {(outer.name, m.name) for m in detect(outer.sequence, False, features=others)}
+    listed = {(outer, inner) for outer, inners in HOLDS.items() for inner in inners}
+    assert found <= listed
+    names = {f.name for f in entries}
+    assert all(outer in names and inner <= names for outer, inner in HOLDS.items())
+
+
+def test_the_catalogue_cag_promoter_starts_inside_the_cmv_enhancer():
+    """The catalogue's CAG entry (ON785707.1:189..1125) begins with the last 249 bp of the CMV
+    enhancer, so the containment is listed in HOLDS by hand rather than found by search."""
+    parts = {f.name: f.sequence for f in catalogue()}
+    head, tail = parts["CAG promoter"][:249], parts["CMV enhancer"][-249:]
+    assert sum(a != b for a, b in zip(head, tail, strict=True)) <= 1
