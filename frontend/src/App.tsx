@@ -52,6 +52,8 @@ import PasteDialog from "./files/PasteDialog";
 import CopyTextDialog from "./files/CopyTextDialog";
 import SaveCopyDialog from "./files/SaveCopyDialog";
 import UnsavedDialog, { type UnsavedChoice } from "./files/UnsavedDialog";
+import QuitDialog from "./files/QuitDialog";
+import { FILES_EVENT, notSavedMessage, QUIT_EVENT, STARTUP_POLL_MS } from "./files/quit";
 import "./files/busy.css";
 
 const DOCTABS_HEIGHT = 30;
@@ -277,14 +279,46 @@ export default function App() {
   useEffect(() => {
     refreshRecent();
     api.samples().then((r) => setSamples(r.samples)).catch(report);
-    api
-      .startupFiles()
-      .then(({ results, errors }) => {
-        results.forEach((r) => addResult(r, r.path ?? ""));
-        errors.forEach((message) => notify("error", message));
-      })
-      .catch(report);
+  }, [refreshRecent, report]);
+
+  // Files from the command line (a double-click on a file starts Vettore with it), then files
+  // that later double-clicks hand over to this window instead of starting a second copy
+  // (src/vettore/desktop/instance.py). A file already open is shown, not opened twice.
+  const taking = useRef(false);
+  const takeStartupFiles = useCallback(async (reportFailure: boolean) => {
+    if (taking.current) return;
+    taking.current = true;
+    try {
+      const { results, errors } = await api.startupFiles();
+      for (const result of results) {
+        const open = result.path ? docsRef.current.find((d) => d.path === result.path) : undefined;
+        if (open) setActive(open.editorName);
+        else addResult(result, result.path ?? "");
+      }
+      errors.forEach((message) => notify("error", message));
+      if (results.length || errors.length) refreshRecent();
+    } catch (e) {
+      // Only the first look reports a failure: an engine that stopped answering would
+      // otherwise repeat the message twice a second.
+      if (reportFailure) report(e);
+    } finally {
+      taking.current = false;
+    }
   }, [addResult, notify, refreshRecent, report]);
+  const takeRef = useRef(takeStartupFiles);
+  takeRef.current = takeStartupFiles;
+
+  useEffect(() => {
+    takeRef.current(true);
+    const timer = setInterval(() => takeRef.current(false), STARTUP_POLL_MS);
+    // The desktop window also says when files arrive, so they open without waiting.
+    const onFiles = () => takeRef.current(false);
+    window.addEventListener(FILES_EVENT, onFiles);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener(FILES_EVENT, onFiles);
+    };
+  }, []);
 
   const openSample = useCallback(
     async (id: string) => {
@@ -537,6 +571,67 @@ export default function App() {
     },
     [askUnsaved, saveDoc],
   );
+
+  // ---- quit ------------------------------------------------------------------------------
+  // The desktop window asks before closing while documents have unsaved changes
+  // (src/vettore/desktop/close_guard.py): Save All, Don't Save or Cancel, then it is told to
+  // close. Without an answer within a few seconds it asks with the system's own dialog.
+  const [quit, setQuit] = useState<{ docs: Doc[]; saving: { name: string; index: number } | null } | null>(null);
+  const quitting = useRef(false);
+
+  const closeWindow = useCallback(async () => {
+    const desktop = await whenDesktopReady(0);
+    await desktop?.confirm_quit?.();
+  }, []);
+
+  const requestQuit = useCallback(() => {
+    if (quitting.current) return;   // the question is already on screen, or saving
+    // A tab's own question gives way to the window's.
+    setUnsaved((open) => {
+      open?.resolve("cancel");
+      return null;
+    });
+    const pending = docsRef.current.filter((d) => needsSave(d, editorState(d.editorName)));
+    if (!pending.length) {
+      closeWindow();
+      return;
+    }
+    quitting.current = true;
+    setQuit({ docs: pending, saving: null });
+  }, [closeWindow]);
+
+  useEffect(() => {
+    const onQuit = (e: Event) => {
+      e.preventDefault();   // tells the desktop window that Vettore asks the user
+      requestQuit();
+    };
+    window.addEventListener(QUIT_EVENT, onQuit);
+    return () => window.removeEventListener(QUIT_EVENT, onQuit);
+  }, [requestQuit]);
+
+  const endQuit = useCallback(() => {
+    quitting.current = false;
+    setQuit(null);
+  }, []);
+
+  /** Save every listed document the way Save does, then close; stop at the first not saved. */
+  const saveAllAndQuit = useCallback(async () => {
+    if (!quit) return;
+    const { docs: listed } = quit;
+    for (const [i, doc] of listed.entries()) {
+      const current = docsRef.current.find((d) => d.editorName === doc.editorName);
+      if (!current || !needsSave(current, editorState(current.editorName))) continue;
+      setActive(current.editorName);   // the save dialog is about the document on screen
+      setQuit({ docs: listed, saving: { name: current.name, index: i + 1 } });
+      if (!(await saveDoc(current, false))) {
+        endQuit();
+        notify("warning", notSavedMessage(current.name));
+        return;
+      }
+    }
+    endQuit();
+    await closeWindow();
+  }, [closeWindow, endQuit, notify, quit, saveDoc]);
 
   // ---- views -----------------------------------------------------------------------------
   const selectView = useCallback(
@@ -865,6 +960,18 @@ export default function App() {
             unsaved.resolve(choice);
             setUnsaved(null);
           }}
+        />
+      )}
+      {quit && (
+        <QuitDialog
+          docs={quit.docs}
+          saving={quit.saving}
+          onSaveAll={saveAllAndQuit}
+          onDiscard={() => {
+            endQuit();
+            closeWindow();
+          }}
+          onCancel={endQuit}
         />
       )}
       {detectOpen && activeDoc && (

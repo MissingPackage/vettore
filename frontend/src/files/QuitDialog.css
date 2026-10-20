@@ -1,0 +1,13 @@
+/* Closing the window with unsaved work. Colours and spacing come from theme/tokens.css. */
+.vt-quit-list {
+  margin: 0 0 var(--vt-space-3);
+  padding-left: var(--vt-space-5);
+  max-height: 240px;
+  overflow-y: auto;
+  line-height: var(--vt-line-height);
+}
+
+.vt-quit-list li {
+  margin-bottom: var(--vt-space-1);
+  overflow-wrap: anywhere;
+}
