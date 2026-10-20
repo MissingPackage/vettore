@@ -5,6 +5,8 @@ import {
   DesignPrimersForm,
   AnnealOligosForm,
   GoldenGateForm,
+  InsertMultipleForm,
+  LigateFragmentsForm,
   MutagenesisForm,
   PcrForm,
   RestrictionInsertForm,
@@ -19,7 +21,10 @@ export interface CloningAction {
   title: string;
   endpoint: string;
   Form: ComponentType<FormProps>;
+  /** One line: what the action does. */
   help: string;
+  /** Optional second paragraph: assumptions and how the inputs are read. */
+  details?: string;
   /** Engines that are not implemented yet stay out of the menus. */
   ready?: boolean;
 }
@@ -122,24 +127,54 @@ export const CLONING_ACTIONS: CloningAction[] = [
   },
   {
     id: "ta",
+    ready: true,
     title: "TA or GC Cloning",
     endpoint: "ta-topo",
     Form: taTopoForm([
-      { value: "TA", label: "TA cloning" },
-      { value: "GC", label: "GC cloning" },
+      { value: "TA", label: "TA cloning (3′ A insert, 3′ T vector)" },
+      { value: "GC", label: "GC cloning (3′ G insert, 3′ C vector)" },
     ]),
-    help: "A-tailed PCR product into a T-vector; both orientations are possible.",
+    help: "Clone a Taq PCR product into a T-vector (or a G-tailed product into a C-vector); both orientations are shown.",
+    details: "The vector file is the vector as double-stranded DNA, without its single-base overhangs: "
+      + "a linearised vector file, or a circular map plus the base after which it opens. Vettore adds the "
+      + "3′ T (or C) to the vector and the 3′ A (or G) to the PCR product.",
   },
   {
     id: "topo",
+    ready: true,
     title: "TOPO Cloning",
     endpoint: "ta-topo",
     Form: taTopoForm([
-      { value: "TOPO-TA", label: "TOPO TA" },
-      { value: "blunt-TOPO", label: "Blunt TOPO" },
-      { value: "directional-TOPO", label: "Directional TOPO (CACC)" },
+      { value: "TOPO-TA", label: "TOPO TA (3′ A insert)" },
+      { value: "blunt-TOPO", label: "Blunt TOPO (blunt insert)" },
+      { value: "directional-TOPO", label: "Directional TOPO (CACC on the forward primer)" },
     ]),
-    help: "Topoisomerase-activated vectors; directional TOPO needs CACC on the forward primer.",
+    help: "Clone a PCR product into a topoisomerase-activated vector; directional TOPO needs CACC at the 5′ end of the forward primer.",
+    details: "The vector file is the vector as double-stranded DNA, without its single-stranded ends: a "
+      + "linearised vector file, or a circular map plus the base after which it opens. For directional "
+      + "TOPO the insert is placed in the direction of the vector's numbering, CACC end first.",
+  },
+  {
+    id: "insert-multiple",
+    ready: true,
+    title: "Insert Multiple Fragments",
+    endpoint: "insert-multiple",
+    Form: InsertMultipleForm,
+    help: "Ligate two or more inserts into a cut vector in one reaction; every product the ends allow is shown.",
+    details: "Each insert is a piece cut out with its own enzymes, or a PCR product (blunt). The order "
+      + "and orientation of the inserts follow from their ends; the order you list only decides which "
+      + "product comes first.",
+  },
+  {
+    id: "ligate",
+    ready: true,
+    title: "Ligate Fragments",
+    endpoint: "ligate",
+    Form: LigateFragmentsForm,
+    help: "Join two or more fragments end to end into a linear molecule (or close them into a circle).",
+    details: "Each fragment is a piece cut out with restriction enzymes, or a whole file or region used "
+      + "as a blunt PCR product. Sticky ends join only when their overhangs pair; blunt ends join any "
+      + "blunt end.",
   },
 ];
 

@@ -115,6 +115,7 @@ export function RegionInput(props: {
   start: number | null;
   end: number | null;
   onChange: (start: number | null, end: number | null) => void;
+  testId?: string;
 }) {
   const len = props.doc?.data().sequence.length ?? 0;
   const num = (v: string) => (v.trim() === "" ? null : Math.max(1, Math.min(len, Number(v))) - 1);
@@ -125,6 +126,7 @@ export function RegionInput(props: {
         type="number"
         min={1}
         max={len}
+        data-testid={props.testId && `${props.testId}-start`}
         value={props.start === null ? "" : props.start + 1}
         onChange={(e) => props.onChange(num(e.target.value), props.end)}
       />
@@ -134,6 +136,7 @@ export function RegionInput(props: {
         type="number"
         min={1}
         max={len}
+        data-testid={props.testId && `${props.testId}-end`}
         value={props.end === null ? "" : props.end + 1}
         onChange={(e) => props.onChange(props.start, num(e.target.value))}
       />

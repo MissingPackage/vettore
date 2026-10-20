@@ -1,0 +1,30 @@
+/* Cloning dialogs: fragment rows, inline validation, product list. Theme tokens only. */
+/* Long forms scroll under a result column that stays in view. */
+.vt-cloning > .vt-cloning-result { position: sticky; top: 0; align-self: start; }
+.vt-fragment {
+  border: 1px solid var(--vt-border-subtle);
+  border-radius: var(--vt-radius-lg);
+  padding: var(--vt-space-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--vt-space-2);
+  background: var(--vt-surface);
+}
+.vt-fragment-head { display: flex; align-items: center; justify-content: space-between; }
+.vt-inline-error { color: var(--vt-danger); font-size: 11px; }
+.vt-inline-warning { color: var(--vt-warning); font-size: 11px; }
+.vt-inline-row { display: flex; align-items: center; gap: var(--vt-space-2); flex-wrap: wrap; }
+.vt-missing {
+  color: var(--vt-text-muted);
+  background: var(--vt-surface-subtle);
+  border: 1px dashed var(--vt-border-subtle);
+  border-radius: var(--vt-radius);
+  padding: var(--vt-space-3);
+}
+.vt-product-choice { display: flex; flex-direction: column; gap: var(--vt-space-1); margin-bottom: var(--vt-space-2); }
+.vt-product-choice label { margin: 0; }
+.vt-product-name { display: flex; align-items: center; gap: var(--vt-space-2); margin: var(--vt-space-2) 0; }
+.vt-product-name input { flex: 1; min-width: 0; }
+.vt-busy { display: flex; align-items: center; gap: var(--vt-space-2); color: var(--vt-text-muted); }
+.vt-help { color: var(--vt-text-muted); margin: 0 0 var(--vt-space-1); }
+.vt-help-more { color: var(--vt-text-muted); font-size: 11px; margin: 0; }

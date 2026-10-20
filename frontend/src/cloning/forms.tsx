@@ -1,6 +1,9 @@
 // One form per cloning action. Each form reports the JSON body of its /api/cloning endpoint.
 import { useEffect, useState } from "react";
 import { ENZYMES } from "../enzymeLogic";
+import { defaultInserts, defaultLinear, defaultVector, docData, openingFromSelection } from "./defaults";
+import { FragmentEditor } from "./fragments";
+import { newRow, rowBody, type FragmentRow } from "./fragmentRows";
 import { DocSelect, EnzymePicker, Field, RegionInput, findDoc } from "./inputs";
 import type { FormProps, OpenDoc } from "./types";
 
@@ -19,9 +22,9 @@ export function RestrictionInsertForm({ docs, active, onChange }: FormProps) {
   useEffect(() => {
     if (!v || !i || !vEnz.length || !iEnz.length) return onChange(null);
     onChange({
-      vector: v.data(),
+      vector: docData(v),
       vector_enzymes: vEnz,
-      insert: i.data(),
+      insert: docData(i),
       insert_enzymes: iEnz,
       insert_fragment_index: null,
       orientation,
@@ -60,6 +63,9 @@ function PrimerInput(props: {
   template: OpenDoc | null;
   value: { name: string; sequence: string };
   onChange: (p: { name: string; sequence: string }) => void;
+  testId?: string;
+  /** Inline validation shown under the primer. */
+  children?: React.ReactNode;
 }) {
   const primers = (() => {
     const p = props.template?.data().primers ?? [];
@@ -77,6 +83,7 @@ function PrimerInput(props: {
         <input
           className="bp3-input bp3-small vt-mono"
           placeholder="5′ → 3′ sequence"
+          data-testid={props.testId}
           value={props.value.sequence}
           onChange={(e) => props.onChange({ ...props.value, sequence: e.target.value.replace(/[^ACGTRYSWKMBDHVNacgtryswkmbdhvn]/g, "") })}
         />
@@ -92,6 +99,7 @@ function PrimerInput(props: {
           </div>
         )}
       </div>
+      {props.children}
     </Field>
   );
 }
@@ -103,7 +111,7 @@ export function PcrForm({ docs, active, onChange }: FormProps) {
   const t = findDoc(docs, template);
   useEffect(() => {
     if (!t || fwd.sequence.length < 10 || rev.sequence.length < 10) return onChange(null);
-    onChange({ template: t.data(), forward: fwd, reverse: rev, mismatches: 0 });
+    onChange({ template: docData(t), forward: fwd, reverse: rev, mismatches: 0 });
   }, [t, fwd, rev]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <>
@@ -127,7 +135,7 @@ export function DesignPrimersForm({ docs, active, onChange }: FormProps) {
   const [rTail, setRTail] = useState("");
   useEffect(() => {
     if (!t || start === null || end === null) return onChange(null);
-    onChange({ template: t.data(), start, end, target_tm: tm, forward_tail: fTail, reverse_tail: rTail });
+    onChange({ template: docData(t), start, end, target_tm: tm, forward_tail: fTail, reverse_tail: rTail });
   }, [t, start, end, tm, fTail, rTail]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <>
@@ -177,8 +185,8 @@ export function overlapForm(method: "gibson" | "hifi" | "infusion") {
       if (!linearize || rows.some((r) => !r.doc)) return onChange(null);
       onChange({
         method,
-        vector: { doc: v.data(), linearize },
-        inserts: rows.map(({ row, doc }) => ({ doc: doc!.data(), start: row.start, end: row.end })),
+        vector: { doc: docData(v), linearize },
+        inserts: rows.map(({ row, doc }) => ({ doc: docData(doc!), start: row.start, end: row.end })),
         overlap,
         target_tm: 60,
       });
@@ -250,7 +258,7 @@ export function MutagenesisForm({ docs, active, onChange }: FormProps) {
   useEffect(() => {
     if (!d || start === null || end === null) return onChange(null);
     if (kind !== "deletion" && !newSeq) return onChange(null);
-    onChange({ doc: d.data(), kind, start, end: kind === "insertion" ? start : end, new_sequence: kind === "deletion" ? "" : newSeq });
+    onChange({ doc: docData(d), kind, start, end: kind === "insertion" ? start : end, new_sequence: kind === "deletion" ? "" : newSeq });
   }, [d, kind, start, end, newSeq]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <>
@@ -289,7 +297,7 @@ export function GoldenGateForm({ docs, active, onChange }: FormProps) {
   useEffect(() => {
     const p = parts.map((n) => findDoc(docs, n));
     if (!v || p.some((x) => !x)) return onChange(null);
-    onChange({ vector: v.data(), parts: p.map((x) => x!.data()), enzyme });
+    onChange({ vector: docData(v), parts: p.map((x) => docData(x!)), enzyme });
   }, [v, parts, enzyme]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <>
@@ -343,35 +351,224 @@ export function gatewayForm(reaction: "BP" | "LR") {
 }
 
 // ---- TA / GC / TOPO ----------------------------------------------------------------------
+const DIRECTIONAL_TAG = "CACC";
+
 export function taTopoForm(kinds: { value: string; label: string }[]) {
   return function TaTopoForm({ docs, active, onChange }: FormProps) {
+    const firstVector = defaultVector(docs, active);
+    const firstInsert = defaultLinear(docs, active, firstVector);
     const [kind, setKind] = useState(kinds[0].value);
-    const [insert, setInsert] = useState<string | null>(active?.editorName ?? null);
-    const [vector, setVector] = useState<string | null>(null);
-    const di = findDoc(docs, insert);
+    const [vector, setVector] = useState<string | null>(firstVector);
+    const [position, setPosition] = useState<number | null>(() => openingFromSelection(findDoc(docs, firstVector)));
+    const [source, setSource] = useState<"file" | "pcr">(firstInsert ? "file" : "pcr");
+    const [insert, setInsert] = useState<string | null>(firstInsert);
+    const [template, setTemplate] = useState<string | null>(firstInsert ?? active?.editorName ?? null);
+    const [fwd, setFwd] = useState({ name: "Forward", sequence: "" });
+    const [rev, setRev] = useState({ name: "Reverse", sequence: "" });
     const dv = findDoc(docs, vector);
+    const di = findDoc(docs, insert);
+    const dt = findDoc(docs, template);
+    const vData = dataOf(dv);
+    const directional = kind === "directional-TOPO";
+    const missingTag = (seq: string | undefined) =>
+      directional && !!seq && seq.length >= 4 && !seq.toUpperCase().startsWith(DIRECTIONAL_TAG);
+
     useEffect(() => {
-      if (!di || !dv) return onChange(null);
-      onChange({ kind, insert: di.data(), vector: dv.data() });
-    }, [kind, di, dv]); // eslint-disable-line react-hooks/exhaustive-deps
+      if (!dv) return onChange(null, "Choose the vector file");
+      if (vData?.circular && position === null) {
+        return onChange(null, `“${dv.name}” is circular: enter where it is opened (the cloning site)`);
+      }
+      const common = { kind, vector: docData(dv), position: vData?.circular ? position : null };
+      if (source === "file") {
+        if (!di) return onChange(null, "Choose the PCR product (a linear file), or amplify a template here");
+        return onChange({ ...common, insert: docData(di) });
+      }
+      if (!dt) return onChange(null, "Choose the template to amplify");
+      if (fwd.sequence.length < 12 || rev.sequence.length < 12) {
+        return onChange(null, "Enter the forward and reverse primers (at least 12 nt each)");
+      }
+      onChange({ ...common, template: docData(dt), forward: fwd, reverse: rev });
+    }, [kind, dv, position, source, di, dt, fwd, rev]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    const len = vData?.sequence.length ?? 0;
     return (
       <>
         <Field label="Method">
           <div className="bp3-html-select">
-            <select value={kind} onChange={(e) => setKind(e.target.value)}>
+            <select data-testid="ta-kind" value={kind} onChange={(e) => setKind(e.target.value)}>
               {kinds.map((k) => <option key={k.value} value={k.value}>{k.label}</option>)}
             </select>
           </div>
         </Field>
-        <Field label="Insert (PCR product)">
-          <DocSelect docs={docs} value={insert} onChange={setInsert} />
+        <Field
+          label="Vector"
+          hint="A linearised vector file, or a circular map plus where it opens"
+        >
+          <DocSelect
+            docs={docs}
+            value={vector}
+            onChange={(v) => {
+              setVector(v);
+              setPosition(openingFromSelection(findDoc(docs, v)));
+            }}
+            testId="vector-doc"
+          />
         </Field>
-        <Field label="Linearized vector (as supplied)">
-          <DocSelect docs={docs} value={vector} onChange={setVector} />
+        {vData?.circular && (
+          <Field label="Opened after base" hint="The insert goes between this base and the next (0 = before base 1)">
+            <div className="vt-inline-row">
+              <input
+                className="bp3-input bp3-small"
+                type="number"
+                min={0}
+                max={len}
+                data-testid="vector-position"
+                value={position ?? ""}
+                onChange={(e) =>
+                  setPosition(e.target.value.trim() === "" ? null : Math.max(0, Math.min(len, Math.round(Number(e.target.value)))))}
+              />
+              <button className="bp3-button bp3-small" disabled={!dv?.selection()} onClick={() => setPosition(openingFromSelection(dv))}>
+                After the selection
+              </button>
+            </div>
+          </Field>
+        )}
+        <Field label="PCR product">
+          <div className="bp3-html-select bp3-fill">
+            <select data-testid="insert-source" value={source} onChange={(e) => setSource(e.target.value as "file" | "pcr")}>
+              <option value="file">An open file (the product as amplified)</option>
+              <option value="pcr">Amplify a template with two primers</option>
+            </select>
+          </div>
         </Field>
+        {source === "file" ? (
+          <Field label="PCR product file">
+            <DocSelect docs={docs} value={insert} onChange={setInsert} testId="insert-doc" />
+            {missingTag(dataOf(di)?.sequence) && (
+              <span className="vt-inline-error" data-testid="cacc-missing">
+                This product does not start with CACC: directional TOPO needs CACC at the 5′ end of the forward primer.
+              </span>
+            )}
+          </Field>
+        ) : (
+          <>
+            <Field label="Template">
+              <DocSelect docs={docs} value={template} onChange={setTemplate} testId="template-doc" />
+            </Field>
+            <PrimerInput label="Forward primer" template={dt} value={fwd} onChange={setFwd} testId="forward-primer">
+              {missingTag(fwd.sequence) && (
+                <span className="vt-inline-row vt-inline-error" data-testid="cacc-missing">
+                  Directional TOPO needs CACC at the 5′ end of the forward primer.
+                  <button
+                    className="bp3-button bp3-small"
+                    data-testid="add-cacc"
+                    onClick={() => setFwd({ ...fwd, sequence: DIRECTIONAL_TAG + fwd.sequence })}
+                  >
+                    Add CACC
+                  </button>
+                </span>
+              )}
+            </PrimerInput>
+            <PrimerInput label="Reverse primer" template={dt} value={rev} onChange={setRev} testId="reverse-primer">
+              {directional && rev.sequence.toUpperCase().startsWith(DIRECTIONAL_TAG) && (
+                <span className="vt-inline-warning">A reverse primer starting with CACC lets the insert go in backwards.</span>
+              )}
+            </PrimerInput>
+          </>
+        )}
       </>
     );
   };
+}
+
+// ---- Insert multiple fragments / Ligate fragments -----------------------------------------
+export function InsertMultipleForm({ docs, active, onChange }: FormProps) {
+  const [vector, setVector] = useState<FragmentRow>(() => newRow(docs, defaultVector(docs, active), "digest"));
+  const [inserts, setInserts] = useState<FragmentRow[]>(() =>
+    defaultInserts(docs, defaultVector(docs, active), 2).map((n) => newRow(docs, n, "digest")));
+
+  useEffect(() => {
+    const v = rowBody(docs, vector, "vector");
+    if (typeof v === "string") return onChange(null, v);
+    const bodies = inserts.map((r, i) => rowBody(docs, r, `insert ${i + 1}`));
+    const missing = bodies.find((b): b is string => typeof b === "string");
+    if (missing) return onChange(null, missing);
+    onChange({ vector: v, inserts: bodies });
+  }, [docs, vector, inserts]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const setInsert = (i: number, row: FragmentRow) => setInserts((rows) => rows.map((r, j) => (j === i ? row : r)));
+  return (
+    <>
+      <FragmentEditor docs={docs} row={vector} title="Vector" role="vector" prefer="digest" testId="vector" onChange={setVector} />
+      {inserts.map((row, i) => (
+        <FragmentEditor
+          key={i}
+          docs={docs}
+          row={row}
+          title={`Insert ${i + 1}`}
+          role="insert"
+          prefer="digest"
+          testId={`insert-${i}`}
+          onChange={(r) => setInsert(i, r)}
+          onRemove={inserts.length > 1 ? () => setInserts((rows) => rows.filter((_, j) => j !== i)) : undefined}
+        />
+      ))}
+      <button
+        className="bp3-button bp3-small"
+        data-testid="add-insert"
+        onClick={() => setInserts((rows) => [...rows, newRow(docs, null, "digest")])}
+      >
+        + Add insert
+      </button>
+    </>
+  );
+}
+
+export function LigateFragmentsForm({ docs, onChange }: FormProps) {
+  const [rows, setRows] = useState<FragmentRow[]>(() =>
+    defaultInserts(docs, null, 2).map((n) => newRow(docs, n, "pcr")));
+  const [circular, setCircular] = useState(false);
+
+  useEffect(() => {
+    const bodies = rows.map((r, i) => rowBody(docs, r, `fragment ${i + 1}`));
+    const missing = bodies.find((b): b is string => typeof b === "string");
+    if (missing) return onChange(null, missing);
+    if (bodies.length < 2 && !circular) {
+      return onChange(null, "Add a second fragment, or tick “Close the product into a circle”");
+    }
+    onChange({ fragments: bodies, circular });
+  }, [docs, rows, circular]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const setRow = (i: number, row: FragmentRow) => setRows((all) => all.map((r, j) => (j === i ? row : r)));
+  return (
+    <>
+      {rows.map((row, i) => (
+        <FragmentEditor
+          key={i}
+          docs={docs}
+          row={row}
+          title={`Fragment ${i + 1}`}
+          role="fragment"
+          prefer="pcr"
+          testId={`fragment-${i}`}
+          onChange={(r) => setRow(i, r)}
+          onRemove={rows.length > 1 ? () => setRows((all) => all.filter((_, j) => j !== i)) : undefined}
+        />
+      ))}
+      <button
+        className="bp3-button bp3-small"
+        data-testid="add-fragment"
+        onClick={() => setRows((all) => [...all, newRow(docs, null, "pcr")])}
+      >
+        + Add fragment
+      </button>
+      <label className="bp3-control bp3-checkbox">
+        <input type="checkbox" data-testid="ligate-circular" checked={circular} onChange={(e) => setCircular(e.target.checked)} />
+        <span className="bp3-control-indicator" />
+        Close the product into a circle
+      </label>
+    </>
+  );
 }
 
 // ---- Delete restriction fragment ---------------------------------------------------------
@@ -381,7 +578,7 @@ export function DeleteFragmentForm({ docs, active, onChange }: FormProps) {
   const d = findDoc(docs, docName);
   useEffect(() => {
     if (!d || !enz.length) return onChange(null);
-    onChange({ doc: d.data(), enzymes: enz, fragment_index: null });
+    onChange({ doc: docData(d), enzymes: enz, fragment_index: null });
   }, [d, enz]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <>
@@ -410,11 +607,11 @@ export function AnnealOligosForm({ docs, active, onChange }: FormProps) {
     if (!v || !enzymes.length) return onChange(null);
     if (mode === "design") {
       if (insert.length < 4) return onChange(null);
-      onChange({ mode, insert, insert_name: insertName || "insert", vector: v.data(), enzymes });
+      onChange({ mode, insert, insert_name: insertName || "insert", vector: docData(v), enzymes });
     } else {
       if (top.length < 10 || bottom.length < 10) return onChange(null);
       onChange({ mode, top, top_name: `${insertName}_top`, bottom, bottom_name: `${insertName}_bottom`,
-                 vector: v.data(), enzymes });
+                 vector: docData(v), enzymes });
     }
   }, [mode, v, enzymes, insert, insertName, top, bottom]); // eslint-disable-line react-hooks/exhaustive-deps
 

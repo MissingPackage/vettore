@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import * as Blueprint from "@blueprintjs/core";
-import { Button, Classes } from "@blueprintjs/core";
+import { Button, Classes, Spinner } from "@blueprintjs/core";
 import { SimpleCircularOrLinearView } from "@teselagen/ove";
 import { api } from "../api";
 import type { CloningAction } from "./registry";
 import type { CloningResult, Oligo, OpenDoc, Product } from "./types";
+import "./cloning.css";
 
 // Blueprint 3 typings predate React 18 (no implicit `children`).
 const { Dialog, Callout } = Blueprint as unknown as Record<string, React.ComponentType<any>>;
@@ -22,6 +23,8 @@ export default function CloningDialog(props: {
 }) {
   const { action } = props;
   const [body, setBody] = useState<object | null>(null);
+  const [missing, setMissing] = useState<string | null>(null);
+  const [name, setName] = useState("");
   const [result, setResult] = useState<CloningResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -57,7 +60,15 @@ export default function CloningDialog(props: {
     return () => clearTimeout(t);
   }, [action.endpoint, bodyKey]);
 
+  // Stable: forms report from their effects.
+  const onFormChange = useCallback((next: object | null, why?: string) => {
+    setBody(next);
+    setMissing(next ? null : why ?? null);
+  }, []);
+
   const product = result?.products[chosen] ?? null;
+  const productName = product?.doc.name ?? "";
+  useEffect(() => setName(productName), [productName]);
   const oligos = result ? (result.oligos.length ? result.oligos : product?.oligos ?? []) : [];
   const { Form } = action;
 
@@ -65,12 +76,21 @@ export default function CloningDialog(props: {
     <Dialog isOpen onClose={props.onClose} title={action.title} style={{ width: 1100, maxWidth: "95vw" }} canOutsideClickClose={false}>
       <div className={`${Classes.DIALOG_BODY} vt-cloning`} data-testid="cloning-dialog">
         <div className="vt-cloning-form">
-          <p className="vt-muted">{action.help}</p>
-          <Form docs={props.docs} active={props.active} onChange={setBody} />
+          <p className="vt-help" data-testid="cloning-help">{action.help}</p>
+          {action.details && <p className="vt-help-more">{action.details}</p>}
+          <Form docs={props.docs} active={props.active} onChange={onFormChange} />
         </div>
         <div className="vt-cloning-result">
-          {busy && <p className="vt-muted">Simulating…</p>}
-          {!bodyKey && !busy && <p className="vt-muted">Fill in the inputs on the left to simulate the product.</p>}
+          {busy && (
+            <div className="vt-busy" data-testid="cloning-busy">
+              <Spinner size={16} /> Simulating…
+            </div>
+          )}
+          {!bodyKey && !busy && (
+            <p className="vt-missing" data-testid="cloning-missing">
+              {missing ?? "Fill in the inputs on the left to simulate the product."}
+            </p>
+          )}
           {error && (
             <Callout intent="danger" title="No product" data-testid="cloning-error">
               {error}
@@ -79,13 +99,14 @@ export default function CloningDialog(props: {
           {result && product && (
             <>
               {result.products.length > 1 && (
-                <div className="vt-products">
+                <div className="vt-product-choice" data-testid="cloning-products">
+                  <b>{result.products.length} possible products: choose the one to create</b>
                   {result.products.map((p, i) => (
-                    <label key={i} className="bp3-control bp3-radio bp3-inline">
+                    <label key={i} className="bp3-control bp3-radio">
                       <input type="radio" checked={i === chosen} onChange={() => setChosen(i)} />
                       <span className="bp3-control-indicator" />
                       {i === 0 ? "Expected: " : `Alternative ${i}: `}
-                      {p.doc.sequence.length} bp {p.doc.circular ? "circular" : "linear"}
+                      {p.label ?? `${p.doc.sequence.length} bp ${p.doc.circular ? "circular" : "linear"}`}
                     </label>
                   ))}
                 </div>
@@ -102,6 +123,15 @@ export default function CloningDialog(props: {
                 <br />
                 <span className="vt-muted">{product.details}</span>
               </p>
+              <label className="vt-product-name">
+                <span>Name of the new file</span>
+                <input
+                  className="bp3-input bp3-small"
+                  data-testid="cloning-name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                />
+              </label>
               {result.warnings.length > 0 && (
                 <Callout intent="warning" title="Check before ordering" data-testid="cloning-warnings">
                   <ul>{result.warnings.map((w, i) => <li key={i}>{w}</li>)}</ul>
@@ -144,7 +174,8 @@ export default function CloningDialog(props: {
             intent="primary"
             data-testid="cloning-create"
             disabled={!product || busy}
-            onClick={() => product && result && props.onCreate(product, result)}
+            onClick={() => product && result
+              && props.onCreate({ ...product, doc: { ...product.doc, name: name.trim() || product.doc.name } }, result)}
           >
             Create Product
           </Button>
