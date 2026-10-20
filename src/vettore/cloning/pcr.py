@@ -63,11 +63,38 @@ def anneal(template: Dseqrecord, forward: PrimerIn, reverse: PrimerIn, limit: in
             raise CloningError(f"{label} primer “{primer.name}” is only {len(primer)} nt; "
                                f"primers must be at least {MIN_PRIMER_LENGTH} nt")
     annealed = Anneal([f, r], template, limit=limit)
-    if not annealed.forward_primers:
-        raise CloningError(f"Forward primer “{f.name}” does not bind “{template.name}”")
-    if not annealed.reverse_primers:
-        raise CloningError(f"Reverse primer “{r.name}” does not bind “{template.name}”")
+    if not annealed.forward_primers or not annealed.reverse_primers:
+        raise CloningError(_binding_problem(annealed, f, r, template.name))
     return annealed
+
+
+def _matches(primers, primer: Primer | PrimerIn) -> bool:
+    """Is that primer (by sequence) among the primers pydna found on one strand?"""
+    bases = "".join(str(primer.sequence if isinstance(primer, PrimerIn) else primer.seq).split())
+    bases = bases.upper().replace("U", "T")
+    return any(str(p.seq).upper() == bases for p in primers)
+
+
+def _binding_problem(annealed, forward: Primer, reverse: Primer, template: str) -> str:
+    """Why no product forms, with the fix: a primer written on the wrong strand (the commonest
+    slip, a reverse primer copied from the top strand) is named with its reverse complement."""
+    top, bottom = annealed.forward_primers, annealed.reverse_primers
+    f_top, f_bottom = _matches(top, forward), _matches(bottom, forward)
+    r_top, r_bottom = _matches(top, reverse), _matches(bottom, reverse)
+    check = "Check that it is written 5′→3′ and that the right template is selected."
+    if r_top and not r_bottom:
+        return (f"Reverse primer “{reverse.name}” matches the top strand of “{template}”, so it "
+                "points the same way as the forward primer. A reverse primer is written on the "
+                "other strand: use its reverse complement, "
+                f"5′-{reverse.seq.reverse_complement()}-3′.")
+    if f_bottom and not f_top:
+        return (f"Forward primer “{forward.name}” matches the bottom strand of “{template}”, so "
+                "it points the same way as the reverse primer. A forward primer is written on "
+                "the top strand: use its reverse complement, "
+                f"5′-{forward.seq.reverse_complement()}-3′.")
+    if not f_top:
+        return f"Forward primer “{forward.name}” does not bind “{template}”. {check}"
+    return f"Reverse primer “{reverse.name}” does not bind “{template}”. {check}"
 
 
 def amplified_region(annealed) -> tuple[int, int, int, int]:
@@ -89,6 +116,15 @@ def run_pcr(template_doc: SequenceDoc, forward: PrimerIn, reverse: PrimerIn,
                            "use primers that match the template exactly")
     template = to_dseqrecord(template_doc)
     annealed = anneal(template, forward, reverse)
+    swapped: list[str] = []
+    if (_matches(annealed.forward_primers, reverse)
+            and not _matches(annealed.forward_primers, forward)):
+        # Both bind, each on the other's strand: the product is the same, and it is drawn with
+        # each primer where it really binds.
+        forward, reverse = reverse, forward
+        swapped.append(f"“{forward.name}” binds as the forward primer and “{reverse.name}” as "
+                       "the reverse primer, the other way round from how they were entered. "
+                       "The product is the same; keep it in mind when you name and order them.")
     start, end, f_tail, r_tail = amplified_region(annealed)
     if not template.circular and start > end:
         raise CloningError(f"The primers face away from each other on the linear template "
@@ -113,7 +149,7 @@ def run_pcr(template_doc: SequenceDoc, forward: PrimerIn, reverse: PrimerIn,
         Oligo(name=reverse.name, sequence=rev_seq, tm=tm_of(r_annealing),
               annealing_length=len(r_annealing)),
     ]
-    warnings = binding_warnings(annealed, oligos)
+    warnings = swapped + binding_warnings(annealed, oligos)
 
     name = f"{template_doc.name} PCR product"
     details = (f"Amplified {region_length(len(template), start, end)} bp of "
