@@ -95,25 +95,96 @@ function Differences(props: { read: ReadSummary }) {
   );
 }
 
+/** Whether a read's aligned span (1-based, inclusive, wrapping past the origin) covers a position. */
+function covers(read: ReadSummary, position: number): boolean {
+  return read.start <= read.end
+    ? read.start <= position && position <= read.end
+    : position >= read.start || position <= read.end;
+}
+
+/** A difference from the reference, however many reads show it. */
+interface Event {
+  /** Reads that show it. */
+  seenBy: number;
+  /** Reads whose aligned span includes its position. */
+  covering: number;
+  /** Every read that shows it calls it on a low-quality base. */
+  weak: boolean;
+}
+
+/** The differences of all reads, each reference event once: two reads over one mutation are one mutation. */
+function events(reads: ReadSummary[]): Event[] {
+  const byKey = new Map<string, { position: number; seenBy: number; weak: boolean }>();
+  for (const r of reads) {
+    for (const d of r.discrepancies) {
+      const key = `${d.kind}:${d.position}:${d.reference}:${d.read}`;
+      const weak = d.quality !== undefined && d.quality < GOOD_QUALITY;
+      const seen = byKey.get(key);
+      if (seen) {
+        seen.seenBy += 1;
+        seen.weak = seen.weak && weak;
+      } else {
+        byKey.set(key, { position: d.position, seenBy: 1, weak });
+      }
+    }
+  }
+  return [...byKey.values()].map((e) => ({
+    seenBy: e.seenBy,
+    covering: Math.max(e.seenBy, reads.filter((r) => covers(r, e.position)).length),
+    weak: e.weak,
+  }));
+}
+
+/** "It is", "Both are", "All 3 are", "2 of them are": the subject for `count` of `total` items. */
+function subject(count: number, total: number, singular: string, plural: string): string {
+  if (count === total) {
+    if (total === 1) return `It ${singular}`;
+    return total === 2 ? `Both ${plural}` : `All ${n(total)} ${plural}`;
+  }
+  return `${n(count)} of them ${count === 1 ? singular : plural}`;
+}
+
 /** One sentence that answers "is my clone right?" for the reads that aligned. */
 function verdict(result: SangerResult): { text: string; ok: boolean } {
-  const total = result.reads.reduce((sum, r) => sum + r.discrepancies.length, 0);
-  const reads = `${result.reads.length} read${result.reads.length === 1 ? "" : "s"}`;
+  const reads = result.reads.length;
   const where = `${result.coverage_percent} % of ${result.reference.name}`;
+  const found = events(result.reads);
+  const total = found.length;
   if (total === 0) {
-    const subject = result.reads.length === 1
-      ? "the read matches" : `all ${result.reads.length} reads match`;
-    const cover = result.reads.length === 1 ? "it covers" : "they cover";
-    return { ok: true, text: `No differences: ${subject} ${result.reference.name} wherever ${cover} it (${where}).` };
+    const who = reads === 1 ? "the read matches" : `all ${reads} reads match`;
+    const cover = reads === 1 ? "it covers" : "they cover";
+    return { ok: true, text: `No differences: ${who} ${result.reference.name} wherever ${cover} it (${where}).` };
   }
-  const weak = result.reads.flatMap((r) => r.discrepancies)
-    .filter((d) => d.quality !== undefined && d.quality < GOOD_QUALITY).length;
-  return {
-    ok: false,
-    text: `${n(total)} difference${total === 1 ? "" : "s"} in ${reads} (covering ${where}).`
-      + (weak ? ` ${n(weak)} of them sit on low-quality bases (under Q${GOOD_QUALITY}, more than 1 chance in 100 of a`
-        + " wrong call): check those peaks in the chromatogram before trusting them." : ""),
-  };
+  const parts = [
+    `${n(total)} difference${total === 1 ? "" : "s"} ${reads === 1 ? "in 1 read" : `across ${n(reads)} reads`}`
+      + ` (covering ${where}).`,
+  ];
+  if (reads > 1) {
+    const shared = found.filter((e) => e.seenBy > 1).length;
+    const disputed = found.filter((e) => e.covering > e.seenBy).length;
+    if (total === 1) {
+      const [e] = found;
+      if (e.covering > 1 && e.seenBy === e.covering) {
+        parts.push(`${e.covering === 2 ? "Both reads" : `All ${n(e.covering)} reads`} covering it show it.`);
+      } else if (e.covering > 1) {
+        parts.push(`Only ${n(e.seenBy)} of the ${n(e.covering)} reads covering it show${e.seenBy === 1 ? "s" : ""} it:`
+          + " check that peak in the chromatogram.");
+      }
+    } else {
+      if (shared) parts.push(`${subject(shared, total, "is", "are")} seen in more than one read.`);
+      if (disputed) {
+        parts.push(`${subject(disputed, total, "is", "are")} missing from another read that covers the same`
+          + ` place: check ${disputed === 1 ? "that peak" : "those peaks"} in the chromatogram.`);
+      }
+    }
+  }
+  const weak = found.filter((e) => e.weak).length;
+  if (weak) {
+    parts.push(`${subject(weak, total, "sits", "sit")} on low-quality bases (under Q${GOOD_QUALITY}, more than 1`
+      + ` chance in 100 of a wrong call): check ${weak === 1 ? "that peak" : "those peaks"} in the chromatogram`
+      + ` before trusting ${weak === 1 ? "it" : "them"}.`);
+  }
+  return { ok: false, text: parts.join(" ") };
 }
 
 /** Tools → Align to Reference DNA Sequence: verify a clone against the expected plasmid. */
