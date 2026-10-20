@@ -629,22 +629,28 @@ export default function App() {
   }, []);
 
   /** Save every listed document the way Save does, then close; stop at the first not saved. */
+  const savingAll = useRef(false);
   const saveAllAndQuit = useCallback(async () => {
-    if (!quit) return;
-    const { docs: listed } = quit;
-    for (const [i, doc] of listed.entries()) {
-      const current = docsRef.current.find((d) => d.editorName === doc.editorName);
-      if (!current || !needsSave(current, editorState(current.editorName))) continue;
-      setActive(current.editorName);   // the save dialog is about the document on screen
-      setQuit({ docs: listed, saving: { name: current.name, index: i + 1 } });
-      if (!(await saveDoc(current, false))) {
-        endQuit();
-        notify("warning", notSavedMessage(current.name));
-        return;
+    if (!quit || savingAll.current) return;   // a second click while saving
+    savingAll.current = true;
+    try {
+      const { docs: listed } = quit;
+      for (const [i, doc] of listed.entries()) {
+        const current = docsRef.current.find((d) => d.editorName === doc.editorName);
+        if (!current || !needsSave(current, editorState(current.editorName))) continue;
+        setActive(current.editorName);   // the save dialog is about the document on screen
+        setQuit({ docs: listed, saving: { name: current.name, index: i + 1 } });
+        if (!(await saveDoc(current, false))) {
+          endQuit();
+          notify("warning", notSavedMessage(current.name));
+          return;
+        }
       }
+      endQuit();
+      await closeWindow();
+    } finally {
+      savingAll.current = false;
     }
-    endQuit();
-    await closeWindow();
   }, [closeWindow, endQuit, notify, quit, saveDoc]);
 
   // ---- views -----------------------------------------------------------------------------
