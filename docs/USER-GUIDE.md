@@ -87,6 +87,7 @@ form.
 | Design Primers to Amplify a Region… | Picks primers for a region at a target Tm, with optional 5′ tails |
 | Mutagenesis… | Substitution, insertion or deletion with back-to-back Q5-style primers |
 | Gibson Assembly… / NEBuilder HiFi… / In-Fusion… | Inserts one or more fragments into a linearised vector and designs the homology arms |
+| Golden Gate Assembly… | Assembles type IIS parts in order, checking the junction overhangs |
 
 Warnings appear under the product when something deserves a check before you order anything:
 an enzyme that cuts more than once, a vector that can re-ligate without insert, a
@@ -96,6 +97,17 @@ different product.
 The biology is computed by [pydna](https://github.com/pydna-group/pydna) and
 [Biopython](https://biopython.org), and every operation is covered by tests that compare the
 result with a sequence worked out by hand.
+
+## Simulating a gel (Tools → Simulate Agarose Gel…)
+
+Add one lane per file, choose the enzymes for each lane (leave them empty to load the uncut
+plasmid, drawn supercoiled), pick a ladder and the agarose percentage. Band positions follow a
+semi-logarithmic migration model: good for predicting the *pattern* of a diagnostic digest and
+reading sizes against the ladder, not a physical simulation of your gel rig. Hover a band to
+see its size.
+
+Not implemented yet: Gateway BP/LR, TA/GC/TOPO cloning, Sanger (.ab1) alignment to a reference,
+and automatic detection of common features.
 
 ## Saving and sharing
 
