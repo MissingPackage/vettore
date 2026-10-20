@@ -118,6 +118,10 @@ body { overflow: hidden; }
 /* The Features / Primers / Enzymes views are chosen with Vettore's tabs, not the properties tab row. */
 .ve-propertiesPanel .bp3-tab-list { display: none !important; }
 .vt-editor-overlay { position: absolute; inset: 0; background: var(--vt-surface); z-index: 30; overflow: auto; }
+/* Under Vettore's own views the editor's panels are covered, but the map's rotate and zoom
+   sliders sit at z-index 900 and were drawn over the Enzymes view's search box, catching its
+   clicks. Hiding the covered panels keeps their layout (and the editor's measurements). */
+.vt-shell[data-overlay-view] .tg-editor-container > .reflex-layout { visibility: hidden; }
 
 /* ---- table views (Enzymes) ------------------------------------------------------------------- */
 .vt-table-view { padding: 10px var(--vt-space-4); }

@@ -32,7 +32,7 @@ import { toolById } from "./tools";
 import { exportMap } from "./mapExport";
 import { applyEnzymeSet, ENZYME_SETS, type EnzymeSetId } from "./enzymeSets";
 import { ENZYMES } from "./enzymeLogic";
-import { showView, VIEWS, type ViewId } from "./views";
+import { OVERLAY_VIEWS, showView, VIEWS, type ViewId } from "./views";
 import { ACCEPT, dirName, SAVE_EXTENSION, safeFileName, type SaveKind } from "./files/formats";
 import { addNotice, dismissNotice, messageOf, type Notice, type NoticeKind } from "./files/notices";
 import NoticeStack from "./files/NoticeStack";
@@ -748,6 +748,7 @@ export default function App() {
 
   return (
     <div className={`vt-shell${busy ? " vt-shell-busy" : ""}`} aria-busy={busy > 0}
+         data-overlay-view={activeDoc && OVERLAY_VIEWS.includes(activeDoc.view) ? activeDoc.view : undefined}
          onDragOver={(e) => e.preventDefault()} onDropCapture={onDrop}>
       <input
         ref={fileInput}

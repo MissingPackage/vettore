@@ -117,6 +117,25 @@ async function expectDropdownCarets(container: Locator, what: string) {
   expect(missing, `${what}: dropdowns without an arrow`).toEqual([]);
 }
 
+/** Nothing is drawn over the element: a click anywhere on it reaches it (or its content). */
+async function expectNotCovered(locator: Locator, what: string) {
+  const covering = await locator.evaluate((el) => {
+    // A grid every 6 px: the map's sliders are thin and only partly overlapped the box.
+    const r = el.getBoundingClientRect();
+    const hits = new Set<string>();
+    for (let x = r.left + 2; x <= r.right - 2; x += 6) {
+      for (let y = r.top + 2; y <= r.bottom - 2; y += 6) {
+        const hit = document.elementFromPoint(x, y);
+        if (hit && hit !== el && !el.contains(hit)) {
+          hits.add(`${hit.tagName}.${typeof hit.className === "string" ? hit.className : ""}`);
+        }
+      }
+    }
+    return [...hits];
+  });
+  expect(covering, `${what} is covered by`).toEqual([]);
+}
+
 /** Text meant to be read passes WCAG AA (4.5:1). */
 async function expectReadable(locator: Locator, what: string) {
   expect(await contrastOf(locator.first()), `${what} contrast`).toBeGreaterThanOrEqual(4.5);
@@ -197,9 +216,15 @@ for (const size of SIZES) {
       await shot(page, "04b-find");
       await page.keyboard.press("Escape");
 
+      // From the map, whose rotate and zoom sliders lie under the Enzymes view's toolbar.
+      await page.getByTestId("view-map").click();
+      await expect(page.locator(".veRotateCircularSlider")).toBeVisible();
       await page.getByTestId("view-enzymes").click();
       await expect(page.getByTestId("enzymes-view")).toBeVisible();
       await expectReadable(page.getByTestId("enzymes-view").locator(".vt-table-toolbar .vt-muted"), "enzyme count");
+      // The map's sliders stay under Vettore's own views.
+      await expectNotCovered(page.getByTestId("enzyme-search"), "enzyme search box");
+      await expectNotCovered(page.getByTestId("enzymes-view").locator("thead th").first(), "first column title");
       await shot(page, "05-enzymes");
 
       await page.getByTestId("view-features").click();
@@ -213,6 +238,7 @@ for (const size of SIZES) {
 
       await page.getByTestId("view-history").click();
       await expect(page.locator(".vt-history")).toContainText("Opened");
+      await expectNotCovered(page.locator(".vt-history h2"), "History heading");
       await shot(page, "08-history");
 
       // Several documents: tabs stay readable and the view bar keeps its controls.
