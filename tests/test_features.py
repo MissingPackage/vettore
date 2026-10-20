@@ -321,6 +321,17 @@ def test_a_name_that_is_not_an_element_raises_no_label_warning():
     assert rows["CMV promoter"]["isNew"] is True                     # 204 of 584 bp
 
 
+def test_a_short_element_at_the_edge_of_a_named_feature_does_not_cast_doubt():
+    """An "EGFP" feature that runs on over the SV40 polyA (232 of its 952 bp) is still EGFP:
+    the polyA is offered as a new feature, and the label is not questioned."""
+    block = [{"name": "EGFP", "start": 584, "end": 1535}]
+    payload = fixture_payload("fidelity-block-cmv.gb", existing=block)
+    rows = rows_by_name(payload)
+    assert payload["label_warnings"] == 0
+    assert rows["SV40 polyA"]["labelWarning"] is None and rows["SV40 polyA"]["isNew"] is True
+    assert rows["EGFP"]["annotatedAs"] == "EGFP"
+
+
 def test_a_cag_block_is_not_a_wrong_label_for_its_cmv_enhancer():
     """CAG is the CMV enhancer, the chicken β-actin promoter and the rabbit β-globin intron
     (Niwa, Yamamura & Miyazaki 1991, Gene 108:193-199)."""

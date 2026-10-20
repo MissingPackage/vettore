@@ -222,9 +222,13 @@ def _dedupe(matches: list[Match], length: int) -> list[Match]:
 ANNOTATED_SHARE_OF_MATCH = 0.9
 ANNOTATED_SHARE_OF_EXISTING = 0.5
 
-#: A match this close to the catalogue, inside a feature named after another element, means
-#: the label is probably wrong.
+#: A feature named after one element whose sequence is mostly another (nearly exact matches,
+#: at least LABEL_CHECK_MIN_IDENTITY, covering at least LABEL_CHECK_SHARE_OF_EXISTING of it)
+#: probably carries a wrong label: a CMV enhancer and promoter labelled "PGK promoter". A
+#: short element at the edge of a longer feature (a polyA signal inside an "EGFP" block) is
+#: not enough to doubt the label.
 LABEL_CHECK_MIN_IDENTITY = 98.0
+LABEL_CHECK_SHARE_OF_EXISTING = 0.5
 
 #: Words that do not tell elements apart: "SV40 polyA" and "bGH polyA" share "polyA" but are
 #: different elements. Words of one character and plain numbers ("5'", "3'") never count.
@@ -348,27 +352,36 @@ def detect_payload(sequence: str, circular: bool, min_identity: float = DEFAULT_
 
     ``isNew`` is false and ``annotatedAs`` names the existing feature when one already covers
     the match. ``labelWarning`` says when that feature is named after a different element
-    although the match is nearly exact: the label is probably wrong (a CMV promoter labelled
-    "PGK promoter"). ``label_warnings`` counts the existing features concerned.
+    while its sequence is mostly this one: the label is probably wrong (a CMV promoter
+    labelled "PGK promoter"). ``label_warnings`` counts the existing features concerned.
     """
     length = len(sequence)
     matches = detect(sequence, circular, min_identity)
     already = _existing_spans(existing or [], length)
 
-    rows = []
-    doubtful: set[int] = set()
+    found = []
+    unexplained: dict[int, set[int]] = {}     # existing feature -> bases of other elements
     for match in matches:
-        row = match.as_dict(length)
         span = match.span(length)
         covering = [(index, name, len(span & other), len(other))
                     for index, (name, other) in enumerate(already)
                     if len(span & other) >= ANNOTATED_SHARE_OF_MATCH * len(span)]
         named = [item for item in covering if _names_element(item[1], match.name)]
         sized = [item for item in covering if item[2] >= ANNOTATED_SHARE_OF_EXISTING * item[3]]
-        # Named after another element, over a nearly exact match: probably a wrong label.
-        mislabelled = ([] if named or match.identity < LABEL_CHECK_MIN_IDENTITY
-                       else [item for item in covering
-                             if _names_another_element(item[1], match.name)])
+        suspect = ([] if named or match.identity < LABEL_CHECK_MIN_IDENTITY
+                   else [item for item in covering
+                         if _names_another_element(item[1], match.name)])
+        for item in suspect:
+            unexplained.setdefault(item[0], set()).update(span & already[item[0]][1])
+        found.append((match, named, sized, suspect))
+    doubtful = {index for index, bases in unexplained.items()
+                if len(bases) >= LABEL_CHECK_SHARE_OF_EXISTING * len(already[index][1])}
+
+    rows = []
+    flagged: set[int] = set()
+    for match, named, sized, suspect in found:
+        row = match.as_dict(length)
+        mislabelled = [item for item in suspect if item[0] in doubtful]
         # The feature that covers most of the match and, of those, fits it most closely.
         best = max(named or mislabelled or sized, key=lambda item: (item[2], -item[3]),
                    default=None)
@@ -376,8 +389,8 @@ def detect_payload(sequence: str, circular: bool, min_identity: float = DEFAULT_
         row["isNew"] = best is None
         row["labelWarning"] = _label_warning(best[1], match) if best and mislabelled else None
         if best and mislabelled:
-            doubtful.add(best[0])
+            flagged.add(best[0])
         rows.append(row)
     return {"features": rows, "catalogue_size": len(catalogue()),
             "new_count": sum(1 for r in rows if r["isNew"]),
-            "label_warnings": len(doubtful)}
+            "label_warnings": len(flagged)}
