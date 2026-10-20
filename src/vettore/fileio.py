@@ -28,7 +28,7 @@ from Bio.Seq import Seq, UndefinedSequenceError, reverse_complement
 from Bio.SeqFeature import SeqFeature, SimpleLocation
 from Bio.SeqRecord import SeqRecord
 
-from .convert import _as_list, ove_to_record, record_to_ove
+from .convert import DIVISIONS, _as_list, ove_to_record, record_to_ove
 
 log = logging.getLogger(__name__)
 
@@ -508,9 +508,23 @@ def _enrich_dna_file(doc: dict, content: bytes) -> None:
 
 # ---- writing ----------------------------------------------------------------------------
 
+_MONTHS = ("JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC")
+
+
+def genbank_date(when: datetime) -> str:
+    """GenBank's date, e.g. 07-AUG-2008, the same in every locale."""
+    return f"{when.day:02d}-{_MONTHS[when.month - 1]}-{when.year}"
+
+
 def write_genbank(data: dict) -> str:
+    """GenBank text. The LOCUS line carries the date of the save and the record's division as
+    it was read (SYN, synthetic, for a construct made or edited here)."""
+    record = ove_to_record(data)
+    record.annotations["date"] = genbank_date(datetime.now())
+    division = str(data.get("division") or "").upper()
+    record.annotations["data_file_division"] = division if division in DIVISIONS else "SYN"
     out = io.StringIO()
-    SeqIO.write(ove_to_record(data), out, "genbank")
+    SeqIO.write(record, out, "genbank")
     return out.getvalue()
 
 

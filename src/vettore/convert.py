@@ -16,6 +16,10 @@ from Bio.SeqFeature import CompoundLocation, SeqFeature, SimpleLocation
 from Bio.SeqRecord import SeqRecord
 
 PRIMER_TYPES = {"primer_bind", "primer"}
+LOCUS_LENGTH = 16            # characters of a GenBank LOCUS name that every reader accepts
+# GenBank divisions (NCBI GenBank release notes, section 3.4.4); "UNK" is not one of them.
+DIVISIONS = frozenset({"PRI", "ROD", "MAM", "VRT", "INV", "PLN", "BCT", "VRL", "PHG", "SYN",
+                       "UNA", "EST", "PAT", "STS", "GSS", "HTG", "HTC", "ENV", "CON", "TSA"})
 NAME_QUALIFIERS = ("label", "name", "gene", "product", "locus_tag", "note")
 
 
@@ -93,7 +97,7 @@ def record_to_ove(record: SeqRecord, fallback_name: str = "Untitled") -> dict[st
             continue
         ann = _annotation(feature, len(sequence), circular)
         (primers if feature.type in PRIMER_TYPES else features).append(ann)
-    return {
+    doc = {
         "name": name or fallback_name,
         "description": record.description if record.description != "<unknown description>" else "",
         "sequence": sequence,
@@ -101,6 +105,19 @@ def record_to_ove(record: SeqRecord, fallback_name: str = "Untitled") -> dict[st
         "features": features,
         "primers": primers,
     }
+    if (division := record.annotations.get("data_file_division")) in DIVISIONS:
+        doc["division"] = division       # written back when the document is saved as GenBank
+    return doc
+
+
+def locus_name(name: str) -> str:
+    """A GenBank LOCUS name: no white space, at most 16 characters, shortened at a word or
+    hyphen boundary when the name is longer (the full name goes in the DEFINITION line)."""
+    compact = "_".join(name.split()) or "Untitled"
+    if len(compact) <= LOCUS_LENGTH:
+        return compact
+    cut = max(compact.rfind(mark, 0, LOCUS_LENGTH + 1) for mark in "_-.")
+    return compact[:cut] if cut >= LOCUS_LENGTH // 2 else compact[:LOCUS_LENGTH]
 
 
 def _location(ann: dict[str, Any], seq_len: int) -> SimpleLocation | CompoundLocation:
@@ -123,12 +140,16 @@ def _location(ann: dict[str, Any], seq_len: int) -> SimpleLocation | CompoundLoc
 def ove_to_record(data: dict[str, Any]) -> SeqRecord:
     """Convert OVE ``sequenceData`` back to a SeqRecord (GenBank-ready)."""
     sequence = data.get("sequence", "")
-    name = (data.get("name") or "Untitled").strip()
+    name = str(data.get("name") or "Untitled").strip() or "Untitled"
+    locus = locus_name(name)
+    description = str(data.get("description") or "").strip() or name
+    if locus != "_".join(name.split()) and name not in description:
+        description = f"{name}: {description}"     # the LOCUS name was shortened
     record = SeqRecord(
         Seq(sequence),
-        id=name.replace(" ", "_")[:16] or "Untitled",
-        name=name.replace(" ", "_")[:16] or "Untitled",
-        description=data.get("description") or name,
+        id=locus,
+        name=locus,
+        description=description,
         annotations={
             "molecule_type": "DNA",
             "topology": "circular" if data.get("circular") else "linear",
