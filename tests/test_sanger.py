@@ -88,6 +88,35 @@ def test_a_planted_mismatch_is_reported_at_the_right_position():
     assert mismatches[0]["read"] == reference[position]
 
 
+def test_a_difference_carries_the_read_quality_of_its_base():
+    t = trace()
+    start, _ = mott_trim(t.quality)
+    core = t.sequence[start + 40 : start + 500]
+    reference = reference_around(core)
+    position = 400                      # reference index; read index start + 40 + 100
+    replacement = "A" if reference[position] != "A" else "G"
+    mutated = reference[:position] + replacement + reference[position + 1 :]
+    [mismatch] = [d for d in align_trace(mutated, False, t).discrepancies
+                  if d["kind"] == "mismatch"]
+    assert mismatch["quality"] == t.quality[start + 140]
+
+
+def test_column_qualities_give_a_gap_the_weaker_neighbour():
+    from vettore.sanger import _column_qualities
+
+    assert _column_qualities("AC-GT", [30, 12, 25, 40]) == [30, 12, 12, 25, 40]
+    assert _column_qualities("--AC", [20, 35]) == [20, 20, 20, 35]
+    assert _column_qualities("AC--", [20, 35]) == [20, 35, 35, 35]
+
+
+def test_a_merged_indel_carries_its_lowest_quality():
+    from vettore.sanger import _discrepancies
+
+    diffs = _discrepancies("AC---GT", "ACTTAGT", 0, 100, [30, 30, 25, 9, 31, 30, 30])
+    assert diffs == [{"kind": "insertion", "position": 3, "reference": "", "read": "TTA",
+                      "quality": 9}]
+
+
 def test_a_planted_deletion_is_reported_as_one_event():
     t = trace()
     start, _ = mott_trim(t.quality)
@@ -123,6 +152,8 @@ def test_payload_satisfies_the_editor_invariants():
     assert len(chromatogram["basePos"]) == len(chromatogram["baseCalls"])
     assert 0 < payload["coverage_percent"] <= 100
     assert payload["reads"][0]["identity"] == 100.0
+    aligned_quality = read_track["sequenceData"]["chromatogramData"]["qualNums"]
+    assert payload["reads"][0]["mean_quality"] == round(sum(aligned_quality) / len(aligned_quality), 1)
 
 
 def test_several_reads_share_one_coordinate_system():
