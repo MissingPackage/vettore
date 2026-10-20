@@ -46,7 +46,8 @@ annotated tag and the GitHub release notes.
    verified only with Biopython and sgffp.
 3. Roadmap S5/S6 (diagnostic digests, Sanger contig, lab primer library, human/mouse
    catalogue growth, construct lineage, progressive alignment, optional NCBI import) is drafted
-   and waiting for the user's answers to its open questions before it goes into the spec.
+   and waiting for the user's answers to its open questions before it goes into the spec
+   (draft: private notes repo, `roadmap/S5-S6-roadmap-DRAFT.md`).
    Catalogue 0.3.1 added PGK (human, mouse), UbC, H1, 7SK, SFFV and full-length CAG; mouse U6,
    H1, 7SK, UbC, Eef1a1 and Gfap and human CAMK2A have no public vector record annotating them.
 4. Progressive multiple alignment (today: star alignment to a reference); related 15 kb
