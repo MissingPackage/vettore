@@ -286,18 +286,22 @@ def _record_label(record: SeqRecord) -> str:
     return f"“{name}”" if name else "The sequence"
 
 
+_NOT_DNA = re.compile(f"[^{''.join(sorted(DNA_LETTERS))}{''.join(sorted(DNA_LETTERS)).lower()}]")
+
+
 def _check_letters(record: SeqRecord, sequence: str) -> str | None:
     """A sentence naming the first character that is not a DNA letter, or None."""
-    for i, ch in enumerate(sequence):
-        if ch.upper() not in DNA_LETTERS:
-            hint = ""
-            if ch in "-.":
-                hint = " Remove the alignment gaps first."
-            elif sum(c.upper() in PROTEIN_ONLY for c in sequence) > len(sequence) / 20:
-                hint = " It looks like a protein sequence; Vettore opens DNA sequences."
-            return (f"{_record_label(record)} has “{ch}” at position {i + 1}, which is not a "
-                    f"DNA letter (A, C, G, T, U or an IUPAC ambiguity code).{hint}")
-    return None
+    bad = _NOT_DNA.search(sequence)
+    if not bad:
+        return None
+    ch = bad.group()
+    hint = ""
+    if ch in "-.":
+        hint = " Remove the alignment gaps first."
+    elif sum(c.upper() in PROTEIN_ONLY for c in sequence) > len(sequence) / 20:
+        hint = " It looks like a protein sequence; Vettore opens DNA sequences."
+    return (f"{_record_label(record)} has “{ch}” at position {bad.start() + 1}, which is not a "
+            f"DNA letter (A, C, G, T, U or an IUPAC ambiguity code).{hint}")
 
 
 def _short(name: str, limit: int = 40) -> str:

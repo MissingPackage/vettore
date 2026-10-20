@@ -42,6 +42,7 @@ import { EDITOR_TOOLS, rightClickOverrides } from "./files/editorFiles";
 import PasteDialog from "./files/PasteDialog";
 import CopyTextDialog from "./files/CopyTextDialog";
 import SaveCopyDialog from "./files/SaveCopyDialog";
+import "./files/busy.css";
 
 const DOCTABS_HEIGHT = 30;
 const VIEWBAR_HEIGHT = 32;
@@ -127,6 +128,17 @@ export default function App() {
   const dismiss = useCallback((id: number) => setNotices((prev) => dismissNotice(prev, id)), []);
   const report = useCallback((e: unknown) => notify("error", messageOf(e)), [notify]);
 
+  // Opening and saving large files takes a moment: show a busy pointer meanwhile.
+  const [busy, setBusy] = useState(0);
+  const whileBusy = useCallback(async <T,>(work: Promise<T>): Promise<T> => {
+    setBusy((n) => n + 1);
+    try {
+      return await work;
+    } finally {
+      setBusy((n) => n - 1);
+    }
+  }, []);
+
   const updateDoc = useCallback((editorName: string, patch: Partial<Doc>) => {
     setDocs((prev) => prev.map((d) => (d.editorName === editorName ? { ...d, ...patch } : d)));
   }, []);
@@ -181,13 +193,13 @@ export default function App() {
         return;
       }
       try {
-        addResult(await api.openPath(path), path);
+        addResult(await whileBusy(api.openPath(path)), path);
         refreshRecent();
       } catch (e) {
         report(e);
       }
     },
-    [addResult, refreshRecent, report],
+    [addResult, refreshRecent, report, whileBusy],
   );
 
   const openFiles = useCallback(async () => {
@@ -203,14 +215,14 @@ export default function App() {
     async (files: FileList | File[] | null) => {
       for (const file of Array.from(files ?? [])) {
         try {
-          addResult(await api.openContent(file), file.name);
+          addResult(await whileBusy(api.openContent(file)), file.name);
         } catch (e) {
           report(e);
         }
       }
       if (fileInput.current) fileInput.current.value = "";
     },
-    [addResult, report],
+    [addResult, report, whileBusy],
   );
 
   useEffect(() => {
@@ -368,7 +380,7 @@ export default function App() {
           );
           if (!path) return false;
         }
-        const saved = await api.savePath(path, sequenceData, "genbank");
+        const saved = await whileBusy(api.savePath(path, sequenceData, "genbank"));
         updateDoc(current.editorName, {
           path: saved.path,
           name: stem(saved.path),
@@ -386,7 +398,7 @@ export default function App() {
         return false;
       }
     },
-    [askSaveCopy, logHistory, notify, refreshRecent, report, updateDoc, warnIfAnnotationsLost],
+    [askSaveCopy, logHistory, notify, refreshRecent, report, updateDoc, warnIfAnnotationsLost, whileBusy],
   );
 
   /** Write a copy in another format; the document keeps its own file. */
@@ -399,7 +411,7 @@ export default function App() {
         if (desktop) {
           const path = await desktop.save_dialog(filename, doc.path ? dirName(doc.path) : "", kind);
           if (!path) return;
-          const saved = await api.savePath(path, sequenceData, kind);
+          const saved = await whileBusy(api.savePath(path, sequenceData, kind));
           logHistory(doc.editorName, "Exported", `${saved.path} (${saved.format_label})`);
           notify("info", `Exported “${baseName(saved.path)}” (${saved.format_label}).`);
         } else {
@@ -411,7 +423,7 @@ export default function App() {
         report(e);
       }
     },
-    [logHistory, notify, report],
+    [logHistory, notify, report, whileBusy],
   );
 
   const exportImage = useCallback(
@@ -664,7 +676,8 @@ export default function App() {
   );
 
   return (
-    <div className="vt-shell" onDragOver={(e) => e.preventDefault()} onDropCapture={onDrop}>
+    <div className={`vt-shell${busy ? " vt-busy" : ""}`} aria-busy={busy > 0}
+         onDragOver={(e) => e.preventDefault()} onDropCapture={onDrop}>
       <input
         ref={fileInput}
         type="file"
