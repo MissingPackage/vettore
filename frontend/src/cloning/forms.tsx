@@ -11,8 +11,9 @@ const dataOf = (d: OpenDoc | null) => (d ? d.data() : null);
 
 // ---- Restriction and insertion cloning ---------------------------------------------------
 export function RestrictionInsertForm({ docs, active, onChange }: FormProps) {
-  const [vector, setVector] = useState<string | null>(active?.editorName ?? null);
-  const [insert, setInsert] = useState<string | null>(null);
+  const firstVector = defaultVector(docs, active);
+  const [vector, setVector] = useState<string | null>(firstVector);
+  const [insert, setInsert] = useState<string | null>(defaultInserts(docs, firstVector, 1)[0]);
   const [vEnz, setVEnz] = useState<string[]>([]);
   const [iEnz, setIEnz] = useState<string[]>([]);
   const [orientation, setOrientation] = useState<"forward" | "reverse">("forward");
@@ -20,7 +21,10 @@ export function RestrictionInsertForm({ docs, active, onChange }: FormProps) {
   const i = findDoc(docs, insert);
 
   useEffect(() => {
-    if (!v || !i || !vEnz.length || !iEnz.length) return onChange(null);
+    if (!v) return onChange(null, "Choose the vector");
+    if (!vEnz.length) return onChange(null, `Choose the enzyme(s) that cut the vector “${v.name}”`);
+    if (!i) return onChange(null, "Choose the file the insert is cut from");
+    if (!iEnz.length) return onChange(null, `Choose the enzyme(s) that cut “${i.name}”`);
     onChange({
       vector: docData(v),
       vector_enzymes: vEnz,
@@ -110,7 +114,10 @@ export function PcrForm({ docs, active, onChange }: FormProps) {
   const [rev, setRev] = useState({ name: "Reverse", sequence: "" });
   const t = findDoc(docs, template);
   useEffect(() => {
-    if (!t || fwd.sequence.length < 10 || rev.sequence.length < 10) return onChange(null);
+    if (!t) return onChange(null, "Choose the template to amplify");
+    if (fwd.sequence.length < 10 || rev.sequence.length < 10) {
+      return onChange(null, "Enter both primers (at least 10 nt each), or pick them from the file");
+    }
     onChange({ template: docData(t), forward: fwd, reverse: rev, mismatches: 0 });
   }, [t, fwd, rev]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
@@ -134,7 +141,11 @@ export function DesignPrimersForm({ docs, active, onChange }: FormProps) {
   const [fTail, setFTail] = useState("");
   const [rTail, setRTail] = useState("");
   useEffect(() => {
-    if (!t || start === null || end === null) return onChange(null);
+    if (!t) return onChange(null, "Choose the template");
+    if (start === null || end === null) {
+      return onChange(null, "Choose the region to amplify, or select it in the editor and press "
+        + "“Use selection”");
+    }
     onChange({ template: docData(t), start, end, target_tm: tm, forward_tail: fTail, reverse_tail: rTail });
   }, [t, start, end, tm, fTail, rTail]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
@@ -167,22 +178,30 @@ interface InsertRow {
 
 export function overlapForm(method: "gibson" | "hifi" | "infusion") {
   return function OverlapAssemblyForm({ docs, active, onChange }: FormProps) {
-    const [vector, setVector] = useState<string | null>(active?.editorName ?? null);
+    const firstVector = defaultVector(docs, active);
+    const [vector, setVector] = useState<string | null>(firstVector);
     const [mode, setMode] = useState<"enzymes" | "pcr">("enzymes");
     const [vEnz, setVEnz] = useState<string[]>([]);
     const [vStart, setVStart] = useState<number | null>(null);
     const [vEnd, setVEnd] = useState<number | null>(null);
-    const [inserts, setInserts] = useState<InsertRow[]>([{ editorName: null, start: null, end: null }]);
+    const [inserts, setInserts] = useState<InsertRow[]>(() =>
+      defaultInserts(docs, firstVector, 1).map((editorName) => ({ editorName, start: null, end: null })));
     const [overlap, setOverlap] = useState(method === "infusion" ? 15 : 25);
     const v = findDoc(docs, vector);
 
     useEffect(() => {
-      if (!v) return onChange(null);
+      if (!v) return onChange(null, "Choose the vector");
       const linearize = mode === "enzymes"
         ? vEnz.length ? { enzymes: vEnz } : null
         : vStart !== null && vEnd !== null ? { pcr: { start: vStart, end: vEnd } } : null;
       const rows = inserts.map((r) => ({ row: r, doc: findDoc(docs, r.editorName) }));
-      if (!linearize || rows.some((r) => !r.doc)) return onChange(null);
+      if (!linearize) {
+        return onChange(null, mode === "enzymes"
+          ? `Choose the enzyme(s) that open the vector “${v.name}”`
+          : "Choose the vector region to keep");
+      }
+      const missing = rows.findIndex((r) => !r.doc);
+      if (missing >= 0) return onChange(null, `Choose the file for insert ${missing + 1}`);
       onChange({
         method,
         vector: { doc: docData(v), linearize },
@@ -256,8 +275,13 @@ export function MutagenesisForm({ docs, active, onChange }: FormProps) {
   const [end, setEnd] = useState<number | null>(sel?.end ?? null);
   const [newSeq, setNewSeq] = useState("");
   useEffect(() => {
-    if (!d || start === null || end === null) return onChange(null);
-    if (kind !== "deletion" && !newSeq) return onChange(null);
+    if (!d) return onChange(null, "Choose the plasmid to change");
+    if (start === null || end === null) {
+      return onChange(null, kind === "insertion"
+        ? "Choose the base to insert after"
+        : "Choose the region to change, or select it in the editor");
+    }
+    if (kind !== "deletion" && !newSeq) return onChange(null, "Enter the new bases");
     onChange({ doc: docData(d), kind, start, end: kind === "insertion" ? start : end, new_sequence: kind === "deletion" ? "" : newSeq });
   }, [d, kind, start, end, newSeq]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
@@ -290,13 +314,16 @@ export function MutagenesisForm({ docs, active, onChange }: FormProps) {
 const GG_ENZYMES = new Set(Object.values(ENZYMES).filter((e) => e.goldenGate).map((e) => e.name));
 
 export function GoldenGateForm({ docs, active, onChange }: FormProps) {
-  const [vector, setVector] = useState<string | null>(active?.editorName ?? null);
-  const [parts, setParts] = useState<(string | null)[]>([null]);
+  const firstVector = defaultVector(docs, active);
+  const [vector, setVector] = useState<string | null>(firstVector);
+  const [parts, setParts] = useState<(string | null)[]>(() => defaultInserts(docs, firstVector, 1));
   const [enzyme, setEnzyme] = useState<string>("BsaI");
   const v = findDoc(docs, vector);
   useEffect(() => {
     const p = parts.map((n) => findDoc(docs, n));
-    if (!v || p.some((x) => !x)) return onChange(null);
+    if (!v) return onChange(null, "Choose the destination vector");
+    const missing = p.findIndex((x) => !x);
+    if (missing >= 0) return onChange(null, `Choose the file for part ${missing + 1}`);
     onChange({ vector: docData(v), parts: p.map((x) => docData(x!)), enzyme });
   }, [v, parts, enzyme]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
@@ -586,11 +613,12 @@ export function LigateFragmentsForm({ docs, onChange }: FormProps) {
 
 // ---- Delete restriction fragment ---------------------------------------------------------
 export function DeleteFragmentForm({ docs, active, onChange }: FormProps) {
-  const [docName, setDocName] = useState<string | null>(active?.editorName ?? null);
+  const [docName, setDocName] = useState<string | null>(defaultVector(docs, active));
   const [enz, setEnz] = useState<string[]>([]);
   const d = findDoc(docs, docName);
   useEffect(() => {
-    if (!d || !enz.length) return onChange(null);
+    if (!d) return onChange(null, "Choose the file");
+    if (!enz.length) return onChange(null, "Choose the enzymes that flank the fragment to delete");
     onChange({ doc: docData(d), enzymes: enz, fragment_index: null });
   }, [d, enz]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
@@ -608,7 +636,7 @@ export function DeleteFragmentForm({ docs, active, onChange }: FormProps) {
 // ---- Anneal oligos -----------------------------------------------------------------------
 export function AnnealOligosForm({ docs, active, onChange }: FormProps) {
   const [mode, setMode] = useState<"design" | "anneal">("design");
-  const [vector, setVector] = useState<string | null>(active?.editorName ?? null);
+  const [vector, setVector] = useState<string | null>(defaultVector(docs, active));
   const [enzymes, setEnzymes] = useState<string[]>([]);
   const [insert, setInsert] = useState("");
   const [insertName, setInsertName] = useState("gRNA1");
@@ -617,12 +645,15 @@ export function AnnealOligosForm({ docs, active, onChange }: FormProps) {
   const v = findDoc(docs, vector);
 
   useEffect(() => {
-    if (!v || !enzymes.length) return onChange(null);
+    if (!v) return onChange(null, "Choose the vector the oligos go into");
+    if (!enzymes.length) return onChange(null, `Choose the enzyme(s) that cut “${v.name}”`);
     if (mode === "design") {
-      if (insert.length < 4) return onChange(null);
+      if (insert.length < 4) return onChange(null, "Enter the insert (for example a 20 nt protospacer)");
       onChange({ mode, insert, insert_name: insertName || "insert", vector: docData(v), enzymes });
     } else {
-      if (top.length < 10 || bottom.length < 10) return onChange(null);
+      if (top.length < 10 || bottom.length < 10) {
+        return onChange(null, "Enter both oligos (at least 10 nt each)");
+      }
       onChange({ mode, top, top_name: `${insertName}_top`, bottom, bottom_name: `${insertName}_bottom`,
                  vector: docData(v), enzymes });
     }
