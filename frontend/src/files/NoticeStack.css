@@ -1,0 +1,70 @@
+.vt-notices {
+  position: fixed;
+  top: 136px; /* below the menus, toolbar, document tabs and view tabs */
+  right: var(--vt-space-4);
+  width: min(560px, calc(100vw - 2 * var(--vt-space-4)));
+  max-height: calc(100vh - 176px);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--vt-space-2);
+  z-index: 25;
+  font-family: var(--vt-font);
+  font-size: var(--vt-font-size);
+}
+.vt-notices-clear {
+  align-self: flex-end;
+  font: inherit;
+  font-size: 12px;
+  color: var(--vt-text-muted);
+  background: var(--vt-surface);
+  border: 1px solid var(--vt-border-subtle);
+  border-radius: var(--vt-radius);
+  padding: 2px var(--vt-space-2);
+  cursor: pointer;
+}
+.vt-notices-clear:hover { color: var(--vt-text-strong); background: var(--vt-surface-hover); }
+
+.vt-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--vt-space-2);
+  padding: var(--vt-space-2) var(--vt-space-2) var(--vt-space-2) var(--vt-space-3);
+  border: 1px solid;
+  border-left-width: 4px;
+  border-radius: var(--vt-radius-lg);
+  background: var(--vt-surface);
+  color: var(--vt-text-strong);
+}
+.vt-notice-error { border-color: var(--vt-danger-border); border-left-color: var(--vt-danger); background: var(--vt-danger-bg); }
+.vt-notice-warning { border-color: var(--vt-border-subtle); border-left-color: var(--vt-warning); background: var(--vt-warning-bg); }
+.vt-notice-info { border-color: var(--vt-border-subtle); border-left-color: var(--vt-success); background: var(--vt-success-bg); }
+
+.vt-notice-label { flex: none; font-weight: 600; line-height: 20px; }
+.vt-notice-error .vt-notice-label { color: var(--vt-danger); }
+.vt-notice-warning .vt-notice-label { color: var(--vt-warning); }
+.vt-notice-info .vt-notice-label { color: var(--vt-success); }
+
+/* The whole message, wrapped: never truncated. */
+.vt-notice-text {
+  flex: 1;
+  min-width: 0;
+  line-height: 20px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+.vt-notice-count { color: var(--vt-text-muted); }
+
+.vt-notice-close {
+  flex: none;
+  border: none;
+  background: transparent;
+  color: var(--vt-text-muted);
+  font-size: 18px;
+  line-height: 20px;
+  padding: 0 var(--vt-space-1);
+  cursor: pointer;
+}
+.vt-notice-close:hover { color: var(--vt-text-strong); }

@@ -1,18 +1,59 @@
-"""Smoke-test a packaged Vettore build: start it headless, open a .dna file through the API.
+"""Smoke-test a packaged Vettore build: start it headless, open and save files through the API.
 
 Usage: python packaging/smoke_test.py <path-to-executable>
 """
 
 import base64
 import json
+import os
+import shutil
 import subprocess
 import sys
+import tempfile
 import time
 import urllib.request
 from pathlib import Path
 
 PORT, TOKEN = 8799, "smoke-token"
-DATA = Path(__file__).resolve().parents[1] / "tests" / "data" / "pFA-KanMX4.dna"
+FIXTURES = Path(__file__).resolve().parents[1] / "tests" / "data"
+DATA = FIXTURES / "pFA-KanMX4.dna"
+
+# One file per format the engine reads, with the sequence lengths of its records.
+EXCHANGE = [
+    ("pFA-KanMX4.dna", [3941]),
+    ("MT612431.1.gb", [7204]),
+    ("exchange-pBR322.embl", [4361]),
+    ("exchange-sample-b.xdna", [1000]),
+    ("exchange-artificial.gck", [12]),
+    ("exchange-plasmids.fasta", [2686, 4361, 4245]),
+    ("exchange-pUC19-numbered.seq", [2686]),
+    ("exchange-quirks-header.gb", [4361]),
+]
+
+
+def round_trips(folder: Path) -> int:
+    """Open each format, save it as GenBank, FASTA and .dna, and open what was saved."""
+    checked = 0
+    for name, lengths in EXCHANGE:
+        opened = call("open-content", {
+            "filename": name,
+            "content_b64": base64.b64encode((FIXTURES / name).read_bytes()).decode(),
+        })
+        docs = opened["documents"]
+        assert [len(d["sequence"]) for d in docs] == lengths, (name, [len(d["sequence"]) for d in docs])
+        doc = docs[0]
+        for ext in (".gb", ".fasta", ".dna"):
+            saved = call("save-path", {"path": str(folder / f"{Path(name).stem}{ext}"),
+                                       "sequenceData": doc})
+            [again] = call("open-path", {"path": saved["path"]})["documents"]
+            assert again["sequence"].upper() == doc["sequence"].upper(), (name, ext)
+            if ext != ".fasta":  # FASTA keeps only the sequence
+                assert again["circular"] == doc["circular"], (name, ext)
+                assert len(again["features"]) == len(doc["features"]), (name, ext)
+            checked += 1
+    pasted = call("open-text", {"text": ">pasted\nACGTACGTNN\n"})
+    assert pasted["documents"][0]["sequence"] == "ACGTACGTNN"
+    return checked
 
 
 def call(path: str, body: dict | None = None) -> dict:
@@ -27,7 +68,10 @@ def call(path: str, body: dict | None = None) -> dict:
 
 def main() -> int:
     exe = sys.argv[1]
-    proc = subprocess.Popen([exe, "--no-window", "--port", str(PORT), "--token", TOKEN])
+    work = Path(tempfile.mkdtemp(prefix="vettore-smoke-"))
+    # Recent files and the last folder go to a throwaway home, not the runner's.
+    env = {**os.environ, "VETTORE_HOME": str(work / "home")}
+    proc = subprocess.Popen([exe, "--no-window", "--port", str(PORT), "--token", TOKEN], env=env)
     try:
         deadline = time.monotonic() + 90
         while True:
@@ -65,8 +109,12 @@ def main() -> int:
         assert product["circular"] and len(product["sequence"]) == 316, len(product["sequence"])
         tm = call("tm", {"sequence": "AGCTTGCATGCCTGCAGGTCG"})["tm"]
         assert 55 < tm < 70, tm
+        saved_files = work / "saved"
+        saved_files.mkdir()
+        checked = round_trips(saved_files)
         print("smoke test passed: server up, .dna parsed (3941 bp, 9 features), UI served, "
-              "restriction cloning and Tm work")
+              f"restriction cloning and Tm work, {checked} open-and-save round trips "
+              f"({len(EXCHANGE)} formats x GenBank/FASTA/.dna)")
         return 0
     finally:
         proc.terminate()
@@ -74,6 +122,7 @@ def main() -> int:
             proc.wait(timeout=10)
         except subprocess.TimeoutExpired:
             proc.kill()
+        shutil.rmtree(work, ignore_errors=True)
 
 
 if __name__ == "__main__":

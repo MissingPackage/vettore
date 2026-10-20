@@ -3,6 +3,10 @@
 from __future__ import annotations
 
 import base64
+import binascii
+import errno
+import logging
+import os
 import secrets
 from collections.abc import Callable
 from pathlib import Path
@@ -21,6 +25,8 @@ from .cloning.base import CloningError
 TOKEN_HEADER = "X-Vettore-Token"
 ALLOWED_HOSTS = {"127.0.0.1", "localhost"}
 
+log = logging.getLogger(__name__)
+
 
 class OpenPath(BaseModel):
     path: str
@@ -31,9 +37,18 @@ class OpenContent(BaseModel):
     content_b64: str
 
 
+class OpenText(BaseModel):
+    """Text pasted from the clipboard: a sequence, a FASTA record or a GenBank/EMBL record."""
+
+    text: str
+    name: str = ""
+
+
 class SavePath(BaseModel):
     path: str
     sequenceData: dict[str, Any]
+    # Used only when the path has no extension Vettore writes: genbank, fasta or dna.
+    format: str | None = None
 
 
 class SaveBinary(BaseModel):
@@ -82,12 +97,42 @@ class Export(BaseModel):
     format: str = "genbank"
 
 
-def _export(data: dict[str, Any], fmt: str) -> str:
-    if fmt == "genbank":
-        return fileio.write_genbank(data)
-    if fmt == "fasta":
-        return fileio.write_fasta(data)
-    raise HTTPException(400, f"Unknown export format: {fmt}")
+def _format(name: str | None) -> str | None:
+    """The UI says "dna" for the .dna format; the engine uses Biopython's identifier."""
+    return fileio.DNA_FILE_FORMAT if name == "dna" else name
+
+
+def _os_reason(exc: OSError) -> str:
+    """Why a file operation failed, in words; the exception itself goes to the log."""
+    if isinstance(exc, PermissionError):
+        return ("Vettore is not allowed to use it there, or another program has the file open. "
+                "Close it in the other program, or choose another folder such as Documents.")
+    if isinstance(exc, IsADirectoryError):
+        return "that name belongs to a folder, not a file."
+    if isinstance(exc, FileNotFoundError):
+        return "the folder does not exist any more."
+    if exc.errno == errno.ENOSPC:
+        return "the disk is full. Free some space or choose another disk."
+    if exc.errno == errno.EROFS:
+        return "the disk or folder is read-only. Choose another folder."
+    return "the system reported a problem. The details were written to Vettore's log file."
+
+
+def _write_atomically(path: Path, data: bytes) -> None:
+    """Write next to the target, then replace it, so a failed save never truncates a file."""
+    tmp = path.with_name(f".{path.name}.vettore-tmp")
+    try:
+        tmp.write_bytes(data)
+        os.replace(tmp, path)
+    except OSError:
+        tmp.unlink(missing_ok=True)
+        raise
+
+
+def _save_failed(path: Path, exc: OSError) -> HTTPException:
+    log.error("Could not save %s: %r", path, exc)
+    return HTTPException(422, f"“{path.name}” could not be saved in {path.parent}: "
+                              f"{_os_reason(exc)}")
 
 
 def create_app(token: str, static_dir: Path | None,
@@ -119,6 +164,10 @@ def create_app(token: str, static_dir: Path | None,
     async def unsupported(_request: Request, exc: fileio.UnsupportedFile):
         return JSONResponse({"detail": str(exc)}, status_code=422)
 
+    @app.exception_handler(fileio.SaveError)
+    async def unsaveable(_request: Request, exc: fileio.SaveError):
+        return JSONResponse({"detail": str(exc)}, status_code=422)
+
     @app.get("/api/health")
     def health() -> dict[str, str]:
         return {"status": "ok"}
@@ -132,19 +181,31 @@ def create_app(token: str, static_dir: Path | None,
         while pending_startup:
             path = pending_startup.pop(0)
             try:
-                results.append({"path": str(path), "documents": _read(path.name, path.read_bytes())})
-            except (OSError, fileio.UnsupportedFile) as exc:
+                results.append(_open_path(path))
+            except HTTPException as exc:
+                errors.append(str(exc.detail))
+            except fileio.UnsupportedFile as exc:
                 errors.append(str(exc))
         return {"results": results, "errors": errors}
 
+    def _open_path(path: Path) -> dict[str, Any]:
+        if not path.is_file():
+            raise HTTPException(404, f"“{path.name}” was not found in {path.parent}. It may have "
+                                     "been moved, renamed or deleted.")
+        try:
+            content = path.read_bytes()
+        except OSError as exc:
+            log.error("Could not read %s: %r", path, exc)
+            raise HTTPException(422, f"“{path.name}” could not be opened: "
+                                     f"{_os_reason(exc)}") from exc
+        result = _read(path.name, content)
+        settings.add_recent(path)
+        settings.remember_folder(path.parent)
+        return {"path": str(path), **result}
+
     @app.post("/api/open-path")
     def open_path(body: OpenPath) -> dict[str, Any]:
-        path = Path(body.path)
-        if not path.is_file():
-            raise HTTPException(404, f"File not found: {path}")
-        documents = _read(path.name, path.read_bytes())
-        settings.add_recent(path)
-        return {"path": str(path), "documents": documents}
+        return _open_path(Path(body.path))
 
     @app.post("/api/unsaved")
     def unsaved(body: Unsaved) -> dict[str, int]:
@@ -219,27 +280,53 @@ def create_app(token: str, static_dir: Path | None,
 
     @app.post("/api/open-content")
     def open_content(body: OpenContent) -> dict[str, Any]:
-        content = base64.b64decode(body.content_b64)
-        return {"path": None, "documents": _read(body.filename, content)}
+        try:
+            content = base64.b64decode(body.content_b64, validate=True)
+        except (binascii.Error, ValueError) as exc:
+            raise HTTPException(422, f"“{body.filename}” did not reach the engine intact; "
+                                     "try opening it again.") from exc
+        return {"path": None, **_read(body.filename, content)}
+
+    @app.post("/api/open-text")
+    def open_text(body: OpenText) -> dict[str, Any]:
+        """Pasted text, recognised the same way as file content."""
+        name = body.name.strip() or "Pasted sequence"
+        return {"path": None, **_read(name, body.text.encode("utf-8"), pasted=True)}
 
     @app.post("/api/save-path")
     def save_path(body: SavePath) -> dict[str, str]:
-        path = Path(body.path)
-        fmt = "fasta" if path.suffix.lower() in {".fa", ".fasta", ".fna", ".fas"} else "genbank"
-        path.write_text(_export(body.sequenceData, fmt), encoding="utf-8")
-        if fmt == "genbank":
+        """Save in the format of the path's extension, appending one when there is none."""
+        path, fmt = fileio.save_target(body.path, _format(body.format))
+        content = fileio.encode(body.sequenceData, fmt)
+        try:
+            _write_atomically(path, content)
+        except OSError as exc:
+            raise _save_failed(path, exc) from exc
+        if fmt != "fasta":  # a FASTA copy is an export, not a document to reopen
             settings.add_recent(path)
-        return {"path": str(path)}
+        settings.remember_folder(path.parent)
+        return {"path": str(path), "format": fmt, "format_label": fileio.LABELS[fmt]}
 
     @app.post("/api/save-binary")
     def save_binary(body: SaveBinary) -> dict[str, str]:
         path = Path(body.path)
-        path.write_bytes(base64.b64decode(body.content_b64))
+        try:
+            _write_atomically(path, base64.b64decode(body.content_b64))
+        except OSError as exc:
+            raise _save_failed(path, exc) from exc
+        settings.remember_folder(path.parent)
         return {"path": str(path)}
 
     @app.post("/api/export")
     def export(body: Export) -> dict[str, str]:
-        return {"content": _export(body.sequenceData, body.format)}
+        """File content for a browser download (no desktop save dialog)."""
+        fmt = _format(body.format)
+        if fmt not in fileio.DEFAULT_EXTENSION:
+            raise HTTPException(400, f"Unknown export format: {body.format}")
+        content = fileio.encode(body.sequenceData, fmt)
+        if fmt in fileio.BINARY_FORMATS:
+            return {"content_b64": base64.b64encode(content).decode("ascii")}
+        return {"content": content.decode("utf-8")}
 
     if static_dir and static_dir.is_dir():
         app.mount("/", StaticFiles(directory=static_dir, html=True), name="static")
@@ -247,10 +334,15 @@ def create_app(token: str, static_dir: Path | None,
     return app
 
 
-def _read(filename: str, content: bytes) -> list[dict[str, Any]]:
+def _read(filename: str, content: bytes, pasted: bool = False) -> dict[str, Any]:
+    """Open result for the UI: documents, format, warnings and whether Save may overwrite."""
     try:
-        return fileio.read_documents(filename, content)
+        return fileio.read_file(filename, content, pasted=pasted).as_dict()
     except fileio.UnsupportedFile:
         raise
-    except Exception as exc:  # parser errors from Biopython are heterogeneous
-        raise fileio.UnsupportedFile(f"Could not read {filename}: {exc}") from exc
+    except Exception as exc:  # anything unexpected: plain words for the user, details in the log
+        log.exception("Unexpected error opening %s", filename)
+        what = "The pasted text" if pasted else f"“{Path(filename).name}”"
+        raise fileio.UnsupportedFile(
+            f"{what} could not be opened because of an unexpected problem. The details were "
+            "written to Vettore's log file; please send it along with the file.") from exc

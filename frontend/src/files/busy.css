@@ -1,0 +1,5 @@
+/* While a file is being opened or saved, the pointer says so everywhere in the window. */
+.vt-busy,
+.vt-busy * {
+  cursor: progress !important;
+}

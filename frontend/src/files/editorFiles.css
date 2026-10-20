@@ -1,0 +1,5 @@
+/* The selection's right-click "Copy" submenu offers a GenBank copy written by the editor
+   component itself, not by the engine; Edit → Copy as FASTA and File → Save cover it. */
+.openVeCopyGenbankForSelection {
+  display: none !important;
+}

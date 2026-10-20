@@ -27,6 +27,20 @@ export interface SequenceData {
 export interface OpenResult {
   path: string | null;
   documents: SequenceData[];
+  /** Engine format id ("genbank", "embl", "fasta", "raw", ...) and its label for people. */
+  format?: string;
+  format_label?: string;
+  /** Things the user should know, e.g. features that could not be placed. */
+  warnings?: string[];
+  /** Save may overwrite the file: it holds exactly this one document. */
+  writable?: boolean;
+}
+
+export interface SaveResult {
+  /** Where the file was written (an extension is appended when none was typed). */
+  path: string;
+  format: string;
+  format_label: string;
 }
 
 /** A sample construct shipped with Vettore (offered on the welcome screen). */
@@ -38,7 +52,8 @@ export interface Sample {
 
 interface DesktopApi {
   open_dialog(): Promise<string[]>;
-  save_dialog(suggestedName: string): Promise<string | null>;
+  /** `kind` (genbank, fasta, dna, svg, png) orders the file types; `directory` is where it starts. */
+  save_dialog(suggestedName: string, directory?: string, kind?: string): Promise<string | null>;
 }
 
 declare global {
@@ -53,13 +68,24 @@ if (token) sessionStorage.setItem("vettore-token", token);
 
 /** Call an engine endpoint under /api/; throws with the engine's message on error. */
 export async function call<T>(path: string, body?: unknown): Promise<T> {
-  const res = await fetch(`/api/${path}`, {
-    method: body === undefined ? "GET" : "POST",
-    headers: { "Content-Type": "application/json", "X-Vettore-Token": token },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
+  let res: Response;
+  try {
+    res = await fetch(`/api/${path}`, {
+      method: body === undefined ? "GET" : "POST",
+      headers: { "Content-Type": "application/json", "X-Vettore-Token": token },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+  } catch {
+    throw new Error("Vettore's engine is not responding. Close Vettore and start it again; "
+      + "your files on disk are not affected.");
+  }
   const payload = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(payload.detail ?? `${res.status} ${res.statusText}`);
+  if (!res.ok) {
+    // The engine's messages are written for people; anything else gets a plain fallback.
+    if (typeof payload.detail === "string") throw new Error(payload.detail);
+    throw new Error(`Something went wrong inside Vettore (error ${res.status}). The details were `
+      + "written to Vettore's log file; please send it if this happens again.");
+  }
   return payload as T;
 }
 
@@ -108,8 +134,14 @@ export const api = {
   openPath: (path: string) => call<OpenResult>("open-path", { path }),
   openContent: async (file: File) =>
     call<OpenResult>("open-content", { filename: file.name, content_b64: await toBase64(file) }),
-  savePath: (path: string, sequenceData: SequenceData) =>
-    call<{ path: string }>("save-path", { path, sequenceData }),
+  /** Pasted text (sequence, FASTA, GenBank or EMBL record), recognised like file content. */
+  openText: (text: string, name = "") => call<OpenResult>("open-text", { text, name }),
+  /** The engine writes the format of the path's extension; `format` applies when there is none. */
+  savePath: (path: string, sequenceData: SequenceData, format?: "genbank" | "fasta" | "dna") =>
+    call<SaveResult>("save-path", { path, sequenceData, format }),
   exportText: (sequenceData: SequenceData, format: "genbank" | "fasta") =>
     call<{ content: string }>("export", { sequenceData, format }),
+  /** File content for a browser download: text for GenBank/FASTA, base64 for .dna. */
+  exportFile: (sequenceData: SequenceData, format: "genbank" | "fasta" | "dna") =>
+    call<{ content?: string; content_b64?: string }>("export", { sequenceData, format }),
 };
