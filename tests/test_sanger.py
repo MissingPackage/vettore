@@ -243,7 +243,7 @@ def test_e2e_reference_fixture_is_up_to_date():
     root = Path(__file__).resolve().parents[1]
     fixture = root / "frontend" / "e2e" / "fixtures" / "sanger-reference.txt"
     out = subprocess.run([sys.executable, "-I", str(root / "scripts" / "make_sanger_fixture.py")],
-                         capture_output=True, text=True, check=True).stdout
-    assert out == fixture.read_text(), (
+                         capture_output=True, text=True, encoding="utf-8", check=True).stdout
+    assert out == fixture.read_text(encoding="utf-8"), (
         "Regenerate: python -I scripts/make_sanger_fixture.py > "
         "frontend/e2e/fixtures/sanger-reference.txt")

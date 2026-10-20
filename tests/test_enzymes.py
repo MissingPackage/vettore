@@ -11,15 +11,15 @@ FIXTURE = ROOT / "frontend" / "src" / "__tests__" / "fixtures" / "cuts.json"
 
 
 def test_bundled_database_is_up_to_date():
-    bundled = json.loads(BUNDLED.read_text())["enzymes"]
+    bundled = json.loads(BUNDLED.read_text(encoding="utf-8"))["enzymes"]
     assert bundled == build_database(), (
         "Regenerate: python -m vettore.enzymes > frontend/src/data/enzymes.json")
 
 
 def test_cross_engine_fixture_is_up_to_date():
     out = subprocess.run([sys.executable, "-I", str(ROOT / "scripts" / "make_enzyme_fixture.py")],
-                         capture_output=True, text=True, check=True).stdout
-    assert json.loads(out) == json.loads(FIXTURE.read_text()), (
+                         capture_output=True, text=True, encoding="utf-8", check=True).stdout
+    assert json.loads(out) == json.loads(FIXTURE.read_text(encoding="utf-8")), (
         "Regenerate: python -I scripts/make_enzyme_fixture.py > " + str(FIXTURE.relative_to(ROOT)))
 
 

@@ -159,7 +159,7 @@ def test_feature_quirks_are_repaired_or_reported():
 
 
 def test_genbank_without_final_terminator_and_with_old_mac_line_endings():
-    text = (DATA / "MT612431.1.gb").read_text().rstrip().removesuffix("//").replace("\n", "\r")
+    text = (DATA / "MT612431.1.gb").read_text(encoding="utf-8").rstrip().removesuffix("//").replace("\n", "\r")
     doc = only(fileio.read_file("x.gb", text.encode()))
     assert len(doc["sequence"]) == 7204
 
@@ -270,7 +270,7 @@ def test_save_target_follows_the_extension():
 def test_browser_file_chooser_lists_every_readable_extension():
     import re
 
-    source = (Path(__file__).parents[1] / "frontend" / "src" / "files" / "formats.ts").read_text()
+    source = (Path(__file__).parents[1] / "frontend" / "src" / "files" / "formats.ts").read_text(encoding="utf-8")
     block = source.split("OPEN_EXTENSIONS = [", 1)[1].split("]", 1)[0]
     assert set(re.findall(r'"(\.[a-z0-9]+)"', block)) == set(fileio.FORMATS)
 

@@ -75,7 +75,7 @@ def test_an_unexpected_problem_is_logged_and_explained(monkeypatch, caplog):
 def test_a_file_vettore_may_not_read_is_explained(tmp_path):
     folder = tmp_path / "private"
     folder.mkdir()
-    (folder / "secret.gb").write_text("LOCUS")
+    (folder / "secret.gb").write_text("LOCUS", encoding="utf-8")
     folder.chmod(0)
     try:
         res = client().post("/api/open-path", headers=H,

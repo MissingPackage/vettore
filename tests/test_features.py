@@ -168,7 +168,7 @@ def test_malformed_existing_features_are_ignored():
 def test_the_database_file_is_the_one_the_builder_produces():
     """The builder needs the network, so this only checks the file's own consistency."""
     text = (Path(__file__).resolve().parents[1] / "src" / "vettore" / "data"
-            / "common_features.json").read_text()
+            / "common_features.json").read_text(encoding="utf-8")
     payload = json.loads(text)
     assert payload["source"].startswith("NCBI")
     assert len(payload["features"]) == len(catalogue())

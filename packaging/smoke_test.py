@@ -122,7 +122,7 @@ def main() -> int:
         assert (placed["start"], placed["identity"]) == (1001, 100.0), placed
         # Sanger reads are aligned with Biopython's BLASTN scoring matrix, a data file.
         reference = (FIXTURES.parents[1] / "frontend" / "e2e" / "fixtures"
-                     / "sanger-reference.txt").read_text()
+                     / "sanger-reference.txt").read_text(encoding="utf-8")
         trace = base64.b64encode((FIXTURES / "3730.ab1").read_bytes()).decode()
         sanger = call("sanger/align", {
             "reference": {"name": "ref", "sequence": reference.strip(), "circular": False},
