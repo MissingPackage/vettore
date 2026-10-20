@@ -1,0 +1,37 @@
+/* Tools → Align Multiple Sequences. Colours and spacing come from theme/tokens.css. */
+.vt-msa { display: flex; flex-direction: column; gap: var(--vt-space-3); max-height: 78vh; overflow: auto; }
+.vt-msa-intro { margin: 0; color: var(--vt-text); }
+.vt-msa-setup { display: flex; flex-direction: column; gap: var(--vt-space-3); }
+.vt-msa-field { display: flex; flex-direction: column; gap: var(--vt-space-1); }
+.vt-msa-label { font-weight: 600; color: var(--vt-text-strong); }
+.vt-msa-choices {
+  display: flex; flex-direction: column; gap: var(--vt-space-1);
+  max-height: 180px; overflow: auto; padding: var(--vt-space-2);
+  border: 1px solid var(--vt-border-subtle); border-radius: var(--vt-radius);
+  background: var(--vt-surface-subtle);
+}
+.vt-msa-choice { display: flex; align-items: baseline; gap: var(--vt-space-2); cursor: pointer; }
+.vt-msa-choice.is-disabled { cursor: default; color: var(--vt-text-faint); }
+.vt-msa-meta { color: var(--vt-text-muted); font-size: 12px; }
+.vt-msa-note { color: var(--vt-text-muted); }
+.vt-msa-invalid { color: var(--vt-danger); font-size: 12px; }
+.vt-msa-actions { display: flex; align-items: center; gap: var(--vt-space-3); flex-wrap: wrap; }
+.vt-msa-busy { color: var(--vt-text); }
+.vt-msa-details {
+  border: 1px solid var(--vt-border-subtle); border-radius: var(--vt-radius);
+  padding: var(--vt-space-2) var(--vt-space-3);
+}
+.vt-msa-details-head { display: flex; align-items: baseline; gap: var(--vt-space-3); flex-wrap: wrap; }
+.vt-msa-diffs {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  column-gap: var(--vt-space-5); row-gap: 2px;
+  margin: var(--vt-space-2) 0 0; padding: 0; list-style: none;
+  max-height: 160px; overflow: auto;
+  font-family: var(--vt-font-mono); font-size: 12px;
+}
+.vt-msa-diff.is-mismatch { color: var(--vt-danger); }
+.vt-msa-diff.is-insertion, .vt-msa-diff.is-deletion { color: var(--vt-warning); }
+.vt-msa-view {
+  height: 430px; flex: none; border: 1px solid var(--vt-border-subtle);
+  border-radius: var(--vt-radius);
+}
