@@ -533,7 +533,7 @@ def _forward(ann: dict[str, Any]) -> bool:
 def write_dna(data: dict) -> bytes:
     """A .dna file with the sequence, topology, features (with colours) and primers.
 
-    The block layout follows the format as read by Biopython (Bio.SeqIO.SnapGeneIO) and sgffp;
+    The block layout follows the format as Biopython and sgffp read it;
     metadata defaults are those found in the Biopython test-suite files in tests/data. History,
     alignments and traces are not written.
     """

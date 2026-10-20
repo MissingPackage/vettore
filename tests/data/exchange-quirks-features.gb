@@ -409,9 +409,9 @@ FEATURES             Location/Qualifiers
      misc_feature    complement(200..300)
                      /label="test region with odd qualifiers"
                      /pseudo
-                     /vntifkey="21"
+                     /custom_feature_key="21"
                      /ApEinfo_revcolor=#ff0000
-                     /SECDrawAs="Gene"
+                     /draw_as="Gene"
                      /note="a ""quoted"" word"
                      /custom-qualifier="x"
      misc_feature    complement(200..300)

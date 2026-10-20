@@ -143,7 +143,7 @@ def test_feature_quirks_are_repaired_or_reported():
     assert len(odd) == 2
     assert odd[0]["notes"]["note"] == ['a "quoted" word']
     assert odd[0]["notes"]["pseudo"] == [""]
-    assert odd[0]["notes"]["vntifkey"] == ["21"]
+    assert odd[0]["notes"]["custom_feature_key"] == ["21"]
     assert len(by_name["tet"]) > 1
     # Features the editor cannot place are left out, and the user is told which and why.
     for name in ("test site between bases", "test region beyond the end",
