@@ -14,6 +14,8 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from . import fileio, settings, tm
+from .cloning.api import router as cloning_router
+from .cloning.base import CloningError
 
 TOKEN_HEADER = "X-Vettore-Token"
 ALLOWED_HOSTS = {"127.0.0.1", "localhost"}
@@ -74,6 +76,12 @@ def create_app(token: str, static_dir: Path | None,
             if not secrets.compare_digest(supplied, token):
                 return JSONResponse({"detail": "Invalid token"}, status_code=403)
         return await call_next(request)
+
+    @app.exception_handler(CloningError)
+    async def cloning_error(_request: Request, exc: CloningError):
+        return JSONResponse({"detail": str(exc)}, status_code=422)
+
+    app.include_router(cloning_router)
 
     @app.exception_handler(fileio.UnsupportedFile)
     async def unsupported(_request: Request, exc: fileio.UnsupportedFile):

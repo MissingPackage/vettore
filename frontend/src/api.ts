@@ -11,6 +11,8 @@ export interface OveAnnotation {
   color?: string;
   locations?: { start: number; end: number }[];
   notes?: Record<string, string[]>;
+  /** Full primer sequence 5'->3' (primers only), including 5' tails. */
+  bases?: string;
 }
 
 export interface SequenceData {
@@ -77,6 +79,7 @@ async function toBase64(blob: Blob): Promise<string> {
 }
 
 export const api = {
+  cloning: <T>(endpoint: string, body: object) => call<T>(`cloning/${endpoint}`, body),
   recent: () => call<{ paths: string[] }>("recent"),
   unsaved: (count: number) => call<{ count: number }>("unsaved", { count }),
   tm: (sequence: string) =>

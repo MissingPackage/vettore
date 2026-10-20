@@ -1,0 +1,396 @@
+// One form per cloning action. Each form reports the JSON body of its /api/cloning endpoint.
+import { useEffect, useState } from "react";
+import { ENZYMES } from "../enzymeLogic";
+import { DocSelect, EnzymePicker, Field, RegionInput, findDoc } from "./inputs";
+import type { FormProps, OpenDoc } from "./types";
+
+const dataOf = (d: OpenDoc | null) => (d ? d.data() : null);
+
+// ---- Restriction and insertion cloning ---------------------------------------------------
+export function RestrictionInsertForm({ docs, active, onChange }: FormProps) {
+  const [vector, setVector] = useState<string | null>(active?.editorName ?? null);
+  const [insert, setInsert] = useState<string | null>(null);
+  const [vEnz, setVEnz] = useState<string[]>([]);
+  const [iEnz, setIEnz] = useState<string[]>([]);
+  const [orientation, setOrientation] = useState<"forward" | "reverse">("forward");
+  const v = findDoc(docs, vector);
+  const i = findDoc(docs, insert);
+
+  useEffect(() => {
+    if (!v || !i || !vEnz.length || !iEnz.length) return onChange(null);
+    onChange({
+      vector: v.data(),
+      vector_enzymes: vEnz,
+      insert: i.data(),
+      insert_enzymes: iEnz,
+      insert_fragment_index: null,
+      orientation,
+    });
+  }, [v, i, vEnz, iEnz, orientation]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <>
+      <Field label="Vector">
+        <DocSelect docs={docs} value={vector} onChange={setVector} testId="vector-doc" />
+      </Field>
+      <Field label="Cut vector with" hint="One enzyme, or two for directional cloning">
+        <EnzymePicker value={vEnz} onChange={setVEnz} max={2} sequence={dataOf(v)?.sequence} circular={dataOf(v)?.circular} testId="vector-enzymes" />
+      </Field>
+      <Field label="Insert from">
+        <DocSelect docs={docs} value={insert} onChange={setInsert} testId="insert-doc" />
+      </Field>
+      <Field label="Cut insert with">
+        <EnzymePicker value={iEnz} onChange={setIEnz} max={2} sequence={dataOf(i)?.sequence} circular={dataOf(i)?.circular} testId="insert-enzymes" />
+      </Field>
+      <Field label="Orientation">
+        <div className="bp3-html-select">
+          <select value={orientation} onChange={(e) => setOrientation(e.target.value as "forward" | "reverse")}>
+            <option value="forward">Forward</option>
+            <option value="reverse">Reverse (flipped)</option>
+          </select>
+        </div>
+      </Field>
+    </>
+  );
+}
+
+// ---- PCR ---------------------------------------------------------------------------------
+function PrimerInput(props: {
+  label: string;
+  template: OpenDoc | null;
+  value: { name: string; sequence: string };
+  onChange: (p: { name: string; sequence: string }) => void;
+}) {
+  const primers = (() => {
+    const p = props.template?.data().primers ?? [];
+    return (Array.isArray(p) ? p : Object.values(p)).filter((x): x is typeof x & { bases: string } => !!x.bases);
+  })();
+  return (
+    <Field label={props.label}>
+      <div className="vt-primer-input">
+        <input
+          className="bp3-input bp3-small"
+          placeholder="Name"
+          value={props.value.name}
+          onChange={(e) => props.onChange({ ...props.value, name: e.target.value })}
+        />
+        <input
+          className="bp3-input bp3-small vt-mono"
+          placeholder="5′ → 3′ sequence"
+          value={props.value.sequence}
+          onChange={(e) => props.onChange({ ...props.value, sequence: e.target.value.replace(/[^ACGTRYSWKMBDHVNacgtryswkmbdhvn]/g, "") })}
+        />
+        {primers.length > 0 && (
+          <div className="bp3-html-select bp3-minimal">
+            <select value="" onChange={(e) => {
+              const p = primers.find((x) => x.name === e.target.value);
+              if (p) props.onChange({ name: p.name, sequence: p.bases });
+            }}>
+              <option value="">From file…</option>
+              {primers.map((p) => <option key={p.name} value={p.name}>{p.name}</option>)}
+            </select>
+          </div>
+        )}
+      </div>
+    </Field>
+  );
+}
+
+export function PcrForm({ docs, active, onChange }: FormProps) {
+  const [template, setTemplate] = useState<string | null>(active?.editorName ?? null);
+  const [fwd, setFwd] = useState({ name: "Forward", sequence: "" });
+  const [rev, setRev] = useState({ name: "Reverse", sequence: "" });
+  const t = findDoc(docs, template);
+  useEffect(() => {
+    if (!t || fwd.sequence.length < 10 || rev.sequence.length < 10) return onChange(null);
+    onChange({ template: t.data(), forward: fwd, reverse: rev, mismatches: 0 });
+  }, [t, fwd, rev]); // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <>
+      <Field label="Template">
+        <DocSelect docs={docs} value={template} onChange={setTemplate} testId="template-doc" />
+      </Field>
+      <PrimerInput label="Forward primer" template={t} value={fwd} onChange={setFwd} />
+      <PrimerInput label="Reverse primer" template={t} value={rev} onChange={setRev} />
+    </>
+  );
+}
+
+export function DesignPrimersForm({ docs, active, onChange }: FormProps) {
+  const [template, setTemplate] = useState<string | null>(active?.editorName ?? null);
+  const t = findDoc(docs, template);
+  const sel = t?.selection() ?? null;
+  const [start, setStart] = useState<number | null>(sel?.start ?? null);
+  const [end, setEnd] = useState<number | null>(sel?.end ?? null);
+  const [tm, setTm] = useState(60);
+  const [fTail, setFTail] = useState("");
+  const [rTail, setRTail] = useState("");
+  useEffect(() => {
+    if (!t || start === null || end === null) return onChange(null);
+    onChange({ template: t.data(), start, end, target_tm: tm, forward_tail: fTail, reverse_tail: rTail });
+  }, [t, start, end, tm, fTail, rTail]); // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <>
+      <Field label="Template">
+        <DocSelect docs={docs} value={template} onChange={setTemplate} />
+      </Field>
+      <Field label="Region to amplify">
+        <RegionInput doc={t} start={start} end={end} onChange={(s, e) => { setStart(s); setEnd(e); }} />
+      </Field>
+      <Field label="Target Tm of annealing parts (°C)">
+        <input className="bp3-input bp3-small" type="number" value={tm} onChange={(e) => setTm(Number(e.target.value))} />
+      </Field>
+      <Field label="Forward primer 5′ tail" hint="e.g. a restriction site with a few extra bases">
+        <input className="bp3-input bp3-small vt-mono" value={fTail} onChange={(e) => setFTail(e.target.value.toUpperCase().replace(/[^ACGTN]/g, ""))} />
+      </Field>
+      <Field label="Reverse primer 5′ tail">
+        <input className="bp3-input bp3-small vt-mono" value={rTail} onChange={(e) => setRTail(e.target.value.toUpperCase().replace(/[^ACGTN]/g, ""))} />
+      </Field>
+    </>
+  );
+}
+
+// ---- Gibson / NEBuilder HiFi / In-Fusion -------------------------------------------------
+interface InsertRow {
+  editorName: string | null;
+  start: number | null;
+  end: number | null;
+}
+
+export function overlapForm(method: "gibson" | "hifi" | "infusion") {
+  return function OverlapAssemblyForm({ docs, active, onChange }: FormProps) {
+    const [vector, setVector] = useState<string | null>(active?.editorName ?? null);
+    const [mode, setMode] = useState<"enzymes" | "pcr">("enzymes");
+    const [vEnz, setVEnz] = useState<string[]>([]);
+    const [vStart, setVStart] = useState<number | null>(null);
+    const [vEnd, setVEnd] = useState<number | null>(null);
+    const [inserts, setInserts] = useState<InsertRow[]>([{ editorName: null, start: null, end: null }]);
+    const [overlap, setOverlap] = useState(method === "infusion" ? 15 : 25);
+    const v = findDoc(docs, vector);
+
+    useEffect(() => {
+      if (!v) return onChange(null);
+      const linearize = mode === "enzymes"
+        ? vEnz.length ? { enzymes: vEnz } : null
+        : vStart !== null && vEnd !== null ? { pcr: { start: vStart, end: vEnd } } : null;
+      const rows = inserts.map((r) => ({ row: r, doc: findDoc(docs, r.editorName) }));
+      if (!linearize || rows.some((r) => !r.doc)) return onChange(null);
+      onChange({
+        method,
+        vector: { doc: v.data(), linearize },
+        inserts: rows.map(({ row, doc }) => ({ doc: doc!.data(), start: row.start, end: row.end })),
+        overlap,
+        target_tm: 60,
+      });
+    }, [v, mode, vEnz, vStart, vEnd, inserts, overlap]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    const update = (i: number, patch: Partial<InsertRow>) =>
+      setInserts((rows) => rows.map((r, j) => (j === i ? { ...r, ...patch } : r)));
+
+    return (
+      <>
+        <Field label="Vector">
+          <DocSelect docs={docs} value={vector} onChange={setVector} testId="vector-doc" />
+        </Field>
+        <Field label="Linearize vector by">
+          <div className="bp3-html-select">
+            <select value={mode} onChange={(e) => setMode(e.target.value as "enzymes" | "pcr")}>
+              <option value="enzymes">Restriction digest</option>
+              <option value="pcr">PCR (inverse PCR of the region to keep)</option>
+            </select>
+          </div>
+        </Field>
+        {mode === "enzymes" ? (
+          <Field label="Enzymes">
+            <EnzymePicker value={vEnz} onChange={setVEnz} max={2} sequence={dataOf(v)?.sequence} circular={dataOf(v)?.circular} testId="vector-enzymes" />
+          </Field>
+        ) : (
+          <Field label="Vector region to keep">
+            <RegionInput doc={v} start={vStart} end={vEnd} onChange={(s, e) => { setVStart(s); setVEnd(e); }} />
+          </Field>
+        )}
+        {inserts.map((row, i) => {
+          const d = findDoc(docs, row.editorName);
+          return (
+            <div key={i} className="vt-insert-row">
+              <Field label={`Insert ${i + 1}`}>
+                <DocSelect docs={docs} value={row.editorName} onChange={(e) => update(i, { editorName: e })} testId={`insert-doc-${i}`} />
+              </Field>
+              <Field label="Region to amplify" hint={d?.data().circular ? "Required for circular files" : "Empty = whole sequence"}>
+                <RegionInput doc={d} start={row.start} end={row.end} onChange={(s, e) => update(i, { start: s, end: e })} />
+              </Field>
+              {inserts.length > 1 && (
+                <button className="bp3-button bp3-small bp3-minimal" onClick={() => setInserts((r) => r.filter((_, j) => j !== i))}>
+                  Remove insert
+                </button>
+              )}
+            </div>
+          );
+        })}
+        <button className="bp3-button bp3-small" onClick={() => setInserts((r) => [...r, { editorName: null, start: null, end: null }])}>
+          + Add insert
+        </button>
+        <Field label="Overlap length (bp)">
+          <input className="bp3-input bp3-small" type="number" min={10} max={60} value={overlap} onChange={(e) => setOverlap(Number(e.target.value))} />
+        </Field>
+      </>
+    );
+  };
+}
+
+// ---- Mutagenesis -------------------------------------------------------------------------
+export function MutagenesisForm({ docs, active, onChange }: FormProps) {
+  const [docName, setDocName] = useState<string | null>(active?.editorName ?? null);
+  const d = findDoc(docs, docName);
+  const sel = d?.selection() ?? null;
+  const [kind, setKind] = useState<"substitution" | "insertion" | "deletion">("substitution");
+  const [start, setStart] = useState<number | null>(sel?.start ?? null);
+  const [end, setEnd] = useState<number | null>(sel?.end ?? null);
+  const [newSeq, setNewSeq] = useState("");
+  useEffect(() => {
+    if (!d || start === null || end === null) return onChange(null);
+    if (kind !== "deletion" && !newSeq) return onChange(null);
+    onChange({ doc: d.data(), kind, start, end: kind === "insertion" ? start : end, new_sequence: kind === "deletion" ? "" : newSeq });
+  }, [d, kind, start, end, newSeq]); // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <>
+      <Field label="Plasmid">
+        <DocSelect docs={docs} value={docName} onChange={setDocName} />
+      </Field>
+      <Field label="Change">
+        <div className="bp3-html-select">
+          <select value={kind} onChange={(e) => setKind(e.target.value as typeof kind)}>
+            <option value="substitution">Substitution (replace the region)</option>
+            <option value="insertion">Insertion (after the first position)</option>
+            <option value="deletion">Deletion (remove the region)</option>
+          </select>
+        </div>
+      </Field>
+      <Field label={kind === "insertion" ? "Insert after base" : "Region"}>
+        <RegionInput doc={d} start={start} end={end} onChange={(s, e) => { setStart(s); setEnd(e); }} />
+      </Field>
+      {kind !== "deletion" && (
+        <Field label="New bases (5′ → 3′, top strand)">
+          <input className="bp3-input bp3-small vt-mono" value={newSeq} onChange={(e) => setNewSeq(e.target.value.toUpperCase().replace(/[^ACGT]/g, ""))} />
+        </Field>
+      )}
+    </>
+  );
+}
+
+// ---- Golden Gate -------------------------------------------------------------------------
+const GG_ENZYMES = new Set(Object.values(ENZYMES).filter((e) => e.goldenGate).map((e) => e.name));
+
+export function GoldenGateForm({ docs, active, onChange }: FormProps) {
+  const [vector, setVector] = useState<string | null>(active?.editorName ?? null);
+  const [parts, setParts] = useState<(string | null)[]>([null]);
+  const [enzyme, setEnzyme] = useState<string>("BsaI");
+  const v = findDoc(docs, vector);
+  useEffect(() => {
+    const p = parts.map((n) => findDoc(docs, n));
+    if (!v || p.some((x) => !x)) return onChange(null);
+    onChange({ vector: v.data(), parts: p.map((x) => x!.data()), enzyme });
+  }, [v, parts, enzyme]); // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <>
+      <Field label="Enzyme">
+        <div className="bp3-html-select">
+          <select value={enzyme} onChange={(e) => setEnzyme(e.target.value)}>
+            {[...GG_ENZYMES].sort().map((n) => <option key={n} value={n}>{n}</option>)}
+          </select>
+        </div>
+      </Field>
+      <Field label="Vector">
+        <DocSelect docs={docs} value={vector} onChange={setVector} />
+      </Field>
+      {parts.map((p, i) => (
+        <Field key={i} label={`Part ${i + 1}`}>
+          <div className="vt-row">
+            <DocSelect docs={docs} value={p} onChange={(e) => setParts((x) => x.map((y, j) => (j === i ? e : y)))} />
+            {parts.length > 1 && (
+              <button className="bp3-button bp3-small bp3-minimal" onClick={() => setParts((x) => x.filter((_, j) => j !== i))}>×</button>
+            )}
+          </div>
+        </Field>
+      ))}
+      <button className="bp3-button bp3-small" onClick={() => setParts((x) => [...x, null])}>+ Add part</button>
+    </>
+  );
+}
+
+// ---- Gateway -----------------------------------------------------------------------------
+export function gatewayForm(reaction: "BP" | "LR") {
+  return function GatewayForm({ docs, active, onChange }: FormProps) {
+    const [a, setA] = useState<string | null>(active?.editorName ?? null);
+    const [b, setB] = useState<string | null>(null);
+    const da = findDoc(docs, a);
+    const db = findDoc(docs, b);
+    useEffect(() => {
+      if (!da || !db) return onChange(null);
+      onChange({ reaction, inputs: [da.data(), db.data()] });
+    }, [da, db]); // eslint-disable-line react-hooks/exhaustive-deps
+    return (
+      <>
+        <Field label={reaction === "BP" ? "attB-flanked insert (e.g. PCR product)" : "Entry clone (attL sites)"}>
+          <DocSelect docs={docs} value={a} onChange={setA} />
+        </Field>
+        <Field label={reaction === "BP" ? "Donor vector (attP sites)" : "Destination vector (attR sites)"}>
+          <DocSelect docs={docs} value={b} onChange={setB} />
+        </Field>
+      </>
+    );
+  };
+}
+
+// ---- TA / GC / TOPO ----------------------------------------------------------------------
+export function taTopoForm(kinds: { value: string; label: string }[]) {
+  return function TaTopoForm({ docs, active, onChange }: FormProps) {
+    const [kind, setKind] = useState(kinds[0].value);
+    const [insert, setInsert] = useState<string | null>(active?.editorName ?? null);
+    const [vector, setVector] = useState<string | null>(null);
+    const di = findDoc(docs, insert);
+    const dv = findDoc(docs, vector);
+    useEffect(() => {
+      if (!di || !dv) return onChange(null);
+      onChange({ kind, insert: di.data(), vector: dv.data() });
+    }, [kind, di, dv]); // eslint-disable-line react-hooks/exhaustive-deps
+    return (
+      <>
+        <Field label="Method">
+          <div className="bp3-html-select">
+            <select value={kind} onChange={(e) => setKind(e.target.value)}>
+              {kinds.map((k) => <option key={k.value} value={k.value}>{k.label}</option>)}
+            </select>
+          </div>
+        </Field>
+        <Field label="Insert (PCR product)">
+          <DocSelect docs={docs} value={insert} onChange={setInsert} />
+        </Field>
+        <Field label="Linearized vector (as supplied)">
+          <DocSelect docs={docs} value={vector} onChange={setVector} />
+        </Field>
+      </>
+    );
+  };
+}
+
+// ---- Delete restriction fragment ---------------------------------------------------------
+export function DeleteFragmentForm({ docs, active, onChange }: FormProps) {
+  const [docName, setDocName] = useState<string | null>(active?.editorName ?? null);
+  const [enz, setEnz] = useState<string[]>([]);
+  const d = findDoc(docs, docName);
+  useEffect(() => {
+    if (!d || !enz.length) return onChange(null);
+    onChange({ doc: d.data(), enzymes: enz, fragment_index: null });
+  }, [d, enz]); // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <>
+      <Field label="File">
+        <DocSelect docs={docs} value={docName} onChange={setDocName} />
+      </Field>
+      <Field label="Enzymes flanking the fragment to delete">
+        <EnzymePicker value={enz} onChange={setEnz} max={2} sequence={dataOf(d)?.sequence} circular={dataOf(d)?.circular} />
+      </Field>
+    </>
+  );
+}
