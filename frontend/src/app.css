@@ -81,3 +81,4 @@ body { font-family: system-ui, "Segoe UI", sans-serif; font-size: 13px; overflow
 .vt-oligos { margin-top: 10px; }
 .vt-row { display: flex; align-items: center; gap: 10px; }
 .vt-break { word-break: break-all; }
+.vt-gel { display: block; margin-bottom: 8px; }

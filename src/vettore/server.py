@@ -13,7 +13,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import fileio, settings, tm
+from . import fileio, gel, settings, tm
 from .cloning.api import router as cloning_router
 from .cloning.base import CloningError
 
@@ -38,6 +38,18 @@ class SavePath(BaseModel):
 class SaveBinary(BaseModel):
     path: str
     content_b64: str
+
+
+class GelLane(BaseModel):
+    name: str
+    sequenceData: dict[str, Any]
+    enzymes: list[str] = []
+
+
+class GelRequest(BaseModel):
+    lanes: list[GelLane]
+    ladder: str = gel.DEFAULT_LADDER
+    percent: float = gel.DEFAULT_PERCENT
 
 
 class Unsaved(BaseModel):
@@ -120,6 +132,33 @@ def create_app(token: str, static_dir: Path | None,
         if on_unsaved:
             on_unsaved(body.count)
         return {"count": body.count}
+
+    @app.get("/api/gel/ladders")
+    def gel_ladders() -> dict[str, Any]:
+        return {"ladders": gel.ladders(), "percentages": sorted(gel.RESOLVING_RANGE),
+                "default_ladder": gel.DEFAULT_LADDER, "default_percent": gel.DEFAULT_PERCENT}
+
+    @app.post("/api/gel")
+    def simulate_gel(body: GelRequest) -> dict[str, Any]:
+        from .cloning.base import SequenceDoc
+        from .cloning.restriction import digest
+
+        lanes = []
+        for lane in body.lanes:
+            doc = SequenceDoc(**lane.sequenceData)
+            if lane.enzymes:
+                sizes = [f["length"] for f in digest(doc, lane.enzymes)]
+                supercoiled = False
+                title = f"{lane.name} / {' + '.join(lane.enzymes)}"
+            else:
+                sizes = [len(doc.sequence)]
+                supercoiled = bool(doc.circular)
+                title = f"{lane.name} / uncut"
+            bands = gel.lane_bands(sizes, body.percent, supercoiled)
+            lanes.append({"name": title, "bands": [b.as_dict() for b in bands],
+                          "sizes": sorted(sizes, reverse=True)})
+        return {"lanes": lanes, "ladder": gel.ladder_bands(body.ladder, body.percent),
+                "ladder_label": gel.LADDERS[body.ladder]["label"], "percent": body.percent}
 
     @app.get("/api/recent")
     def recent() -> dict[str, list[str]]:

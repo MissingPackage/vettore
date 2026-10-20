@@ -19,6 +19,7 @@ export interface MenuHandlers {
   exportPng: () => void;
   view: (view: ViewId) => void;
   cloning: (actionId: string) => void;
+  gel: () => void;
   useEnzymeSet: (set: EnzymeSetId) => void;
   recent: string[];
 }
@@ -142,7 +143,15 @@ export function buildMenu(ref: MutableRefObject<MenuHandlers>) {
 
     const tools = {
       text: "Tools",
-      submenu: ["find", "goTo", "--", { text: "Minimum ORF Size…", cmd: "minOrfSizeCmd" }, "toggleOrfs"],
+      submenu: [
+        { text: "Simulate Agarose Gel…", hotkey: "mod+shift+g", onClick: () => h().gel() },
+        "--",
+        "find",
+        "goTo",
+        "--",
+        { text: "Minimum ORF Size…", cmd: "minOrfSizeCmd" },
+        "toggleOrfs",
+      ],
     };
 
     const views = {
