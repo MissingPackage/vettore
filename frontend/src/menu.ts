@@ -20,6 +20,7 @@ export interface MenuHandlers {
   view: (view: ViewId) => void;
   cloning: (actionId: string) => void;
   gel: () => void;
+  sanger: () => void;
   useEnzymeSet: (set: EnzymeSetId) => void;
   recent: string[];
 }
@@ -145,6 +146,7 @@ export function buildMenu(ref: MutableRefObject<MenuHandlers>) {
     const tools = {
       text: "Tools",
       submenu: [
+        { text: "Align to Reference DNA Sequence…", onClick: () => h().sanger() },
         { text: "Simulate Agarose Gel…", hotkey: "mod+shift+g", onClick: () => h().gel() },
         "--",
         "find",

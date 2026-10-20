@@ -13,7 +13,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import fileio, gel, settings, tm
+from . import fileio, gel, sanger, settings, tm
 from .cloning.api import router as cloning_router
 from .cloning.base import CloningError
 
@@ -38,6 +38,17 @@ class SavePath(BaseModel):
 class SaveBinary(BaseModel):
     path: str
     content_b64: str
+
+
+class SangerRead(BaseModel):
+    filename: str
+    content_b64: str
+
+
+class SangerRequest(BaseModel):
+    reference: dict[str, Any]
+    reads: list[SangerRead]
+    cutoff: float = sanger.DEFAULT_CUTOFF
 
 
 class GelLane(BaseModel):
@@ -132,6 +143,18 @@ def create_app(token: str, static_dir: Path | None,
         if on_unsaved:
             on_unsaved(body.count)
         return {"count": body.count}
+
+    @app.post("/api/sanger/align")
+    def sanger_align(body: SangerRequest) -> dict[str, Any]:
+        reference = body.reference.get("sequence") or ""
+        if len(reference) < 50:
+            raise HTTPException(422, "The reference sequence is too short to align reads to")
+        if not body.reads:
+            raise HTTPException(422, "Add at least one .ab1 trace")
+        reads = [(r.filename, base64.b64decode(r.content_b64)) for r in body.reads]
+        return sanger.alignment_payload(
+            body.reference.get("name") or "Reference", reference.upper(),
+            bool(body.reference.get("circular")), reads, body.cutoff)
 
     @app.get("/api/gel/ladders")
     def gel_ladders() -> dict[str, Any]:

@@ -82,3 +82,7 @@ body { font-family: system-ui, "Segoe UI", sans-serif; font-size: 13px; overflow
 .vt-row { display: flex; align-items: center; gap: 10px; }
 .vt-break { word-break: break-all; }
 .vt-gel { display: block; margin-bottom: 8px; }
+.vt-sanger-bar { gap: 16px; flex-wrap: wrap; margin-bottom: 10px; }
+.vt-alignment { height: 430px; border: 1px solid #d8dce1; border-radius: 4px; margin-top: 10px; }
+.vt-ok { color: #0f7b3f; font-weight: 600; }
+.vt-warn { color: #b54708; font-weight: 600; }

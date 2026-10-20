@@ -98,6 +98,19 @@ The biology is computed by [pydna](https://github.com/pydna-group/pydna) and
 [Biopython](https://biopython.org), and every operation is covered by tests that compare the
 result with a sequence worked out by hand.
 
+## Verifying a clone by sequencing (Tools → Align to Reference DNA Sequence…)
+
+Open the plasmid you expect, then choose the `.ab1` files your sequencing provider sent. Each
+read is quality-trimmed (Mott's algorithm; the stringency is adjustable), aligned to the
+plasmid on either strand, and stacked under the reference with its chromatogram, starting at
+the region the reads cover.
+
+The table above the view is the answer to "is my clone right?": for every read it gives the
+strand, the region covered in plasmid coordinates, the identity, and every difference listed
+as `position: reference → read`. Insertions and deletions are grouped into one event each, and
+the last line tells you how much of the plasmid the reads cover in total. Reads that cross the
+origin of a circular plasmid are handled and marked.
+
 ## Simulating a gel (Tools → Simulate Agarose Gel…)
 
 Add one lane per file, choose the enzymes for each lane (leave them empty to load the uncut
@@ -106,8 +119,8 @@ semi-logarithmic migration model: good for predicting the *pattern* of a diagnos
 reading sizes against the ladder, not a physical simulation of your gel rig. Hover a band to
 see its size.
 
-Not implemented yet: Gateway BP/LR, TA/GC/TOPO cloning, Sanger (.ab1) alignment to a reference,
-and automatic detection of common features.
+Not implemented yet: Gateway BP/LR and TA/GC/TOPO cloning, automatic detection of common
+features, multiple sequence alignment, and writing `.dna` files (saving is GenBank).
 
 ## Saving and sharing
 
