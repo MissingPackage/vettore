@@ -370,10 +370,14 @@ every later step will use to refer to this file.
 ## Annotating a new sequence (Features → Detect Common Features…)
 
 Opened a plasmid that arrives bare, or built one from scratch? This searches it, on both
-strands, for the elements AAV work uses every day: AAV2 ITRs (including the truncated ones
-found in real vectors), CMV, CAG, hSyn, EF-1α, CaMKIIα, GFAP and U6 promoters, WPRE, bGH and
-SV40 polyA, AmpR and KanR, pUC and f1 origins, EGFP, mCherry, tdTomato, loxP, lox2272, FRT,
-SpCas9, SaCas9 and the FLAG and HA tags.
+strands, for the elements AAV and lentiviral work use every day: AAV2 ITRs (including the
+truncated ones found in real vectors), the CMV enhancer and promoter, CAG (the full-length
+promoter and the shorter one of some AAV vectors), hSyn, EF-1α, CaMKIIα, GFAP, PGK, UbC and SFFV
+promoters, the RNA polymerase III promoters U6, H1 and 7SK, WPRE, bGH and SV40 polyA, AmpR and
+KanR, pUC and f1 origins, EGFP, mCherry, tdTomato, loxP, lox2272, FRT, SpCas9, SaCas9 and the
+FLAG and HA tags. When a promoter is used in vectors in more than one species, the name says
+which one it is: "PGK promoter (human)" and "PGK promoter (mouse)" are two entries, and the
+table tells you which one your plasmid carries.
 
 Every entry in the catalogue is a real subsequence of a public GenBank record. The table shows
 which record it came from and the percent identity of the match, so you can judge a hit

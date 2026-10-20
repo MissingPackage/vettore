@@ -7,7 +7,7 @@ biology computed by tested engines (pydna / Biopython / primer3).
 **Repo:** github.com/MissingPackage/vettore · **Guide:** `docs/USER-GUIDE.md` ·
 **Spec:** `specs/vettore.md` · **Research notes:** private repo `MissingPackage/vettore-notes`
 
-## State (2026-10-20) — v0.3.0
+## State (2026-10-20) — v0.3.1
 
 | Slice | State |
 |---|---|
@@ -17,7 +17,7 @@ biology computed by tested engines (pydna / Biopython / primer3).
 | S3 verification | done — gel, Sanger (verdict, read quality, wrong-plasmid detection), star alignment, common features with label checks, primer3 design |
 | S4 polish | mostly — samples, help, preferences, AAV check, design tokens, in-app quit dialog, single window for double-clicked files, per-user file associations |
 
-Evidence for 0.3.0: 566 pytest, 110 vitest, 130 Playwright e2e, all green; CI builds Windows and Linux, runs the
+Evidence for 0.3.1: 602 pytest, 110 vitest, 130 Playwright e2e, all green; CI builds Windows and Linux, runs the
 packaging smoke test against the real binary (file round trips, cloning, primer design,
 alignment, Sanger, samples, feature detection, file associations in dry run, second-start
 hand-over) and screenshots the Windows window.
@@ -44,8 +44,11 @@ annotated tag and the GitHub release notes.
    File → Print… / Save as PDF in the WebView2 window.
 2. Open a Vettore-written `.dna` in the program that defines the format: the round trip is
    verified only with Biopython and sgffp.
-3. Catalogue: full-length CAG, and sequences for PGK, UbC, H1, 7SK and SFFV (today the label
-   check knows them only by name).
+3. Roadmap S5/S6 (diagnostic digests, Sanger contig, lab primer library, human/mouse
+   catalogue growth, construct lineage, progressive alignment, optional NCBI import) is drafted
+   and waiting for the user's answers to its open questions before it goes into the spec.
+   Catalogue 0.3.1 added PGK (human, mouse), UbC, H1, 7SK, SFFV and full-length CAG; mouse U6,
+   H1, 7SK, UbC, Eef1a1 and Gfap and human CAMK2A have no public vector record annotating them.
 4. Progressive multiple alignment (today: star alignment to a reference); related 15 kb
    sequences take ~3.5 s each.
 5. Printing in the Linux (Qt WebEngine) window; history graph.
@@ -92,3 +95,6 @@ whether Vettore-written `.dna` files open in colleagues' tools.
 - Qt WebEngine silently drops `window.print()` unless `printRequested` is connected.
 - The page polls `/api/startup-files` every 500 ms (single-window hand-over): e2e mocks of
   `**/api/**` also catch that poll.
+- Catalogue provenance: the human 7SK entry comes from a patent sequence (no deposited vector
+  annotates it), and the truncated CAG entry's record gives its span only in a note; the build
+  script depends on both records staying available.

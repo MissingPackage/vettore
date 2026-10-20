@@ -2,6 +2,12 @@
 
 The download links in the README always point to the latest release.
 
+## 0.3.1 — more promoters, with their species
+
+- Detect Common Features knows the PGK (human and mouse), UbC, H1, 7SK and SFFV promoters and the full-length CAG promoter (CMV enhancer, chicken β-actin promoter and chimeric intron), each taken from a public GenBank record and cross-checked against a second, independent one.
+- Promoters carry their species in the name — "U6 promoter (human)", "CaMKIIα promoter (mouse)", "PGK promoter (human)" and "(mouse)" — and the label check uses the same sequences, so a mouse PGK labelled as human, or a CMV labelled as PGK, is flagged.
+- A CMV enhancer inside a detected full-length CAG is reported as part of the CAG, not as a separate element.
+
 ## 0.3.0 — files from vendors, MultiSite Gateway, a real desktop app
 
 **Files from vendors and labs**

@@ -10,3 +10,4 @@ frontend/test-results/
 frontend/playwright-report/
 .pytest_cache/
 .ruff_cache/
+.claude/
