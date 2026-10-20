@@ -158,6 +158,12 @@ for (const size of SIZES) {
       await page.getByTestId("view-sequence").click();
       await expect(page.locator(".veRowView")).toBeVisible();
       await shot(page, "04-sequence");
+      // The editor's find bar uses the harmonised inputs.
+      await page.locator(".veRowView").click({ position: { x: 300, y: 120 } });
+      await page.keyboard.press("Control+f");
+      await expect(page.locator(".veFindBar")).toBeVisible();
+      await shot(page, "04b-find");
+      await page.keyboard.press("Escape");
 
       await page.getByTestId("view-enzymes").click();
       await expect(page.getByTestId("enzymes-view")).toBeVisible();
@@ -327,6 +333,8 @@ for (const size of SIZES) {
 
       await menu(page, "Actions", "Simulate Digestion…");
       await expect(page.getByText("Virtual Digest").first()).toBeVisible();
+      // The app is offline: no visible link leads to a web page.
+      await expect(page.locator('a[href^="http"]:visible')).toHaveCount(0);
       await shot(page, "47-simulate-digestion");
     });
   });

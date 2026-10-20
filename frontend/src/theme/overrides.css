@@ -35,6 +35,13 @@
   display: block;
 }
 
+/* ---- links out of the app ---------------------------------------------------------------- */
+/* The digest tool links to the editor component's online documentation. Vettore runs offline,
+   and in the desktop window the link would open a page that cannot load. */
+:root a[href*="docs.teselagen.com"] {
+  display: none;
+}
+
 /* ---- dialogs --------------------------------------------------------------------------- */
 :root .bp3-dialog {
   background: var(--vt-surface-subtle);
