@@ -48,10 +48,24 @@
 }
 
 .vt-aav-scale {
+  position: relative;
   display: flex;
   justify-content: space-between;
   font-size: 11px;
+  /* Room for the limit caption on the line below the scale's ends. */
+  padding-bottom: var(--vt-space-4);
   margin: 0 0 var(--vt-space-4);
+}
+
+/* Under the limit marker: the caption's own point at the marker's percentage sits under the
+   marker (--at), so a limit near the end of the bar never pushes the caption past it. */
+.vt-aav-limit-caption {
+  position: absolute;
+  top: var(--vt-space-4);
+  left: var(--at);
+  transform: translateX(calc(-1 * var(--at)));
+  white-space: nowrap;
+  color: var(--vt-text-strong);
 }
 
 .vt-aav-sources {
