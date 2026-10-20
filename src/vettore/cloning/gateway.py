@@ -324,7 +324,7 @@ def _check_donor_pair(docs: Sequence[SequenceDoc], records: Sequence[Dseqrecord]
     donor, record = docs[-1], records[-1]
     found = sorted({site.number for site in _reacting(record, "BP") if site.kind == "attP"})
     wanted = sorted(set(donor_sites))
-    if found != wanted:
+    if not set(wanted) <= set(found):
         raise CloningError(
             f"The donor vector “{donor.name}” does not carry the att pair you chose "
             f"(attP{' and attP'.join(str(number) for number in wanted)}). "
