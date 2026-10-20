@@ -6,6 +6,7 @@ import {
   defaultChoice,
   describeDifference,
   differencesAsTsv,
+  distinctNames,
   ineligible,
   summarizeCounts,
 } from "./alignmentText";
@@ -90,4 +91,12 @@ it("copies differences as tab-separated lines", () => {
     "sequence\tkind\tstart\tend\treference bases\tsequence bases",
     "pX\tmismatch\t10\t10\tA\tC",
   ]);
+});
+
+it("tells apart open files that share a name by their tab number", () => {
+  expect(distinctNames([
+    { editorName: "a", name: "Pasted sequence" },
+    { editorName: "b", name: "pUC19" },
+    { editorName: "c", name: "Pasted sequence" },
+  ])).toEqual({ a: "Pasted sequence (tab 1)", b: "pUC19", c: "Pasted sequence (tab 3)" });
 });

@@ -61,6 +61,19 @@ export function differencesAsTsv(name: string, diffs: Difference[]): string {
   return [header, ...rows].join("\n");
 }
 
+/**
+ * The name each open document goes by in the dialog and its results: its tab name, plus its tab
+ * number when another open tab has the same name ("Pasted sequence (tab 3)").
+ */
+export function distinctNames(docs: { editorName: string; name: string }[]): Record<string, string> {
+  const uses = new Map<string, number>();
+  for (const d of docs) uses.set(d.name, (uses.get(d.name) ?? 0) + 1);
+  return Object.fromEntries(docs.map((d, i) => [
+    d.editorName,
+    (uses.get(d.name) ?? 0) > 1 ? `${d.name} (tab ${i + 1})` : d.name,
+  ]));
+}
+
 /** Why a document cannot take part, or null if it can. */
 export function ineligible(length: number, limits: AlignmentLimits): string | null {
   if (length === 0) return "empty";
