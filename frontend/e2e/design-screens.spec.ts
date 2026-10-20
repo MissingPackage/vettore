@@ -332,6 +332,54 @@ for (const size of SIZES) {
   });
 }
 
+// The shared classes from docs/DESIGN.md, rendered with the app's real stylesheet. New dialogs
+// adopt them; this keeps their contrast and look under test before they do.
+const SPECIMEN = `
+  <div class="bp3-dialog-body" style="margin:0">
+    <p class="vt-dialog-intro">Cut the vector and the insert with the same enzymes and ligate them.</p>
+    <p class="vt-section-title">Inputs</p>
+    <label class="vt-field"><span class="vt-field-label">Vector</span>
+      <input class="bp3-input" value="pUC19"><span class="vt-field-hint">One enzyme, or two for directional cloning</span></label>
+    <label class="vt-field vt-field-invalid"><span class="vt-field-label">Overlap length (bp)</span>
+      <input class="bp3-input" value="4"><span class="vt-field-error">Use 15 to 40 bp.</span></label>
+    <div class="vt-notice vt-notice-danger"><span class="vt-notice-title">No product</span>The primer does not bind.</div>
+    <div class="vt-notice vt-notice-warning"><span class="vt-notice-title">Check before ordering</span>BsaI also cuts the insert.</div>
+    <div class="vt-notice vt-notice-success"><span class="vt-notice-title">Matches</span>All reads agree with the reference.</div>
+    <div class="vt-notice vt-notice-info"><span class="vt-notice-title">Note</span>Positions are approximate.</div>
+    <p class="vt-error">The ladder file could not be read.</p>
+    <div class="vt-empty-state"><p class="vt-empty-state-title">No product yet</p><p>Choose a vector on the left.</p></div>
+    <p>Press <span class="vt-kbd">Ctrl</span>+<span class="vt-kbd">O</span> · <span class="vt-busy">Simulating…</span>
+      · <span class="vt-num">59.7 °C</span> · <span class="vt-ok">100.00 %</span> · <span class="vt-warn">98.1 %</span>
+      · <span class="vt-bad">failed</span> · <span class="vt-muted">89 of 1165 nt</span></p>
+  </div>`;
+
+test("shared classes render readable with the app stylesheet", async ({ page }) => {
+  await page.goto(`/?token=${TOKEN}`);
+  await expect(page.locator(".vt-welcome")).toBeVisible();
+  await page.evaluate((html) => {
+    const panel = document.createElement("div");
+    panel.id = "vt-specimen";
+    panel.className = "bp3-dialog";
+    panel.style.cssText = "position:fixed;top:20px;left:20px;width:560px;z-index:100;padding:16px";
+    panel.innerHTML = html;
+    document.body.appendChild(panel);
+  }, SPECIMEN);
+  const specimen = page.locator("#vt-specimen");
+  for (const selector of [
+    ".vt-dialog-intro", ".vt-section-title", ".vt-field-hint", ".vt-field-error", ".vt-notice-title",
+    ".vt-notice", ".vt-error", ".vt-empty-state p", ".vt-empty-state-title", ".vt-kbd", ".vt-busy",
+    ".vt-ok", ".vt-warn", ".vt-bad", ".vt-muted",
+  ]) {
+    const all = specimen.locator(selector);
+    for (let i = 0; i < await all.count(); i++) await expectReadable(all.nth(i), selector);
+  }
+  // The invalid field is outlined in the danger colour.
+  const shadow = await specimen.locator(".vt-field-invalid .bp3-input").evaluate((el) => getComputedStyle(el).boxShadow);
+  expect(shadow).toContain("rgb(180, 35, 24)");
+  await expectNoHorizontalOverflow(specimen);
+  await specimen.screenshot({ path: "test-results/design/specimen.png", animations: "disabled" });
+});
+
 test("the app icon is served next to the page", async ({ page, request }) => {
   await page.goto(`/?token=${TOKEN}`);
   const href = await page.locator('link[rel="icon"][type="image/svg+xml"]').getAttribute("href");
