@@ -14,7 +14,8 @@ import time
 import urllib.request
 from pathlib import Path
 
-PORT, TOKEN = 8799, "smoke-token"
+PORT = int(os.environ.get("VETTORE_SMOKE_PORT", "8799"))
+TOKEN = "smoke-token"
 FIXTURES = Path(__file__).resolve().parents[1] / "tests" / "data"
 DATA = FIXTURES / "pFA-KanMX4.dna"
 
@@ -119,6 +120,15 @@ def main() -> int:
         aligned = call("alignment/align", {"reference": doc, "sequences": [fragment]})
         [placed] = aligned["sequences"]
         assert (placed["start"], placed["identity"]) == (1001, 100.0), placed
+        # Sanger reads are aligned with Biopython's BLASTN scoring matrix, a data file.
+        reference = (FIXTURES.parents[1] / "frontend" / "e2e" / "fixtures"
+                     / "sanger-reference.txt").read_text()
+        trace = base64.b64encode((FIXTURES / "3730.ab1").read_bytes()).decode()
+        sanger = call("sanger/align", {
+            "reference": {"name": "ref", "sequence": reference.strip(), "circular": False},
+            "reads": [{"filename": "3730.ab1", "content_b64": trace}],
+        })
+        assert sanger["reads"] and sanger["reads"][0]["identity"] > 99, sanger["reads"]
         # Engine data files (vettore/data) must be in the bundle.
         sample = call("app/samples")["samples"][0]
         sample_doc = call(f"app/samples/{sample['id']}")["documents"][0]
@@ -129,8 +139,8 @@ def main() -> int:
         saved_files.mkdir()
         checked = round_trips(saved_files)
         print("smoke test passed: server up, .dna parsed (3941 bp, 9 features), UI served, "
-              f"restriction cloning, Tm, primer design, alignment, samples and feature detection "
-              f"work, {checked} open-and-save round trips "
+              f"restriction cloning, Tm, primer design, alignment, Sanger reads, samples and feature "
+              f"detection work, {checked} open-and-save round trips "
               f"({len(EXCHANGE)} formats x GenBank/FASTA/.dna)")
         return 0
     finally:

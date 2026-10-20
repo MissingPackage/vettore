@@ -3,7 +3,8 @@
 import sys
 from pathlib import Path
 
-from PyInstaller.utils.hooks import collect_all, collect_submodules, copy_metadata
+from PyInstaller.utils.hooks import (collect_all, collect_data_files, collect_submodules,
+                                    copy_metadata)
 
 root = Path(SPECPATH).parent
 static = root / "src" / "vettore" / "static"
@@ -14,7 +15,9 @@ datas = [(str(static), "vettore/static"),
          # Engine data read through importlib.resources: common features, sample constructs.
          (str(root / "src" / "vettore" / "data"), "vettore/data")]
 binaries = []
-hiddenimports = collect_submodules("uvicorn") + collect_submodules("Bio")
+hiddenimports = collect_submodules("uvicorn") + collect_submodules("Bio") + ["vettore.data"]
+# Biopython's pairwise aligner loads its scoring matrices (e.g. BLASTN) from data files.
+datas += collect_data_files("Bio.Align.substitution_matrices")
 
 # pydna reads these distributions' metadata at import time (importlib.metadata.version).
 for distribution in ("seguid", "pydna", "biopython", "primer3-py", "sgffp", "pydivsufsort",
