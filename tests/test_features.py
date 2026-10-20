@@ -148,6 +148,24 @@ def test_an_element_annotated_under_another_name_is_not_offered_again():
     assert payload["new_count"] == sum(1 for row in payload["features"] if row["isNew"])
 
 
+def test_the_unannotated_fixture_is_the_aav_plasmid_without_its_features():
+    """The end-to-end test adds detected features to a plasmid that has none; the published
+    record annotates every element, so it would rightly offer nothing to add."""
+    from vettore.fileio import read_documents
+
+    data = Path(__file__).parent / "data"
+    [bare] = read_documents("x.gb", (data / "PZ629150.1-unannotated.gb").read_bytes())
+    [full] = read_documents("y.gb", (data / "PZ629150.1.gb").read_bytes())
+    assert bare["sequence"] == full["sequence"] and bare["circular"] is True
+    assert bare["features"] == [] and len(full["features"]) == 16
+    payload = detect_payload(bare["sequence"], True, existing=bare["features"])
+    assert payload["new_count"] == len(payload["features"]) == 9
+    annotated = detect_payload(full["sequence"], True, existing=full["features"])
+    assert annotated["new_count"] == 0
+    rows = {row["name"]: row["annotatedAs"] for row in annotated["features"]}
+    assert rows["SaCas9"] == "SaCas9 fusion protein"
+
+
 def test_a_large_feature_does_not_hide_the_elements_inside_it():
     sequence, circular = plasmid("PZ629150.1")
     everything = [{"name": "backbone", "start": 0, "end": len(sequence) - 1}]
