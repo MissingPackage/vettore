@@ -311,7 +311,9 @@ def _run_ui(api: DesktopApi, url: str, args: argparse.Namespace) -> None:
             )
             api._attach(window)
             window.events.loaded += lambda: _bind_drop(window)
-            storage = Path.home() / ".vettore" / "webview"
+            # The page's storage (preferences) lives with the other settings: ~/.vettore, or
+            # $VETTORE_HOME, which keeps test runs away from the user's own.
+            storage = settings.home() / "webview"
             storage.mkdir(parents=True, exist_ok=True)
             # On Linux the bundled Qt WebEngine is used (GTK bindings are not shipped).
             gui = "qt" if sys.platform.startswith("linux") else None
