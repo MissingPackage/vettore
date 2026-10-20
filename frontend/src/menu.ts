@@ -4,6 +4,8 @@ import type { MutableRefObject } from "react";
 import { baseName } from "./documents";
 import { READY_ACTIONS } from "./cloning/registry";
 import { ENZYME_SETS, type EnzymeSetId } from "./enzymeSets";
+import { TOOLS } from "./tools";
+import type { MenuName } from "./tools/types";
 import type { ViewId } from "./views";
 
 export interface MenuHandlers {
@@ -23,7 +25,10 @@ export interface MenuHandlers {
   sanger: () => void;
   detectFeatures: () => void;
   useEnzymeSet: (set: EnzymeSetId) => void;
+  /** Open a dialog from the tool registry (tools/index.ts). */
+  tool: (id: string) => void;
   recent: string[];
+  hasDocument: boolean;
 }
 
 type MenuItem = Record<string, unknown> | string;
@@ -38,6 +43,21 @@ export function buildMenu(ref: MutableRefObject<MenuHandlers>) {
     const view = findMenu(defaultMenu, "View");
     const help = findMenu(defaultMenu, "Help");
     const recent = h().recent;
+    const hasDocument = h().hasDocument;
+
+    // Registry tools of one menu, after a separator.
+    const toolItems = (menu: MenuName): MenuItem[] => {
+      const items = TOOLS.filter((t) => t.menu === menu).map((t) => ({
+        text: `${t.label}…`,
+        hotkey: t.hotkey,
+        disabled: !!t.requiresDocument && !hasDocument,
+        "data-test": `tool-${t.id}`,
+        onClick: () => h().tool(t.id),
+      }));
+      return items.length ? ["--", ...items] : [];
+    };
+    const withTools = (menu: Record<string, unknown> | undefined, name: MenuName) =>
+      menu && { ...menu, submenu: [...((menu.submenu as MenuItem[]) ?? []), ...toolItems(name)] };
 
     const file = {
       text: "File",
@@ -67,6 +87,7 @@ export function buildMenu(ref: MutableRefObject<MenuHandlers>) {
         },
         "--",
         { text: "Print…", cmd: "print" },
+        ...toolItems("File"),
       ],
     };
 
@@ -102,6 +123,7 @@ export function buildMenu(ref: MutableRefObject<MenuHandlers>) {
         { text: "New File from Selection", cmd: "createNewFromSubsequence" },
         "--",
         { text: "Simulate Digestion…", cmd: "simulateDigestion" },
+        ...toolItems("Actions"),
       ],
     };
 
@@ -115,6 +137,7 @@ export function buildMenu(ref: MutableRefObject<MenuHandlers>) {
         { text: "Feature Types…", cmd: "featureTypesCmd" },
         "--",
         { text: "Features View", hotkey: "mod+4", onClick: () => h().view("features") },
+        ...toolItems("Features"),
       ],
     };
 
@@ -126,6 +149,7 @@ export function buildMenu(ref: MutableRefObject<MenuHandlers>) {
         { text: "Show Primers", cmd: "togglePrimers" },
         "--",
         { text: "Primers View", hotkey: "mod+5", onClick: () => h().view("primers") },
+        ...toolItems("Primers"),
       ],
     };
 
@@ -143,6 +167,7 @@ export function buildMenu(ref: MutableRefObject<MenuHandlers>) {
         { text: "Show Enzymes", cmd: "toggleCutsites" },
         "--",
         { text: "Enzymes View", hotkey: "mod+3", onClick: () => h().view("enzymes") },
+        ...toolItems("Enzymes"),
       ],
     };
 
@@ -157,6 +182,7 @@ export function buildMenu(ref: MutableRefObject<MenuHandlers>) {
         "--",
         { text: "Minimum ORF Size…", cmd: "minOrfSizeCmd" },
         "toggleOrfs",
+        ...toolItems("Tools"),
       ],
     };
 
@@ -171,10 +197,14 @@ export function buildMenu(ref: MutableRefObject<MenuHandlers>) {
         { text: "History", hotkey: "mod+6", onClick: () => h().view("history") },
         "--",
         ...((view?.submenu as MenuItem[]) ?? []),
+        ...toolItems("View"),
       ],
     };
 
     // Menu order: File, Edit, View, Enzymes, Features, Primers, Actions, Tools, Help.
-    return [file, edit, views, enzymes, features, primers, actions, tools, help].filter(Boolean) as MenuItem[];
+    const helpMenu = withTools(help, "Help") ?? (toolItems("Help").length
+      ? { text: "Help", submenu: toolItems("Help").slice(1) } : undefined);
+    return [file, withTools(edit, "Edit"), views, enzymes, features, primers, actions, tools, helpMenu]
+      .filter(Boolean) as MenuItem[];
   };
 }

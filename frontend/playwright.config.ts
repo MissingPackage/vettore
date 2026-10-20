@@ -1,6 +1,7 @@
 import { defineConfig } from "@playwright/test";
 
-const PORT = 8765;
+// Override with VETTORE_E2E_PORT to run several suites side by side.
+const PORT = Number(process.env.VETTORE_E2E_PORT ?? 8765);
 export const TOKEN = "e2e-token";
 
 export default defineConfig({

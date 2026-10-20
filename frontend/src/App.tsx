@@ -3,7 +3,6 @@ import { useSelector } from "react-redux";
 import { Editor } from "@teselagen/ove";
 import { api, whenDesktopReady, type OpenResult, type SequenceData } from "./api";
 import {
-  baseName,
   canSaveInPlace,
   createDocument,
   editorState,
@@ -26,6 +25,8 @@ import HistoryView from "./HistoryView";
 import EditorSlot from "./EditorSlot";
 import EnzymesView from "./EnzymesView";
 import StatusLine from "./StatusLine";
+import Welcome from "./Welcome";
+import { toolById } from "./tools";
 import { exportMap } from "./mapExport";
 import { applyEnzymeSet, ENZYME_SETS, type EnzymeSetId } from "./enzymeSets";
 import { ENZYMES } from "./enzymeLogic";
@@ -64,6 +65,7 @@ export default function App() {
   const [gelOpen, setGelOpen] = useState(false);
   const [sangerOpen, setSangerOpen] = useState(false);
   const [detectOpen, setDetectOpen] = useState(false);
+  const [toolId, setToolId] = useState<string | null>(null);
   const [recent, setRecent] = useState<string[]>([]);
   const fileInput = useRef<HTMLInputElement>(null);
   const height = useWindowHeight();
@@ -173,6 +175,24 @@ export default function App() {
       .catch(report);
   }, [addResult, refreshRecent, report]);
 
+  const openSample = useCallback(
+    async (id: string) => {
+      try {
+        addResult(await api.openSample(id), "Sample construct");
+      } catch (e) {
+        report(e);
+      }
+    },
+    [addResult, report],
+  );
+
+  /** Open sequence data in a new tab (cloning products, tool results, History snapshots). */
+  const openDocument = useCallback((data: SequenceData, action: string, detail?: string) => {
+    const doc = createDocument(data, null, { time: now(), action, detail });
+    setDocs((prev) => [...prev, doc]);
+    setActive(doc.editorName);
+  }, []);
+
   // ---- new -------------------------------------------------------------------------------
   const createNew = useCallback((seq: NewSequence) => {
     setNewOpen(false);
@@ -201,11 +221,17 @@ export default function App() {
     const oligos = (result.oligos.length ? result.oligos : product.oligos)
       .map((o) => `${o.name} ${o.sequence}`)
       .join(" · ");
+    // Snapshot the inputs as they are now, so History can reopen them after they change.
+    const parents = docsRef.current
+      .filter((d) => product.parents.includes(d.name))
+      .map((d) => ({ name: d.name, data: editorState(d.editorName)?.sequenceData as SequenceData }))
+      .filter((p) => p.data);
     const doc = createDocument(product.doc as SequenceData, null, {
       time: now(),
       action: product.operation,
       detail: `${product.details}. From: ${product.parents.join(", ")}.`
         + (oligos ? ` Primers: ${oligos}` : ""),
+      parents,
     });
     setDocs((prev) => [...prev, doc]);
     setActive(doc.editorName);
@@ -393,7 +419,9 @@ export default function App() {
     gel: () => setGelOpen(true),
     sanger: () => setSangerOpen(true),
     detectFeatures: () => setDetectOpen(true),
+    tool: (id: string) => setToolId(id),
     recent: [] as string[],
+    hasDocument: false,
   });
   Object.assign(handlers.current, {
     open: openFiles,
@@ -411,10 +439,12 @@ export default function App() {
     gel: () => setGelOpen(true),
     sanger: () => setSangerOpen(true),
     detectFeatures: () => setDetectOpen(true),
+    tool: (id: string) => setToolId(id),
     recent,
+    hasDocument: !!activeDoc,
   });
   // menuFilter must be stable (OVE memoizes on it); handlers are read through the ref.
-  const menuFilter = useMemo(() => buildMenu(handlers), [recent]); // eslint-disable-line react-hooks/exhaustive-deps
+  const menuFilter = useMemo(() => buildMenu(handlers), [recent, !!activeDoc]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const onSave = useCallback(
     (opts: { isSaveAs?: boolean }) => (activeDoc ? saveDoc(activeDoc, !!opts?.isSaveAs).then(() => undefined) : undefined),
@@ -502,7 +532,10 @@ export default function App() {
             </EditorSlot>
             {activeDoc.view === "history" && (
               <EditorSlot editorName={activeDoc.editorName} placement="overlay">
-                <HistoryView doc={activeDoc} />
+                <HistoryView
+                  doc={activeDoc}
+                  onReopen={(data, from) => openDocument({ ...data, name: `${data.name} (from History)` }, "Reopened", from)}
+                />
               </EditorSlot>
             )}
             {activeDoc.view === "enzymes" && (
@@ -528,7 +561,8 @@ export default function App() {
         ) : (
           <>
           {docTabs}
-          <Welcome recent={recent} onOpen={openFiles} onNew={() => setNewOpen(true)} onRecent={openPath} />
+          <Welcome recent={recent} onOpen={openFiles} onNew={() => setNewOpen(true)} onRecent={openPath}
+                   onSample={openSample} />
           </>
         )}
       </div>
@@ -559,6 +593,20 @@ export default function App() {
         <GelDialog docs={openDocs} active={openDocs.find((d) => d.editorName === active) ?? null}
                    onClose={() => setGelOpen(false)} />
       )}
+      {toolId && (() => {
+        const tool = toolById(toolId);
+        if (!tool) return null;
+        const { Component } = tool;
+        return (
+          <Component
+            docs={openDocs}
+            active={openDocs.find((d) => d.editorName === active) ?? null}
+            onClose={() => setToolId(null)}
+            openDocument={openDocument}
+            logHistory={logHistory}
+          />
+        );
+      })()}
       {cloning && (
         <CloningDialog
           action={cloning}
@@ -572,30 +620,3 @@ export default function App() {
   );
 }
 
-function Welcome(props: { recent: string[]; onOpen: () => void; onNew: () => void; onRecent: (p: string) => void }) {
-  return (
-    <div className="vt-welcome">
-      <h1>Vettore</h1>
-      <p>Open a sequence file (.dna, .gb, .fasta, .ab1) or drop it here.</p>
-      <div className="vt-welcome-actions">
-        <button data-testid="open" onClick={props.onOpen}>Open…  (Ctrl+O)</button>
-        <button data-testid="new" onClick={props.onNew}>New DNA File…  (Ctrl+N)</button>
-      </div>
-      {props.recent.length > 0 && (
-        <div className="vt-recent">
-          <h3>Recent files</h3>
-          <ul>
-            {props.recent.map((p) => (
-              <li key={p}>
-                <a href="#" onClick={(e) => { e.preventDefault(); props.onRecent(p); }} title={p}>
-                  {baseName(p)}
-                </a>
-                <span className="vt-recent-dir">{p}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-    </div>
-  );
-}

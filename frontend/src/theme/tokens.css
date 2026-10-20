@@ -1,0 +1,36 @@
+/* Design tokens. Components use these variables instead of literal colours and sizes. */
+:root {
+  --vt-font: system-ui, "Segoe UI", sans-serif;
+  --vt-font-mono: Menlo, Consolas, monospace;
+  --vt-font-size: 13px;
+
+  --vt-text: #374151;
+  --vt-text-strong: #111827;
+  --vt-text-muted: #6b7280;
+  --vt-text-faint: #9ca3af;
+
+  --vt-surface: #ffffff;
+  --vt-surface-subtle: #f7f8fa;
+  --vt-surface-sunken: #dfe3e8;
+  --vt-surface-hover: #e9edf2;
+  --vt-border: #c3c8cf;
+  --vt-border-subtle: #d8dce1;
+
+  --vt-accent: #2563eb;
+  --vt-selection: #e6f0fb;
+  --vt-danger: #b42318;
+  --vt-danger-bg: #fef3f2;
+  --vt-danger-border: #fecdca;
+  --vt-warning: #b54708;
+  --vt-warning-bg: #fffaeb;
+  --vt-success: #027a48;
+  --vt-success-bg: #ecfdf3;
+
+  --vt-radius: 4px;
+  --vt-radius-lg: 6px;
+  --vt-space-1: 4px;
+  --vt-space-2: 8px;
+  --vt-space-3: 12px;
+  --vt-space-4: 16px;
+  --vt-space-5: 24px;
+}

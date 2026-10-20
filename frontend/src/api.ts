@@ -29,6 +29,13 @@ export interface OpenResult {
   documents: SequenceData[];
 }
 
+/** A sample construct shipped with Vettore (offered on the welcome screen). */
+export interface Sample {
+  id: string;
+  label: string;
+  description: string;
+}
+
 interface DesktopApi {
   open_dialog(): Promise<string[]>;
   save_dialog(suggestedName: string): Promise<string | null>;
@@ -44,7 +51,8 @@ const params = new URLSearchParams(window.location.search);
 const token = params.get("token") ?? sessionStorage.getItem("vettore-token") ?? "";
 if (token) sessionStorage.setItem("vettore-token", token);
 
-async function call<T>(path: string, body?: unknown): Promise<T> {
+/** Call an engine endpoint under /api/; throws with the engine's message on error. */
+export async function call<T>(path: string, body?: unknown): Promise<T> {
   const res = await fetch(`/api/${path}`, {
     method: body === undefined ? "GET" : "POST",
     headers: { "Content-Type": "application/json", "X-Vettore-Token": token },
@@ -69,7 +77,7 @@ export function whenDesktopReady(timeoutMs = 1500): Promise<DesktopApi | null> {
   });
 }
 
-async function toBase64(blob: Blob): Promise<string> {
+export async function toBase64(blob: Blob): Promise<string> {
   const bytes = new Uint8Array(await blob.arrayBuffer());
   let binary = "";
   for (let i = 0; i < bytes.length; i += 0x8000) {
@@ -86,6 +94,8 @@ export const api = {
   gelLadders: () => call<{ ladders: { id: string; label: string }[]; percentages: number[];
     default_ladder: string; default_percent: number }>("gel/ladders"),
   recent: () => call<{ paths: string[] }>("recent"),
+  samples: () => call<{ samples: Sample[] }>("app/samples"),
+  openSample: (id: string) => call<OpenResult>(`app/samples/${encodeURIComponent(id)}`),
   unsaved: (count: number) => call<{ count: number }>("unsaved", { count }),
   tm: (sequence: string) =>
     call<{ tm: number; method: string; presets: { key: string; label: string; description: string; tm: number }[] }>(

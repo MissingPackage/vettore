@@ -2,13 +2,16 @@
 import { actions, updateEditor } from "@teselagen/ove";
 import type { SequenceData } from "./api";
 import { store } from "./store";
-import { DEFAULT_ENZYME_SET, type EnzymeSetId } from "./enzymeSets";
+import type { EnzymeSetId } from "./enzymeSets";
+import { loadPreferences } from "./preferences";
 import { panelsFor, type ViewId } from "./views";
 
 export interface HistoryEntry {
   time: string;
   action: string;
   detail?: string;
+  /** Snapshots of the input documents of a cloning step, so they can be reopened later. */
+  parents?: { name: string; data: SequenceData }[];
 }
 
 export interface Doc {
@@ -49,7 +52,7 @@ export function createDocument(
     name: sequenceData.name,
     path,
     view: "map",
-    enzymeSet: DEFAULT_ENZYME_SET,
+    enzymeSet: loadPreferences().enzymeSet,
     history: [firstEntry],
   };
 }
