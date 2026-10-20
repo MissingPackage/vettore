@@ -409,16 +409,24 @@ class LinuxAssociations:
         for section in ("Default Applications", "Added Associations"):
             if not parser.has_section(section):
                 continue
+            touched = False
             for mime, value in list(parser.items(section)):
                 apps = [a for a in value.split(";") if a and a != DESKTOP_FILE]
                 if len(apps) != len([a for a in value.split(";") if a]):
-                    changed = True
+                    touched = True
                     if apps:
                         parser.set(section, mime, "".join(f"{a};" for a in apps))
                     else:
                         parser.remove_option(section, mime)
-        if changed:
+            if touched and not parser.items(section):
+                parser.remove_section(section)
+            changed = changed or touched
+        if not changed:
+            return
+        if parser.sections():
             self._write_mimeapps(parser)
+        else:                      # it held only what Vettore wrote
+            self.mimeapps.unlink(missing_ok=True)
 
     def status(self) -> dict[str, Any]:
         registered = None

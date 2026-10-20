@@ -294,7 +294,15 @@ def test_linux_undo_removes_only_what_vettore_added(tmp_path):
     assert "vettore.desktop" not in text
     assert "chemical/x-genbank=other.desktop;" in text
     assert "text/plain=org.kde.kate.desktop;" in text
+    assert "[Added Associations]" in text
     assert assoc.status()["enabled"] is False
+
+
+def test_linux_undo_removes_a_defaults_file_that_held_only_vettore(tmp_path):
+    assoc, _ = linux(tmp_path)
+    assoc.enable()
+    assoc.disable()
+    assert not (tmp_path / "config" / "mimeapps.list").exists()
 
 
 def test_linux_status_after_the_folder_was_moved(tmp_path):
