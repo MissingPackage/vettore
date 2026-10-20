@@ -37,6 +37,10 @@ export default function NewSequenceDialog(props: {
   return (
     <Dialog isOpen={props.isOpen} onClose={props.onClose} title="New DNA File" style={{ width: 620 }}>
       <div className={Classes.DIALOG_BODY}>
+        <p className="vt-dialog-intro" data-testid="new-seq-intro">
+          Starts a new file from a sequence you type or paste. FASTA headers, spaces and numbers
+          are left out. The file stays in Vettore until you save it (Ctrl+S).
+        </p>
         <FormGroup label="Name" labelFor="vt-new-name">
           <InputGroup id="vt-new-name" value={name} onChange={(e: any) => setName(e.target.value)} />
         </FormGroup>

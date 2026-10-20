@@ -344,6 +344,8 @@ for (const size of SIZES) {
       await page.getByTestId("new").click();
       await expect(page.locator(".bp3-dialog")).toBeVisible();
       await expectDialogInViewport(page);
+      // Like every dialog, it says in one line what it does.
+      await expectReadable(page.getByTestId("new-seq-intro"), "New DNA File intro");
       await shot(page, "40-new-dna-file");
       await closeDialog(page);
 
