@@ -2,6 +2,7 @@
 // Items with `cmd` reuse OVE commands (and their hotkeys); items with `onClick` call Vettore.
 import type { MutableRefObject } from "react";
 import { baseName } from "./documents";
+import { READY_ACTIONS } from "./cloning/registry";
 import { ENZYME_SETS, type EnzymeSetId } from "./enzymeSets";
 import type { ViewId } from "./views";
 
@@ -17,6 +18,7 @@ export interface MenuHandlers {
   exportSvg: () => void;
   exportPng: () => void;
   view: (view: ViewId) => void;
+  cloning: (actionId: string) => void;
   useEnzymeSet: (set: EnzymeSetId) => void;
   recent: string[];
 }
@@ -65,18 +67,36 @@ export function buildMenu(ref: MutableRefObject<MenuHandlers>) {
       ],
     };
 
+    const cloningItem = (id: string, label?: string) => {
+      const action = READY_ACTIONS.find((a) => a.id === id);
+      return action ? [{ text: `${label ?? action.title}…`, onClick: () => h().cloning(id) }] : [];
+    };
+
     const actions = {
       text: "Actions",
       submenu: [
+        {
+          text: "Restriction and Insertion Cloning",
+          submenu: [
+            ...cloningItem("restriction", "Insert Fragment"),
+            ...cloningItem("delete-fragment", "Delete Restriction Fragment"),
+          ],
+        },
+        ...cloningItem("pcr", "PCR"),
+        ...cloningItem("design-primers", "Design Primers to Amplify a Region"),
+        ...cloningItem("mutagenesis", "Mutagenesis"),
+        "--",
+        ...cloningItem("gibson", "Gibson Assembly"),
+        ...cloningItem("hifi", "NEBuilder HiFi DNA Assembly"),
+        ...cloningItem("infusion", "In-Fusion Cloning"),
+        "--",
         "reverseComplementEntireSequence",
         "reverseComplementSelection",
         { text: "Set Origin at Cursor", cmd: "rotateToCaretPosition" },
         { text: "Change Topology", cmd: "changeCircularityCmd", submenu: ["toggleCircular", "toggleLinear"] },
-        "--",
         { text: "New File from Selection", cmd: "createNewFromSubsequence" },
         "--",
         { text: "Simulate Digestion…", cmd: "simulateDigestion" },
-        { text: "PCR…", cmd: "simulatePCR" },
       ],
     };
 

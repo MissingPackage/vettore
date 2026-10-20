@@ -19,11 +19,14 @@ export interface CloningAction {
   endpoint: string;
   Form: ComponentType<FormProps>;
   help: string;
+  /** Engines that are not implemented yet stay out of the menus. */
+  ready?: boolean;
 }
 
 export const CLONING_ACTIONS: CloningAction[] = [
   {
     id: "restriction",
+    ready: true,
     title: "Restriction Cloning: Insert Fragment",
     endpoint: "restriction-insert",
     Form: RestrictionInsertForm,
@@ -31,6 +34,7 @@ export const CLONING_ACTIONS: CloningAction[] = [
   },
   {
     id: "delete-fragment",
+    ready: true,
     title: "Delete Restriction Fragment",
     endpoint: "delete-fragment",
     Form: DeleteFragmentForm,
@@ -38,6 +42,7 @@ export const CLONING_ACTIONS: CloningAction[] = [
   },
   {
     id: "pcr",
+    ready: true,
     title: "PCR",
     endpoint: "pcr",
     Form: PcrForm,
@@ -45,6 +50,7 @@ export const CLONING_ACTIONS: CloningAction[] = [
   },
   {
     id: "design-primers",
+    ready: true,
     title: "Design Primers to Amplify a Region",
     endpoint: "design-pcr-primers",
     Form: DesignPrimersForm,
@@ -52,6 +58,7 @@ export const CLONING_ACTIONS: CloningAction[] = [
   },
   {
     id: "gibson",
+    ready: true,
     title: "Gibson Assembly",
     endpoint: "overlap-assembly",
     Form: overlapForm("gibson"),
@@ -59,6 +66,7 @@ export const CLONING_ACTIONS: CloningAction[] = [
   },
   {
     id: "hifi",
+    ready: true,
     title: "NEBuilder HiFi DNA Assembly",
     endpoint: "overlap-assembly",
     Form: overlapForm("hifi"),
@@ -66,6 +74,7 @@ export const CLONING_ACTIONS: CloningAction[] = [
   },
   {
     id: "infusion",
+    ready: true,
     title: "In-Fusion Cloning",
     endpoint: "overlap-assembly",
     Form: overlapForm("infusion"),
@@ -73,6 +82,7 @@ export const CLONING_ACTIONS: CloningAction[] = [
   },
   {
     id: "mutagenesis",
+    ready: true,
     title: "Mutagenesis (Q5 SDM style)",
     endpoint: "mutagenesis",
     Form: MutagenesisForm,
@@ -121,5 +131,7 @@ export const CLONING_ACTIONS: CloningAction[] = [
     help: "Topoisomerase-activated vectors; directional TOPO needs CACC on the forward primer.",
   },
 ];
+
+export const READY_ACTIONS = CLONING_ACTIONS.filter((a) => a.ready);
 
 export const actionById = (id: string) => CLONING_ACTIONS.find((a) => a.id === id) ?? null;

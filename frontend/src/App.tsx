@@ -16,6 +16,9 @@ import {
 } from "./documents";
 import { buildMenu } from "./menu";
 import NewSequenceDialog, { type NewSequence } from "./NewSequenceDialog";
+import CloningDialog from "./cloning/CloningDialog";
+import { actionById, type CloningAction } from "./cloning/registry";
+import type { CloningResult, OpenDoc, Product } from "./cloning/types";
 import HistoryView from "./HistoryView";
 import EditorSlot from "./EditorSlot";
 import EnzymesView from "./EnzymesView";
@@ -54,6 +57,7 @@ export default function App() {
   const [active, setActive] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [newOpen, setNewOpen] = useState(false);
+  const [cloning, setCloning] = useState<CloningAction | null>(null);
   const [recent, setRecent] = useState<string[]>([]);
   const fileInput = useRef<HTMLInputElement>(null);
   const height = useWindowHeight();
@@ -168,6 +172,35 @@ export default function App() {
     setNewOpen(false);
     const sequenceData: SequenceData = { ...seq, features: [], primers: [] };
     const doc = createDocument(sequenceData, null, { time: now(), action: "Created", detail: `${seq.sequence.length} bp` });
+    setDocs((prev) => [...prev, doc]);
+    setActive(doc.editorName);
+  }, []);
+
+  // ---- cloning -------------------------------------------------------------------------
+  // Memoised: the cloning forms key their effects on these objects' identity.
+  const openDocs: OpenDoc[] = useMemo(() => docs.map((d) => ({
+    editorName: d.editorName,
+    name: d.name,
+    data: () => editorState(d.editorName)?.sequenceData as SequenceData,
+    selection: () => {
+      const layer = editorState(d.editorName)?.selectionLayer;
+      return layer && layer.start >= 0 && layer.end >= 0
+        ? { start: layer.start, end: layer.end }
+        : null;
+    },
+  })), [docs]);
+
+  const createProduct = useCallback((product: Product, result: CloningResult) => {
+    setCloning(null);
+    const oligos = (result.oligos.length ? result.oligos : product.oligos)
+      .map((o) => `${o.name} ${o.sequence}`)
+      .join(" · ");
+    const doc = createDocument(product.doc as SequenceData, null, {
+      time: now(),
+      action: product.operation,
+      detail: `${product.details}. From: ${product.parents.join(", ")}.`
+        + (oligos ? ` Primers: ${oligos}` : ""),
+    });
     setDocs((prev) => [...prev, doc]);
     setActive(doc.editorName);
   }, []);
@@ -350,6 +383,7 @@ export default function App() {
     exportPng: () => activeDoc && exportImage(activeDoc, "png"),
     view: selectView,
     useEnzymeSet,
+    cloning: (id: string) => setCloning(actionById(id)),
     recent: [] as string[],
   });
   Object.assign(handlers.current, {
@@ -364,6 +398,7 @@ export default function App() {
     exportPng: () => activeDoc && exportImage(activeDoc, "png"),
     view: selectView,
     useEnzymeSet,
+    cloning: (id: string) => setCloning(actionById(id)),
     recent,
   });
   // menuFilter must be stable (OVE memoizes on it); handlers are read through the ref.
@@ -493,7 +528,17 @@ export default function App() {
           </span>
         )}
       </div>
-      <NewSequenceDialog isOpen={newOpen} onClose={() => setNewOpen(false)} onCreate={createNew} />
+      {/* Remounted on every open so the form never keeps the previous file's name or topology. */}
+      {newOpen && <NewSequenceDialog isOpen onClose={() => setNewOpen(false)} onCreate={createNew} />}
+      {cloning && (
+        <CloningDialog
+          action={cloning}
+          docs={openDocs}
+          active={openDocs.find((d) => d.editorName === active) ?? null}
+          onClose={() => setCloning(null)}
+          onCreate={createProduct}
+        />
+      )}
     </div>
   );
 }

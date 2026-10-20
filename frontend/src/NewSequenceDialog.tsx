@@ -51,8 +51,8 @@ export default function NewSequenceDialog(props: {
           />
         </FormGroup>
         <RadioGroup inline label="Topology" selectedValue={circular ? "circular" : "linear"} onChange={(e: any) => setCircular(e.currentTarget.value === "circular")}>
-          <Radio label="Linear" value="linear" />
-          <Radio label="Circular" value="circular" />
+          <Radio label="Linear" value="linear" inputRef={undefined} data-testid="topology-linear" />
+          <Radio label="Circular" value="circular" data-testid="topology-circular" />
         </RadioGroup>
       </div>
       <div className={Classes.DIALOG_FOOTER}>

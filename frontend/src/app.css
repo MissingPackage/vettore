@@ -60,3 +60,24 @@ body { font-family: system-ui, "Segoe UI", sans-serif; font-size: 13px; overflow
 .vt-mono { font-family: Menlo, Consolas, monospace; }
 .vt-muted { color: #6b7280; }
 .vt-cut { margin-right: 8px; }
+
+/* cloning dialogs */
+.vt-cloning { display: grid; grid-template-columns: 380px 1fr; gap: 18px; max-height: 70vh; overflow: auto; }
+.vt-cloning-form { display: flex; flex-direction: column; gap: 10px; }
+.vt-cloning-result { border-left: 1px solid #e5e7eb; padding-left: 18px; min-width: 0; }
+.vt-field { display: flex; flex-direction: column; gap: 3px; }
+.vt-field-label { font-weight: 600; }
+.vt-field-hint { color: #6b7280; font-size: 11px; }
+.vt-enzyme-picker { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.vt-enzyme-picker input { width: 110px; }
+.vt-region { display: flex; align-items: center; gap: 6px; }
+.vt-region input { width: 90px; }
+.vt-primer-input { display: flex; gap: 6px; }
+.vt-primer-input input:nth-child(1) { width: 110px; }
+.vt-primer-input input:nth-child(2) { flex: 1; min-width: 0; }
+.vt-insert-row { border: 1px solid #e5e7eb; border-radius: 6px; padding: 8px; display: flex; flex-direction: column; gap: 8px; }
+.vt-preview { height: 280px; border: 1px solid #e5e7eb; border-radius: 6px; margin-bottom: 10px; }
+.vt-products { display: flex; flex-direction: column; gap: 2px; margin-bottom: 8px; }
+.vt-oligos { margin-top: 10px; }
+.vt-row { display: flex; align-items: center; gap: 10px; }
+.vt-break { word-break: break-all; }

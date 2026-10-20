@@ -27,18 +27,21 @@ export default function CloningDialog(props: {
   const [busy, setBusy] = useState(false);
   const [chosen, setChosen] = useState(0);
   const request = useRef(0);
+  // Depend on the serialised body: forms rebuild it on every render.
+  const bodyKey = body ? JSON.stringify(body) : "";
 
   useEffect(() => {
     setError(null);
-    if (!body) {
+    if (!bodyKey) {
       setResult(null);
       return;
     }
+    const payload = JSON.parse(bodyKey);
     const id = ++request.current;
     const t = setTimeout(() => {
       setBusy(true);
       api
-        .cloning<CloningResult>(action.endpoint, body)
+        .cloning<CloningResult>(action.endpoint, payload)
         .then((r) => {
           if (id !== request.current) return;
           setResult(r);
@@ -52,7 +55,7 @@ export default function CloningDialog(props: {
         .finally(() => id === request.current && setBusy(false));
     }, 350);
     return () => clearTimeout(t);
-  }, [action.endpoint, body]);
+  }, [action.endpoint, bodyKey]);
 
   const product = result?.products[chosen] ?? null;
   const oligos = result ? (result.oligos.length ? result.oligos : product?.oligos ?? []) : [];
@@ -67,7 +70,7 @@ export default function CloningDialog(props: {
         </div>
         <div className="vt-cloning-result">
           {busy && <p className="vt-muted">Simulating…</p>}
-          {!body && !busy && <p className="vt-muted">Fill in the inputs on the left to simulate the product.</p>}
+          {!bodyKey && !busy && <p className="vt-muted">Fill in the inputs on the left to simulate the product.</p>}
           {error && (
             <Callout intent="danger" title="No product" data-testid="cloning-error">
               {error}
