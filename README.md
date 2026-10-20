@@ -16,12 +16,15 @@ Start here: **[user guide](docs/USER-GUIDE.md)** · what changed: [changelog](CH
 
 ## What it does
 
-**Sequences and maps**
-- Opens `.dna`, GenBank (`.gb`, `.gbk`, `.ape`), FASTA and `.ab1` files, keeping features,
-  colours, primers (with their 5′ tails) and topology. Saves GenBank; exports FASTA and maps as
-  SVG or PNG for figures.
+**Files from colleagues**
+- Opens `.dna`, GenBank (`.gb`, `.gbk`, `.ape`), EMBL, FASTA, `.xdna`, `.gck`, `.ab1` and plain
+  sequence text, recognising the format from the content — a GenBank file saved as `.txt` opens
+  too — and keeping features, colours, primers (with their 5′ tails) and topology.
+- Saves GenBank, FASTA or `.dna`; never overwrites a file it cannot write back without losing
+  something, and says so in plain words. Paste a sequence from an email as a new file, copy a
+  selection as FASTA, export maps as SVG or PNG for figures.
 - Map, Sequence, Enzymes, Features, Primers and History views, with editing, undo and find
-  (DNA or protein, with mismatches).
+  (DNA or protein, with mismatches). History keeps every input of a cloning step, ready to reopen.
 
 **Enzymes**
 - REBASE commercial enzymes, one per specificity; sets for unique, unique-and-dual, 6+, type IIS
@@ -30,25 +33,29 @@ Start here: **[user guide](docs/USER-GUIDE.md)** · what changed: [changelog](CH
   site that REBASE records as blocked.
 
 **Cloning simulation** — each with a live preview, warnings and the primers to order
-- Restriction cloning (insert or delete a fragment, either orientation, directionality and
-  self-ligation checks).
+- Restriction cloning: insert one fragment or several in one ligation, delete a fragment, ligate
+  fragments into a linear or circular molecule; directionality and self-ligation checks.
 - Gibson, NEBuilder HiFi and In-Fusion assembly of one or more inserts, with the homology arms
   designed for you.
-- Golden Gate with junction-overhang checks; annealed-oligo cloning for gRNAs, shRNAs and
-  linkers, with the oligo pair written from the cut vector's own overhangs.
-- PCR (tailed primers, amplicons across the origin), primer design to a target Tm, and
-  site-directed mutagenesis with back-to-back primers.
+- Golden Gate with junction-overhang checks; Gateway BP and LR reactions; TA, GC and TOPO
+  cloning (with the CACC check for directional TOPO); annealed-oligo cloning for gRNAs, shRNAs
+  and linkers.
+- PCR (tailed primers, amplicons across the origin), site-directed mutagenesis with back-to-back
+  primers, primers placed on a region at a target Tm, and primer3 design of the best pairs
+  around a region with hairpin and dimer checks.
 
 **Verification**
-- Sanger reads aligned to the expected construct on either strand, with chromatograms and a
-  per-read list of every difference in plasmid coordinates.
+- Sanger reads aligned to the expected construct on either strand, with chromatograms, a
+  one-line verdict and every difference in plasmid coordinates with the read quality behind it.
+- Several sequences aligned against a reference, with coverage, identity and differences.
 - Simulated agarose gels against NEB, Thermo and Invitrogen ladders.
 - Automatic annotation of AAV ITRs, common promoters, WPRE, polyA signals, markers, origins,
   fluorescent proteins, lox/FRT sites, Cas9 and epitope tags — each traceable to a public
-  GenBank record.
+  GenBank record — and an AAV packaging check of the cargo between the ITRs.
 
 Primer Tm is always shown with the model and conditions behind it, with presets matching NEB's
-calculator for Q5 and Taq.
+calculator for Q5 and Taq. Three public sample constructs (pUC19 and two AAV transfer plasmids)
+come with the app to try everything on.
 
 ## How it is built
 

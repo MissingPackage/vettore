@@ -49,5 +49,10 @@ the one published in their source repository, `TeselaGen/tg-oss`.
   GenBank/RefSeq records fetched from NCBI, each entry citing its accession and coordinate
   range (see `scripts/build_feature_database.py`). NCBI places no restriction on reuse of
   these records.
-- **Test fixtures** in `tests/data/` — copied from the Biopython test suite (Biopython License /
-  BSD-3-Clause); see `tests/data/README.md`.
+- **Sample constructs** — `src/vettore/data/samples/` holds public GenBank records downloaded
+  unchanged from NCBI (accessions and retrieval dates in its `README.md`). NCBI places no
+  restriction on reuse of these records; their authors and references travel inside each file.
+- **Test fixtures** in `tests/data/` — files copied from the Biopython test suite (Biopython
+  License / BSD-3-Clause) and public GenBank/EMBL records from NCBI and ENA; see
+  `tests/data/README.md` and the docstrings of the tests that use them.
+- **Alignment scoring** — Biopython's BLASTN substitution matrix, bundled with Biopython.

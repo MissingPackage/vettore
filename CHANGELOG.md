@@ -2,7 +2,75 @@
 
 The download links in the README always point to the latest release.
 
-## Unreleased
+## 0.2.0 — Files from colleagues, more cloning, primer design and alignment
+
+**Files from colleagues**
+- Opens EMBL (`.embl`), `.xdna` and `.gck` files and plain sequence text (`.txt`, `.seq`), as
+  well as `.dna`, GenBank, FASTA and `.ab1`.
+- Files are recognised by what is inside them: a GenBank file saved as `.txt`, a FASTA file
+  named `.seq` or a file without an extension opens correctly.
+- A file with several sequences opens one tab per sequence, and a message says how many.
+- GenBank files from other programs open even with very long names, no topology, Windows line
+  endings, accented characters or features drawn across the origin; features that cannot be
+  placed on the sequence are listed by name.
+- Error messages name the file, say in plain words what is wrong and what to try; for plain
+  sequences they point to the line and column of the first character that is not a DNA letter.
+- Save As and Export write GenBank, FASTA or `.dna` files; the format follows the extension you
+  type, and `.gb` is added when you type none.
+- Save only writes over a file when nothing in it would be lost. Otherwise (a `.dna`, EMBL,
+  `.xdna`, `.gck` or `.ab1` file, one sequence out of several, features that could not be
+  shown) it explains this once and saves a GenBank copy next to the original, which is left
+  untouched.
+- Files dropped on the window open from where they are on disk, so Save writes back to them.
+- File → New File from Clipboard (Ctrl+Shift+V) opens a copied sequence, FASTA or GenBank/EMBL
+  record; Edit → Copy as FASTA copies the selection with its positions for emails and order
+  forms.
+- The Open and Save dialogs start in the folder you used last.
+
+**Cloning simulation**
+- Insert Multiple Fragments: a cut vector and two or more inserts in one ligation; every
+  product the ends allow is listed with its order and orientation.
+- Ligate Fragments: join fragments end to end into a linear molecule, or close them into a
+  circle.
+- Ligation warnings before you order anything: a vector that can close without an insert,
+  blunt ends, PCR products without 5′ phosphate, fragments that only fit in another order.
+- TA and GC cloning, and TOPO cloning (TA, blunt and directional, with the CACC check and an
+  Add CACC button).
+- Gateway BP and LR reactions, listing the clone and the by-product, with a warning when the
+  product still carries ccdB; validated against published entry, destination and expression
+  clones.
+- Every cloning dialog starts from the files you have open, prefills regions from the editor
+  selection, says which input is still missing, and lets you name the product.
+- History keeps a copy of every input of a cloning step: open it again as it was when the step
+  ran, or copy the step's parameters and primers for your notebook.
+
+**Primers and verification**
+- Primers → Design PCR Primers: primer3 proposes the five best pairs around a region or feature,
+  with Tm, GC, product size and hairpin/dimer ΔG warnings; add a pair to the plasmid or copy it
+  for ordering.
+- Tools → Align Multiple Sequences: up to 10 sequences against a reference, on either strand,
+  with coverage, identity and every difference in the reference's numbering.
+- Sanger verification: a one-line verdict, the read quality behind every difference, and
+  low-quality calls flagged.
+- Tools → AAV Packaging Check: the cargo between the ITRs and including them, against the
+  single-stranded and self-complementary limits, with the sources of the numbers.
+
+**Getting started and everyday comfort**
+- Welcome screen with three sample constructs (pUC19 and two AAV transfer plasmids, public
+  GenBank records), recent files, paste and drop.
+- Help menu: Keyboard Shortcuts, Getting Started, About Vettore — also reachable before any
+  file is open.
+- File → Preferences: default enzyme set, gel ladder and agarose percentage, minimum identity
+  for feature detection.
+- Ctrl+Shift+G opens the gel simulation.
+- A calmer, consistent look: one font, one accent colour, readable secondary text, visible
+  keyboard focus; every dialog fits a 1366×768 screen with its buttons in view.
+- New app icon.
+
+**Fixes**
+- Align to Reference DNA Sequence (Sanger) and Detect Common Features work in the packaged app:
+  in the 0.1.0 download both stopped with an error because a data file was missing from the
+  build. The build check now exercises both on Windows and Linux.
 
 ## 0.1.0
 

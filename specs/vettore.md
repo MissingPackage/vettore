@@ -26,7 +26,7 @@ known reference results. The UI never computes biology on its own.
 | Bridge | Local FastAPI server bound to 127.0.0.1 with a per-session random token; UI talks HTTP JSON | One code path for desktop and browser/test mode |
 | Desktop window | pywebview (Edge WebView2 on Windows, Qt WebEngine on Linux); fallback: open system browser | No Electron, single Python process |
 | Packaging | PyInstaller one-folder build, zipped; built by GitHub Actions on `windows-latest` and `ubuntu-latest` | Unsigned exe acceptable (personal PC) |
-| Native file format | Read `.dna`, `.gb/.gbk/.ape`, `.fasta`, `.ab1`; save GenBank (`.gb`) | Every sequence tool reads GenBank; it is the lossless open standard |
+| Native file format | Read `.dna`, `.gb/.gbk/.ape`, `.embl`, `.fasta`, `.xdna`, `.gck`, `.ab1` and plain text, detected from the content; save GenBank (`.gb`, default), FASTA or `.dna` (written with sgffp, round trip verified with Biopython and sgffp) | Every sequence tool reads GenBank; it is the lossless open standard |
 | `.dna` reading | Biopython (sequence, features, primer sites after hybridization filtering) + sgffp 0.22 (MIT) for feature colours, full primer sequences, description | Biopython alone drops colours and primer 5′ tails |
 | Enzyme data | Nonredundant commercial set generated from REBASE via Biopython (`vettore.enzymes` → `frontend/src/data/enzymes.json`), fed to OVE | OVE's default list contains isoschizomers with uncharacterised cuts (seen: Atu1II GGATCC shown as blunt); OVE's cut engine is cross-checked against Biopython in tests |
 | Tm | Biopython `Tm_NN` with named presets: Standard (SantaLucia & Hicks 2004, default), NEB Q5, NEB Taq; all shown in the tooltip | Values differ by several °C between tools; the method is always shown |
@@ -145,7 +145,6 @@ AAV helper: ITR-to-ITR cargo size with a warning above 4.7 kb.
 ## Non-goals
 
 - No cloud sync, accounts, telemetry or auto-update.
-- No writing of `.dna` files in S0–S3 (GenBank is the save format).
 - No protein structure, CRISPR guide scoring, or codon optimisation.
 - No third-party names, logos, icons or proprietary databases.
 - No macOS build (not requested) — the code should not block one later.
@@ -158,22 +157,19 @@ AAV helper: ITR-to-ITR cargo size with a warning above 4.7 kb.
 - Deadline: S1 ships as soon as it is green, without waiting for S2 — the editor is useful on its own.
 - Biology results must match the reference engine; any operation without tests is not shipped.
 
-## Status (2026-10-20) — v0.1.0, first public release
+## Status (2026-10-20) — v0.2.0
 
 | Slice | State | Missing |
 |---|---|---|
 | S0 Spike | done | — |
-| S1 Daily driver | done (S1.1–S1.6) | — |
-| S2 Cloning | done: S2.1 restriction, S2.2 Gibson/HiFi/In-Fusion, S2.3 PCR, S2.4 mutagenesis, S2.5 Golden Gate; plus annealed-oligo cloning | S2.6 Gateway, S2.7 TA/TOPO and linear ligation of selected fragments; S2.8 History records parents and operations, but parents cannot be reopened from it yet |
-| S3 Verification | done: S3.1 gel, S3.2 Sanger alignment, S3.4 common features; plus Dam/Dcm methylation warnings | S3.3 multiple alignment; S3.5 primer3 design with size constraints and ranked pairs (design to a target Tm already exists) |
-| S4 Polish | not started | everything |
+| S1 Daily driver | done (S1.1–S1.6), plus more formats (EMBL, `.xdna`, `.gck`, plain text), content-based format detection, `.dna` writing, clipboard exchange | — |
+| S2 Cloning | done: S2.1–S2.8 — restriction (one or several inserts), linear and circular ligation, Gibson/HiFi/In-Fusion, PCR, mutagenesis, Golden Gate, Gateway BP/LR (validated against published entry, destination and expression clones), TA/GC/TOPO, annealed oligos; History reopens every input of a step | MultiSite Gateway (att3–att5) not specifically tested |
+| S3 Verification | done: S3.1–S3.5 — gel, Sanger alignment with verdict and read quality, star alignment of several sequences to a reference, common features, primer3 pair design | progressive multiple alignment (sequences are aligned to the reference, not to each other) |
+| S4 Polish | partly: preferences, shortcut list, sample constructs, help, AAV packaging check, consistent look | history graph, print/PDF, file associations |
 
-Gateway and TA/TOPO forms exist but are hidden from the menu (`ready` flag in
-`frontend/src/cloning/registry.ts`); Gateway needs att-site sequences verified against a
-published vector map before it can ship.
-
-Tests: 136 pytest, 20 vitest, 13 Playwright end-to-end, plus a packaging smoke test that runs
-the packaged binary on both platforms in CI.
+Tests: TEST_COUNTS, plus a packaging smoke test that runs the packaged binary on both
+platforms in CI (file round trips in every format, cloning, Tm, primer design, alignment,
+Sanger reads, sample constructs, feature detection).
 
 ## Resolved
 
@@ -182,7 +178,7 @@ the packaged binary on both platforms in CI.
 ## Open questions
 
 1. (resolved — see above)
-2. [ASSUMED: save as GenBank `.gb`; `.dna` is read-only] — writing `.dna` is technically possible with sgffp (MIT), but nobody has verified that sgffp-written files reopen correctly in other tools. Is writing `.dna` important for exchanging files with colleagues? If yes: add `.dna` export and verify the round trip first.
+2. Resolved in 0.2.0: GenBank stays the default and recommended exchange format; `.dna` is written on Save As/Export only, and Save never overwrites a `.dna` it opened. The round trip is verified with Biopython and sgffp; whether other programs open Vettore-written `.dna` files has not been checked yet.
 3. [ASSUMED: S2 priority order = restriction cloning, Gibson/HiFi, PCR, mutagenesis, Golden Gate, Gateway, In-Fusion, TA/TOPO] — which methods are used most? (All but Gateway and TA/TOPO are done.)
 4. (resolved — Sanger verification shipped)
 5. [ASSUMED: ladders listed in S3.1] — which ladder brands are used in the lab?
