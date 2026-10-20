@@ -1,0 +1,11 @@
+/* Detect Common Features: a row whose existing label may be wrong. */
+.vt-detect-doubt td { background: var(--vt-warning-bg); }
+/* Under the feature name; :root outranks the shared .vt-warn weight for a calmer paragraph. */
+:root .vt-detect-doubt .vt-detect-doubt-text {
+  display: block;
+  max-width: var(--vt-measure);
+  margin-top: var(--vt-space-0);
+  font-size: var(--vt-font-size-sm);
+  font-weight: var(--vt-weight-medium);
+  line-height: var(--vt-line-height-tight);
+}

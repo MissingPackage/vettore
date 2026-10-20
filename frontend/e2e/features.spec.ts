@@ -91,6 +91,59 @@ test("an element already annotated under another name is shown as such and not t
   await expect(row.locator("input[type=checkbox]")).not.toBeChecked();
 });
 
+// tests/data/fidelity-*-cmv.gb: a CMV-EGFP plasmid built from catalogue sequences, with one
+// vendor-style block annotation over the CMV enhancer and promoter (see tests/data/README.md).
+
+test("elements inside a block named after them are already annotated", async ({ page }) => {
+  await page.goto(`/?token=${TOKEN}`);
+  await page.getByTestId("file-input").setInputFiles(data("fidelity-block-cmv.gb"));
+  await expect(page.locator(".veCircularView")).toBeVisible();
+  await menu(page, "Features", "Detect Common Features…");
+  await expect(page.getByTestId("detect-table")).toBeVisible({ timeout: 30_000 });
+
+  // The 204 bp CMV promoter sits in the 584 bp "CMV promoter" block: not offered again.
+  await expect(page.getByTestId("detect-row")).toHaveCount(7);
+  const cmv = page.getByTestId("detect-row").filter({ hasText: /^CMV promoter/ });
+  await expect(cmv.getByTestId("detect-annotated")).toHaveText("· already annotated");
+  await expect(page.getByTestId("detect-row").filter({ hasText: "CMV enhancer" })
+    .getByTestId("detect-annotated")).toHaveText("· annotated as “CMV promoter”");
+  await expect(page.locator("[data-testid=detect-row] input[type=checkbox]:checked")).toHaveCount(0);
+  await expect(page.getByTestId("detect-label-summary")).toHaveCount(0);
+  await expect(page.getByTestId("detect-add")).toBeDisabled();
+});
+
+test("a label that names another element is flagged and not ticked", async ({ page }) => {
+  await page.goto(`/?token=${TOKEN}`);
+  await page.getByTestId("file-input").setInputFiles(data("fidelity-mislabelled-cmv.gb"));
+  await expect(page.locator(".veCircularView")).toBeVisible();
+  await menu(page, "Features", "Detect Common Features…");
+  await expect(page.getByTestId("detect-table")).toBeVisible({ timeout: 30_000 });
+
+  const summary = page.getByTestId("detect-label-summary");
+  await expect(summary).toContainText("1 label may be wrong");
+  const enhancer = page.getByTestId("detect-row").filter({ hasText: "CMV enhancer" });
+  await expect(enhancer.getByTestId("detect-label-warning")).toHaveText(
+    "Annotated as “PGK promoter”, but the sequence is the CMV enhancer (100 % identity). Check the label.");
+  const promoter = page.getByTestId("detect-row").filter({ hasText: /^CMV promoter/ });
+  await expect(promoter.getByTestId("detect-label-warning")).toContainText("the CMV promoter");
+  await expect(page.getByTestId("detect-label-warning")).toHaveCount(2);
+  await expect(enhancer.locator("input[type=checkbox]")).not.toBeChecked();
+  await expect(promoter.locator("input[type=checkbox]")).not.toBeChecked();
+  // Amber, like every "check this" message, and not only by colour: the text says it.
+  const background = await enhancer.locator("td").first()
+    .evaluate((td) => getComputedStyle(td).backgroundColor);
+  expect(background).toBe("rgb(255, 250, 235)");      // --vt-warning-bg
+  await page.waitForTimeout(400);                     // let the dialog finish opening
+  await page.screenshot({ path: "test-results/detect-label-warning.png" });
+
+  // Ticking one adds the element under its own name.
+  await promoter.locator("input[type=checkbox]").check();
+  await page.getByTestId("detect-add").click();
+  await expect(page.getByTestId("detect-dialog")).toBeHidden();
+  await page.getByTestId("view-features").click();
+  await expect(page.locator(".ve-propertiesPanel").getByText("CMV promoter", { exact: true })).toBeVisible();
+});
+
 test.describe("on a 1366 × 768 screen", () => {
   test.use({ viewport: { width: 1366, height: 768 } });
 
