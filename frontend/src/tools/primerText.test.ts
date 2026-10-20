@@ -4,8 +4,10 @@ import {
   DEFAULT_FORM,
   defaultProductRange,
   orderingText,
+  pairAlreadyIn,
   primerNames,
   regionLength,
+  roomProblem,
   validate,
 } from "./primerText";
 
@@ -47,6 +49,40 @@ describe("constraints", () => {
       .toBe("At least 236 bp: the 200 bp region plus two primers.");
     expect(validate({ ...ok, productMin: "400", productMax: "300" }, 1500, false).product).toMatch(/exceed/);
   });
+});
+
+describe("room for primers", () => {
+  it("explains a circular region that leaves less than two primers of plasmid", () => {
+    // 10,459 bp plasmid: a primer of at least 18 nt on each side needs 36 bp outside the region.
+    const whole = form({ start: "1", end: "10459" });
+    const message = roomProblem(whole, 10459, true, "pBig");
+    expect(message).toMatch(/^The region covers 10,459 of the 10,459 bp of “pBig”, which leaves no room for primers/);
+    expect(message).toContain("Choose a region at least 36 bp shorter than the plasmid.");
+    expect(message).toContain("Actions → Design Primers to Amplify a Region");
+    // 10,459 − 36 = 10,423 bp still fits; one more base does not.
+    expect(roomProblem(form({ start: "1", end: "10423" }), 10459, true, "pBig")).toBeNull();
+    expect(roomProblem(form({ start: "1", end: "10424" }), 10459, true, "pBig")).not.toBeNull();
+  });
+
+  it("names the range that works on a linear sequence", () => {
+    expect(roomProblem(form({ start: "10", end: "500" }), 1500, false, "lin"))
+      .toMatch(/reaches the start of the linear sequence “lin”\. Choose a region from 19 to 1,482\./);
+    expect(roomProblem(form({ start: "300", end: "1490" }), 1500, false, "lin")).toMatch(/reaches the end/);
+    expect(roomProblem(form({ start: "19", end: "1482" }), 1500, false, "lin")).toBeNull();
+  });
+
+  it("puts no product-size error under a field the user never typed in", () => {
+    const whole = form({ start: "1", end: "10459" });
+    expect(validate(whole, 10459, true)).toEqual({});
+    expect(buildRequest(whole, { name: "pBig", sequence: "A".repeat(10459), circular: true })).toBeNull();
+  });
+});
+
+it("finds a pair that is already in the document", () => {
+  const primers = [{ name: "KanR_F", bases: "acgtacgtacgtacgtacgt" }, { name: "KanR_R", bases: "TTTTGGGGCCCCAAAATTTT" }];
+  expect(pairAlreadyIn("ACGTACGTACGTACGTACGT", "TTTTGGGGCCCCAAAATTTT", primers)).toEqual(["KanR_F", "KanR_R"]);
+  expect(pairAlreadyIn("ACGTACGTACGTACGTACGT", "GGGGGGGGGGGGGGGGGGGG", primers)).toBeNull();
+  expect(pairAlreadyIn("ACGT", "TTTT", [])).toBeNull();
 });
 
 it("sends 0-based positions and leaves an empty product range to the engine", () => {

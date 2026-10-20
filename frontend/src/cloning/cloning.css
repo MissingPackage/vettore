@@ -21,6 +21,7 @@
   border-radius: var(--vt-radius);
   padding: var(--vt-space-3);
 }
+.vt-missing-why { display: block; margin-top: var(--vt-space-1); font-size: var(--vt-font-size-xs); }
 .vt-product-choice { display: flex; flex-direction: column; gap: var(--vt-space-1); margin-bottom: var(--vt-space-2); }
 .vt-product-choice label { margin: 0; }
 .vt-product-name { display: flex; align-items: center; gap: var(--vt-space-2); margin: var(--vt-space-2) 0; }
@@ -28,3 +29,11 @@
 .vt-busy { display: flex; align-items: center; gap: var(--vt-space-2); color: var(--vt-text-muted); }
 .vt-help { color: var(--vt-text-muted); margin: 0 0 var(--vt-space-1); }
 .vt-help-more { color: var(--vt-text-muted); font-size: 11px; margin: 0; }
+/* Region: a feature picker above start … end, Use selection and the length, kept on one line
+   inside an insert card at 1366 px. */
+.vt-region-input { display: flex; flex-direction: column; gap: var(--vt-space-1); }
+.vt-region-input .vt-region input { width: 80px; }
+.vt-region-input .vt-region .bp3-button,
+.vt-region-input .vt-region .vt-muted { white-space: nowrap; }
+/* Confirmation next to a copy button, shown only once the text is on the clipboard. */
+.vt-copied { color: var(--vt-success); font-size: var(--vt-font-size-sm); }

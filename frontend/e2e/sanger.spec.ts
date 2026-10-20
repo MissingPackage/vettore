@@ -64,3 +64,26 @@ test("a planted mismatch is reported with the read quality behind it", async ({ 
   await expect(differences).toContainText(`${index + 1}: ${replacement} → ${reference[index]}`);
   await expect(differences).toContainText(/\(Q\d+/);
 });
+
+test("a mutation seen by two reads is counted once", async ({ page }) => {
+  // One base changed in the reference and the same trace loaded twice, as a forward and a
+  // reverse read over the same insert would be: one mutated position, reported by both reads.
+  const reference = referenceAroundTheRead();
+  const index = 4 * 74 + 200;
+  const replacement = reference[index] === "A" ? "G" : "A";
+  await newSequence(page, "pMutant", reference.slice(0, index) + replacement + reference.slice(index + 1));
+
+  await menu(page, "Tools", "Align to Reference DNA Sequence…");
+  const trace = fs.readFileSync(path.join(DATA, "3730.ab1"));
+  await page.getByTestId("sanger-files").setInputFiles([
+    { name: "read_F.ab1", mimeType: "application/octet-stream", buffer: trace },
+    { name: "read_R.ab1", mimeType: "application/octet-stream", buffer: trace },
+  ]);
+  const verdict = page.getByTestId("sanger-verdict");
+  await expect(verdict).toContainText("1 difference across 2 reads", { timeout: 30_000 });
+  await expect(verdict).toContainText("Both reads covering it show it.");
+  // The per-read table still lists the difference under each read.
+  const differences = page.getByTestId("sanger-differences");
+  await expect(differences).toHaveCount(2);
+  await expect(differences.nth(1)).toContainText(`${index + 1}: ${replacement} → ${reference[index]}`);
+});

@@ -59,6 +59,32 @@ export function defaultProductRange(regionBp: number, sizeMin: number): [number,
   return [smallest, smallest + PRODUCT_SLACK];
 }
 
+const WHOLE_REGION = "To amplify the whole region, primers included, use Actions → Design Primers to "
+  + "Amplify a Region, which places the primers at the ends of the region itself.";
+
+/**
+ * Why the region leaves no room for a primer on each side of it, with what to do; null when
+ * there is room or the region is not set. The same check, in the same words, as the engine's
+ * (primer_design._no_room): the dialog shows it in the result pane before asking the engine.
+ */
+export function roomProblem(form: PrimerForm, length: number, circular: boolean, name: string): string | null {
+  const region = regionLength(form, length, circular);
+  const sizeMin = int(form.sizeMin);
+  if (region === null || Number.isNaN(sizeMin)) return null;
+  const start = int(form.start) - 1;
+  const end = int(form.end) - 1;
+  if (circular) {
+    if (region + 2 * sizeMin <= length) return null;
+    return `The region covers ${n(region)} of the ${n(length)} bp of “${name}”, which leaves no room `
+      + `for primers: each needs at least ${sizeMin} bases outside the region. Choose a region at `
+      + `least ${2 * sizeMin} bp shorter than the plasmid. ${WHOLE_REGION}`;
+  }
+  if (start >= sizeMin && end + sizeMin <= length - 1) return null;
+  return `Primers need at least ${sizeMin} bases on each side of the region, outside it, but this `
+    + `region reaches ${start < sizeMin ? "the start" : "the end"} of the linear sequence “${name}”. `
+    + `Choose a region from ${n(sizeMin + 1)} to ${n(length - sizeMin)}. ${WHOLE_REGION}`;
+}
+
 /** Inline messages next to the fields; empty when the form can be sent. */
 export function validate(form: PrimerForm, length: number, circular: boolean): FormErrors {
   const errors: FormErrors = {};
@@ -93,7 +119,9 @@ export function validate(form: PrimerForm, length: number, circular: boolean): F
   if (Number.isNaN(diff) || diff < 0) errors.tmDiff = "Enter 0 °C or more.";
 
   const region = regionLength(form, length, circular);
-  if (!errors.region && region !== null && !errors.size) {
+  // A region with no room for primers is explained in the result pane (roomProblem), not here.
+  const noRoom = roomProblem(form, length, circular, "") !== null;
+  if (!errors.region && region !== null && !errors.size && !noRoom) {
     const [defaultMin, defaultMax] = defaultProductRange(region, sMin);
     const pMin = form.productMin.trim() === "" ? defaultMin : int(form.productMin);
     const pMax = form.productMax.trim() === "" ? defaultMax : int(form.productMax);
@@ -112,6 +140,7 @@ export function buildRequest(
   template: { name: string; sequence: string; circular: boolean },
 ): object | null {
   if (Object.keys(validate(form, template.sequence.length, template.circular)).length) return null;
+  if (roomProblem(form, template.sequence.length, template.circular, template.name)) return null;
   const optional = (text: string) => (text.trim() === "" ? null : int(text));
   return {
     template,
@@ -140,6 +169,18 @@ export function primerNames(prefix: string, existing: string[]): [string, string
     const pair: [string, string] = [`${base}_F${suffix}`, `${base}_R${suffix}`];
     if (!taken.has(pair[0]) && !taken.has(pair[1])) return pair;
   }
+}
+
+/** The names under which both primers of a pair are already in the document, or null. */
+export function pairAlreadyIn(
+  forward: string,
+  reverse: string,
+  primers: { name: string; bases?: string }[],
+): [string, string] | null {
+  const find = (sequence: string) =>
+    primers.find((p) => p.bases?.toUpperCase() === sequence.toUpperCase())?.name;
+  const [f, r] = [find(forward), find(reverse)];
+  return f && r ? [f, r] : null;
 }
 
 /** "name ⇥ sequence" lines, the format order forms accept. */

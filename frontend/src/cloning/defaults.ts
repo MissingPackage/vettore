@@ -34,6 +34,38 @@ export function defaultLinear(docs: OpenDoc[], active: OpenDoc | null, exclude: 
   return linear[linear.length - 1]?.editorName ?? null;
 }
 
+/** The att sites each Gateway input carries: [insert side, vector side]. */
+export const GATEWAY_SITE_KINDS = { BP: ["attB", "attP"], LR: ["attL", "attR"] } as const;
+
+/**
+ * Gateway inputs chosen by their att sites (`sites[i]` lists the sites of `docs[i]`, as
+ * /api/cloning/gateway-sites answers): for LR the entry clone (attL) and the destination
+ * vector (attR), for BP the attB insert and the donor vector (attP). The active document is
+ * preferred when it fits, then the one with more sites of the kind, then (for the attB insert)
+ * a linear PCR product. A role that no open file fits stays null, for the user to choose.
+ */
+export function gatewayDefaults(
+  reaction: "BP" | "LR",
+  docs: OpenDoc[],
+  sites: string[][],
+  active: OpenDoc | null,
+): [string | null, string | null] {
+  const [insertKind, vectorKind] = GATEWAY_SITE_KINDS[reaction];
+  const pick = (kind: string, exclude: string | null, preferLinear: boolean) => {
+    const fits = docs
+      .map((d, i) => ({ d, i, n: (sites[i] ?? []).filter((s) => s.startsWith(kind)).length }))
+      .filter((x) => x.n > 0 && x.d.editorName !== exclude);
+    fits.sort((x, y) =>
+      Number(y.d.editorName === active?.editorName) - Number(x.d.editorName === active?.editorName)
+      || y.n - x.n
+      || (preferLinear ? Number(isCircular(x.d)) - Number(isCircular(y.d)) : 0)
+      || x.i - y.i);
+    return fits[0]?.d.editorName ?? null;
+  };
+  const insert = pick(insertKind, null, reaction === "BP");
+  return [insert, pick(vectorKind, insert, false)];
+}
+
 /** The editor selection of a document as a region, or nulls. */
 export function selectionOf(d: OpenDoc | null): { start: number | null; end: number | null } {
   const s = d?.selection() ?? null;

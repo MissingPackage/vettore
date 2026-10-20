@@ -52,6 +52,46 @@ test("design primers around a feature, copy them and add them to the plasmid", a
   await expect(page.locator(".vt-history")).toContainText("Added primers (primer3)");
 });
 
+test("a pair is added once, and the chosen feature stays shown", async ({ page }) => {
+  const dialog = await openDesigner(page);
+  await dialog.getByTestId("pd-feature").selectOption({ label: "KanR (459–1,268)" });
+  await expect(dialog.getByTestId("pd-pair")).toHaveCount(5, { timeout: 30_000 });
+  await expect(dialog.getByTestId("pd-feature").locator("option:checked")).toHaveText("KanR (459–1,268)");
+
+  const add = page.getByTestId("pd-add");
+  await add.click();
+  await expect(page.getByTestId("pd-notice")).toContainText("Added KanR_F and KanR_R to pFA-KanMX4");
+  await expect(add).toHaveText("Added");
+  await expect(add).toBeDisabled();
+  // Another pair can still be added; going back to the first says it is already there.
+  await dialog.getByTestId("pd-pair").nth(1).click();
+  await expect(add).toHaveText("Add to Sequence");
+  await page.getByTestId("pd-close").click();
+
+  // Opened again later: the pair is recognised as already in the file.
+  await menu(page, "Primers", "Design PCR Primers…");
+  await dialog.getByTestId("pd-feature").selectOption({ label: "KanR (459–1,268)" });
+  await expect(dialog.getByTestId("pd-pair")).toHaveCount(5, { timeout: 30_000 });
+  await expect(dialog.getByTestId("pd-already")).toContainText("Pair 1 is already in pFA-KanMX4 as KanR_F and KanR_R");
+  await expect(add).toBeDisabled();
+});
+
+test("a region with no room for primers says what to choose instead, in the result pane", async ({ page }) => {
+  const dialog = await openDesigner(page);
+  // The whole 3,941 bp plasmid: an 18 nt primer on each side needs 36 bp outside the region.
+  await dialog.getByTestId("pd-start").fill("1");
+  await dialog.getByTestId("pd-end").fill("3941");
+  const message = dialog.getByTestId("pd-no-room");
+  await expect(message).toContainText("The region covers 3,941 of the 3,941 bp of “pFA-KanMX4”");
+  await expect(message).toContainText("Choose a region at least 36 bp shorter than the plasmid.");
+  await expect(message).toContainText("Actions → Design Primers to Amplify a Region");
+  // Nothing is reported under Product size, a field the user never typed in.
+  await expect(dialog.getByTestId("pd-product-error")).toHaveCount(0);
+
+  await dialog.getByTestId("pd-end").fill("3905");
+  await expect(message).toHaveCount(0);
+});
+
 test("impossible settings explain what to change", async ({ page }) => {
   const dialog = await openDesigner(page);
   await dialog.getByTestId("pd-start").fill("459");

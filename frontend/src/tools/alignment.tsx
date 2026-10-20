@@ -7,13 +7,16 @@ import { Button, Classes } from "@blueprintjs/core";
 import { AlignmentView, addAlignment } from "@teselagen/ove";
 import { call } from "../api";
 import { store } from "../store";
+import { useCopyText } from "../cloning/useCopyText";
 import type { Tool, ToolProps } from "./types";
 import {
+  choicePrompt,
   choiceProblem,
   DEFAULT_LIMITS,
   defaultChoice,
   describeDifference,
   differencesAsTsv,
+  distinctNames,
   ineligible,
   MODE_HELP,
   summarizeCounts,
@@ -63,6 +66,8 @@ function AlignMultipleSequences(props: ToolProps) {
     () => Object.fromEntries(docs.map((d) => [d.editorName, d.data()?.sequence?.length ?? 0])),
     [docs],
   );
+  // Several pasted sequences are all called "Pasted sequence": the tab number tells them apart.
+  const names = useMemo(() => distinctNames(docs), [docs]);
   const [reference, setReference] = useState<string | null>(
     props.active?.editorName ?? docs[0]?.editorName ?? null,
   );
@@ -73,6 +78,7 @@ function AlignMultipleSequences(props: ToolProps) {
   const [busy, setBusy] = useState(false);
   const [selected, setSelected] = useState(0);
   const [copied, setCopied] = useState(false);
+  const { copy: copyText, fallbackDialog } = useCopyText();
   const request = useRef(0);
 
   useEffect(() => {
@@ -83,7 +89,8 @@ function AlignMultipleSequences(props: ToolProps) {
   const others = docs.filter((d) => d.editorName !== reference);
   const referenceProblem = referenceDoc ? ineligible(lengths[referenceDoc.editorName], limits) : null;
   const problem = choiceProblem(chosen.length, limits);
-  const ready = !!referenceDoc && !referenceProblem && !problem;
+  const prompt = choicePrompt(chosen.length);
+  const ready = !!referenceDoc && !referenceProblem && !problem && chosen.length > 0;
 
   const changeReference = (editorName: string) => {
     setReference(editorName);
@@ -108,8 +115,8 @@ function AlignMultipleSequences(props: ToolProps) {
       // Tab names, not the names stored in the files, so the user recognises each track.
       const chosenDocs = others.filter((d) => chosen.includes(d.editorName));
       const payload = await call<AlignResult>("alignment/align", {
-        reference: { ...referenceDoc.data(), name: referenceDoc.name },
-        sequences: chosenDocs.map((d) => ({ ...d.data(), name: d.name })),
+        reference: { ...referenceDoc.data(), name: names[referenceDoc.editorName] },
+        sequences: chosenDocs.map((d) => ({ ...d.data(), name: names[d.editorName] })),
       });
       if (id !== request.current) return;
       setResult(payload);
@@ -136,11 +143,13 @@ function AlignMultipleSequences(props: ToolProps) {
   };
 
   const row = result?.sequences[selected] ?? null;
-  const copy = () => {
+  const copy = async () => {
     if (!row) return;
-    navigator.clipboard?.writeText(differencesAsTsv(row.name, row.differences));
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
+    setCopied(false);
+    if (await copyText(differencesAsTsv(row.name, row.differences), `Differences of ${row.name}`)) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    }
   };
 
   return (
@@ -167,7 +176,7 @@ function AlignMultipleSequences(props: ToolProps) {
                         onChange={(e) => changeReference(e.target.value)}>
                   {docs.map((d) => (
                     <option key={d.editorName} value={d.editorName}>
-                      {d.name} ({bp(lengths[d.editorName])} bp)
+                      {names[d.editorName]} ({bp(lengths[d.editorName])} bp)
                     </option>
                   ))}
                 </select>
@@ -194,7 +203,7 @@ function AlignMultipleSequences(props: ToolProps) {
                         checked={!why && chosen.includes(d.editorName)}
                         onChange={() => toggle(d.editorName)}
                       />
-                      <span>{d.name}</span>
+                      <span>{names[d.editorName]}</span>
                       <span className="vt-msa-meta">
                         {bp(lengths[d.editorName])} bp, {circular ? "circular" : "linear"}
                       </span>
@@ -206,6 +215,7 @@ function AlignMultipleSequences(props: ToolProps) {
               {problem && (
                 <span className="vt-msa-invalid" data-testid="msa-choice-problem">{problem}</span>
               )}
+              {prompt && <span className="vt-msa-meta" data-testid="msa-choice-prompt">{prompt}</span>}
             </div>
 
             <div className="vt-msa-actions">
@@ -216,7 +226,7 @@ function AlignMultipleSequences(props: ToolProps) {
               {busy ? (
                 <span className="vt-msa-busy" data-testid="msa-busy">
                   Aligning {chosen.length} sequence{chosen.length === 1 ? "" : "s"} to{" "}
-                  {referenceDoc?.name}… long plasmids take a few seconds each.
+                  {referenceDoc && names[referenceDoc.editorName]}… long plasmids take a few seconds each.
                 </span>
               ) : (
                 <span className="vt-msa-meta">
@@ -285,7 +295,7 @@ function AlignMultipleSequences(props: ToolProps) {
                   </span>
                   {row.differences.length > 0 && (
                     <Button small minimal icon="duplicate" data-testid="msa-copy" onClick={copy}>
-                      {copied ? "Copied" : "Copy list (for a spreadsheet)"}
+                      {copied ? "Copied: paste it into a spreadsheet" : "Copy list (for a spreadsheet)"}
                     </Button>
                   )}
                 </div>
@@ -317,6 +327,7 @@ function AlignMultipleSequences(props: ToolProps) {
           </>
         )}
       </div>
+      {fallbackDialog}
       <div className={Classes.DIALOG_FOOTER}>
         <div className={Classes.DIALOG_FOOTER_ACTIONS}>
           <Button onClick={props.onClose}>Close</Button>

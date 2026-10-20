@@ -18,7 +18,8 @@ interface GelBand {
 }
 
 interface GelResult {
-  lanes: { name: string; bands: GelBand[]; sizes: number[] }[];
+  /** `note`: why a lane is not what was asked (an enzyme that does not cut, an empty file). */
+  lanes: { name: string; bands: GelBand[]; sizes: number[]; note?: string | null }[];
   ladder: GelBand[];
   ladder_label: string;
   percent: number;
@@ -29,11 +30,52 @@ interface LaneSetup {
   enzymes: string[];
 }
 
-const GEL_HEIGHT = 430;
+const GEL_HEIGHT = 440;
 const LANE_WIDTH = 104;
 const MARGIN_LEFT = 62;
 const TITLE_Y = 14;
-const WELL_Y = 40;
+/** Lane headers take up to three lines of 12 px above the wells. */
+const LINE_HEIGHT = 12;
+const HEADER_LINES = 3;
+const WELL_Y = TITLE_Y + HEADER_LINES * LINE_HEIGHT + 6;
+/** Characters of a 10 px header line that fit over one lane. */
+const HEADER_CHARS = 17;
+/** Ladder sizes closer than this (px) would overprint: only one of them is written. */
+const LABEL_GAP = 10;
+
+/** Words over at most `lines` lines of `max` characters; what does not fit ends in "…". */
+function wrapWords(text: string, max: number, lines: number): string[] {
+  const out: string[] = [];
+  let line = "";
+  for (const word of text.split(/\s+/).filter(Boolean)) {
+    if (!line) line = word;
+    else if (`${line} ${word}`.length <= max) line = `${line} ${word}`;
+    else {
+      out.push(line);
+      line = word;
+    }
+  }
+  if (line) out.push(line);
+  const cut = (l: string) => (l.length > max ? `${l.slice(0, max - 1)}…` : l);
+  const kept = out.slice(0, lines).map(cut);
+  if (out.length > lines) kept[lines - 1] = `${kept[lines - 1].slice(0, max - 1)}…`;
+  return kept;
+}
+
+/** Which ladder bands get their size written: reference bands first, then any band far
+ * enough from every size already written. */
+function labelledBands(ys: number[], reference: boolean[]): boolean[] {
+  const keep = ys.map(() => false);
+  const placed: number[] = [];
+  const order = ys.map((_, i) => i).sort((a, b) => Number(reference[b]) - Number(reference[a]) || a - b);
+  for (const i of order) {
+    if (placed.every((y) => Math.abs(y - ys[i]) >= LABEL_GAP)) {
+      keep[i] = true;
+      placed.push(ys[i]);
+    }
+  }
+  return keep;
+}
 
 /** Tools → Simulate Agarose Gel: lanes are digests of the open documents. */
 export default function GelDialog(props: { docs: OpenDoc[]; active: OpenDoc | null; onClose: () => void }) {
@@ -175,7 +217,7 @@ export default function GelDialog(props: { docs: OpenDoc[]; active: OpenDoc | nu
         <div className="vt-cloning-result">
           {error && (
             <Callout intent="danger" title="No gel to draw" data-testid="gel-error">
-              {error}. Check that every lane has a file and that the enzymes cut it.
+              {error}
             </Callout>
           )}
           {!result && !error && !busy && (
@@ -200,9 +242,20 @@ export default function GelDialog(props: { docs: OpenDoc[]; active: OpenDoc | nu
                 are an approximation (semi-log migration), meant for reading a digest pattern
                 against the ladder rather than for measuring a real run.
               </p>
+              {result.lanes.some((lane) => lane.note) && (
+                <Callout intent="warning" data-testid="gel-notes">
+                  {result.lanes.map((lane, i) => lane.note && (
+                    <p key={i} data-testid="gel-note" style={{ margin: 0 }}>
+                      <b>Lane {i + 1}:</b> {lane.note}
+                    </p>
+                  ))}
+                </Callout>
+              )}
               {result.lanes.map((lane, i) => (
                 <p key={i} className="vt-muted">
-                  <b>{lane.name}</b>: {lane.sizes.map((s) => s.toLocaleString()).join(", ")} bp
+                  <b>{lane.name}</b>: {lane.sizes.length
+                    ? `${lane.sizes.map((s) => s.toLocaleString("en-US")).join(", ")} bp`
+                    : "no bands"}
                 </p>
               ))}
             </>
@@ -220,26 +273,40 @@ export default function GelDialog(props: { docs: OpenDoc[]; active: OpenDoc | nu
 
 function Lane(props: { x: number; label: string; bands: GelBand[]; isLadder?: boolean }) {
   const width = LANE_WIDTH - 20;
+  // "pUC19 + GFP (Gibson) / EcoRI + BamHI": the file on up to two lines, the enzymes in grey.
   const [first, ...rest] = props.label.split(" / ");
+  const enzymes = rest.join(" / ");
+  const nameLines = wrapWords(first, HEADER_CHARS, enzymes ? HEADER_LINES - 1 : HEADER_LINES);
+  const lines = [
+    ...nameLines.map((text) => ({ text, muted: false })),
+    ...(enzymes ? wrapWords(enzymes, HEADER_CHARS, 1).map((text) => ({ text, muted: true })) : []),
+  ];
+  const ys = props.bands.map((band) => WELL_Y + band.rf * (GEL_HEIGHT - WELL_Y - 10));
+  const labelled = props.isLadder ? labelledBands(ys, props.bands.map((b) => !!b.reference)) : [];
   return (
     <g>
-      <text x={props.x + width / 2} y={TITLE_Y} fontSize={10} textAnchor="middle" fill="#374151">
-        {first.length > 16 ? `${first.slice(0, 15)}…` : first}
-        <tspan x={props.x + width / 2} dy={12} fill="#6b7280">
-          {rest.join(" / ").slice(0, 18)}
-        </tspan>
+      <text x={props.x + width / 2} y={TITLE_Y} fontSize={10} textAnchor="middle" fill="#374151"
+            data-testid="gel-lane-header">
+        <title>{props.label}</title>
+        {lines.map((line, i) => (
+          <tspan key={i} x={props.x + width / 2} dy={i === 0 ? 0 : LINE_HEIGHT}
+                 fill={line.muted ? "#6b7280" : undefined}>
+            {line.text}
+          </tspan>
+        ))}
       </text>
       <rect x={props.x} y={WELL_Y - 8} width={width} height={7} fill="#3f3f46" rx={1} />
       {props.bands.map((band, i) => {
-        const y = WELL_Y + band.rf * (GEL_HEIGHT - WELL_Y - 10);
+        const y = ys[i];
         return (
           <g key={i}>
             <rect x={props.x} y={y} width={width} height={band.reference ? 5 : 4} rx={1}
                   fill="#e8f1c8" opacity={0.2 + 0.8 * band.intensity}>
               <title>{band.label}</title>
             </rect>
-            {props.isLadder && (
-              <text x={props.x - 10} y={y + 5} fill="#9ca3af" fontSize={9} textAnchor="end">
+            {props.isLadder && labelled[i] && (
+              <text x={props.x - 10} y={y + 5} fill="#9ca3af" fontSize={9} textAnchor="end"
+                    data-testid="gel-ladder-label">
                 {band.label}
               </text>
             )}

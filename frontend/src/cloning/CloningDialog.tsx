@@ -3,8 +3,10 @@ import * as Blueprint from "@blueprintjs/core";
 import { Button, Classes, Spinner } from "@blueprintjs/core";
 import { SimpleCircularOrLinearView } from "@teselagen/ove";
 import { api } from "../api";
+import { defaultProductName } from "./productName";
 import type { CloningAction } from "./registry";
 import type { CloningResult, Oligo, OpenDoc, Product } from "./types";
+import { useCopyText } from "./useCopyText";
 import "./cloning.css";
 
 // Blueprint 3 typings predate React 18 (no implicit `children`).
@@ -28,7 +30,12 @@ export default function CloningDialog(props: {
   const [result, setResult] = useState<CloningResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Until the user changes an input, the inputs are Vettore's guesses: a failure then says what
+  // to choose, in the neutral box, rather than showing a red error.
+  const [touched, setTouched] = useState(false);
   const [chosen, setChosen] = useState(0);
+  const [copied, setCopied] = useState<string | null>(null);
+  const { copy, fallbackDialog } = useCopyText();
   const request = useRef(0);
   // Depend on the serialised body: forms rebuild it on every render.
   const bodyKey = body ? JSON.stringify(body) : "";
@@ -67,15 +74,29 @@ export default function CloningDialog(props: {
   }, []);
 
   const product = result?.products[chosen] ?? null;
-  const productName = product?.doc.name ?? "";
-  useEffect(() => setName(productName), [productName]);
+  const suggestedName = product
+    ? defaultProductName(product.doc.name, product.operation, props.docs.map((d) => d.name))
+    : "";
+  useEffect(() => setName(suggestedName), [suggestedName]);
   const oligos = result ? (result.oligos.length ? result.oligos : product?.oligos ?? []) : [];
+  const oligoText = oligosAsText(oligos);
+  // A confirmation belongs to the primers it was given for.
+  useEffect(() => setCopied(null), [oligoText]);
+  const copyOligos = async () => {
+    if (await copy(oligoText, "Primers to order")) {
+      setCopied(`Copied ${oligos.length} primer${oligos.length === 1 ? "" : "s"}: paste them into the order form.`);
+    }
+  };
   const { Form } = action;
 
   return (
     <Dialog isOpen onClose={props.onClose} title={action.title} style={{ width: 1100, maxWidth: "95vw" }} canOutsideClickClose={false}>
       <div className={`${Classes.DIALOG_BODY} vt-cloning`} data-testid="cloning-dialog">
-        <div className="vt-cloning-form">
+        <div
+          className="vt-cloning-form"
+          onChangeCapture={() => setTouched(true)}
+          onClickCapture={(e) => (e.target as HTMLElement).closest("button") && setTouched(true)}
+        >
           <p className="vt-help" data-testid="cloning-help">{action.help}</p>
           {action.details && <p className="vt-help-more">{action.details}</p>}
           <Form docs={props.docs} active={props.active} onChange={onFormChange} />
@@ -91,10 +112,16 @@ export default function CloningDialog(props: {
               {missing ?? "Fill in the inputs on the left to simulate the product."}
             </p>
           )}
-          {error && (
+          {error && touched && (
             <Callout intent="danger" title="No product" data-testid="cloning-error">
               {error}
             </Callout>
+          )}
+          {error && !touched && (
+            <p className="vt-missing" data-testid="cloning-missing">
+              Choose the inputs on the left: the open files picked for you do not give a product.
+              <span className="vt-missing-why">{error}</span>
+            </p>
           )}
           {result && product && (
             <>
@@ -141,9 +168,10 @@ export default function CloningDialog(props: {
                 <div className="vt-oligos">
                   <div className="vt-row">
                     <b>Primers to order</b>
-                    <Button small minimal icon="duplicate" onClick={() => navigator.clipboard?.writeText(oligosAsText(oligos))}>
+                    <Button small minimal icon="duplicate" data-testid="cloning-copy" onClick={copyOligos}>
                       Copy all (name ⇥ sequence)
                     </Button>
+                    {copied && <span className="vt-copied" role="status" data-testid="cloning-copied">{copied}</span>}
                   </div>
                   <table className="bp3-html-table bp3-html-table-condensed vt-table" data-testid="cloning-oligos">
                     <thead>
@@ -167,6 +195,7 @@ export default function CloningDialog(props: {
           )}
         </div>
       </div>
+      {fallbackDialog}
       <div className={Classes.DIALOG_FOOTER}>
         <div className={Classes.DIALOG_FOOTER_ACTIONS}>
           <Button onClick={props.onClose}>Cancel</Button>
@@ -175,7 +204,7 @@ export default function CloningDialog(props: {
             data-testid="cloning-create"
             disabled={!product || busy}
             onClick={() => product && result
-              && props.onCreate({ ...product, doc: { ...product.doc, name: name.trim() || product.doc.name } }, result)}
+              && props.onCreate({ ...product, doc: { ...product.doc, name: name.trim() || suggestedName } }, result)}
           >
             Create Product
           </Button>

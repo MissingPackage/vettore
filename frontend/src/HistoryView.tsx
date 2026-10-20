@@ -1,5 +1,7 @@
+import { useState } from "react";
 import type { SequenceData } from "./api";
 import type { Doc } from "./documents";
+import { useCopyText } from "./cloning/useCopyText";
 import "./history.css";
 
 /** Provenance of the document: opened, created, saved, and every cloning step with its inputs. */
@@ -9,6 +11,16 @@ export default function HistoryView({ doc, onReopen }: {
   onReopen: (data: SequenceData, from: string) => void;
 }) {
   const steps = [...doc.history].reverse();
+  const { copy, fallbackDialog } = useCopyText();
+  /** The step whose text was just put on the clipboard. */
+  const [copied, setCopied] = useState<number | null>(null);
+  const copyStep = async (i: number, text: string) => {
+    setCopied(null);
+    if (await copy(text, "Copy this step")) {
+      setCopied(i);
+      setTimeout(() => setCopied((current) => (current === i ? null : current)), 2500);
+    }
+  };
   return (
     <div className="vt-history" data-testid="history-view">
       <h2>History of “{doc.name}”</h2>
@@ -52,9 +64,9 @@ export default function HistoryView({ doc, onReopen }: {
                     className="bp3-button bp3-small bp3-minimal vt-history-copy"
                     data-testid="history-copy"
                     title="Copy this step (parameters and primers) to the clipboard"
-                    onClick={() => navigator.clipboard?.writeText(`${h.action}: ${h.detail}`)}
+                    onClick={() => copyStep(i, `${h.action}: ${h.detail}`)}
                   >
-                    Copy
+                    {copied === i ? "Copied" : "Copy"}
                   </button>
                 )}
               </td>
@@ -62,6 +74,7 @@ export default function HistoryView({ doc, onReopen }: {
           ))}
         </tbody>
       </table>
+      {fallbackDialog}
     </div>
   );
 }

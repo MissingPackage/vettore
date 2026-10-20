@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+  choicePrompt,
   choiceProblem,
   DEFAULT_LIMITS,
   defaultChoice,
   describeDifference,
   differencesAsTsv,
+  distinctNames,
   ineligible,
   summarizeCounts,
 } from "./alignmentText";
@@ -49,13 +51,17 @@ describe("choosing sequences", () => {
     { editorName: "e", length: 3000 },
   ];
 
-  it("ticks every other usable document by default", () => {
-    expect(defaultChoice(docs, "a", DEFAULT_LIMITS)).toEqual(["b", "e"]);
+  it("ticks nothing by default when several files could be compared", () => {
+    expect(defaultChoice(docs, "a", DEFAULT_LIMITS)).toEqual([]);
+    const many = Array.from({ length: 15 }, (_, i) => ({ editorName: `d${i}`, length: 1000 }));
+    expect(defaultChoice(many, "d0", DEFAULT_LIMITS)).toEqual([]);
   });
 
-  it("never ticks more than the limit allows", () => {
-    const many = Array.from({ length: 15 }, (_, i) => ({ editorName: `d${i}`, length: 1000 }));
-    expect(defaultChoice(many, "d0", DEFAULT_LIMITS)).toHaveLength(DEFAULT_LIMITS.max_sequences - 1);
+  it("ticks the other file when it is the only one that can be compared", () => {
+    expect(defaultChoice(docs.slice(0, 2), "a", DEFAULT_LIMITS)).toEqual(["b"]);
+    // "c" is empty and "d" too long: "b" is the only usable one.
+    expect(defaultChoice(docs.slice(0, 4), "a", DEFAULT_LIMITS)).toEqual(["b"]);
+    expect(defaultChoice(docs.slice(0, 1), "a", DEFAULT_LIMITS)).toEqual([]);
   });
 
   it("explains why a document cannot be used", () => {
@@ -65,8 +71,13 @@ describe("choosing sequences", () => {
     expect(ineligible(5000, DEFAULT_LIMITS)).toBeNull();
   });
 
-  it("asks for at least one and at most the limit", () => {
-    expect(choiceProblem(0, DEFAULT_LIMITS)).toMatch(/at least one/);
+  it("prompts, without an error, while nothing is ticked", () => {
+    expect(choicePrompt(0)).toMatch(/^Tick the sequences to compare/);
+    expect(choicePrompt(1)).toBeNull();
+    expect(choiceProblem(0, DEFAULT_LIMITS)).toBeNull();
+  });
+
+  it("allows at most the limit", () => {
     expect(choiceProblem(3, DEFAULT_LIMITS)).toBeNull();
     expect(choiceProblem(11, DEFAULT_LIMITS)).toBe("Too many: at most 9 besides the reference. Untick 2.");
   });
@@ -80,4 +91,12 @@ it("copies differences as tab-separated lines", () => {
     "sequence\tkind\tstart\tend\treference bases\tsequence bases",
     "pX\tmismatch\t10\t10\tA\tC",
   ]);
+});
+
+it("tells apart open files that share a name by their tab number", () => {
+  expect(distinctNames([
+    { editorName: "a", name: "Pasted sequence" },
+    { editorName: "b", name: "pUC19" },
+    { editorName: "c", name: "Pasted sequence" },
+  ])).toEqual({ a: "Pasted sequence (tab 1)", b: "pUC19", c: "Pasted sequence (tab 3)" });
 });

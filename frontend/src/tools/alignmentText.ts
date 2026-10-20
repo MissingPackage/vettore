@@ -61,6 +61,19 @@ export function differencesAsTsv(name: string, diffs: Difference[]): string {
   return [header, ...rows].join("\n");
 }
 
+/**
+ * The name each open document goes by in the dialog and its results: its tab name, plus its tab
+ * number when another open tab has the same name ("Pasted sequence (tab 3)").
+ */
+export function distinctNames(docs: { editorName: string; name: string }[]): Record<string, string> {
+  const uses = new Map<string, number>();
+  for (const d of docs) uses.set(d.name, (uses.get(d.name) ?? 0) + 1);
+  return Object.fromEntries(docs.map((d, i) => [
+    d.editorName,
+    (uses.get(d.name) ?? 0) > 1 ? `${d.name} (tab ${i + 1})` : d.name,
+  ]));
+}
+
 /** Why a document cannot take part, or null if it can. */
 export function ineligible(length: number, limits: AlignmentLimits): string | null {
   if (length === 0) return "empty";
@@ -69,21 +82,29 @@ export function ineligible(length: number, limits: AlignmentLimits): string | nu
   return null;
 }
 
-/** Default selection: every other eligible document, up to the limit. */
+/**
+ * Default selection: the other document when it is the only one that can take part, else
+ * nothing. Unrelated open files only share chance matches with the reference, so the user
+ * ticks what they expect to resemble it.
+ */
 export function defaultChoice(
   candidates: { editorName: string; length: number }[],
   reference: string | null,
   limits: AlignmentLimits,
 ): string[] {
-  return candidates
-    .filter((c) => c.editorName !== reference && !ineligible(c.length, limits))
-    .slice(0, limits.max_sequences - 1)
-    .map((c) => c.editorName);
+  const usable = candidates.filter((c) => c.editorName !== reference && !ineligible(c.length, limits));
+  return usable.length === 1 ? [usable[0].editorName] : [];
 }
 
-/** Inline message for the "Compare with" list, or null when the choice is valid. */
+/** Neutral prompt while nothing is ticked yet, or null. */
+export function choicePrompt(chosen: number): string | null {
+  if (chosen > 0) return null;
+  return "Tick the sequences to compare with the reference: versions of the same plasmid, a gene "
+    + "and its source, reads of a clone. Unrelated files only share short chance matches.";
+}
+
+/** Inline error for the "Compare with" list, or null when the choice can be aligned. */
 export function choiceProblem(chosen: number, limits: AlignmentLimits): string | null {
-  if (chosen === 0) return "Tick at least one sequence to compare with the reference.";
   const max = limits.max_sequences - 1;
   if (chosen > max) {
     return `Too many: at most ${max} besides the reference. Untick ${chosen - max}.`;

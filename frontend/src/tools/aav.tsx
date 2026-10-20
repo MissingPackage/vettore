@@ -266,10 +266,14 @@ function AavPackagingDialog(props: ToolProps) {
                   {bp(cargo.totalBp)} of {bp(limit)}
                 </span>
               </div>
-              <p className="vt-muted vt-aav-scale">
+              <p className="vt-muted vt-aav-scale" data-testid="aav-scale">
                 <span>0</span>
-                <span>limit {bp(limit)}</span>
                 <span>{bp(hardLimit)}</span>
+                {/* Under the marker, on a line of its own so it never runs into the scale's end. */}
+                <span className="vt-aav-limit-caption" data-testid="aav-limit-caption"
+                      style={{ "--at": `${100 * limit / hardLimit}%` } as React.CSSProperties}>
+                  limit {bp(limit)}
+                </span>
               </p>
 
               <table className="bp3-html-table bp3-html-table-condensed vt-table"

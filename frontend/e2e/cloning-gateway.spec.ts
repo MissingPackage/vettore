@@ -39,6 +39,79 @@ test("LR reaction between an entry clone and a destination vector", async ({ pag
   await expect(page.getByTestId("history-reopen")).toHaveCount(2);
 });
 
+/**
+ * Answer /api/cloning/gateway-sites as the engine does ({"sites": [[...], ...]}, one list per
+ * document sent), from the names of the test records: the dialog's choice is tested on its own.
+ */
+async function answerGatewaySites(page: Page) {
+  await page.route("**/api/cloning/gateway-sites*", async (route) => {
+    const docs = (route.request().postDataJSON() as { docs: { name: string }[] }).docs;
+    const sites = docs.map((d) => (d.name.includes("entry") ? ["attL1", "attL2"]
+      : d.name.includes("destination") ? ["attR1", "attR2"] : []));
+    await route.fulfill({ json: { sites } });
+  });
+}
+
+test("LR picks the entry clone and the destination vector by their att sites", async ({ page }) => {
+  await answerGatewaySites(page);
+  await page.goto(`/?token=${TOKEN}`);
+  await page.getByTestId("file-input").setInputFiles([
+    data("pFA-KanMX4.dna"),
+    data("cloning-gateway-destination.gb"),
+    data("cloning-gateway-entry.gb"),
+  ]);
+  await expect(page.locator(".vt-doctab")).toHaveCount(3);
+  // The destination tab is active: it still goes to the destination role, not the entry one.
+  await page.locator(".vt-doctab", { hasText: "destination" }).click();
+
+  await menu(page, "Actions", "Gateway LR Reaction…");
+  const dialog = page.getByTestId("cloning-dialog");
+  await expect(dialog.getByTestId("insert-doc").locator("option:checked")).toContainText("entry");
+  await expect(dialog.getByTestId("insert-doc").locator("option:checked")).toContainText("attL1, attL2");
+  await expect(dialog.getByTestId("vector-doc").locator("option:checked")).toContainText("destination");
+  await expect(page.getByTestId("cloning-product")).toContainText("expression clone", { timeout: 30_000 });
+  await expect(dialog.getByTestId("cloning-error")).toHaveCount(0);
+});
+
+test("when no open file has the att sites, the dialog asks for them instead of guessing", async ({ page }) => {
+  await answerGatewaySites(page);
+  await page.goto(`/?token=${TOKEN}`);
+  await page.getByTestId("file-input").setInputFiles([data("cloning-gateway-entry.gb"), data("pFA-KanMX4.dna")]);
+  await expect(page.locator(".vt-doctab")).toHaveCount(2);
+  await menu(page, "Actions", "Gateway LR Reaction…");
+  const dialog = page.getByTestId("cloning-dialog");
+  await expect(dialog.getByTestId("insert-doc").locator("option:checked")).toContainText("entry");
+  await expect(dialog.getByTestId("vector-doc")).toHaveValue("");
+  await expect(dialog.getByTestId("cloning-missing"))
+    .toContainText("Choose the destination vector (attR sites). None of the open files has attR sites");
+  await expect(dialog.getByTestId("cloning-error")).toHaveCount(0);
+});
+
+test("if the att sites cannot be read, both inputs are left for the user to choose", async ({ page }) => {
+  await page.route("**/api/cloning/gateway-sites*", (route) => route.abort());
+  await page.goto(`/?token=${TOKEN}`);
+  await page.getByTestId("file-input").setInputFiles([data("cloning-gateway-entry.gb"), data("cloning-gateway-destination.gb")]);
+  await expect(page.locator(".vt-doctab")).toHaveCount(2);
+  await menu(page, "Actions", "Gateway LR Reaction…");
+  const dialog = page.getByTestId("cloning-dialog");
+  await expect(dialog.getByTestId("cloning-missing")).toHaveText("Choose the entry clone (attL sites)");
+  await expect(dialog.getByTestId("insert-doc")).toHaveValue("");
+  await expect(dialog.getByTestId("vector-doc")).toHaveValue("");
+});
+
+test("Golden Gate opened on unrelated files says what to choose, without an error", async ({ page }) => {
+  await page.goto(`/?token=${TOKEN}`);
+  await page.getByTestId("file-input").setInputFiles([data("MT612431.1.gb"), data("pFA-KanMX4.dna")]);
+  await expect(page.locator(".vt-doctab")).toHaveCount(2);
+  await menu(page, "Actions", "Golden Gate Assembly…");
+  const dialog = page.getByTestId("cloning-dialog");
+  await expect(dialog.getByTestId("cloning-missing")).toContainText("Choose the inputs on the left", { timeout: 30_000 });
+  await expect(dialog.getByTestId("cloning-error")).toHaveCount(0);
+  // Once the user changes an input, a failure is an error again.
+  await dialog.locator("select").first().selectOption("BsmBI");
+  await expect(dialog.getByTestId("cloning-error")).toBeVisible({ timeout: 30_000 });
+});
+
 test("a molecule without att sites is refused with a message that names it", async ({ page }) => {
   await page.goto(`/?token=${TOKEN}`);
   await page.getByTestId("file-input").setInputFiles([

@@ -62,6 +62,33 @@ test("the cargo of an AAV transfer plasmid is measured ITR to ITR", async ({ pag
   await expect(dialog.getByTestId("aav-backbone-warning")).toContainText("backbone");
 });
 
+test("the limit caption sits under the limit marker", async ({ page }) => {
+  await page.goto(`/?token=${TOKEN}`);
+  await page.getByTestId("sample-paav-ctnt-sacas9").click();
+  await expect(page.locator(".veCircularView")).toBeVisible();
+  await menu(page, "Tools", "AAV Packaging Check…");
+  const dialog = page.getByTestId("aav-dialog");
+  for (const kind of ["ss", "sc"]) {
+    await dialog.getByTestId("aav-kind").selectOption(kind);
+    await expect(dialog.getByTestId("aav-bar")).toBeVisible();
+    // The dialog opens with a zoom: measure once it is over.
+    await expect(page.locator(".bp3-overlay-appear-active, .bp3-overlay-enter-active")).toHaveCount(0);
+    const bar = await dialog.getByTestId("aav-bar").boundingBox();
+    const marker = await dialog.locator(".vt-aav-limit").boundingBox();
+    const caption = await dialog.getByTestId("aav-limit-caption").boundingBox();
+    expect(bar && marker && caption).toBeTruthy();
+    // The marker is above the caption, at the same share of the caption as of the bar.
+    const at = (marker!.x + marker!.width / 2 - bar!.x) / bar!.width;
+    expect(Math.abs(caption!.x + at * caption!.width - (marker!.x + marker!.width / 2)),
+           `${kind}: caption under the marker`).toBeLessThanOrEqual(3);
+    expect(caption!.x, `${kind}: caption inside the bar`).toBeGreaterThanOrEqual(bar!.x - 1);
+    expect(caption!.x + caption!.width, `${kind}: caption inside the bar`).toBeLessThanOrEqual(bar!.x + bar!.width + 1);
+    // On its own line: it does not run into the scale's end label.
+    const end = await dialog.getByTestId("aav-scale").locator("span").nth(1).boundingBox();
+    expect(caption!.y, `${kind}: caption below the end label`).toBeGreaterThanOrEqual(end!.y + end!.height - 1);
+  }
+});
+
 test("ITRs annotated only by a note are found too", async ({ page }) => {
   await page.goto(`/?token=${TOKEN}`);
   await page.getByTestId("sample-paav-ef1a-dio").click();
