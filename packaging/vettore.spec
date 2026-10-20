@@ -10,7 +10,9 @@ static = root / "src" / "vettore" / "static"
 if not (static / "index.html").is_file():
     raise SystemExit("Build the frontend first and copy frontend/dist to src/vettore/static")
 
-datas = [(str(static), "vettore/static")]
+datas = [(str(static), "vettore/static"),
+         # Engine data read through importlib.resources: common features, sample constructs.
+         (str(root / "src" / "vettore" / "data"), "vettore/data")]
 binaries = []
 hiddenimports = collect_submodules("uvicorn") + collect_submodules("Bio")
 
@@ -44,6 +46,6 @@ exe = EXE(
     exclude_binaries=True,
     name="Vettore",
     console=False,
-    icon=None,
+    icon=str(root / "frontend" / "public" / "vettore.ico"),
 )
 coll = COLLECT(exe, a.binaries, a.datas, name="Vettore")

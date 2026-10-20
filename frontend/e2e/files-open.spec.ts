@@ -32,9 +32,9 @@ test("opens EMBL, .xdna, .gck and plain-sequence files", async ({ page }) => {
     await expect(tab(page, name)).toBeVisible();
   }
   await tab(page, "exchange-pBR322").click();
-  await expect(page.getByTestId("status-line")).toContainText("4361 bp · circular");
+  await expect(page.getByTestId("status-line")).toContainText("4,361 bp · circular");
   await tab(page, "exchange-pUC19-numbered").click();
-  await expect(page.getByTestId("status-line")).toContainText("2686 bp · linear");
+  await expect(page.getByTestId("status-line")).toContainText("2,686 bp · linear");
 });
 
 test("a file with several sequences opens one tab each and says so", async ({ page }) => {
@@ -52,7 +52,7 @@ test("a GenBank file saved as .txt opens by its content", async ({ page }) => {
     buffer: fs.readFileSync(data("MT612431.1.gb")),
   });
   await expect(page.locator(".vt-doctab.active")).toContainText("from-a-colleague");
-  await expect(page.getByTestId("status-line")).toContainText("7204 bp · circular");
+  await expect(page.getByTestId("status-line")).toContainText("7,204 bp · circular");
   await page.getByTestId("view-history").click();
   await expect(page.locator(".vt-history")).toContainText("(GenBank)");
 });
@@ -68,7 +68,7 @@ test("errors show their whole message, stack up and can be dismissed", async ({ 
   // The end of a long message is visible too: nothing is cut off.
   await expect(errors.nth(1)).toContainText("and plain sequence text (.txt, .seq).");
   for (const i of [0, 1]) {
-    const text = errors.nth(i).locator(".vt-notice-text");
+    const text = errors.nth(i).locator(".vt-toast-text");
     const { scrollWidth, clientWidth, scrollHeight, clientHeight } = await text.evaluate((el) => ({
       scrollWidth: el.scrollWidth, clientWidth: el.clientWidth, scrollHeight: el.scrollHeight, clientHeight: el.clientHeight,
     }));
@@ -100,7 +100,7 @@ test("features that cannot be placed are reported by name", async ({ page }) => 
 test("dropping files on the window opens them", async ({ page }) => {
   await dropFile(page, "exchange-pBR322.embl", fs.readFileSync(data("exchange-pBR322.embl")));
   await expect(page.locator(".vt-doctab.active")).toContainText("exchange-pBR322");
-  await expect(page.getByTestId("status-line")).toContainText("4361 bp · circular");
+  await expect(page.getByTestId("status-line")).toContainText("4,361 bp · circular");
 });
 
 test("the file chooser offers every format the engine reads", async ({ page }) => {

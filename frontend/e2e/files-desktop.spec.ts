@@ -112,7 +112,7 @@ test("a dropped file whose path is unknown is opened by its content", async ({ p
     detail: { paths: [], unresolved: ["pBR322.embl"] },
   })));
   await expect(page.locator(".vt-doctab.active")).toContainText("pBR322");
-  await expect(page.getByTestId("status-line")).toContainText("4361 bp · circular");
+  await expect(page.getByTestId("status-line")).toContainText("4,361 bp · circular");
 });
 
 test("Save on a .dna file explains the GenBank copy once and leaves the original untouched", async ({ page }) => {

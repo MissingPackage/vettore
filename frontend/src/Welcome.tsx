@@ -4,9 +4,6 @@ import { baseName } from "./documents";
 import { HelpDialogById } from "./tools/help";
 import "./Welcome.css";
 
-/** A sample construct as the engine lists it (api.Sample plus its GenBank accession). */
-type SampleEntry = Sample & { accession?: string };
-
 /** Shown while no document is open: what Vettore is, and the three ways in. */
 export default function Welcome(props: {
   recent: string[];
@@ -14,8 +11,10 @@ export default function Welcome(props: {
   onNew: () => void;
   onRecent: (path: string) => void;
   onSample: (id: string) => void;
+  /** Open a sequence copied from an email or a web page. */
+  onPaste?: () => void;
 }) {
-  const [samples, setSamples] = useState<SampleEntry[]>([]);
+  const [samples, setSamples] = useState<Sample[]>([]);
   const [opening, setOpening] = useState<string | null>(null);
   // The menu bar belongs to the editor, so it is not on screen here: the help dialogs a
   // first-time user needs are opened from the welcome screen itself.
@@ -47,10 +46,16 @@ export default function Welcome(props: {
           New DNA file…
           <span>Ctrl+N</span>
         </button>
+        {props.onPaste && (
+          <button data-testid="paste" onClick={props.onPaste}>
+            Paste a sequence…
+            <span>Ctrl+Shift+V</span>
+          </button>
+        )}
       </div>
       <p className="vt-welcome-drop" data-testid="drop-hint">
-        You can also drop a .dna, GenBank (.gb, .gbk, .ape), FASTA or Sanger .ab1 file anywhere
-        on this window.
+        You can also drop a file anywhere on this window: GenBank (.gb, .gbk, .ape), .dna, EMBL,
+        FASTA, .xdna, .gck, Sanger .ab1 or plain sequence text.
       </p>
 
       {samples.length > 0 && (

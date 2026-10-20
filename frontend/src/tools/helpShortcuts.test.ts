@@ -21,7 +21,8 @@ describe("keyboard shortcut list", () => {
     ]);
   });
 
-  it("does not advertise the gel shortcut, which nothing binds", () => {
-    expect(ALL_SHORTCUTS.some((s) => s.keys === "Ctrl+Shift+G")).toBe(false);
+  it("lists the shortcuts Vettore binds itself", () => {
+    const keys = ALL_SHORTCUTS.map((s) => s.keys);
+    expect(keys).toEqual(expect.arrayContaining(["Ctrl+Shift+G", "Ctrl+Shift+V"]));
   });
 });

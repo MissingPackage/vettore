@@ -109,11 +109,28 @@ def main() -> int:
         assert product["circular"] and len(product["sequence"]) == 316, len(product["sequence"])
         tm = call("tm", {"sequence": "AGCTTGCATGCCTGCAGGTCG"})["tm"]
         assert 55 < tm < 70, tm
+        # primer3 reads its thermodynamic tables from files next to its compiled module and
+        # swallows the error at import: a build without them only fails when primer design runs.
+        status = call("primer-design/status")
+        assert status["ready"], status
+        designed = call("primer-design/design", {"template": doc, "start": 458, "end": 1267})
+        assert len(designed["pairs"]) == 5, designed
+        fragment = {"name": "frag", "sequence": doc["sequence"][1000:1600], "circular": False}
+        aligned = call("alignment/align", {"reference": doc, "sequences": [fragment]})
+        [placed] = aligned["sequences"]
+        assert (placed["start"], placed["identity"]) == (1001, 100.0), placed
+        # Engine data files (vettore/data) must be in the bundle.
+        sample = call("app/samples")["samples"][0]
+        sample_doc = call(f"app/samples/{sample['id']}")["documents"][0]
+        assert len(sample_doc["sequence"]) > 1000, len(sample_doc["sequence"])
+        detected = call("features/detect", {"sequenceData": sample_doc})
+        assert detected["catalogue_size"] >= 20 and detected["features"], detected.get("catalogue_size")
         saved_files = work / "saved"
         saved_files.mkdir()
         checked = round_trips(saved_files)
         print("smoke test passed: server up, .dna parsed (3941 bp, 9 features), UI served, "
-              f"restriction cloning and Tm work, {checked} open-and-save round trips "
+              f"restriction cloning, Tm, primer design, alignment, samples and feature detection "
+              f"work, {checked} open-and-save round trips "
               f"({len(EXCHANGE)} formats x GenBank/FASTA/.dna)")
         return 0
     finally:

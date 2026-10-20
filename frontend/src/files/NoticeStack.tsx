@@ -14,18 +14,18 @@ function NoticeItem({ notice, onDismiss }: { notice: Notice; onDismiss: (id: num
 
   return (
     <div
-      className={`vt-notice vt-notice-${kind}`}
+      className={`vt-toast vt-toast-${kind}`}
       role={kind === "info" ? "status" : "alert"}
       data-testid="notice"
       data-kind={kind}
     >
-      <span className="vt-notice-label">{LABEL[kind]}</span>
-      <span className="vt-notice-text">
+      <span className="vt-toast-label">{LABEL[kind]}</span>
+      <span className="vt-toast-text">
         {notice.text}
-        {notice.count > 1 && <span className="vt-notice-count"> (×{notice.count})</span>}
+        {notice.count > 1 && <span className="vt-toast-count"> (×{notice.count})</span>}
       </span>
       <button
-        className="vt-notice-close"
+        className="vt-toast-close"
         aria-label="Dismiss this message"
         title="Dismiss"
         data-testid="notice-dismiss"
@@ -48,9 +48,9 @@ export default function NoticeStack(props: {
 }) {
   if (!props.notices.length) return null;
   return (
-    <div className="vt-notices" data-testid="notices">
+    <div className="vt-toasts" data-testid="notices">
       {props.notices.length > 1 && (
-        <button className="vt-notices-clear" data-testid="notice-dismiss-all" onClick={props.onDismissAll}>
+        <button className="vt-toasts-clear" data-testid="notice-dismiss-all" onClick={props.onDismissAll}>
           Dismiss all
         </button>
       )}

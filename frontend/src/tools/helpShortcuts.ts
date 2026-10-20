@@ -1,7 +1,8 @@
 // The keyboard shortcuts Help → Keyboard Shortcuts lists.
 //
 // Only shortcuts that are really bound in the running app are listed here:
-// - Ctrl+O / Ctrl+N / Ctrl+W and Ctrl+1 … Ctrl+6 are bound by Vettore itself (App.tsx);
+// - Ctrl+O / Ctrl+N / Ctrl+W, Ctrl+Shift+V, Ctrl+Shift+G and Ctrl+1 … Ctrl+6 are bound by
+//   Vettore itself (App.tsx);
 // - the rest are Open Vector Editor commands, read from the editor's own hotkey registry
 //   (Help → View Editor Hotkeys) and checked in the running app (e2e/help.spec.ts).
 // A shortcut the menus advertise but nothing binds must not be added here.
@@ -22,10 +23,12 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
     shortcuts: [
       { keys: "Ctrl+O", what: "Open a sequence file" },
       { keys: "Ctrl+N", what: "New DNA file" },
+      { keys: "Ctrl+Shift+V", what: "New file from a sequence you copied" },
       { keys: "Ctrl+S", what: "Save (GenBank)" },
       { keys: "Ctrl+Shift+S", what: "Save As…" },
       { keys: "Ctrl+P", what: "Print the current view" },
       { keys: "Ctrl+W", what: "Close the open document" },
+      { keys: "Ctrl+Shift+G", what: "Simulate an agarose gel" },
     ],
   },
   {

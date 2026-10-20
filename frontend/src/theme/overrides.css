@@ -47,6 +47,13 @@
   background: var(--vt-surface-subtle);
   border-radius: var(--vt-radius-lg);
   box-shadow: var(--vt-shadow-3);
+  /* Every dialog fits the window: the body scrolls, the title and the buttons stay on screen
+     (Blueprint's container adds a 30px margin above and below). */
+  max-height: calc(100vh - 60px);
+}
+:root .bp3-dialog > .bp3-dialog-body {
+  min-height: 0;
+  overflow: auto;
 }
 :root .bp3-dialog-header {
   border-radius: var(--vt-radius-lg) var(--vt-radius-lg) 0 0;

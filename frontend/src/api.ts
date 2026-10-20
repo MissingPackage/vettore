@@ -48,6 +48,8 @@ export interface Sample {
   id: string;
   label: string;
   description: string;
+  /** GenBank accession.version of the record the sample comes from. */
+  accession?: string;
 }
 
 interface DesktopApi {

@@ -519,6 +519,9 @@ export default function App() {
       } else if (key === "n" && !e.shiftKey) {
         e.preventDefault();
         setNewOpen(true);
+      } else if (key === "g" && e.shiftKey && activeDoc) {
+        e.preventDefault();
+        setGelOpen(true);
       } else if (key === "w" && activeDoc) {
         e.preventDefault();
         closeDoc(activeDoc);
@@ -728,6 +731,7 @@ export default function App() {
           <>
           {docTabs}
           <Welcome recent={recent} onOpen={openFiles} onNew={() => setNewOpen(true)} onRecent={openPath}
+                   onPaste={newFromClipboard}
                    onSample={openSample} />
           </>
         )}

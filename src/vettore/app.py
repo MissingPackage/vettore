@@ -217,7 +217,11 @@ def main(argv: list[str] | None = None) -> None:
             storage.mkdir(parents=True, exist_ok=True)
             # On Linux the bundled Qt WebEngine is used (GTK bindings are not shipped).
             gui = "qt" if sys.platform.startswith("linux") else None
-            webview.start(gui=gui, private_mode=False, storage_path=str(storage))
+            # The window icon option is honoured by the Qt backend only; on Windows the window
+            # takes the executable's icon (packaging/vettore.spec).
+            static = static_dir()
+            icon = str(static / "vettore.png") if gui == "qt" and static else None
+            webview.start(gui=gui, private_mode=False, storage_path=str(storage), icon=icon)
             return
         except Exception:  # no GUI backend available: fall back to the browser
             log.exception("Native window unavailable, opening the system browser")

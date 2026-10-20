@@ -119,7 +119,7 @@ test.describe("when the system refuses the clipboard", () => {
     await open.click();
     await expect(dialog).toBeHidden();
     await expect(page.locator(".vt-doctab.active")).toContainText("MT612431");
-    await expect(page.getByTestId("status-line")).toContainText("7204 bp · circular");
+    await expect(page.getByTestId("status-line")).toContainText("7,204 bp · circular");
   });
 
   test("a plain sequence pasted in the box takes the name and topology chosen", async ({ page }) => {

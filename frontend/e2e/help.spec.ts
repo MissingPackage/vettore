@@ -25,10 +25,14 @@ test("the shortcut list is in the Help menu, and the shortcuts it lists work",
     for (const keys of ["Ctrl+O", "Ctrl+2", "Ctrl+F", "Ctrl+Z", "Ctrl+Shift+D"]) {
       await expect(dialog.getByText(keys, { exact: true })).toBeVisible();
     }
-    // A shortcut that nothing binds must not be advertised.
-    await expect(dialog).not.toContainText("Ctrl+Shift+G");
+    await expect(dialog.getByText("Ctrl+Shift+G", { exact: true })).toBeVisible();
     await page.screenshot({ path: "test-results/shortcuts.png" });
     await page.keyboard.press("Escape");
+
+    await page.keyboard.press("Control+Shift+G");
+    await expect(page.getByTestId("gel-dialog")).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(page.getByTestId("gel-dialog")).toBeHidden();
 
     // Spot-check three of the listed shortcuts in the running app.
     await page.keyboard.press("Control+2");

@@ -208,7 +208,7 @@ for (const size of SIZES) {
       await page.getByTestId("file-input").setInputFiles({
         name: "broken.gb", mimeType: "text/plain", buffer: Buffer.from("not a sequence file"),
       });
-      await expect(page.locator(".vt-error")).toBeVisible();
+      await expect(page.locator(".vt-toast-error")).toBeVisible();
       await shot(page, "11-open-error");
     });
 
