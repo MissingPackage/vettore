@@ -17,8 +17,10 @@ test("detect common features on a real AAV plasmid and add them to the map", asy
   await expect(page.locator(".veCircularView")).toBeVisible();
 
   await menu(page, "Features", "Detect Common Features…");
+  await expect(page.getByTestId("detect-busy")).toBeVisible();
   const table = page.getByTestId("detect-table");
   await expect(table).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId("detect-identity")).toHaveValue("95");
   for (const name of ["SaCas9", "U6 promoter", "AmpR", "AAV2 ITR (truncated)", "ori"]) {
     await expect(table).toContainText(name);
   }

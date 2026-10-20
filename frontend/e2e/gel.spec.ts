@@ -19,6 +19,7 @@ test("simulate an agarose gel of a digest and of the uncut plasmid", async ({ pa
   await menu(page, "Tools", "Simulate Agarose Gel…");
   const dialog = page.getByTestId("gel-dialog");
   await expect(dialog).toBeVisible();
+  await expect(dialog).toContainText("Leave a lane without enzymes");
   await dialog.getByTestId("gel-doc-0").selectOption({ index: 1 });
   await expect(page.getByTestId("gel-image")).toBeVisible();
   // Uncut circular plasmid: one supercoiled band.

@@ -4,6 +4,7 @@ import { Button, Classes } from "@blueprintjs/core";
 import { actions } from "@teselagen/ove";
 import { api, type OveAnnotation, type SequenceData } from "./api";
 import { store } from "./store";
+import { IDENTITY_CHOICES, loadPreferences } from "./preferences";
 import type { OpenDoc } from "./cloning/types";
 
 const { Dialog, Callout } = Blueprint as unknown as Record<string, React.ComponentType<any>>;
@@ -45,21 +46,26 @@ export default function DetectFeaturesDialog(props: { doc: OpenDoc; onClose: () 
   const [error, setError] = useState<string | null>(null);
   const [chosen, setChosen] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(true);
+  // The threshold from Preferences is the starting point; it can be loosened here for one run.
+  const [minIdentity, setMinIdentity] = useState(loadPreferences().detectMinIdentity);
   const data = props.doc.data();
 
   const key = (f: Detected) => `${f.name}@${f.start}`;
 
   useEffect(() => {
+    setBusy(true);
+    setError(null);
     api
-      .detectFeatures<DetectResult>({ sequenceData: data })
+      .detectFeatures<DetectResult>({ sequenceData: data, min_identity: minIdentity })
       .then((payload) => {
         setResult(payload);
+        // Everything not annotated yet is ticked: one click adds the useful result.
         setChosen(new Set(payload.features.filter((f) => f.isNew).map(key)));
       })
       .catch((e) => setError(String((e as Error).message)))
       .finally(() => setBusy(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [minIdentity]);
 
   const selected = useMemo(
     () => (result?.features ?? []).filter((f) => chosen.has(key(f))),
@@ -104,11 +110,41 @@ export default function DetectFeaturesDialog(props: { doc: OpenDoc; onClose: () 
   return (
     <Dialog isOpen onClose={props.onClose} title="Detect Common Features" style={{ width: 920 }}>
       <div className={Classes.DIALOG_BODY} data-testid="detect-dialog">
-        {busy && <p className="vt-muted">Searching…</p>}
-        {error && <Callout intent="danger" title="Could not search">{error}</Callout>}
-        {result && result.features.length === 0 && (
-          <Callout intent="primary">
-            No feature from the catalogue was found in {props.doc.name}.
+        <div
+          className="vt-row"
+          style={{ alignItems: "flex-start", justifyContent: "space-between",
+                   gap: "var(--vt-space-4)" }}
+        >
+          <p className="vt-muted">
+            Searches both strands for the elements AAV and everyday cloning work use: ITRs,
+            promoters, WPRE, polyA signals, markers, origins, fluorescent proteins, tags,
+            lox/FRT sites and Cas9. Tick what you want and it is added to the map.
+          </p>
+          <label style={{ whiteSpace: "nowrap" }} title="How close a match has to be to count">
+            Minimum identity&nbsp;
+            <div className="bp3-html-select bp3-small">
+              <select
+                data-testid="detect-identity"
+                value={minIdentity}
+                disabled={busy}
+                onChange={(e) => setMinIdentity(Number(e.target.value))}
+              >
+                {IDENTITY_CHOICES.map((p) => <option key={p} value={p}>{p} %</option>)}
+              </select>
+            </div>
+          </label>
+        </div>
+        {busy && <p className="vt-muted" data-testid="detect-busy">Searching the sequence…</p>}
+        {error && (
+          <Callout intent="danger" title="Could not search">
+            {error}. Try again, or lower the minimum identity above.
+          </Callout>
+        )}
+        {result && !busy && result.features.length === 0 && (
+          <Callout intent="primary" data-testid="detect-empty">
+            Nothing from the catalogue of {result.catalogue_size} elements was found in{" "}
+            <b>{props.doc.name}</b> at {minIdentity} % identity. Lower the threshold above to
+            catch variants, or annotate the region by hand with Features → Add Feature…
           </Callout>
         )}
         {result && result.features.length > 0 && (

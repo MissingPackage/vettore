@@ -58,24 +58,35 @@ export default function EnzymesView({ editorName, set }: { editorName: string; s
       <div className="vt-table-toolbar">
         <input
           className="bp3-input"
-          placeholder="Find enzymes"
+          placeholder="Find an enzyme by name"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           data-testid="enzyme-search"
+          title="Type a name, for example BamHI"
         />
         <span className="vt-muted">
-          {rows.length} enzymes in “{setLabel}” cut this sequence
+          {rows.length === 0
+            ? `No enzyme of “${setLabel}” cuts this sequence`
+            : `${rows.length} enzyme${rows.length === 1 ? "" : "s"} of “${setLabel}” cut this `
+              + `sequence${query.trim() && shown.length !== rows.length
+                ? `, ${shown.length} shown` : ""}`}
+          . Click a position to select that site.
         </span>
       </div>
       <table className="bp3-html-table bp3-html-table-condensed bp3-interactive vt-table">
         <thead>
           <tr>
             {header("name", "Enzyme")}
-            <th>Recognition site</th>
+            <th title="5′→3′ on the top strand">Recognition site</th>
             {header("sites", "Sites")}
             {header("location", "Location(s)")}
-            <th>Ends</th>
-            <th>Methylation</th>
+            <th title="What the cut leaves: blunt ends, or an overhang of so many bases">
+              Ends
+            </th>
+            <th title="Dam (GATC) or Dcm (CCWGG) methylation inside the site, in the usual
+                       cloning strains">
+              Methylation
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -121,7 +132,16 @@ export default function EnzymesView({ editorName, set }: { editorName: string; s
           ))}
         </tbody>
       </table>
-      {!shown.length && <p className="vt-muted">No enzymes of this set cut the sequence.</p>}
+      {!shown.length && (
+        <p className="vt-muted" data-testid="enzymes-empty">
+          {query.trim()
+            ? `No enzyme in “${setLabel}” matches “${query.trim()}”. It may cut more often than `
+              + "this set allows: try another set in the box at the top right, or Enzymes → "
+              + "Choose Enzymes… for the full list."
+            : `No enzyme of “${setLabel}” cuts this sequence. Pick a wider set in the box at `
+              + "the top right (Unique & Dual Cutters, or Nonredundant Commercial)."}
+        </p>
+      )}
       {Object.keys(methylation).length > 0 && (
         <p className="vt-muted" data-testid="methylation-note">
           A base methylated by Dam (GATC) or Dcm (CCWGG) in the usual cloning strains lies

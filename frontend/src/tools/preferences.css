@@ -1,0 +1,14 @@
+/* File → Preferences. Colours and spacing come from theme/tokens.css. */
+.vt-preferences {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vt-space-4);
+}
+
+.vt-preferences > p {
+  margin: 0;
+}
+
+.vt-preferences .vt-field-hint {
+  color: var(--vt-text-muted);
+}
