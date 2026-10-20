@@ -1,0 +1,94 @@
+LOCUS       AY530579                2211 bp    DNA     linear   VRL 24-JUN-2004
+DEFINITION  Adeno-associated virus 9 isolate hu.14 capsid protein VP1 (cap)
+            gene, complete cds.
+ACCESSION   AY530579
+VERSION     AY530579.1
+KEYWORDS    .
+SOURCE      Adeno-associated virus 9
+  ORGANISM  Adeno-associated virus 9
+            Viruses; Floreoviria; Shotokuvirae; Cossaviricota; Quintoviricetes;
+            Piccovirales; Parvoviridae; Parvovirinae; Dependoparvovirus;
+            Dependoparvovirus primate1.
+REFERENCE   1  (bases 1 to 2211)
+  AUTHORS   Gao,G., Vandenberghe,L.H., Alvira,M.R., Lu,Y., Calcedo,R., Zhou,X.
+            and Wilson,J.M.
+  TITLE     Clades of Adeno-associated viruses are widely disseminated in human
+            tissues
+  JOURNAL   J. Virol. 78 (12), 6381-6388 (2004)
+   PUBMED   15163731
+REFERENCE   2  (bases 1 to 2211)
+  AUTHORS   Gao,G., Vandenberghe,L.H., Alvira,M.R., Lu,Y., Calcedo,R., Zhou,X.
+            and Wilson,J.M.
+  TITLE     Direct Submission
+  JOURNAL   Submitted (20-JAN-2004) Gene Therapy Program, Division of Medical
+            Genetics, Department of Medicine, University of Pennsylvania, 3601
+            Spruce Street, Wistar Institute, Philadelphia, PA 19104, USA
+FEATURES             Location/Qualifiers
+     source          1..2211
+                     /organism="Adeno-associated virus 9"
+                     /mol_type="genomic DNA"
+                     /isolate="hu.14"
+                     /isolation_source="human tissue"
+                     /db_xref="taxon:235455"
+                     /geo_loc_name="USA"
+                     /note="clade F"
+     gene            1..2211
+                     /gene="cap"
+     CDS             1..2211
+                     /gene="cap"
+                     /codon_start=1
+                     /product="capsid protein VP1"
+                     /protein_id="AAS99264.1"
+                     /translation="MAADGYLPDWLEDNLSEGIREWWALKPGAPQPKANQQHQDNARG
+                     LVLPGYKYLGPGNGLDKGEPVNAADAAALEHDKAYDQQLKAGDNPYLKYNHADAEFQE
+                     RLKEDTSFGGNLGRAVFQAKKRLLEPLGLVEEAAKTAPGKKRPVEQSPQEPDSSAGIG
+                     KSGAQPAKKRLNFGQTGDTESVPDPQPIGEPPAAPSGVGSLTMASGGGAPVADNNEGA
+                     DGVGSSSGNWHCDSQWLGDRVITTSTRTWALPTYNNHLYKQISNSTSGGSSNDNAYFG
+                     YSTPWGYFDFNRFHCHFSPRDWQRLINNNWGFRPKRLNFKLFNIQVKEVTDNNGVKTI
+                     ANNLTSTVQVFTDSDYQLPYVLGSAHEGCLPPFPADVFMIPQYGYLTLNDGSQAVGRS
+                     SFYCLEYFPSQMLRTGNNFQFSYEFENVPFHSSYAHSQSLDRLMNPLIDQYLYYLSKT
+                     INGSGQNQQTLKFSVAGPSNMAVQGRNYIPGPSYRQQRVSTTVTQNNNSEFAWPGASS
+                     WALNGRNSLMNPGPAMASHKEGEDRFFPLSGSLIFGKQGTGRDNVDADKVMITNEEEI
+                     KTTNPVATESYGQVATNHQSAQAQAQTGWVQNQGILPGMVWQDRDVYLQGPIWAKIPH
+                     TDGNFHPSPLMGGFGMKHPPPQILIKNTPVPADPPTAFNKDKLNSFITQYSTGQVSVE
+                     IEWELQKENSKRWNPEIQYTSNYYKSNNVEFAVNTEGVYSEPRPIGTRYLTRNL"
+ORIGIN      
+        1 atggctgccg atggttatct tccagattgg ctcgaggaca accttagtga aggaattcgc
+       61 gagtggtggg ctttgaaacc tggagcccct caacccaagg caaatcaaca acatcaagac
+      121 aacgctcgag gtcttgtgct tccgggttac aaataccttg gacccggcaa cggactcgac
+      181 aagggggagc cggtcaacgc agcagacgcg gcggccctcg agcacgacaa ggcctacgac
+      241 cagcagctca aggccggaga caacccgtac ctcaagtaca accacgccga cgccgagttc
+      301 caggagcggc tcaaagaaga tacgtctttt gggggcaacc tcgggcgagc agtcttccag
+      361 gccaaaaaga ggcttcttga acctcttggt ctggttgagg aagcggctaa gacggctcct
+      421 ggaaagaaga ggcctgtaga gcagtctcct caggaaccgg actcctccgc gggtattggc
+      481 aaatcgggtg cacagcccgc taaaaagaga ctcaatttcg gtcagactgg cgacacagag
+      541 tcagtcccag accctcaacc aatcggagaa cctcccgcag ccccctcagg tgtgggatct
+      601 cttacaatgg cttcaggtgg tggcgcacca gtggcagaca ataacgaagg tgccgatgga
+      661 gtgggtagtt cctcgggaaa ttggcattgc gattcccaat ggctggggga cagagtcatc
+      721 accaccagca cccgaacctg ggccctgccc acctacaaca atcacctcta caagcaaatc
+      781 tccaacagca catctggagg atcttcaaat gacaacgcct acttcggcta cagcaccccc
+      841 tgggggtatt ttgacttcaa cagattccac tgccacttct caccacgtga ctggcagcga
+      901 ctcatcaaca acaactgggg attccggcct aagcgactca acttcaagct cttcaacatt
+      961 caggtcaaag aggttacgga caacaatgga gtcaagacca tcgccaataa ccttaccagc
+     1021 acggtccagg tcttcacgga ctcagactat cagctcccgt acgtgctcgg gtcggctcac
+     1081 gagggctgcc tcccgccgtt cccagcggac gttttcatga ttcctcagta cgggtatctg
+     1141 acgcttaatg atggaagcca ggccgtgggt cgttcgtcct tttactgcct ggaatatttc
+     1201 ccgtcgcaaa tgctaagaac gggtaacaac ttccagttca gctacgagtt tgagaacgta
+     1261 cctttccata gcagctacgc tcacagccaa agcctggacc gactaatgaa tccactcatc
+     1321 gaccaatact tgtactatct ctcaaagact attaacggtt ctggacagaa tcaacaaacg
+     1381 ctaaaattca gtgtggccgg acccagcaac atggctgtcc agggaagaaa ctacatacct
+     1441 ggacccagct accgacaaca acgtgtctca accactgtga ctcaaaacaa caacagcgaa
+     1501 tttgcttggc ctggagcttc ttcttgggct ctcaatggac gtaatagctt gatgaatcct
+     1561 ggacctgcta tggccagcca caaagaagga gaggaccgtt tctttccttt gtctggatct
+     1621 ttaatttttg gcaaacaagg aactggaaga gacaacgtgg atgcggacaa agtcatgata
+     1681 accaacgaag aagaaattaa aactactaac ccggtagcaa cggagtccta tggacaagtg
+     1741 gccacaaacc accagagtgc ccaagcacag gcgcagaccg gctgggttca aaaccaagga
+     1801 atacttccgg gtatggtttg gcaggacaga gatgtgtacc tgcaaggacc catttgggcc
+     1861 aaaattcctc acacggacgg caactttcac ccttctccgc tgatgggagg gtttggaatg
+     1921 aagcacccgc ctcctcagat cctcatcaaa aacacacctg tacctgcgga tcctccaacg
+     1981 gccttcaaca aggacaagct gaactctttc atcacccagt attctactgg ccaagtcagc
+     2041 gtggagatcg agtgggagct gcagaaggaa aacagcaagc gctggaaccc ggagatccag
+     2101 tacacttcca actattacaa gtctaataat gttgaatttg ctgttaatac tgaaggtgta
+     2161 tatagtgaac cccgccccat tggcaccaga tacctgactc gtaatctgta a
+//
+

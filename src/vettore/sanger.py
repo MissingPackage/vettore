@@ -250,12 +250,13 @@ def align_trace(reference: str, circular: bool, trace: Trace, cutoff: float = DE
                        offset=t_start)
 
 
-def _columns(aligned: AlignedRead, length: int) -> tuple[dict[int, str], dict[int, str]]:
+def _columns(reference_gapped: str, read_gapped: str, offset: int,
+             length: int) -> tuple[dict[int, str], dict[int, str]]:
     """Per reference position: the read base aligned to it, and any bases inserted before it."""
     bases: dict[int, str] = {}
     inserts: dict[int, str] = {}
-    position = aligned.offset
-    for ref_base, read_base in zip(aligned.reference_gapped, aligned.read_gapped):
+    position = offset
+    for ref_base, read_base in zip(reference_gapped, read_gapped):
         if ref_base == "-":
             key = position % length
             inserts[key] = inserts.get(key, "") + read_base
@@ -268,10 +269,18 @@ def _columns(aligned: AlignedRead, length: int) -> tuple[dict[int, str], dict[in
 def merge_tracks(reference: str, reads: list[AlignedRead]) -> tuple[str, list[str]]:
     """Put the reference and every read on one coordinate system: an insertion found in any
     read opens a column in all tracks, so the reads can be stacked under the reference."""
+    return merge_gapped(reference, [(r.reference_gapped, r.read_gapped, r.offset) for r in reads])
+
+
+def merge_gapped(reference: str,
+                 alignments: list[tuple[str, str, int]]) -> tuple[str, list[str]]:
+    """``merge_tracks`` for any pairwise alignment to the reference, each given as
+    (gapped reference span, gapped other sequence, first reference position of the span).
+    Spans may run past the end of a circular reference; positions wrap around the origin."""
     length = len(reference)
-    columns = [_columns(read, length) for read in reads]
+    columns = [_columns(ref, other, offset, length) for ref, other, offset in alignments]
     reference_gapped: list[str] = []
-    tracks: list[list[str]] = [[] for _ in reads]
+    tracks: list[list[str]] = [[] for _ in alignments]
     for position in range(length):
         width = max((len(inserts.get(position, "")) for _, inserts in columns), default=0)
         if width:
