@@ -10,12 +10,20 @@ from Bio.Seq import Seq
 from fastapi import APIRouter
 from pydantic import BaseModel
 from pydna.amplify import Anneal
-from pydna.dseqrecord import Dseqrecord
 from pydna.design import primer_design
+from pydna.dseqrecord import Dseqrecord
 from pydna.primer import Primer
 
 from ..tm import primer_tm
-from .base import CloningError, CloningResult, Oligo, Product, SequenceDoc, from_dseqrecord, to_dseqrecord
+from .base import (
+    CloningError,
+    CloningResult,
+    Oligo,
+    Product,
+    SequenceDoc,
+    from_dseqrecord,
+    to_dseqrecord,
+)
 from .regions import annotate, check_region, features_in_region, region_length, region_sequence
 
 router = APIRouter()
