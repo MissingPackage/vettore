@@ -1,7 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSelector } from "react-redux";
 import { Editor } from "@teselagen/ove";
-import { api, EngineError, whenDesktopReady, type OpenResult, type SaveResult, type SequenceData } from "./api";
+import {
+  api,
+  EngineError,
+  whenDesktopReady,
+  type OpenResult,
+  type Sample,
+  type SaveResult,
+  type SequenceData,
+} from "./api";
 import {
   baseName,
   canSaveInPlace,
@@ -15,7 +23,7 @@ import {
   uniqueName,
   type Doc,
 } from "./documents";
-import { buildMenu } from "./menu";
+import { buildMenu, type MenuHandlers } from "./menu";
 import NewSequenceDialog, { type NewSequence } from "./NewSequenceDialog";
 import CloningDialog from "./cloning/CloningDialog";
 import GelDialog from "./GelDialog";
@@ -101,6 +109,7 @@ export default function App() {
   const [detectOpen, setDetectOpen] = useState(false);
   const [toolId, setToolId] = useState<string | null>(null);
   const [recent, setRecent] = useState<string[]>([]);
+  const [samples, setSamples] = useState<Sample[]>([]);
   const fileInput = useRef<HTMLInputElement>(null);
   const height = useWindowHeight();
   const docsRef = useRef(docs);
@@ -267,6 +276,7 @@ export default function App() {
 
   useEffect(() => {
     refreshRecent();
+    api.samples().then((r) => setSamples(r.samples)).catch(report);
     api
       .startupFiles()
       .then(({ results, errors }) => {
@@ -591,6 +601,23 @@ export default function App() {
     return () => window.removeEventListener("keydown", onKey);
   }, [activeDoc, closeDoc, newFromClipboard, openFiles, selectView]);
 
+  // ---- one PCR tool -----------------------------------------------------------------------
+  // The Primers view's "Simulate PCR" button opened the editor's own PCR panel, a second PCR
+  // tool beside Actions → PCR… that replaced the primer list while the Primers tab stayed
+  // selected. It opens Vettore's PCR dialog instead (captured before the editor sees the click).
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      const button = (e.target as Element | null)?.closest?.(".ve-propertiesPanel button");
+      if (!button || button.textContent?.trim() !== "Simulate PCR") return;
+      e.preventDefault();
+      e.stopPropagation();
+      const pcr = actionById("pcr");
+      if (pcr) setCloning(pcr);
+    };
+    document.addEventListener("click", onClick, true);
+    return () => document.removeEventListener("click", onClick, true);
+  }, []);
+
   // ---- paste on the start screen: Ctrl+V with no document open opens what was copied -----
   useEffect(() => {
     if (docs.length) return;
@@ -620,7 +647,9 @@ export default function App() {
   );
 
   // ---- menu ------------------------------------------------------------------------------
-  const handlers = useRef({
+  // Read by the menu through the ref, so the menu always calls the current callbacks.
+  const handlers = useRef<MenuHandlers>(null as unknown as MenuHandlers);
+  handlers.current = {
     newFile: () => setNewOpen(true),
     newFromClipboard,
     open: openFiles,
@@ -641,34 +670,13 @@ export default function App() {
     sanger: () => setSangerOpen(true),
     detectFeatures: () => setDetectOpen(true),
     tool: (id: string) => setToolId(id),
-    recent: [] as string[],
-    hasDocument: false,
-  });
-  Object.assign(handlers.current, {
-    newFromClipboard,
-    open: openFiles,
-    openRecent: openPath,
-    close: () => activeDoc && closeDoc(activeDoc),
-    save: () => activeDoc && saveDoc(activeDoc, false),
-    saveAs: () => activeDoc && saveDoc(activeDoc, true),
-    exportGenbank: () => activeDoc && exportAs(activeDoc, "genbank"),
-    exportFasta: () => activeDoc && exportAs(activeDoc, "fasta"),
-    exportDna: () => activeDoc && exportAs(activeDoc, "dna"),
-    copyAsFasta,
-    exportSvg: () => activeDoc && exportImage(activeDoc, "svg"),
-    exportPng: () => activeDoc && exportImage(activeDoc, "png"),
-    view: selectView,
-    useEnzymeSet,
-    cloning: (id: string) => setCloning(actionById(id)),
-    gel: () => setGelOpen(true),
-    sanger: () => setSangerOpen(true),
-    detectFeatures: () => setDetectOpen(true),
-    tool: (id: string) => setToolId(id),
+    openSample,
     recent,
+    samples,
     hasDocument: !!activeDoc,
-  });
+  };
   // menuFilter must be stable (OVE memoizes on it); handlers are read through the ref.
-  const menuFilter = useMemo(() => buildMenu(handlers), [recent, !!activeDoc]); // eslint-disable-line react-hooks/exhaustive-deps
+  const menuFilter = useMemo(() => buildMenu(handlers), [recent, samples, !!activeDoc]); // eslint-disable-line react-hooks/exhaustive-deps
   const contextMenus = useMemo(() => rightClickOverrides(() => handlers.current.copyAsFasta()), []);
 
   const onSave = useCallback(
@@ -799,9 +807,8 @@ export default function App() {
         ) : (
           <>
           {docTabs}
-          <Welcome recent={recent} onOpen={openFiles} onNew={() => setNewOpen(true)} onRecent={openPath}
-                   onPaste={newFromClipboard}
-                   onSample={openSample} onError={report} />
+          <Welcome recent={recent} samples={samples} onOpen={openFiles} onNew={() => setNewOpen(true)}
+                   onRecent={openPath} onPaste={newFromClipboard} onSample={openSample} />
           </>
         )}
       </div>

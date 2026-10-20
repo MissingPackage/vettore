@@ -34,6 +34,29 @@
 :root .bp3-menu > .bp3-popover-wrapper > .bp3-popover-target {
   display: block;
 }
+/* The editor's menus draw Ctrl, Shift and Alt as ^, ⇧ and ⌥ icons, which Windows and Linux
+   users do not read. Off a Mac (main.tsx sets data-platform) they are written out, as on the
+   welcome screen and in Help: Ctrl+Shift+S. ::after, because Blueprint clears ::before on icons. */
+:root[data-platform="pc"] .bp3-menu .bp3-key-combo > .bp3-icon-key-control > svg,
+:root[data-platform="pc"] .bp3-menu .bp3-key-combo > .bp3-icon-key-shift > svg,
+:root[data-platform="pc"] .bp3-menu .bp3-key-combo > .bp3-icon-key-option > svg {
+  display: none;
+}
+:root[data-platform="pc"] .bp3-menu .bp3-key-combo > .bp3-icon-key-control,
+:root[data-platform="pc"] .bp3-menu .bp3-key-combo > .bp3-icon-key-shift,
+:root[data-platform="pc"] .bp3-menu .bp3-key-combo > .bp3-icon-key-option {
+  margin-right: 0;
+  vertical-align: baseline;
+}
+:root[data-platform="pc"] .bp3-menu .bp3-key-combo > .bp3-icon-key-control::after {
+  content: "Ctrl+";
+}
+:root[data-platform="pc"] .bp3-menu .bp3-key-combo > .bp3-icon-key-shift::after {
+  content: "Shift+";
+}
+:root[data-platform="pc"] .bp3-menu .bp3-key-combo > .bp3-icon-key-option::after {
+  content: "Alt+";
+}
 
 /* ---- links out of the app ---------------------------------------------------------------- */
 /* The digest tool links to the editor component's online documentation. Vettore runs offline,

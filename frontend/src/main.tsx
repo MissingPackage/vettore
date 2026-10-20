@@ -8,6 +8,10 @@ import "./app.css";
 import { store } from "./store";
 import App from "./App";
 
+// Menus write shortcuts out as Ctrl+Shift+S except on a Mac, which has its own key symbols
+// (theme/overrides.css).
+document.documentElement.dataset.platform = /Mac|iPhone|iPad/.test(navigator.platform) ? "mac" : "pc";
+
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <Provider store={store}>

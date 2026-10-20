@@ -20,10 +20,11 @@ test("new DNA file, edit, unsaved marker, save as GenBank download", async ({ pa
   await page.getByTestId("new-seq-create").click();
   await expect(page.locator(".vt-doctab.active")).toContainText("test-insert");
   await expect(page.getByTestId("status-line")).toContainText("33 bp · linear");
-  await expect(page.locator(".vt-doctab.active")).not.toContainText("•");
+  // A new file exists only in Vettore until it is saved: unsaved from the start.
+  await expect(page.locator(".vt-doctab.active")).toContainText("• test-insert");
 
   await menu(page, "Actions", "Reverse Complement Entire Sequence");
-  await expect(page.locator(".vt-doctab.active")).toContainText("•");
+  await expect(page.locator(".vt-doctab.active")).toContainText("• test-insert");
 
   const download = page.waitForEvent("download");
   await menu(page, "File", "Save");
