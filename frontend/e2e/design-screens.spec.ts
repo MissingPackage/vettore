@@ -331,3 +331,16 @@ for (const size of SIZES) {
     });
   });
 }
+
+test("the app icon is served next to the page", async ({ page, request }) => {
+  await page.goto(`/?token=${TOKEN}`);
+  const href = await page.locator('link[rel="icon"][type="image/svg+xml"]').getAttribute("href");
+  expect(href).toBe("/favicon.svg");
+  const svg = await request.get(href!);
+  expect(svg.status()).toBe(200);
+  expect(await svg.text()).toContain("<svg");
+  const ico = await request.get("/vettore.ico");
+  expect(ico.status()).toBe(200);
+  // ICO header: reserved 0, type 1 (icon).
+  expect([...(await ico.body()).subarray(0, 4)]).toEqual([0, 0, 1, 0]);
+});
