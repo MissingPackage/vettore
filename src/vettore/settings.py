@@ -15,6 +15,11 @@ def home() -> Path:
     return path
 
 
+def log_path() -> Path:
+    """Where the app writes its log: ~/.vettore/vettore.log, or under $VETTORE_HOME."""
+    return home() / "vettore.log"
+
+
 def _recent_file() -> Path:
     return home() / "recent.json"
 

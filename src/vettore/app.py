@@ -1,8 +1,14 @@
-"""Desktop entry point: starts the local API server and opens the UI in a native window."""
+"""Desktop entry point: starts the local API server and opens the UI in a native window.
+
+A start with a copy of Vettore already running hands its files to that copy and exits
+(``desktop.instance``). That decision comes first and needs none of the biology engine, so the
+engine (``server``, ``fileio``, uvicorn) is imported only once this process is going to run.
+"""
 
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import logging
 import os
@@ -16,19 +22,14 @@ import webbrowser
 from pathlib import Path
 from typing import Any
 
-import uvicorn
-
-from . import app_info, fileio, settings
-from .server import TOKEN_HEADER, create_app
+from . import settings
+from .desktop import close_guard, instance
+from .desktop.window import WindowPresence
 
 log = logging.getLogger("vettore")
 
-# Open dialog: every extension the engine reads (it also recognises files by their content, so
-# "All files" opens files with a wrong or missing extension). "*" matches names without a dot.
-FILE_TYPES = (
-    "Sequence files (" + ";".join(f"*{ext}" for ext in fileio.FORMATS) + ")",
-    "All files (*.*;*)",
-)
+TITLE = "Vettore"
+
 # Save dialog filters per kind of file; the engine picks the format from the extension.
 SAVE_TYPES = {
     "genbank": "GenBank (*.gb;*.gbk)",
@@ -41,6 +42,18 @@ SEQUENCE_KINDS = ("genbank", "fasta", "dna")
 
 # Browser event carrying the full paths of files dropped on the native window.
 DROP_EVENT = "vettore:dropped-paths"
+
+
+def file_types() -> tuple[str, ...]:
+    """Open dialog filters: every extension the engine reads (it also recognises files by their
+    content, so "All files" opens files with a wrong or missing extension). "*" matches names
+    without a dot."""
+    from . import fileio
+
+    return (
+        "Sequence files (" + ";".join(f"*{ext}" for ext in fileio.FORMATS) + ")",
+        "All files (*.*;*)",
+    )
 
 
 def save_file_types(kind: str) -> tuple[str, ...]:
@@ -107,8 +120,12 @@ def free_port() -> int:
 
 
 def start_server(port: int, token: str, startup_files: list[Path] | None = None,
-                 on_unsaved=None) -> uvicorn.Server:
-    app = create_app(token, static_dir(), startup_files or [], on_unsaved)
+                 on_unsaved=None, on_hand_over=None):
+    import uvicorn
+
+    from .server import TOKEN_HEADER, create_app
+
+    app = create_app(token, static_dir(), startup_files or [], on_unsaved, on_hand_over)
     # log_config=None: uvicorn's default formatter calls isatty() on streams that do not
     # exist in windowed builds; our own logging setup is used instead.
     config = uvicorn.Config(app, host="127.0.0.1", port=port, log_level="warning",
@@ -135,18 +152,53 @@ class DesktopApi:
         # js_api object to JavaScript; walking the native window object never terminates on
         # Windows (Bounds.Empty.Empty...) and blocks the UI thread.
         self._window = None
+        self._guard: close_guard.CloseGuard | None = None
+        self._presence: WindowPresence | None = None
+        self._unsaved = 0
+
+    def _attach(self, window) -> None:
+        """Called once the native window exists: guard its closing, follow its state."""
+        self._window = window
+        self._guard = close_guard.CloseGuard(window)
+        self._guard.set_unsaved(self._unsaved)
+        window.events.closing += self._guard.on_closing
+        self._presence = WindowPresence(window, TITLE)
 
     def set_unsaved(self, count: int) -> None:
-        # pywebview reads confirm_close when the window is about to close.
-        if self._window is not None:
-            self._window.confirm_close = count > 0
+        """How many documents have unsaved changes (the page reports it through the API)."""
+        self._unsaved = count
+        if self._guard is not None:
+            self._guard.set_unsaved(count)
+
+    def confirm_quit(self) -> None:
+        """The page saved or discarded every unsaved document: close the window."""
+        if self._guard is not None:
+            self._guard.confirm()
+
+    def _handed_over(self) -> None:
+        """A second start handed files over: show the window and tell the page at once
+        (it would also find them at its next look, within half a second)."""
+        window = self._window
+        if window is None:
+            return
+
+        def show() -> None:
+            if self._presence is not None:
+                self._presence.bring_to_front()
+            try:
+                window.run_js(instance.files_script())
+            except Exception:
+                log.debug("Could not tell the page about handed-over files", exc_info=True)
+
+        # Off the server's thread: the page may take a moment to answer.
+        threading.Thread(target=show, name="vettore-hand-over", daemon=True).start()
 
     def open_dialog(self) -> list[str]:
         import webview
 
         paths = self._window.create_file_dialog(
             webview.FileDialog.OPEN, directory=settings.last_folder(), allow_multiple=True,
-            file_types=FILE_TYPES,
+            file_types=file_types(),
         )
         return list(paths or [])
 
@@ -169,7 +221,7 @@ class DesktopApi:
 def _ensure_streams() -> tuple[Path, bool]:
     """Windowed (no-console) builds have no stdout/stderr; send them to the log file. Returns
     the log file and whether stderr now writes to it."""
-    log_path = app_info.log_path()
+    log_path = settings.log_path()
     if sys.stdout is None or sys.stderr is None:
         stream = open(log_path, "a", encoding="utf-8", buffering=1)  # noqa: SIM115
         sys.stdout = sys.stdout or stream
@@ -178,8 +230,7 @@ def _ensure_streams() -> tuple[Path, bool]:
     return log_path, False
 
 
-def main(argv: list[str] | None = None) -> None:
-    log_path, redirected = _ensure_streams()
+def _parse(argv: list[str] | None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(prog="vettore")
     parser.add_argument("--browser", action="store_true",
                         help="open the UI in the system browser instead of a native window")
@@ -187,8 +238,29 @@ def main(argv: list[str] | None = None) -> None:
                         help="only run the server (for tests); prints the URL")
     parser.add_argument("--port", type=int, default=0)
     parser.add_argument("--token", default=None, help=argparse.SUPPRESS)
+    # A server started with --no-window always runs on its own; this makes it the running
+    # copy that later starts hand their files to (used by the tests of that hand-over).
+    parser.add_argument("--single-instance", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("files", nargs="*", help="sequence files to open")
-    args = parser.parse_args(argv)
+    return parser.parse_args(argv)
+
+
+def _hand_over(files: list[Path]) -> bool:
+    """Give the files to a running copy of Vettore; True when it took them."""
+    running = instance.find_live()
+    if running is None:
+        return False
+    if instance.hand_over(running, files):
+        log.info("Handed %d file(s) to the running Vettore (pid %d)", len(files), running.pid)
+        return True
+    log.warning("The running Vettore (pid %d) did not open the files; starting a new window",
+                running.pid)
+    return False
+
+
+def main(argv: list[str] | None = None) -> None:
+    log_path, redirected = _ensure_streams()
+    args = _parse(argv)
 
     # Messages for unexpected problems tell the user the details are in the log file, so it
     # is written whether or not there is a console.
@@ -200,12 +272,28 @@ def main(argv: list[str] | None = None) -> None:
             pass
     logging.basicConfig(level=logging.INFO, handlers=handlers,
                         format="%(asctime)s %(levelname)s %(name)s: %(message)s")
-    token = args.token or secrets.token_urlsafe(24)
-    port = args.port or free_port()
+    files = [Path(f).resolve() for f in args.files]
+    single = args.single_instance or not args.no_window
     api = DesktopApi()
-    start_server(port, token, [Path(f).resolve() for f in args.files], api.set_unsaved)
-    url = f"http://127.0.0.1:{port}/?token={token}"
+    record = None
+    # Starts that overlap (several files opened at once) take turns: the first becomes the
+    # running copy, the next ones find it and hand their files over.
+    with instance.startup_lock() if single else contextlib.nullcontext():
+        if single and _hand_over(files):
+            return
+        token = args.token or secrets.token_urlsafe(24)
+        port = args.port or free_port()
+        start_server(port, token, files, api.set_unsaved, api._handed_over)
+        if single:
+            record = instance.register(port, token)
+    try:
+        _run_ui(api, f"http://127.0.0.1:{port}/?token={token}", args)
+    finally:
+        if record is not None:
+            instance.unregister(record)
 
+
+def _run_ui(api: DesktopApi, url: str, args: argparse.Namespace) -> None:
     if args.no_window:
         print(url, flush=True)
         threading.Event().wait()
@@ -215,12 +303,13 @@ def main(argv: list[str] | None = None) -> None:
         try:
             import webview
 
-            api._window = webview.create_window(
-                "Vettore", url, js_api=api, width=1400, height=900, maximized=True,
-                localization={"global.quitConfirmation":
-                              "Some documents have unsaved changes. Quit Vettore and discard them?"},
+            window = webview.create_window(
+                TITLE, url, js_api=api, width=1400, height=900, maximized=True,
+                # Shown only when the page does not answer (desktop.close_guard): normally
+                # Vettore's own dialog offers to save each document.
+                localization={"global.quitConfirmation": close_guard.FALLBACK_QUESTION},
             )
-            window = api._window
+            api._attach(window)
             window.events.loaded += lambda: _bind_drop(window)
             storage = Path.home() / ".vettore" / "webview"
             storage.mkdir(parents=True, exist_ok=True)

@@ -22,8 +22,8 @@ from . import alignment, app_info, fileio, gel, primer_design, sanger, settings,
 from . import features as common_features
 from .cloning.api import router as cloning_router
 from .cloning.base import CloningError, dna_sequence
+from .desktop.instance import HAND_OVER_WAIT, TOKEN_HEADER, Inbox
 
-TOKEN_HEADER = "X-Vettore-Token"
 ALLOWED_HOSTS = {"127.0.0.1", "localhost"}
 
 log = logging.getLogger(__name__)
@@ -89,6 +89,12 @@ class Unsaved(BaseModel):
     count: int
 
 
+class HandOver(BaseModel):
+    """Files from a second start of Vettore (a double-click while this one runs)."""
+
+    paths: list[str] = []
+
+
 class TmRequest(BaseModel):
     sequence: str
 
@@ -145,6 +151,7 @@ ACTIONS: tuple[tuple[str, str], ...] = (
     ("/api/cloning/", "The simulation"),
     ("/api/app/samples", "Opening the sample"),
     ("/api/unsaved", "Counting the documents with unsaved changes"),
+    ("/api/hand-over", "Opening the file"),
 )
 
 
@@ -198,7 +205,12 @@ def _save_failed(path: Path, exc: OSError) -> HTTPException:
 
 def create_app(token: str, static_dir: Path | None,
                startup_files: list[Path] | None = None,
-               on_unsaved: Callable[[int], None] | None = None) -> FastAPI:
+               on_unsaved: Callable[[int], None] | None = None,
+               on_hand_over: Callable[[], None] | None = None,
+               hand_over_wait: float = HAND_OVER_WAIT) -> FastAPI:
+    """The API and the UI's files. ``on_unsaved`` hears the count of unsaved documents;
+    ``on_hand_over`` is called when a second start hands files over (to bring the window
+    forward and tell the page); ``hand_over_wait`` is how long the page has to take them."""
     app = FastAPI(title="Vettore", docs_url=None, redoc_url=None, openapi_url=None)
 
     @app.middleware("http")
@@ -246,14 +258,15 @@ def create_app(token: str, static_dir: Path | None,
     def health() -> dict[str, str]:
         return {"status": "ok"}
 
-    pending_startup = list(startup_files or [])
+    inbox = Inbox(startup_files or [])
 
     @app.get("/api/startup-files")
     def startup() -> dict[str, Any]:
-        """Files passed on the command line (e.g. double-click in the file manager), once."""
+        """Files waiting to be opened, each served once: those on the command line (a
+        double-click in the file manager), then those handed over by later starts. The page
+        asks every half second."""
         results, errors = [], []
-        while pending_startup:
-            path = pending_startup.pop(0)
+        for path in inbox.take():
             try:
                 results.append(_open_path(path))
             except HTTPException as exc:
@@ -288,6 +301,16 @@ def create_app(token: str, static_dir: Path | None,
         settings.add_recent(path)
         settings.remember_folder(path.parent)
         return {"path": str(path), **result}
+
+    @app.post("/api/hand-over")
+    def hand_over(body: HandOver) -> dict[str, bool]:
+        """Queue files from a second start and wait until the page has taken them.
+        ``delivered`` is false when it did not within ``hand_over_wait`` seconds (a frozen or
+        closed page): the files are withdrawn and the caller opens its own window."""
+        ticket = inbox.put(Path(p) for p in body.paths)
+        if on_hand_over:
+            on_hand_over()
+        return {"delivered": inbox.wait_or_withdraw(ticket, hand_over_wait)}
 
     @app.post("/api/open-path")
     def open_path(body: OpenPath) -> dict[str, Any]:

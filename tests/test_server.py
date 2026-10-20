@@ -255,10 +255,10 @@ def test_desktop_dialog_filters_are_valid_for_pywebview():
 
     from vettore import app, fileio
 
-    for spec in app.FILE_TYPES + tuple(app.SAVE_TYPES.values()):
+    for spec in app.file_types() + tuple(app.SAVE_TYPES.values()):
         parse_file_type(spec)  # raises on a filter pywebview rejects
     for ext in fileio.FORMATS:
-        assert f"*{ext}" in app.FILE_TYPES[0]
+        assert f"*{ext}" in app.file_types()[0]
     assert app.save_file_types("fasta")[0].startswith("FASTA")
     assert app.save_file_types("png") == ("PNG image (*.png)",)
 
