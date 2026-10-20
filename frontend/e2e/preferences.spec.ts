@@ -47,3 +47,16 @@ test("preferences change the defaults, apply at once and survive a restart", asy
   await page.getByTestId("pref-reset").click();
   await expect(page.getByTestId("pref-enzyme-set")).toHaveValue("unique6");
 });
+
+test("when the ladder list cannot be read, Preferences says so under the field", async ({ page }) => {
+  await page.route("**/api/gel/ladders", (route) =>
+    route.fulfill({ status: 500, contentType: "text/plain", body: "Internal Server Error" }));
+  await page.goto(`/?token=${TOKEN}`);
+  await page.getByTestId("file-input").setInputFiles(data("pFA-KanMX4.dna"));
+  await expect(page.locator(".veCircularView")).toBeVisible();
+  await menu(page, "File", "Preferences…");
+  const error = page.getByTestId("pref-ladder-error");
+  await expect(error).toContainText("The list of ladders could not be read");
+  await expect(error).toContainText("Something went wrong inside Vettore (error 500)");
+  await expect(error).toContainText("reopen Preferences");
+});
