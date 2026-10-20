@@ -17,7 +17,7 @@ biology computed by tested engines (pydna / Biopython / primer3).
 | S3 verification | done — gel, Sanger (verdict, read quality, wrong-plasmid detection), star alignment, common features with label checks, primer3 design |
 | S4 polish | mostly — samples, help, preferences, AAV check, design tokens, in-app quit dialog, single window for double-clicked files, per-user file associations |
 
-Evidence for 0.3.1: 602 pytest, 110 vitest, 130 Playwright e2e, all green; CI builds Windows and Linux, runs the
+Evidence for 0.3.1: 609 pytest, 110 vitest, 130 Playwright e2e, all green; CI builds Windows and Linux, runs the
 packaging smoke test against the real binary (file round trips, cloning, primer design,
 alignment, Sanger, samples, feature detection, file associations in dry run, second-start
 hand-over) and screenshots the Windows window.

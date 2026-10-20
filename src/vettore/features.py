@@ -307,17 +307,23 @@ def _element_words() -> tuple[tuple[str, frozenset[str]], ...]:
                  if (words := name_words(name, pieces=False)))
 
 
+def _label_words(label: str) -> frozenset[str]:
+    """A label's identifying words, with a species prefix also read off ("mU6" names U6)."""
+    words = name_words(label)
+    return words | {w[1:] for w in words if w[:1] in "hm" and len(w) > 2}
+
+
 def named_elements(label: str) -> set[str]:
     """The known elements a label names: "CMV promoter" names the catalogue's CMV enhancer and
     CMV promoter; "my insert" names none."""
-    words = name_words(label)
+    words = _label_words(label)
     return {name for name, element in _element_words() if words & element}
 
 
 def _names_element(label: str, element: str) -> bool:
     """Whether a feature called ``label`` annotates the catalogue ``element``: the label
     shares an identifying word with it ("CMV" and "CMV enhancer")."""
-    return bool(name_words(label) & name_words(element, pieces=False))
+    return bool(_label_words(label) & name_words(element, pieces=False))
 
 
 def _names_another_element(label: str, element: str) -> bool:
@@ -325,6 +331,40 @@ def _names_another_element(label: str, element: str) -> bool:
     it (a "CAG" block holds the CMV enhancer, so that label is right)."""
     others = named_elements(label)
     return bool(others) and not any(element in HOLDS.get(name, ()) for name in others)
+
+
+#: How labels say which species an element comes from: a word ("human", "murine"), or a
+#: one-letter prefix on the element's own word ("hPGK", "mU6").
+_SPECIES_WORDS = {"human": "human", "homo": "human", "mouse": "mouse", "murine": "mouse",
+                  "mus": "mouse"}
+_PREFIXES = {"h": "human", "m": "mouse"}
+
+
+def entry_species(element: str) -> str | None:
+    """The species a catalogue entry names, from its "(human)" or "(mouse)" suffix."""
+    found = re.search(r"\((human|mouse)\)", element)
+    return found.group(1) if found else None
+
+
+def label_species(label: str, element: str) -> str | None:
+    """The species a feature label gives for ``element``, or None when it gives none."""
+    tokens = [t for t in re.split(r"[^a-z0-9]+", label.translate(_LETTERS).lower()) if t]
+    for token in tokens:
+        if token in _SPECIES_WORDS:
+            return _SPECIES_WORDS[token]
+    words = name_words(element, pieces=False)
+    for token in tokens:
+        rest = token[1:]
+        if token[:1] in _PREFIXES and len(rest) > 1 and WORD_ALIASES.get(rest, rest) in words:
+            return _PREFIXES[token[:1]]
+    return None
+
+
+def _species_conflict(label: str, element: str) -> bool:
+    """Whether a label names the element of the other species ("PGK promoter (human)" over
+    the mouse PGK promoter, or "mU6" over the human U6)."""
+    ours, theirs = entry_species(element), label_species(label, element)
+    return bool(ours and theirs and ours != theirs)
 
 
 def _identity_text(identity: float) -> str:
@@ -383,10 +423,15 @@ def detect_payload(sequence: str, circular: bool, min_identity: float = DEFAULT_
                     for index, (name, other) in enumerate(already)
                     if len(span & other) >= ANNOTATED_SHARE_OF_MATCH * len(span)]
         named = [item for item in covering if _names_element(item[1], match.name)]
+        # A label naming this element but the other species is a wrong label, not an
+        # annotation of it.
+        other_species = [item for item in named if _species_conflict(item[1], match.name)]
+        named = [item for item in named if item not in other_species]
         sized = [item for item in covering if item[2] >= ANNOTATED_SHARE_OF_EXISTING * item[3]]
         suspect = ([] if named or match.identity < LABEL_CHECK_MIN_IDENTITY
                    else [item for item in covering
-                         if _names_another_element(item[1], match.name)])
+                         if item in other_species
+                         or _names_another_element(item[1], match.name)])
         for item in suspect:
             unexplained.setdefault(item[0], set()).update(span & already[item[0]][1])
         found.append((match, named, sized, suspect))

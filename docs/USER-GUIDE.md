@@ -393,7 +393,9 @@ promoter" block over both the CMV enhancer and the CMV promoter, and neither is 
 amber, for example: “Annotated as “PGK promoter”, but the sequence is the CMV enhancer (100 %
 identity). Check the label.” A notice at the top says how many labels to check. These rows are
 not ticked, so nothing changes unless you tick one: the element is then added under its
-catalogue name, and you can rename or delete the old feature in the Features view. A feature
+catalogue name, and you can rename or delete the old feature in the Features view. The same check
+reads the species in a label — a word ("human", "mouse", "murine") or a prefix ("hPGK",
+"mU6") — so a mouse PGK promoter labelled "PGK promoter (human)" is flagged too. A feature
 whose name is not an element, such as "my insert", is never questioned.
 
 When a promoter or an ITR is a few bases off, loosen the identity threshold for one run; the

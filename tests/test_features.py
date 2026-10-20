@@ -5,7 +5,13 @@ import pytest
 from Bio import SeqIO
 from cloning_helpers import clean_dna, rc
 
-from vettore.features import SHORT_FEATURE, catalogue, detect, detect_payload
+from vettore.features import (
+    DEFAULT_MIN_IDENTITY,
+    SHORT_FEATURE,
+    catalogue,
+    detect,
+    detect_payload,
+)
 
 DATA = Path(__file__).parent / "data"
 
@@ -587,3 +593,36 @@ def test_the_human_and_mouse_pgk_promoters_are_two_sequences_not_one():
     human, mouse = entry("PGK promoter (human)"), entry("PGK promoter (mouse)")
     assert names(detect(human.sequence, False)) == ["PGK promoter (human)"]
     assert names(detect(mouse.sequence, False)) == ["PGK promoter (mouse)"]
+
+
+def _plasmid_with(element: str, label: str) -> tuple[str, list[dict]]:
+    """A linear construct: random flanks around a catalogue element annotated as ``label``."""
+    import random
+
+    sequence = next(f.sequence for f in catalogue() if f.name == element)
+    rng = random.Random(7)
+    left = "".join(rng.choice("ACGT") for _ in range(300))
+    right = "".join(rng.choice("ACGT") for _ in range(300))
+    annotation = {"name": label, "type": "promoter", "start": 300,
+                  "end": 300 + len(sequence) - 1, "strand": 1}
+    return left + sequence + right, [annotation]
+
+
+@pytest.mark.parametrize("element, label, wrong", [
+    ("PGK promoter (mouse)", "PGK promoter (human)", True),
+    ("PGK promoter (mouse)", "hPGK", True),
+    ("PGK promoter (mouse)", "mPGK promoter", False),
+    ("PGK promoter (mouse)", "PGK promoter", False),
+    ("PGK promoter (human)", "murine PGK promoter", True),
+    ("U6 promoter (human)", "mU6", True),
+    ("U6 promoter (human)", "hU6 promoter", False),
+])
+def test_a_label_naming_the_other_species_is_flagged(element, label, wrong):
+    sequence, existing = _plasmid_with(element, label)
+    out = detect_payload(sequence, False, DEFAULT_MIN_IDENTITY, existing)
+    [row] = [r for r in out["features"] if r["name"] == element]
+    assert row["isNew"] is False and row["annotatedAs"] == label
+    assert bool(row["labelWarning"]) is wrong
+    assert out["label_warnings"] == (1 if wrong else 0)
+    if wrong:
+        assert row["labelWarning"].startswith(f"Annotated as “{label}”, but the sequence is the {element}")
