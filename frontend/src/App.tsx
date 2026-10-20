@@ -73,6 +73,12 @@ function fromBase64(b64: string): Blob {
 
 const count = (x: unknown) => (Array.isArray(x) ? x.length : x && typeof x === "object" ? Object.keys(x).length : 0);
 
+/** Text fields keep their own copy and paste. */
+function isEditable(target: EventTarget | null): boolean {
+  const el = target as HTMLElement | null;
+  return !!el && (el.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName));
+}
+
 function listNames(names: string[]): string {
   return names.length <= 6 ? names.join(", ") : `${names.slice(0, 5).join(", ")} and ${names.length - 5} more`;
 }
@@ -494,6 +500,10 @@ export default function App() {
       if (key === "o" && !e.shiftKey) {
         e.preventDefault();
         openFiles();
+      } else if (key === "v" && e.shiftKey && !isEditable(e.target)) {
+        // Cancels the browser's paste too, so the open sequence is left as it is.
+        e.preventDefault();
+        newFromClipboard();
       } else if (key === "n" && !e.shiftKey) {
         e.preventDefault();
         setNewOpen(true);
@@ -510,7 +520,21 @@ export default function App() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [activeDoc, closeDoc, openFiles, selectView]);
+  }, [activeDoc, closeDoc, newFromClipboard, openFiles, selectView]);
+
+  // ---- paste on the start screen: Ctrl+V with no document open opens what was copied -----
+  useEffect(() => {
+    if (docs.length) return;
+    const onPaste = (e: ClipboardEvent) => {
+      if (isEditable(e.target)) return;
+      const text = e.clipboardData?.getData("text/plain") ?? "";
+      if (!text.trim()) return;
+      e.preventDefault();
+      api.openText(text).then((result) => addResult(result, null)).catch(() => setPaste({ text }));
+    };
+    document.addEventListener("paste", onPaste);
+    return () => document.removeEventListener("paste", onPaste);
+  }, [addResult, docs.length]);
 
   // ---- drag and drop ---------------------------------------------------------------------
   const onDrop = useCallback(

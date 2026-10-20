@@ -72,6 +72,20 @@ test.describe("with clipboard access", () => {
   });
 });
 
+test("pasting on the start screen opens what was copied", async ({ page }) => {
+  await page.goto(`/?token=${TOKEN}`);
+  await expect(page.getByTestId("open")).toBeVisible();
+  await page.evaluate((text) => {
+    const transfer = new DataTransfer();
+    transfer.setData("text/plain", text);
+    document.body.dispatchEvent(new ClipboardEvent("paste", { clipboardData: transfer, bubbles: true }));
+  }, TWO_RECORDS);
+  await expect(page.getByTestId("doctab")).toHaveCount(2);
+  await expect(page.locator(".vt-doctab.active")).toContainText("part2");
+  await page.getByTestId("view-history").click();
+  await expect(page.locator(".vt-history")).toContainText("Created from clipboard");
+});
+
 test.describe("when the system refuses the clipboard", () => {
   test.beforeEach(async ({ page }) => {
     await page.addInitScript(() => {
@@ -117,6 +131,13 @@ test.describe("when the system refuses the clipboard", () => {
     await page.getByTestId("paste-open").click();
     await expect(page.locator(".vt-doctab.active")).toContainText("pBR322 start");
     await expect(page.getByTestId("status-line")).toContainText("40 bp · circular");
+  });
+
+  test("Ctrl+Shift+V opens the paste box without touching the open sequence", async ({ page }) => {
+    await page.locator(".veCircularView").click({ position: { x: 20, y: 20 } });
+    await page.keyboard.press("Control+Shift+V");
+    await expect(page.getByTestId("paste-dialog")).toBeVisible();
+    await expect(page.locator(".vt-doctab.active")).not.toContainText("•");
   });
 
   test("Copy as FASTA shows the text to copy by hand", async ({ page }) => {

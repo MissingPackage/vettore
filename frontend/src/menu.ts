@@ -80,7 +80,7 @@ export function buildMenu(ref: MutableRefObject<MenuHandlers>) {
       "data-test": "file",
       submenu: [
         { text: "New DNA File…", hotkey: "mod+n", onClick: () => h().newFile() },
-        { text: "New File from Clipboard", "data-test": "new-from-clipboard", onClick: () => h().newFromClipboard() },
+        { text: "New File from Clipboard", hotkey: "mod+shift+v", "data-test": "new-from-clipboard", onClick: () => h().newFromClipboard() },
         { text: "Open…", hotkey: "mod+o", onClick: () => h().open() },
         {
           text: "Open Recent",
