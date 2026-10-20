@@ -2,11 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import * as Blueprint from "@blueprintjs/core";
 import { Button, Classes } from "@blueprintjs/core";
 import { api } from "./api";
-import { cutsites, ENZYMES } from "./enzymeLogic";
+import { loadPreferences } from "./preferences";
 import type { OpenDoc } from "./cloning/types";
 import { EnzymePicker, Field } from "./cloning/inputs";
 
-const { Dialog } = Blueprint as unknown as Record<string, React.ComponentType<any>>;
+const { Dialog, Callout } = Blueprint as unknown as Record<string, React.ComponentType<any>>;
 
 interface GelBand {
   size: number;
@@ -37,25 +37,30 @@ const WELL_Y = 40;
 
 /** Tools → Simulate Agarose Gel: lanes are digests of the open documents. */
 export default function GelDialog(props: { docs: OpenDoc[]; active: OpenDoc | null; onClose: () => void }) {
+  // The document in front is lane 1, uncut: that already draws a gel at the first click.
   const [lanes, setLanes] = useState<LaneSetup[]>([
     { editorName: props.active?.editorName ?? null, enzymes: [] },
   ]);
-  const [ladder, setLadder] = useState("neb-1kb-plus");
-  const [percent, setPercent] = useState(1.0);
+  // Ladder and agarose come from Preferences; the engine's defaults are the fallback.
+  const preferences = loadPreferences();
+  const [ladder, setLadder] = useState(preferences.gelLadder);
+  const [percent, setPercent] = useState(preferences.gelPercent);
   const [ladders, setLadders] = useState<{ id: string; label: string }[]>([]);
   const [percentages, setPercentages] = useState<number[]>([0.7, 1.0, 1.2, 1.5, 2.0]);
   const [result, setResult] = useState<GelResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     api.gelLadders()
       .then((r) => {
         setLadders(r.ladders);
         setPercentages(r.percentages);
-        setLadder(r.default_ladder);
-        setPercent(r.default_percent);
+        if (!r.ladders.some((l) => l.id === preferences.gelLadder)) setLadder(r.default_ladder);
+        if (!r.percentages.includes(preferences.gelPercent)) setPercent(r.default_percent);
       })
       .catch(() => undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const body = useMemo(() => {
@@ -80,12 +85,14 @@ export default function GelDialog(props: { docs: OpenDoc[]; active: OpenDoc | nu
     setError(null);
     const payload = JSON.parse(bodyKey);
     const t = setTimeout(() => {
+      setBusy(true);
       api.gel<GelResult>(payload)
         .then(setResult)
         .catch((e) => {
           setResult(null);
           setError(String((e as Error).message));
-        });
+        })
+        .finally(() => setBusy(false));
     }, 250);
     return () => clearTimeout(t);
   }, [bodyKey]);
@@ -99,6 +106,10 @@ export default function GelDialog(props: { docs: OpenDoc[]; active: OpenDoc | nu
     <Dialog isOpen onClose={props.onClose} title="Simulate Agarose Gel" style={{ width: 1050, maxWidth: "95vw" }}>
       <div className={`${Classes.DIALOG_BODY} vt-cloning`} data-testid="gel-dialog">
         <div className="vt-cloning-form">
+          <p className="vt-muted">
+            Predicts the pattern of a diagnostic digest: one lane per open file, next to the
+            ladder you run. Leave a lane without enzymes to load the plasmid uncut.
+          </p>
           {lanes.map((lane, i) => {
             const doc = props.docs.find((d) => d.editorName === lane.editorName) ?? null;
             const data = doc?.data();
@@ -118,7 +129,12 @@ export default function GelDialog(props: { docs: OpenDoc[]; active: OpenDoc | nu
                     </select>
                   </div>
                 </Field>
-                <Field label="Digest with" hint="Leave empty to load the uncut plasmid">
+                <Field
+                  label="Digest with"
+                  hint={doc
+                    ? "Up to three enzymes. Leave empty to load the uncut plasmid."
+                    : "Choose a file first."}
+                >
                   <EnzymePicker
                     value={lane.enzymes}
                     onChange={(enzymes) => update(i, { enzymes })}
@@ -141,14 +157,14 @@ export default function GelDialog(props: { docs: OpenDoc[]; active: OpenDoc | nu
                   onClick={() => setLanes((r) => [...r, { editorName: null, enzymes: [] }])}>
             + Add lane
           </button>
-          <Field label="Ladder">
+          <Field label="Ladder" hint="Your usual ladder: File → Preferences keeps the choice.">
             <div className="bp3-html-select bp3-fill">
               <select data-testid="gel-ladder" value={ladder} onChange={(e) => setLadder(e.target.value)}>
                 {ladders.map((l) => <option key={l.id} value={l.id}>{l.label}</option>)}
               </select>
             </div>
           </Field>
-          <Field label="Agarose (%)">
+          <Field label="Agarose (%)" hint="Higher percentages separate short fragments better.">
             <div className="bp3-html-select bp3-fill">
               <select data-testid="gel-percent" value={percent} onChange={(e) => setPercent(Number(e.target.value))}>
                 {percentages.map((p) => <option key={p} value={p}>{p.toFixed(1)} %</option>)}
@@ -157,7 +173,17 @@ export default function GelDialog(props: { docs: OpenDoc[]; active: OpenDoc | nu
           </Field>
         </div>
         <div className="vt-cloning-result">
-          {error && <p className="vt-error">{error}</p>}
+          {error && (
+            <Callout intent="danger" title="No gel to draw" data-testid="gel-error">
+              {error}. Check that every lane has a file and that the enzymes cut it.
+            </Callout>
+          )}
+          {!result && !error && !busy && (
+            <p className="vt-muted" data-testid="gel-empty">
+              Choose a file for lane 1 and the gel appears here.
+            </p>
+          )}
+          {busy && !result && <p className="vt-muted">Running the gel…</p>}
           {result && (
             <>
               <svg width={width} height={GEL_HEIGHT + 16} className="vt-gel" data-testid="gel-image">
@@ -170,8 +196,9 @@ export default function GelDialog(props: { docs: OpenDoc[]; active: OpenDoc | nu
                 ))}
               </svg>
               <p className="vt-muted">
-                {result.percent.toFixed(1)} % agarose. Positions are an approximation
-                (semi-log migration), meant for reading a digest pattern against the ladder.
+                {result.percent.toFixed(1)} % agarose. Hover a band to read its size. Positions
+                are an approximation (semi-log migration), meant for reading a digest pattern
+                against the ladder rather than for measuring a real run.
               </p>
               {result.lanes.map((lane, i) => (
                 <p key={i} className="vt-muted">

@@ -51,19 +51,28 @@ export default function StatusLine({ editorName }: { editorName: string }) {
     <div className="vt-status" data-testid="status-line">
       {hasSelection ? (
         <>
-          <span>Selected {start + 1} … {end + 1}</span>
-          <span>{selected.length} bp</span>
-          <span>{gc.toFixed(1)}% GC</span>
+          <span title={start > end ? "The selection runs across the origin" : "Selected range"}>
+            Selected {start + 1} … {end + 1}
+            {start > end ? " (across the origin)" : ""}
+          </span>
+          <span>{selected.length.toLocaleString()} bp</span>
+          <span title="G and C as a percentage of the selection">{gc.toFixed(1)}% GC</span>
           {tm !== null && (
             <span className="vt-tm" title={tm.tooltip} data-testid="selection-tm">
               Tm {tm.value.toFixed(1)} °C
             </span>
           )}
+          {tm === null && selected.length > TM_MAX_LENGTH && (
+            <span className="vt-muted" title={`Tm is shown for selections up to ${TM_MAX_LENGTH} bases`}>
+              Tm: select ≤ {TM_MAX_LENGTH} bases
+            </span>
+          )}
         </>
       ) : (
         <>
-          <span>{sequence.length} bp · {circular ? "circular" : "linear"}</span>
-          <span>{gc.toFixed(1)}% GC</span>
+          <span>{sequence.length.toLocaleString()} bp · {circular ? "circular" : "linear"}</span>
+          <span title="G and C as a percentage of the whole sequence">{gc.toFixed(1)}% GC</span>
+          <span className="vt-muted">Select a region for its length, %GC and Tm</span>
         </>
       )}
     </div>

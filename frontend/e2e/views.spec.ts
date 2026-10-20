@@ -43,6 +43,20 @@ test("view tabs switch the document view", async ({ page }) => {
 });
 
 test("status bar shows length, topology and enzyme set", async ({ page }) => {
-  await expect(page.getByTestId("status-line")).toContainText("3941 bp · circular");
+  const status = page.getByTestId("status-line");
+  await expect(status).toContainText("3,941 bp · circular");
+  await expect(status).toContainText("Select a region");
   await expect(page.locator(".vt-status-set")).toHaveText("Unique 6+ Cutters");
+
+  // Selecting shows the range, and the Tm once the selection is oligo-sized.
+  await page.getByTestId("view-enzymes").click();
+  await page.getByTestId("enzymes-view").getByRole("cell", { name: "NdeI", exact: true }).click();
+  await expect(status).toContainText("Selected");
+  await expect(status).not.toContainText("Select a region");
+});
+
+test("the Enzymes view says what to do when nothing cuts", async ({ page }) => {
+  await page.getByTestId("view-enzymes").click();
+  await page.getByTestId("enzyme-search").fill("NotAnEnzyme");
+  await expect(page.getByTestId("enzymes-empty")).toContainText("Choose Enzymes…");
 });
