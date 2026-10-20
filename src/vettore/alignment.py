@@ -244,8 +244,9 @@ def _run_coverage(chain: list[tuple[int, int]], on_query: bool) -> int:
 def place(reference: str, ref_circular: bool, query: str, query_circular: bool,
           index: dict[str, list[int]] | None = None) -> tuple[Placement, str, str] | None:
     """Strand, rotation and mode for one sequence. Returns the placement together with the
-    reference and the sequence as they go into the aligner, or None when the two share no
-    word on either strand."""
+    reference and the sequence as they go into the aligner, or None when no diagonal
+    collects MIN_VOTES shared words on either strand (what two unrelated sequences share by
+    chance)."""
     index = index if index is not None else _reference_index(reference, ref_circular)
     ref_len, query_len = len(reference), len(query)
     modulus = query_len if query_circular else ref_len if ref_circular else None
@@ -427,9 +428,10 @@ def alignment_payload(reference_doc: dict[str, Any], docs: list[dict[str, Any]])
         result = align_pair(reference, ref_circular, name, sequence, bool(doc.get("circular")),
                             index)
         if result is None:
-            warnings.append(f"“{name}” was left out: it shares no stretch of {WORD} identical "
-                            f"bases with “{reference_name}” on either strand, so the two "
-                            "cannot be aligned meaningfully.")
+            warnings.append(f"“{name}” was left out: it has nothing recognisably in common "
+                            f"with “{reference_name}” on either strand (not even two stretches "
+                            f"of {WORD} identical bases in line), so the two cannot be aligned "
+                            "meaningfully. Check that it is the sequence you meant.")
             continue
         results.append((i, result))
 
