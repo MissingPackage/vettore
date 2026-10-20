@@ -19,6 +19,7 @@ import NewSequenceDialog, { type NewSequence } from "./NewSequenceDialog";
 import CloningDialog from "./cloning/CloningDialog";
 import GelDialog from "./GelDialog";
 import SangerDialog from "./SangerDialog";
+import DetectFeaturesDialog from "./DetectFeaturesDialog";
 import { actionById, type CloningAction } from "./cloning/registry";
 import type { CloningResult, OpenDoc, Product } from "./cloning/types";
 import HistoryView from "./HistoryView";
@@ -62,6 +63,7 @@ export default function App() {
   const [cloning, setCloning] = useState<CloningAction | null>(null);
   const [gelOpen, setGelOpen] = useState(false);
   const [sangerOpen, setSangerOpen] = useState(false);
+  const [detectOpen, setDetectOpen] = useState(false);
   const [recent, setRecent] = useState<string[]>([]);
   const fileInput = useRef<HTMLInputElement>(null);
   const height = useWindowHeight();
@@ -390,6 +392,7 @@ export default function App() {
     cloning: (id: string) => setCloning(actionById(id)),
     gel: () => setGelOpen(true),
     sanger: () => setSangerOpen(true),
+    detectFeatures: () => setDetectOpen(true),
     recent: [] as string[],
   });
   Object.assign(handlers.current, {
@@ -407,6 +410,7 @@ export default function App() {
     cloning: (id: string) => setCloning(actionById(id)),
     gel: () => setGelOpen(true),
     sanger: () => setSangerOpen(true),
+    detectFeatures: () => setDetectOpen(true),
     recent,
   });
   // menuFilter must be stable (OVE memoizes on it); handlers are read through the ref.
@@ -538,6 +542,15 @@ export default function App() {
       </div>
       {/* Remounted on every open so the form never keeps the previous file's name or topology. */}
       {newOpen && <NewSequenceDialog isOpen onClose={() => setNewOpen(false)} onCreate={createNew} />}
+      {detectOpen && activeDoc && (
+        <DetectFeaturesDialog
+          doc={openDocs.find((d) => d.editorName === activeDoc.editorName)!}
+          onClose={() => {
+            setDetectOpen(false);
+            logHistory(activeDoc.editorName, "Detected common features");
+          }}
+        />
+      )}
       {sangerOpen && (
         <SangerDialog active={openDocs.find((d) => d.editorName === active) ?? null}
                       onClose={() => setSangerOpen(false)} />

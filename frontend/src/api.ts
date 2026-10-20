@@ -82,6 +82,7 @@ export const api = {
   cloning: <T>(endpoint: string, body: object) => call<T>(`cloning/${endpoint}`, body),
   gel: <T>(body: object) => call<T>("gel", body),
   sangerAlign: <T>(body: object) => call<T>("sanger/align", body),
+  detectFeatures: <T>(body: object) => call<T>("features/detect", body),
   gelLadders: () => call<{ ladders: { id: string; label: string }[]; percentages: number[];
     default_ladder: string; default_percent: number }>("gel/ladders"),
   recent: () => call<{ paths: string[] }>("recent"),

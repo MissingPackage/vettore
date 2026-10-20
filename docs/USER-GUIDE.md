@@ -98,6 +98,20 @@ The biology is computed by [pydna](https://github.com/pydna-group/pydna) and
 [Biopython](https://biopython.org), and every operation is covered by tests that compare the
 result with a sequence worked out by hand.
 
+## Annotating a new sequence (Features → Detect Common Features…)
+
+Opened a plasmid that arrives bare, or built one from scratch? This searches it, on both
+strands, for the elements AAV work uses every day: AAV2 ITRs (including the truncated ones
+found in real vectors), CMV, CAG, hSyn, EF-1α, CaMKIIα, GFAP and U6 promoters, WPRE, bGH and
+SV40 polyA, AmpR and KanR, pUC and f1 origins, EGFP, mCherry, tdTomato, loxP, lox2272, FRT,
+SpCas9, SaCas9 and the FLAG and HA tags.
+
+Every entry in the catalogue is a real subsequence of a public GenBank record, and the table
+shows which one it came from along with the percent identity of the match, so you can judge a
+hit yourself. Tick the ones you want and they are added to the map, coloured by type, with
+their provenance kept in the feature's notes. Features already annotated are shown greyed and
+left unticked.
+
 ## Verifying a clone by sequencing (Tools → Align to Reference DNA Sequence…)
 
 Open the plasmid you expect, then choose the `.ab1` files your sequencing provider sent. Each
@@ -119,8 +133,8 @@ semi-logarithmic migration model: good for predicting the *pattern* of a diagnos
 reading sizes against the ladder, not a physical simulation of your gel rig. Hover a band to
 see its size.
 
-Not implemented yet: Gateway BP/LR and TA/GC/TOPO cloning, automatic detection of common
-features, multiple sequence alignment, and writing `.dna` files (saving is GenBank).
+Not implemented yet: Gateway BP/LR and TA/GC/TOPO cloning, annealing oligos, multiple sequence
+alignment, and writing `.dna` files (saving is GenBank).
 
 ## Saving and sharing
 

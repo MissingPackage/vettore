@@ -86,3 +86,4 @@ body { font-family: system-ui, "Segoe UI", sans-serif; font-size: 13px; overflow
 .vt-alignment { height: 430px; border: 1px solid #d8dce1; border-radius: 4px; margin-top: 10px; }
 .vt-ok { color: #0f7b3f; font-weight: 600; }
 .vt-warn { color: #b54708; font-weight: 600; }
+.vt-swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: middle; }

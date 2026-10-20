@@ -21,6 +21,7 @@ export interface MenuHandlers {
   cloning: (actionId: string) => void;
   gel: () => void;
   sanger: () => void;
+  detectFeatures: () => void;
   useEnzymeSet: (set: EnzymeSetId) => void;
   recent: string[];
 }
@@ -107,6 +108,7 @@ export function buildMenu(ref: MutableRefObject<MenuHandlers>) {
       text: "Features",
       submenu: [
         { text: "Add Feature…", cmd: "newFeature" },
+        { text: "Detect Common Features…", onClick: () => h().detectFeatures() },
         "--",
         { text: "Show Features", cmd: "toggleFeatures" },
         { text: "Feature Types…", cmd: "featureTypesCmd" },

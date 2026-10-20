@@ -13,6 +13,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+from . import features as common_features
 from . import fileio, gel, sanger, settings, tm
 from .cloning.api import router as cloning_router
 from .cloning.base import CloningError
@@ -38,6 +39,11 @@ class SavePath(BaseModel):
 class SaveBinary(BaseModel):
     path: str
     content_b64: str
+
+
+class DetectRequest(BaseModel):
+    sequenceData: dict[str, Any]
+    min_identity: float = common_features.DEFAULT_MIN_IDENTITY
 
 
 class SangerRead(BaseModel):
@@ -143,6 +149,18 @@ def create_app(token: str, static_dir: Path | None,
         if on_unsaved:
             on_unsaved(body.count)
         return {"count": body.count}
+
+    @app.post("/api/features/detect")
+    def detect_features(body: DetectRequest) -> dict[str, Any]:
+        data = body.sequenceData
+        sequence = (data.get("sequence") or "").upper()
+        if len(sequence) < 20:
+            raise HTTPException(422, "The sequence is too short to annotate")
+        existing = data.get("features") or []
+        if isinstance(existing, dict):
+            existing = list(existing.values())
+        return common_features.detect_payload(sequence, bool(data.get("circular")),
+                                              body.min_identity, existing)
 
     @app.post("/api/sanger/align")
     def sanger_align(body: SangerRequest) -> dict[str, Any]:
