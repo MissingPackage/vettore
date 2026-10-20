@@ -55,6 +55,23 @@ export interface Sample {
   accession?: string;
 }
 
+/** Opening sequence files with Vettore on double-click (offered by the packaged application). */
+export interface FileAssociations {
+  available: boolean;
+  /** Sequence files open with this copy of Vettore. */
+  enabled: boolean;
+  /** The registration points at this copy (not at one in a folder that was moved). */
+  current: boolean;
+  /** The Vettore program sequence files are registered to, if any. */
+  registered_executable: string | null;
+  extensions: string[];
+  /** Extensions Windows keeps for another program ("Always use this app"). */
+  overridden: string[];
+  platform: string;
+  /** Why it is not offered, when `available` is false. */
+  reason?: string;
+}
+
 interface DesktopApi {
   open_dialog(): Promise<string[]>;
   /** `kind` (genbank, fasta, dna, svg, png) orders the file types; `directory` is where it starts. */
@@ -140,6 +157,9 @@ export const api = {
   samples: () => call<{ samples: Sample[] }>("app/samples"),
   openSample: (id: string) => call<OpenResult>(`app/samples/${encodeURIComponent(id)}`),
   unsaved: (count: number) => call<{ count: number }>("unsaved", { count }),
+  fileAssociations: () => call<FileAssociations>("desktop/file-associations"),
+  /** Make sequence files open with Vettore on double-click (`true`), or undo it. */
+  setFileAssociations: (enabled: boolean) => call<FileAssociations>("desktop/file-associations", { enabled }),
   tm: (sequence: string) =>
     call<{ tm: number; method: string; presets: { key: string; label: string; description: string; tm: number }[] }>(
       "tm",
