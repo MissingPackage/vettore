@@ -1,36 +1,97 @@
-/* Design tokens. Components use these variables instead of literal colours and sizes. */
+/* Design tokens. Components use these variables instead of literal colours and sizes.
+   docs/DESIGN.md lists every token with its purpose and the contrast it was chosen for.
+   Contrast ratios (WCAG 2.x) are noted where a pair is meant to be read: text needs 4.5:1,
+   control borders and focus indicators 3:1. */
 :root {
-  --vt-font: system-ui, "Segoe UI", sans-serif;
-  --vt-font-mono: Menlo, Consolas, monospace;
-  --vt-font-size: 13px;
+  /* ---- type ---------------------------------------------------------------------------- */
+  /* system-ui is Segoe UI on Windows and the desktop font on Linux. Named Linux fonts follow so
+     the stack never falls through to Blueprint's icon font, which draws wide spaces and a heavy
+     "+" when no listed font is installed. */
+  --vt-font: system-ui, "Segoe UI", "Noto Sans", Ubuntu, Cantarell, "DejaVu Sans", "Liberation Sans", Arial, sans-serif;
+  /* Menlo is bundled by the editor component (its sequence font), so sequences typed in Vettore's
+     own fields look like the sequences in the editor. */
+  --vt-font-mono: Menlo, Consolas, "DejaVu Sans Mono", "Liberation Mono", monospace;
+  --vt-font-size-xs: 12px;   /* hints, captions, badges: the smallest text in the app */
+  --vt-font-size-sm: 13px;   /* dense tables, status bar */
+  --vt-font-size: 14px;      /* body text and controls (Blueprint's base size) */
+  --vt-font-size-md: 16px;   /* view headings */
+  --vt-font-size-lg: 18px;   /* dialog titles */
+  --vt-font-size-xl: 28px;   /* welcome title */
+  --vt-line-height: 1.43;    /* 20px at 14px */
+  --vt-line-height-tight: 1.25;
+  --vt-weight-regular: 400;
+  --vt-weight-medium: 500;
+  --vt-weight-strong: 600;
 
-  --vt-text: #374151;
-  --vt-text-strong: #111827;
-  --vt-text-muted: #6b7280;
-  --vt-text-faint: #9ca3af;
+  /* ---- text colours ---------------------------------------------------------------------- */
+  --vt-text: #374151;          /* 10.3:1 on surface, 8.0:1 on surface-sunken */
+  --vt-text-strong: #111827;   /* headings, active tabs, values */
+  --vt-text-muted: #5b6472;    /* secondary text: >= 4.6:1 on every surface below */
+  --vt-text-placeholder: #6b7280; /* 4.8:1 on surface; placeholders still name the field */
+  --vt-text-faint: #9ca3af;    /* disabled controls and decoration only, never for reading */
+  --vt-text-on-accent: #ffffff;
 
+  /* ---- surfaces and borders ----------------------------------------------------------------- */
   --vt-surface: #ffffff;
-  --vt-surface-subtle: #f7f8fa;
-  --vt-surface-sunken: #dfe3e8;
+  --vt-surface-subtle: #f7f8fa;  /* view bar, status bar, dialog bodies */
+  --vt-surface-sunken: #dfe3e8;  /* document tab strip */
+  --vt-surface-raised: #eceff2;  /* inactive document tabs */
   --vt-surface-hover: #e9edf2;
-  --vt-border: #c3c8cf;
+  --vt-border: #c3c8cf;          /* dividers and container outlines (decorative) */
   --vt-border-subtle: #d8dce1;
+  --vt-border-strong: #868e9a;   /* input and control outlines: 3.3:1 on surface */
 
-  --vt-accent: #2563eb;
-  --vt-selection: #e6f0fb;
-  --vt-danger: #b42318;
+  /* ---- accent and states ------------------------------------------------------------------ */
+  /* The accent follows the editor component's blue so both read as one application. */
+  --vt-accent: #106ba3;          /* links, primary buttons, active indicators: 5.8:1 on surface */
+  --vt-accent-hover: #0e5a8a;
+  --vt-accent-active: #0c4d77;
+  --vt-accent-bg: #eef5fb;       /* info notices */
+  --vt-accent-border: #b3d4ee;
+  --vt-selection: #e6f0fb;       /* selected table rows */
+  --vt-accent-disabled: rgba(16, 107, 163, 0.45); /* disabled primary buttons */
+  --vt-focus: #2d72d2;           /* focus ring: 4.7:1 on surface */
+  --vt-focus-halo: rgba(45, 114, 210, 0.3);
+  --vt-focus-ring: 0 0 0 2px var(--vt-surface), 0 0 0 4px var(--vt-focus);
+  --vt-overlay-hover: rgba(16, 24, 40, 0.08); /* hover tint over any background */
+
+  --vt-danger: #b42318;          /* 6.0:1 on danger-bg */
   --vt-danger-bg: #fef3f2;
   --vt-danger-border: #fecdca;
-  --vt-warning: #b54708;
+  --vt-danger-halo: rgba(180, 35, 24, 0.25);
+  --vt-warning: #b54708;         /* 5.2:1 on warning-bg */
   --vt-warning-bg: #fffaeb;
-  --vt-success: #027a48;
+  --vt-warning-border: #fedf89;
+  --vt-success: #027a48;         /* 5.1:1 on success-bg */
   --vt-success-bg: #ecfdf3;
+  --vt-success-border: #a6f4c5;
 
+  /* ---- shape, space, size ------------------------------------------------------------------ */
+  --vt-radius-sm: 3px;           /* controls (Blueprint's radius) */
   --vt-radius: 4px;
-  --vt-radius-lg: 6px;
+  --vt-radius-lg: 6px;           /* cards, panels, document tabs */
+  --vt-space-0: 2px;
   --vt-space-1: 4px;
   --vt-space-2: 8px;
   --vt-space-3: 12px;
   --vt-space-4: 16px;
   --vt-space-5: 24px;
+  --vt-space-6: 32px;
+  --vt-space-7: 48px;
+  --vt-control-height: 30px;     /* inputs, selects and buttons in Vettore's forms */
+  --vt-control-height-sm: 24px;  /* the smallest hit target allowed (WCAG 2.5.8) */
+  --vt-measure: 72ch;            /* longest comfortable line for explanatory text */
+
+  /* ---- elevation ---------------------------------------------------------------------------- */
+  --vt-shadow-1: 0 1px 2px rgba(16, 24, 40, 0.08);
+  --vt-shadow-2: 0 2px 8px rgba(16, 24, 40, 0.12), 0 1px 2px rgba(16, 24, 40, 0.08);
+  --vt-shadow-3: 0 0 0 1px rgba(16, 24, 40, 0.08), 0 12px 32px rgba(16, 24, 40, 0.18),
+    0 2px 6px rgba(16, 24, 40, 0.1);   /* dialogs */
+
+  /* ---- motion ------------------------------------------------------------------------------- */
+  --vt-duration: 120ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --vt-duration: 0ms; }
 }

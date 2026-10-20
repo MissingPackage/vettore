@@ -1,89 +1,318 @@
+@import "./theme/overrides.css";
+
+/* Vettore's own surfaces. Colours, sizes and spacing come from theme/tokens.css; the shared
+   presentational classes at the end are documented in docs/DESIGN.md. */
+
 html, body, #root { height: 100%; margin: 0; }
-body { font-family: system-ui, "Segoe UI", sans-serif; font-size: 13px; overflow: hidden; }
+body { overflow: hidden; }
 .vt-shell { display: flex; flex-direction: column; height: 100%; }
 
-/* document tabs */
-.vt-doctabs { display: flex; align-items: flex-end; gap: 2px; padding: 0 6px; background: #dfe3e8; border-bottom: 1px solid #c3c8cf; overflow-x: auto; box-sizing: border-box; }
-.vt-doctab { display: flex; align-items: center; gap: 6px; padding: 4px 6px 4px 12px; border: 1px solid #c3c8cf; border-bottom: none; border-radius: 6px 6px 0 0; background: #eceff2; cursor: pointer; white-space: nowrap; max-width: 240px; }
+/* ---- document tabs ------------------------------------------------------------------------- */
+.vt-doctabs {
+  display: flex; align-items: flex-end; gap: var(--vt-space-0); padding: 0 6px;
+  background: var(--vt-surface-sunken); border-bottom: 1px solid var(--vt-border);
+  overflow-x: auto; box-sizing: border-box;
+}
+.vt-doctab {
+  display: flex; align-items: center; gap: 6px; max-width: 240px; padding: 4px 6px 4px 12px;
+  border: 1px solid var(--vt-border); border-bottom: none; border-radius: var(--vt-radius-lg) var(--vt-radius-lg) 0 0;
+  background: var(--vt-surface-raised); color: var(--vt-text); cursor: pointer; white-space: nowrap;
+}
 .vt-doctab span { overflow: hidden; text-overflow: ellipsis; }
-.vt-doctab.active { background: #fff; font-weight: 600; }
-.vt-doctab-close { border: none; background: transparent; font-size: 15px; line-height: 1; cursor: pointer; color: #6b7280; padding: 0 2px; }
-.vt-doctab-close:hover { color: #111; }
-.vt-brand { align-self: center; font-weight: 700; color: #374151; letter-spacing: 0.04em; }
-.vt-error { align-self: center; margin-left: auto; color: #b42318; background: #fef3f2; border: 1px solid #fecdca; border-radius: 4px; padding: 2px 8px; cursor: pointer; max-width: 50%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vt-doctab:hover { background: var(--vt-surface-subtle); }
+/* The open document: white like the page below it, with the accent along its top edge. */
+.vt-doctab.active {
+  background: var(--vt-surface); color: var(--vt-text-strong); font-weight: var(--vt-weight-strong);
+  box-shadow: inset 0 2px 0 var(--vt-accent);
+}
+.vt-doctab-close {
+  display: inline-flex; align-items: center; justify-content: center; flex: none;
+  width: 20px; height: 20px; padding: 0; border: none; border-radius: var(--vt-radius-sm);
+  background: transparent; color: var(--vt-text-muted); font-size: 15px; line-height: 1; cursor: pointer;
+  transition: background-color var(--vt-duration), color var(--vt-duration);
+}
+.vt-doctab-close:hover { background: var(--vt-overlay-hover); color: var(--vt-text-strong); }
+.vt-brand { align-self: center; padding-left: 2px; font-weight: 700; color: var(--vt-text); letter-spacing: 0.04em; }
 
-/* view tabs, at the top of the document area */
-.vt-viewbar { display: flex; align-items: center; justify-content: space-between; padding: 0 8px; background: #f7f8fa; border-bottom: 1px solid #d8dce1; box-sizing: border-box; }
-.vt-viewtabs { display: flex; gap: 2px; }
-.vt-viewtab { font: inherit; padding: 4px 14px; border: 1px solid transparent; border-radius: 4px; background: transparent; cursor: pointer; color: #374151; }
-.vt-viewtab:hover:not(:disabled) { background: #e9edf2; }
-.vt-viewtab.active { background: #fff; border-color: #c3c8cf; font-weight: 600; color: #111827; }
-.vt-viewtab:disabled { color: #9ca3af; cursor: default; }
-.vt-enzyme-set { color: #4b5563; }
-.vt-enzyme-set select { font: inherit; }
+/* ---- view tabs, at the top of the document area --------------------------------------------- */
+.vt-viewbar {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--vt-space-3);
+  padding: 0 var(--vt-space-2); background: var(--vt-surface-subtle);
+  border-bottom: 1px solid var(--vt-border-subtle); box-sizing: border-box;
+}
+.vt-viewtabs { display: flex; gap: var(--vt-space-0); }
+.vt-viewtab {
+  font: inherit; line-height: var(--vt-line-height-tight); padding: 4px 14px;
+  border: 1px solid transparent; border-radius: var(--vt-radius);
+  background: transparent; color: var(--vt-text); cursor: pointer;
+  /* Only colours fade: a global rule from the editor's UI kit animates every property of every
+     button, which made the previous tab look selected for a moment. */
+  transition: background-color var(--vt-duration), color var(--vt-duration), border-color var(--vt-duration);
+}
+.vt-viewtab:hover:not(:disabled) { background: var(--vt-surface-hover); color: var(--vt-text-strong); }
+.vt-viewtab.active {
+  background: var(--vt-surface); border-color: var(--vt-border); color: var(--vt-text-strong);
+  font-weight: var(--vt-weight-strong); box-shadow: inset 0 -2px 0 var(--vt-accent);
+}
+.vt-viewtab.active:hover { background: var(--vt-surface); }
+.vt-viewtab:disabled { color: var(--vt-text-faint); cursor: default; }
+.vt-enzyme-set { display: flex; align-items: center; color: var(--vt-text-muted); white-space: nowrap; }
+.vt-enzyme-set select {
+  font: inherit; height: 24px; padding: 0 var(--vt-space-1);
+  border: 1px solid var(--vt-border-strong); border-radius: var(--vt-radius-sm);
+  background: var(--vt-surface); color: var(--vt-text-strong); cursor: pointer;
+}
 
 .vt-editor { min-height: 0; overflow: hidden; }
 
-/* status bar */
-.vt-status-bar { display: flex; align-items: center; justify-content: space-between; padding: 0 10px; background: #f7f8fa; border-top: 1px solid #d8dce1; color: #374151; box-sizing: border-box; }
+/* ---- status bar ---------------------------------------------------------------------------- */
+.vt-status-bar {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--vt-space-4);
+  padding: 0 10px; background: var(--vt-surface-subtle); border-top: 1px solid var(--vt-border-subtle);
+  color: var(--vt-text); box-sizing: border-box; white-space: nowrap; overflow: hidden;
+  font-variant-numeric: tabular-nums;   /* numbers keep their width while the selection changes */
+}
 .vt-status { display: flex; gap: 14px; }
-.vt-status-set { color: #6b7280; }
+.vt-status-set { color: var(--vt-text-muted); }
+/* Tm has a tooltip with every preset and its method: the dotted underline says so. */
+.vt-tm { cursor: help; text-decoration: underline dotted var(--vt-text-faint); text-underline-offset: 3px; }
 
-/* welcome screen */
-.vt-welcome { max-width: 760px; margin: 60px auto; color: #374151; }
-.vt-welcome h1 { font-size: 30px; margin: 0 0 6px; color: #111827; }
-.vt-welcome-actions { display: flex; gap: 10px; margin: 18px 0 28px; }
-.vt-welcome-actions button { font: inherit; padding: 8px 16px; border: 1px solid #c3c8cf; border-radius: 6px; background: #fff; cursor: pointer; }
-.vt-welcome-actions button:hover { background: #f3f4f6; }
-.vt-recent ul { list-style: none; padding: 0; margin: 0; }
-.vt-recent li { display: flex; gap: 12px; align-items: baseline; padding: 3px 0; }
-.vt-recent-dir { color: #9ca3af; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* ---- welcome screen ------------------------------------------------------------------------- */
+.vt-welcome { max-width: 760px; margin: 60px auto; padding: 0 var(--vt-space-5); color: var(--vt-text); line-height: var(--vt-line-height); }
+.vt-welcome h1 {
+  margin: 0 0 6px; color: var(--vt-text-strong); font-size: var(--vt-font-size-xl);
+  font-weight: var(--vt-weight-strong); line-height: var(--vt-line-height-tight);
+}
+.vt-welcome p { margin: 0; }
+.vt-welcome h3 {
+  margin: 0 0 var(--vt-space-2); color: var(--vt-text-strong); font-size: var(--vt-font-size-md);
+  font-weight: var(--vt-weight-strong); line-height: var(--vt-line-height-tight);
+}
+.vt-welcome-actions { display: flex; flex-wrap: wrap; gap: var(--vt-space-3); margin: 18px 0 28px; }
+.vt-welcome-actions button {
+  font: inherit; line-height: var(--vt-line-height-tight); min-height: 36px; padding: 8px 16px;
+  border: 1px solid var(--vt-border-strong); border-radius: var(--vt-radius-lg);
+  background: var(--vt-surface); color: var(--vt-text-strong); cursor: pointer;
+  transition: background-color var(--vt-duration), border-color var(--vt-duration);
+}
+.vt-welcome-actions button:hover { background: var(--vt-surface-hover); }
+/* Opening a file is what most people came for. */
+.vt-welcome-actions button:first-child {
+  background: var(--vt-accent); border-color: var(--vt-accent); color: var(--vt-text-on-accent);
+}
+.vt-welcome-actions button:first-child:hover { background: var(--vt-accent-hover); border-color: var(--vt-accent-hover); }
+.vt-recent, .vt-samples { margin-bottom: var(--vt-space-5); }
+.vt-recent ul, .vt-samples ul { list-style: none; padding: 0; margin: 0; }
+.vt-recent li, .vt-samples li { display: flex; gap: var(--vt-space-3); align-items: baseline; padding: 3px 0; min-width: 0; }
+.vt-recent li a, .vt-samples li a { flex: none; }
+.vt-recent-dir {
+  color: var(--vt-text-muted); font-size: var(--vt-font-size-xs);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
+}
 
-/* history view */
-.vt-history { padding: 16px 24px; }
-.vt-history h2 { font-size: 16px; margin: 0 0 12px; }
+/* ---- history view ---------------------------------------------------------------------------- */
+.vt-history { padding: var(--vt-space-4) var(--vt-space-5); }
+.vt-history h2 {
+  margin: 0 0 var(--vt-space-3); color: var(--vt-text-strong); font-size: var(--vt-font-size-md);
+  font-weight: var(--vt-weight-strong); line-height: var(--vt-line-height-tight);
+}
 .vt-history table { width: 100%; }
 
-/* OVE: one view at a time, switched from Vettore's view tabs */
+/* ---- the editor component: one view at a time, switched from Vettore's view tabs ---------------- */
 .veEditor .ve-draggable-tabs, .veEditor .ve-clickable-tabs { display: none !important; }
 .vt-editor-slot { flex: none; }
 /* The Features / Primers / Enzymes views are chosen with Vettore's tabs, not the properties tab row. */
 .ve-propertiesPanel .bp3-tab-list { display: none !important; }
-.vt-editor-overlay { position: absolute; inset: 0; background: #fff; z-index: 30; overflow: auto; }
-.vt-table-view { padding: 10px 16px; }
-.vt-table-toolbar { display: flex; align-items: center; gap: 14px; margin-bottom: 8px; }
+.vt-editor-overlay { position: absolute; inset: 0; background: var(--vt-surface); z-index: 30; overflow: auto; }
+
+/* ---- table views (Enzymes) ------------------------------------------------------------------- */
+.vt-table-view { padding: 10px var(--vt-space-4); }
+.vt-table-toolbar { display: flex; align-items: center; gap: 14px; margin-bottom: var(--vt-space-2); }
 .vt-table-toolbar input { width: 220px; }
 .vt-table { width: 100%; }
+/* Column titles stay in sight while a long enzyme list scrolls. */
+.vt-table-view .vt-table thead th {
+  position: sticky; top: 0; z-index: 1; background: var(--vt-surface);
+  box-shadow: inset 0 -1px 0 var(--vt-border-subtle);
+}
 .vt-sortable { cursor: pointer; user-select: none; }
-.vt-row-selected td { background: #e6f0fb !important; }
+.vt-sortable:hover { color: var(--vt-accent); }
+.vt-row-selected td { background: var(--vt-selection) !important; }
 .vt-bold { font-weight: 700; }
-.vt-mono { font-family: Menlo, Consolas, monospace; }
-.vt-muted { color: #6b7280; }
-.vt-cut { margin-right: 8px; }
+.vt-mono { font-family: var(--vt-font-mono); }
+/* :root lifts these above Blueprint's table-cell colour, so they also work on <td> and <tr>. */
+:root .vt-muted, :root .vt-muted > td { color: var(--vt-text-muted); }
+.vt-cut { margin-right: var(--vt-space-2); }
 
-/* cloning dialogs */
-.vt-cloning { display: grid; grid-template-columns: 380px 1fr; gap: 18px; max-height: 70vh; overflow: auto; }
-.vt-cloning-form { display: flex; flex-direction: column; gap: 10px; }
-.vt-cloning-result { border-left: 1px solid #e5e7eb; padding-left: 18px; min-width: 0; }
-.vt-field { display: flex; flex-direction: column; gap: 3px; }
-.vt-field-label { font-weight: 600; }
-.vt-field-hint { color: #6b7280; font-size: 11px; }
-.vt-enzyme-picker { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
-.vt-enzyme-picker input { width: 110px; }
+/* ---- cloning and tool dialogs ------------------------------------------------------------------ */
+/* The body scrolls inside the dialog; 200px is the dialog's own title, footer and margins, so
+   the buttons stay on screen at 1366x768. */
+.vt-cloning {
+  display: grid; grid-template-columns: 380px 1fr; gap: 18px;
+  max-height: max(70vh, calc(100vh - 200px)); overflow: auto;
+}
+.vt-cloning-form { display: flex; flex-direction: column; gap: var(--vt-space-3); }
+.vt-cloning-result { border-left: 1px solid var(--vt-border-subtle); padding-left: 18px; min-width: 0; }
+.vt-field { display: flex; flex-direction: column; gap: var(--vt-space-1); }
+.vt-field-label { color: var(--vt-text-strong); font-weight: var(--vt-weight-strong); }
+.vt-field-hint { color: var(--vt-text-muted); font-size: var(--vt-font-size-xs); line-height: var(--vt-line-height-tight); }
+/* One control height in Vettore's forms: Blueprint's small inputs (24px, 12px text) sat next to
+   30px selects, and typed sequences were hard to read. */
+:root .vt-cloning-form .bp3-input.bp3-small,
+:root .vt-field .bp3-input.bp3-small {
+  height: var(--vt-control-height); line-height: var(--vt-control-height);
+  font-size: var(--vt-font-size); padding: 0 var(--vt-space-2);
+}
+:root .vt-cloning-form .bp3-button.bp3-small { min-height: var(--vt-control-height); font-size: var(--vt-font-size); }
+.vt-enzyme-picker { display: flex; flex-wrap: wrap; gap: var(--vt-space-1); align-items: center; }
+.vt-enzyme-picker input { width: 130px; }
+:root .vt-enzyme-picker .bp3-tag { min-height: var(--vt-control-height-sm); font-size: var(--vt-font-size-sm); }
 .vt-region { display: flex; align-items: center; gap: 6px; }
 .vt-region input { width: 90px; }
 .vt-primer-input { display: flex; gap: 6px; }
 .vt-primer-input input:nth-child(1) { width: 110px; }
 .vt-primer-input input:nth-child(2) { flex: 1; min-width: 0; }
-.vt-insert-row { border: 1px solid #e5e7eb; border-radius: 6px; padding: 8px; display: flex; flex-direction: column; gap: 8px; }
-.vt-preview { height: 280px; border: 1px solid #e5e7eb; border-radius: 6px; margin-bottom: 10px; }
-.vt-products { display: flex; flex-direction: column; gap: 2px; margin-bottom: 8px; }
+.vt-insert-row, .vt-card {
+  display: flex; flex-direction: column; gap: var(--vt-space-2); padding: 10px;
+  border: 1px solid var(--vt-border-subtle); border-radius: var(--vt-radius-lg); background: var(--vt-surface);
+}
+.vt-preview {
+  height: 280px; margin-bottom: 10px; border: 1px solid var(--vt-border-subtle);
+  border-radius: var(--vt-radius-lg); background: var(--vt-surface);
+}
+.vt-products { display: flex; flex-direction: column; gap: var(--vt-space-0); margin-bottom: var(--vt-space-2); }
 .vt-oligos { margin-top: 10px; }
+/* Short cells (name, length, Tm) never wrap; the sequence column breaks anywhere. */
+.vt-oligos td { white-space: nowrap; }
+.vt-oligos td.vt-break { white-space: normal; }
 .vt-row { display: flex; align-items: center; gap: 10px; }
 .vt-break { word-break: break-all; }
-.vt-gel { display: block; margin-bottom: 8px; }
-.vt-sanger-bar { gap: 16px; flex-wrap: wrap; margin-bottom: 10px; }
-.vt-alignment { height: 430px; border: 1px solid #d8dce1; border-radius: 4px; margin-top: 10px; }
-.vt-ok { color: #0f7b3f; font-weight: 600; }
-.vt-warn { color: #b54708; font-weight: 600; }
+.vt-gel { display: block; margin-bottom: var(--vt-space-2); }
+.vt-sanger-bar { gap: var(--vt-space-4); flex-wrap: wrap; margin-bottom: 10px; }
+.vt-alignment {
+  height: 430px; margin-top: 10px; border: 1px solid var(--vt-border-subtle);
+  border-radius: var(--vt-radius); background: var(--vt-surface);
+}
+:root .vt-ok { color: var(--vt-success); font-weight: var(--vt-weight-strong); }
+:root .vt-warn { color: var(--vt-warning); font-weight: var(--vt-weight-strong); }
+:root .vt-bad { color: var(--vt-danger); font-weight: var(--vt-weight-strong); }
 .vt-swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: middle; }
+
+/* ---- errors ----------------------------------------------------------------------------------- */
+/* An error inside a dialog or view: a full-width danger notice that wraps. */
+.vt-error {
+  display: block; margin: 0 0 var(--vt-space-3); padding: var(--vt-space-2) var(--vt-space-3);
+  border: 1px solid var(--vt-danger-border); border-left: 3px solid var(--vt-danger);
+  border-radius: var(--vt-radius); background: var(--vt-danger-bg); color: var(--vt-danger);
+  line-height: var(--vt-line-height);
+}
+/* An error in the document tab strip (a file that could not be opened): one line, click to dismiss. */
+.vt-doctabs .vt-error {
+  align-self: center; margin: 0 0 0 auto; padding: 1px 10px 1px 6px; max-width: 50%;
+  border-left-width: 1px; cursor: pointer; font-weight: var(--vt-weight-medium);
+  line-height: var(--vt-line-height-tight); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.vt-doctabs .vt-error::before {
+  content: "!" / "";
+  display: inline-block; width: 16px; height: 16px; margin-right: 6px; border-radius: 50%;
+  background: var(--vt-danger); color: var(--vt-text-on-accent); font-size: var(--vt-font-size-xs);
+  font-weight: 700; line-height: 16px; text-align: center; vertical-align: -2px;
+}
+.vt-doctabs .vt-error:hover { border-color: var(--vt-danger); }
+
+/* ---- keyboard focus ------------------------------------------------------------------------------ */
+/* Visible on every Vettore control reached with the keyboard (WCAG 2.4.7); mouse clicks show none. */
+.vt-viewtab:focus-visible,
+.vt-doctab:focus-visible,
+.vt-doctab-close:focus-visible,
+.vt-enzyme-set select:focus-visible,
+.vt-welcome button:focus-visible,
+.vt-welcome a:focus-visible,
+.vt-table-view a:focus-visible,
+.vt-table-view input:focus-visible,
+.vt-history button:focus-visible,
+.vt-error:focus-visible {
+  outline: 2px solid var(--vt-focus);
+  outline-offset: 2px;
+}
+.vt-viewtab:focus-visible, .vt-doctab:focus-visible { outline-offset: -2px; }
+
+/* ==== Shared presentational classes (see docs/DESIGN.md) ========================================== */
+
+/* First line of a dialog: what it does, in one sentence. */
+.vt-dialog-intro {
+  margin: 0 0 var(--vt-space-4); max-width: var(--vt-measure);
+  color: var(--vt-text); line-height: var(--vt-line-height);
+}
+/* A heading inside a dialog or view ("Primers to order", "Lanes"). */
+.vt-section-title {
+  margin: var(--vt-space-4) 0 var(--vt-space-2); color: var(--vt-text-strong);
+  font-size: var(--vt-font-size); font-weight: var(--vt-weight-strong); line-height: var(--vt-line-height-tight);
+}
+.vt-section-title:first-child { margin-top: 0; }
+
+/* Inline validation, directly under the field it is about. */
+.vt-field-error {
+  color: var(--vt-danger); font-size: var(--vt-font-size-xs); font-weight: var(--vt-weight-medium);
+  line-height: var(--vt-line-height-tight);
+}
+:root .vt-field-invalid .bp3-input,
+:root .vt-field-invalid select { box-shadow: inset 0 0 0 1px var(--vt-danger); }
+
+/* Nothing to show yet: say why, and what to do. */
+.vt-empty-state {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--vt-space-2);
+  padding: var(--vt-space-6) var(--vt-space-5); border: 1px dashed var(--vt-border); border-radius: var(--vt-radius-lg);
+  background: var(--vt-surface); color: var(--vt-text-muted); text-align: center; line-height: var(--vt-line-height);
+}
+.vt-empty-state > * { margin: 0; max-width: 48ch; }
+.vt-empty-state-title { color: var(--vt-text-strong); font-size: var(--vt-font-size-md); font-weight: var(--vt-weight-strong); }
+
+/* A message block: neutral by default, with danger / warning / success / info variants. */
+.vt-notice {
+  display: block; margin: 0 0 var(--vt-space-3); padding: var(--vt-space-2) var(--vt-space-3);
+  border: 1px solid var(--vt-border-subtle); border-left: 3px solid var(--vt-text-muted);
+  border-radius: var(--vt-radius); background: var(--vt-surface); color: var(--vt-text-strong);
+  line-height: var(--vt-line-height);
+}
+.vt-notice > :last-child { margin-bottom: 0; }
+.vt-notice ul { margin: var(--vt-space-1) 0 0; padding-left: var(--vt-space-5); }
+.vt-notice-title { display: block; margin-bottom: var(--vt-space-0); font-weight: var(--vt-weight-strong); }
+.vt-notice-danger { border-color: var(--vt-danger-border); border-left-color: var(--vt-danger); background: var(--vt-danger-bg); }
+.vt-notice-danger .vt-notice-title { color: var(--vt-danger); }
+.vt-notice-warning { border-color: var(--vt-warning-border); border-left-color: var(--vt-warning); background: var(--vt-warning-bg); }
+.vt-notice-warning .vt-notice-title { color: var(--vt-warning); }
+.vt-notice-success { border-color: var(--vt-success-border); border-left-color: var(--vt-success); background: var(--vt-success-bg); }
+.vt-notice-success .vt-notice-title { color: var(--vt-success); }
+.vt-notice-info { border-color: var(--vt-accent-border); border-left-color: var(--vt-accent); background: var(--vt-accent-bg); }
+.vt-notice-info .vt-notice-title { color: var(--vt-accent); }
+
+/* A keyboard key: <span class="vt-kbd">Ctrl</span>+<span class="vt-kbd">O</span>. */
+.vt-kbd {
+  display: inline-block; min-width: 1.6em; padding: 0 var(--vt-space-1); box-sizing: border-box;
+  border: 1px solid var(--vt-border); border-bottom-width: 2px; border-radius: var(--vt-radius-sm);
+  background: var(--vt-surface); color: var(--vt-text-strong); font-family: var(--vt-font);
+  font-size: var(--vt-font-size-xs); font-weight: var(--vt-weight-medium); line-height: 18px;
+  text-align: center; white-space: nowrap;
+}
+
+/* Work in progress: a small spinner before the text ("Simulating…"). */
+.vt-busy { display: inline-flex; align-items: center; gap: var(--vt-space-2); color: var(--vt-text-muted); }
+.vt-busy::before {
+  content: ""; flex: none; width: 12px; height: 12px; border-radius: 50%;
+  border: 2px solid var(--vt-border); border-top-color: var(--vt-accent);
+  animation: vt-spin 0.8s linear infinite;
+}
+@keyframes vt-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .vt-busy::before { animation: none; border-color: var(--vt-accent); border-right-color: var(--vt-border); }
+}
+
+/* Numbers that line up in columns and never wrap ("59.7 °C", "3,941 bp"). */
+.vt-num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* Text for screen readers only (e.g. a label for an icon button). */
+.vt-sr-only {
+  position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; border: 0;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
+}

@@ -1,0 +1,243 @@
+/* Harmonises Blueprint 3 and the editor component's chrome (dialogs, menus, buttons, inputs,
+   tables, tags, callouts) with Vettore's tokens. The editor's map, sequence and alignment
+   drawings are not touched.
+
+   Every selector starts with :root. Blueprint's stylesheet is bundled twice, the second copy
+   after app.css (it comes with the editor component's JavaScript), so an override with the
+   same specificity as Blueprint's rule would lose. The extra pseudo-class keeps these rules
+   winning whatever the bundle order. */
+
+/* ---- type ------------------------------------------------------------------------------ */
+/* Only the family changes: size, line height and colour stay Blueprint's, which the editor's
+   panels are laid out for. */
+:root body {
+  font-family: var(--vt-font);
+  font-size: var(--vt-font-size);
+}
+/* Form controls default to the browser's own font (Arial), not the page's. */
+:root button,
+:root input,
+:root select,
+:root textarea {
+  font-family: inherit;
+}
+:root .bp3-input::placeholder,
+:root input::placeholder,
+:root textarea::placeholder {
+  color: var(--vt-text-placeholder);
+}
+
+/* ---- menus ----------------------------------------------------------------------------- */
+/* The editor wraps disabled menu items in an inline tooltip wrapper, which put two of them on
+   one row ("Reverse Complement Selection" and "Set Origin at Cursor"). */
+:root .bp3-menu > .bp3-popover-wrapper,
+:root .bp3-menu > .bp3-popover-wrapper > .bp3-popover-target {
+  display: block;
+}
+
+/* ---- dialogs --------------------------------------------------------------------------- */
+:root .bp3-dialog {
+  background: var(--vt-surface-subtle);
+  border-radius: var(--vt-radius-lg);
+  box-shadow: var(--vt-shadow-3);
+}
+:root .bp3-dialog-header {
+  border-radius: var(--vt-radius-lg) var(--vt-radius-lg) 0 0;
+  box-shadow: 0 1px 0 var(--vt-border-subtle);
+  min-height: 44px;
+}
+:root .bp3-dialog-header .bp3-heading {
+  color: var(--vt-text-strong);
+  font-size: var(--vt-font-size-lg);
+  font-weight: var(--vt-weight-strong);
+}
+/* Explanations get room between lines; labels and controls keep Blueprint's compact 18px. */
+:root .bp3-dialog-body p {
+  line-height: var(--vt-line-height);
+}
+:root .bp3-dialog-close-button {
+  min-width: 32px;
+  min-height: 32px;
+}
+
+/* ---- inputs and selects ------------------------------------------------------------------ */
+/* Outlines at 3:1 against the field, so the places to type are visible (WCAG 1.4.11). */
+:root .bp3-input {
+  box-shadow: inset 0 0 0 1px var(--vt-border-strong);
+  color: var(--vt-text-strong);
+}
+:root .bp3-input:focus,
+:root .bp3-input.bp3-active {
+  box-shadow: inset 0 0 0 1px var(--vt-focus), 0 0 0 3px var(--vt-focus-halo);
+}
+:root .bp3-input:disabled,
+:root .bp3-input.bp3-disabled {
+  box-shadow: none;
+}
+:root .bp3-input.bp3-intent-danger {
+  box-shadow: inset 0 0 0 1px var(--vt-danger);
+}
+:root .bp3-input.bp3-intent-danger:focus {
+  box-shadow: inset 0 0 0 1px var(--vt-danger), 0 0 0 3px var(--vt-danger-halo);
+}
+:root .bp3-html-select select,
+:root .bp3-select select {
+  box-shadow: inset 0 0 0 1px var(--vt-border-strong);
+  color: var(--vt-text-strong);
+}
+:root .bp3-html-select select:focus,
+:root .bp3-select select:focus {
+  outline: 2px solid var(--vt-focus);
+  outline-offset: 1px;
+}
+:root .bp3-html-select select:disabled,
+:root .bp3-select select:disabled {
+  box-shadow: none;
+}
+
+/* Native controls Blueprint does not style. */
+:root input[type="checkbox"],
+:root input[type="radio"] {
+  accent-color: var(--vt-accent);
+}
+:root .bp3-dialog input[type="file"] {
+  color: var(--vt-text);
+  font-size: var(--vt-font-size);
+}
+:root .bp3-dialog input[type="file"]::file-selector-button {
+  height: var(--vt-control-height);
+  margin-right: var(--vt-space-2);
+  padding: 0 var(--vt-space-3);
+  border: 1px solid var(--vt-border-strong);
+  border-radius: var(--vt-radius-sm);
+  background: var(--vt-surface);
+  color: var(--vt-text-strong);
+  font: inherit;
+  cursor: pointer;
+}
+:root .bp3-dialog input[type="file"]::file-selector-button:hover {
+  background: var(--vt-surface-hover);
+}
+
+/* ---- buttons ----------------------------------------------------------------------------- */
+/* Filled primary buttons in the accent colour (white text at 5.8:1; Blueprint's own blue is
+   4.5:1). Minimal and outlined primary buttons (the editor's toolbar) keep their transparent
+   background. */
+:root .bp3-button.bp3-intent-primary:not(.bp3-minimal):not(.bp3-outlined) {
+  background-color: var(--vt-accent);
+}
+:root .bp3-button.bp3-intent-primary:not(.bp3-minimal):not(.bp3-outlined):hover {
+  background-color: var(--vt-accent-hover);
+}
+:root .bp3-button.bp3-intent-primary:not(.bp3-minimal):not(.bp3-outlined):active,
+:root .bp3-button.bp3-intent-primary:not(.bp3-minimal):not(.bp3-outlined).bp3-active {
+  background-color: var(--vt-accent-active);
+}
+:root .bp3-button.bp3-intent-primary:not(.bp3-minimal):not(.bp3-outlined):disabled,
+:root .bp3-button.bp3-intent-primary:not(.bp3-minimal):not(.bp3-outlined).bp3-disabled {
+  background-color: var(--vt-accent-disabled);
+}
+/* A small Blueprint button is 24px tall: keep it, but never smaller (WCAG 2.5.8). */
+:root .bp3-button.bp3-small {
+  min-height: var(--vt-control-height-sm);
+}
+:root .bp3-dialog .bp3-button:focus-visible,
+:root .bp3-dialog a:focus-visible,
+:root .bp3-dialog input[type="checkbox"]:focus-visible,
+:root .bp3-dialog input[type="radio"]:focus-visible,
+:root .bp3-dialog input[type="file"]:focus-visible {
+  outline: 2px solid var(--vt-focus);
+  outline-offset: 2px;
+}
+
+/* ---- tags (enzyme chips) -------------------------------------------------------------------- */
+:root .bp3-tag.bp3-minimal.bp3-intent-success {
+  background-color: var(--vt-success-bg);
+  box-shadow: inset 0 0 0 1px var(--vt-success-border);
+  color: var(--vt-success);
+}
+:root .bp3-tag.bp3-minimal.bp3-intent-warning {
+  background-color: var(--vt-warning-bg);
+  box-shadow: inset 0 0 0 1px var(--vt-warning-border);
+  color: var(--vt-warning);
+}
+:root .bp3-tag.bp3-minimal.bp3-intent-danger {
+  background-color: var(--vt-danger-bg);
+  box-shadow: inset 0 0 0 1px var(--vt-danger-border);
+  color: var(--vt-danger);
+}
+:root .bp3-tag.bp3-minimal.bp3-intent-primary {
+  background-color: var(--vt-accent-bg);
+  box-shadow: inset 0 0 0 1px var(--vt-accent-border);
+  color: var(--vt-accent);
+}
+/* The remove cross is the only way to take an enzyme out: make it a real target. */
+:root .bp3-tag-remove {
+  min-width: 20px;
+  min-height: 20px;
+  justify-content: center;
+  align-items: center;
+  border-radius: var(--vt-radius-sm);
+  opacity: 0.75;
+}
+:root .bp3-tag-remove:hover {
+  background: var(--vt-overlay-hover);
+  opacity: 1;
+}
+:root .bp3-tag-remove:focus-visible {
+  outline: 2px solid var(--vt-focus);
+  outline-offset: 0;
+  opacity: 1;
+}
+
+/* ---- callouts (dialog errors, warnings, notes) ---------------------------------------------- */
+/* Same colours as .vt-notice: tinted background, coloured rule on the left, dark body text. */
+:root .bp3-callout {
+  border-radius: var(--vt-radius);
+  color: var(--vt-text-strong);
+}
+:root .bp3-callout + .bp3-callout {
+  margin-top: var(--vt-space-2);
+}
+:root .bp3-callout.bp3-intent-danger {
+  background-color: var(--vt-danger-bg);
+  box-shadow: inset 3px 0 0 var(--vt-danger), inset 0 0 0 1px var(--vt-danger-border);
+}
+:root .bp3-callout.bp3-intent-danger > .bp3-icon:first-child,
+:root .bp3-callout.bp3-intent-danger .bp3-heading {
+  color: var(--vt-danger);
+}
+:root .bp3-callout.bp3-intent-warning {
+  background-color: var(--vt-warning-bg);
+  box-shadow: inset 3px 0 0 var(--vt-warning), inset 0 0 0 1px var(--vt-warning-border);
+}
+:root .bp3-callout.bp3-intent-warning > .bp3-icon:first-child,
+:root .bp3-callout.bp3-intent-warning .bp3-heading {
+  color: var(--vt-warning);
+}
+:root .bp3-callout.bp3-intent-success {
+  background-color: var(--vt-success-bg);
+  box-shadow: inset 3px 0 0 var(--vt-success), inset 0 0 0 1px var(--vt-success-border);
+}
+:root .bp3-callout.bp3-intent-success > .bp3-icon:first-child,
+:root .bp3-callout.bp3-intent-success .bp3-heading {
+  color: var(--vt-success);
+}
+:root .bp3-callout.bp3-intent-primary {
+  background-color: var(--vt-accent-bg);
+  box-shadow: inset 3px 0 0 var(--vt-accent), inset 0 0 0 1px var(--vt-accent-border);
+}
+:root .bp3-callout.bp3-intent-primary > .bp3-icon:first-child,
+:root .bp3-callout.bp3-intent-primary .bp3-heading {
+  color: var(--vt-accent);
+}
+:root .bp3-callout ul {
+  margin: var(--vt-space-1) 0 0;
+  padding-left: var(--vt-space-5);
+}
+
+/* ---- tables ------------------------------------------------------------------------------- */
+:root table.bp3-html-table th {
+  color: var(--vt-text-strong);
+  font-weight: var(--vt-weight-strong);
+}
