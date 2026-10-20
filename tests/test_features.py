@@ -128,7 +128,7 @@ def test_payload_flags_which_features_are_new():
     payload = detect_payload(sequence, circular, existing=existing)
     rows = {row["name"]: row for row in payload["features"]}
     assert rows["SaCas9"]["isNew"] is False
-    assert rows["U6 promoter"]["isNew"] is True
+    assert rows["U6 promoter (human)"]["isNew"] is True
     assert payload["new_count"] == len(payload["features"]) - 1
     assert payload["catalogue_size"] == len(catalogue())
 
@@ -207,7 +207,7 @@ def test_http_route():
                                              "circular": circular, "features": []}})
     assert res.status_code == 200
     body = res.json()
-    assert {f["name"] for f in body["features"]} >= {"SaCas9", "U6 promoter", "AmpR"}
+    assert {f["name"] for f in body["features"]} >= {"SaCas9", "U6 promoter (human)", "AmpR"}
     assert all(f["isNew"] for f in body["features"])
     short = client.post("/api/features/detect", headers={TOKEN_HEADER: "t0ken"},
                         json={"sequenceData": {"sequence": "ACGT"}})
@@ -367,13 +367,14 @@ def test_published_and_correct_labels_raise_no_warning(name):
 
 @pytest.mark.parametrize(("label", "element", "expected"), [
     ("CMV", "CMV enhancer", True), ("CMV promoter", "CMV enhancer", True),
-    ("EF1A", "EF-1α promoter", True), ("EF-1a promoter", "EF-1α promoter", True),
-    ("hEF1a", "EF-1α promoter", True), ("SV40 late pA", "SV40 polyA", True),
+    ("EF1A", "EF-1α promoter (human)", True),
+    ("EF-1a promoter", "EF-1α promoter (human)", True),
+    ("hEF1a", "EF-1α promoter (human)", True), ("SV40 late pA", "SV40 polyA", True),
     ("BGH pA", "bGH polyA", True), ("5' ITR", "AAV2 ITR", True),
     ("hSyn1 promoter", "hSyn promoter", True), ("CMV-promoter", "CMV promoter", True),
     ("HA tag", "3×HA", True), ("EGFP:T2A:Puro", "EGFP", True),
     ("CMV promoter", "SV40 polyA", False), ("pUC ori", "f1 ori", False),
-    ("Exon 1a", "EF-1α promoter", False), ("PGK promoter", "CMV promoter", False),
+    ("Exon 1a", "EF-1α promoter (human)", False), ("PGK promoter", "CMV promoter", False),
     ("promoter", "CMV promoter", False), ("my insert", "CMV enhancer", False),
 ])
 def test_names_are_matched_on_the_words_that_identify_an_element(label, element, expected):
@@ -386,7 +387,7 @@ def test_name_words_ignore_generic_words_and_numbers():
     from vettore.features import name_words
 
     assert name_words("SV40 late polyA signal") == {"sv40"}
-    assert name_words("EF-1α promoter", pieces=False) == {"ef1a"}
+    assert name_words("EF-1α promoter (human)", pieces=False) == {"ef1a"}
     assert name_words("5' ITR") == {"itr"}
     assert name_words("promoter") == set()
 
@@ -435,11 +436,11 @@ def test_the_truncated_cag_promoter_starts_inside_the_cmv_enhancer():
 # each fixture is in tests/data/README.md.
 
 CROSS_CHECKS = {
-    "human PGK promoter": "MT921016.1",
-    "mouse PGK promoter": "MT891341.1",
-    "UbC promoter": "MN389527.1",
-    "H1 promoter": "FJ687158.1",
-    "7SK promoter": "MQ296444.1",
+    "PGK promoter (human)": "MT921016.1",
+    "PGK promoter (mouse)": "MT891341.1",
+    "UbC promoter (human)": "MN389527.1",
+    "H1 promoter (human)": "FJ687158.1",
+    "7SK promoter (human)": "MQ296444.1",
     "SFFV promoter": "MP040844.1",
     "CAG promoter": "HG530138.1",
 }
@@ -537,31 +538,52 @@ def test_a_block_named_cag_already_annotates_the_promoter_under_it():
 def test_a_pgk_promoter_labelled_cmv_is_flagged():
     """The other way round from the CMV block labelled “PGK promoter”: now the sequence is the
     PGK promoter and the label names the CMV one."""
-    pgk = entry("human PGK promoter")
+    pgk = entry("PGK promoter (human)")
     sequence = pgk.sequence + clean_dna(1500, 44)
     mislabelled = [{"name": "CMV promoter", "start": 0, "end": pgk.length - 1}]
     payload = detect_payload(sequence, True, existing=mislabelled)
     [row] = payload["features"]
-    assert row["name"] == "human PGK promoter"
+    assert row["name"] == "PGK promoter (human)"
     assert row["labelWarning"] == (
-        "Annotated as “CMV promoter”, but the sequence is the human PGK promoter "
+        "Annotated as “CMV promoter”, but the sequence is the PGK promoter (human) "
         "(100 % identity). Check the label.")
     assert row["isNew"] is False and row["annotatedAs"] == "CMV promoter"
     assert payload["label_warnings"] == 1
 
 
 @pytest.mark.parametrize(("label", "element", "expected"), [
-    ("PGK promoter", "human PGK promoter", True),
-    ("PGK promoter", "mouse PGK promoter", True),
-    ("hPGK promoter", "human PGK promoter", True),
-    ("UBC", "UbC promoter", True), ("UbC-EGFP", "UbC promoter", True),
-    ("H1", "H1 promoter", True), ("H1-shRNA", "H1 promoter", True),
-    ("7SK promoter", "7SK promoter", True), ("SFFV", "SFFV promoter", True),
+    ("PGK promoter", "PGK promoter (human)", True),
+    ("PGK promoter", "PGK promoter (mouse)", True),
+    ("hPGK promoter", "PGK promoter (human)", True),
+    ("UBC", "UbC promoter (human)", True), ("UbC-EGFP", "UbC promoter (human)", True),
+    ("H1", "H1 promoter (human)", True), ("H1-shRNA", "H1 promoter (human)", True),
+    ("7SK promoter", "7SK promoter (human)", True), ("SFFV", "SFFV promoter", True),
     ("CAG", "CAG promoter", True), ("CAG", "CAG promoter (truncated)", True),
-    ("U6 promoter", "H1 promoter", False), ("PGK promoter", "UbC promoter", False),
-    ("SFFV promoter", "CMV promoter", False), ("CMV promoter", "human PGK promoter", False),
+    ("U6 promoter", "H1 promoter (human)", False),
+    ("PGK promoter", "UbC promoter (human)", False),
+    ("SFFV promoter", "CMV promoter", False), ("CMV promoter", "PGK promoter (human)", False),
 ])
 def test_the_new_promoters_are_named_by_the_labels_vectors_use(label, element, expected):
     from vettore.features import _names_element
 
     assert _names_element(label, element) is expected
+
+
+def test_the_species_in_a_name_does_not_tell_two_promoters_apart():
+    """The catalogue names the species, so the table says which promoter a hit is. The word
+    is not one that identifies an element: a label that says only "PGK promoter" names both
+    entries, and is not read as naming some element the catalogue does not have."""
+    from vettore.features import name_words, named_elements
+
+    assert name_words("PGK promoter (human)", pieces=False) == {"pgk"}
+    assert name_words("PGK promoter (mouse)", pieces=False) == {"pgk"}
+    assert name_words("U6 promoter (human)", pieces=False) == {"u6"}
+    assert named_elements("PGK promoter") == {"PGK promoter (human)", "PGK promoter (mouse)"}
+
+
+def test_the_human_and_mouse_pgk_promoters_are_two_sequences_not_one():
+    """Two entries earn their place only if a search tells them apart: the human promoter is
+    not found in the mouse one, nor the other way round."""
+    human, mouse = entry("PGK promoter (human)"), entry("PGK promoter (mouse)")
+    assert names(detect(human.sequence, False)) == ["PGK promoter (human)"]
+    assert names(detect(mouse.sequence, False)) == ["PGK promoter (mouse)"]

@@ -67,47 +67,47 @@ ENTRIES: list[Entry] = [
     # Human PGK1 promoter, the 511 bp fragment lentiviral vectors use (pLKO.1 and its
     # derivatives). MT921016.1, from another laboratory and another backbone, differs at one
     # base; PX675714.1 and PY500167.1 carry it unchanged.
-    Entry("human PGK promoter", "promoter", "OQ427862.1", 1, 511,
+    Entry("PGK promoter (human)", "promoter", "OQ427862.1", 1, 511,
           "human phosphoglycerate kinase 1 promoter; cross-check MT921016.1 (99.8 %)"),
     # Mouse Pgk-1 promoter, the 500 bp fragment of PGK-neo and PGK-puro selection cassettes.
     # It is not the human promoter: the two share only ~70 % identity, hence two entries.
     # MH325104.1 (Berman et al., J Am Chem
     # Soc 2018;140:18093), LC744045.1 and MT891341.1 (Frei et al., Nat Commun 2020;11:4641)
     # annotate exactly the same 500 bp.
-    Entry("mouse PGK promoter", "promoter", "MH325104.1", 3321, 3820,
+    Entry("PGK promoter (mouse)", "promoter", "MH325104.1", 3321, 3820,
           "mouse Pgk-1 promoter of PGK-neo/PGK-puro cassettes; "
           "cross-check MT891341.1 (100 %)"),
     # Human ubiquitin C promoter with its first exon and intron, as in UbC-driven lentiviral
     # vectors. OL870463.1 (Katzman et al., Viruses 2021;14:11) is the shared span: MN389527.1,
     # MK873089.1 and MW987535.2 annotate the same region with a few extra bases at the start
     # and, in MW987535.2, a polylinker at the end.
-    Entry("UbC promoter", "promoter", "OL870463.1", 1096, 2299,
+    Entry("UbC promoter (human)", "promoter", "OL870463.1", 1096, 2299,
           "human ubiquitin C promoter with its first intron; "
           "cross-check MN389527.1 (99.2 %)"),
     # Human H1 RNA promoter, the 216 bp of the pSUPER-type shRNA cassette. AY640634.1 is
     # Michel et al., Biochem Biophys Res Commun 2005;326:307-312; the same 216 bp is annotated
     # in the pSUPER vectors AY640627.1 and HQ416701.1, and FJ687158.1, from another
     # laboratory, annotates -230 to -9 of the same promoter.
-    Entry("H1 promoter", "promoter", "AY640634.1", 1543, 1758,
+    Entry("H1 promoter (human)", "promoter", "AY640634.1", 1543, 1758,
           "human H1 RNA promoter, RNA polymerase III; cross-check FJ687158.1 (99.5 %)"),
     # Human 7SK RNA promoter: the 243 bp directly upstream of the 7SK transcription start.
     # Checked against the human locus as well — the fragment aligns to the 243 bp in front of
     # RN7SK on NC_000006.12 (98.8 %), where NR_001445.2 starts at the next base. PY046810.1
     # and MQ296444.1 come from unrelated applicants.
-    Entry("7SK promoter", "promoter", "PY046810.1", 1, 243,
+    Entry("7SK promoter (human)", "promoter", "PY046810.1", 1, 243,
           "human 7SK RNA promoter, RNA polymerase III; cross-check MQ296444.1 (99.2 %)"),
     # Spleen focus-forming virus U3 promoter from the viral LTR, the 483 bp lentiviral
     # vectors use. KJ697750.1 is the pRRL-sffv vector series; MP040844.1 carries the same
     # fragment with four extra bases at each end.
     Entry("SFFV promoter", "promoter", "KJ697750.1", 6155, 6637,
           "spleen focus-forming virus U3 (LTR) promoter; cross-check MP040844.1 (100 %)"),
-    Entry("EF-1α promoter", "promoter", "MT612431.1", 174, 1357,
+    Entry("EF-1α promoter (human)", "promoter", "MT612431.1", 174, 1357,
           "human elongation factor 1α promoter with intron A"),
-    Entry("CaMKIIα promoter", "promoter", "MW139900.1", 576, 1866,
+    Entry("CaMKIIα promoter (mouse)", "promoter", "MW139900.1", 576, 1866,
           "mouse CaMKIIα promoter, excitatory neurons"),
     Entry("GFAP promoter (gfaABC1D)", "promoter", "PZ398262.1", 3384, 4070,
           "compact GFAP promoter, astrocytes"),
-    Entry("U6 promoter", "promoter", "PZ629150.1", 3986, 4226,
+    Entry("U6 promoter (human)", "promoter", "PZ629150.1", 3986, 4226,
           "human U6 snRNA promoter, RNA polymerase III"),
     Entry("WPRE", "misc_feature", "MH282430.1", 2377, 2965,
           "woodchuck hepatitis virus post-transcriptional regulatory element"),

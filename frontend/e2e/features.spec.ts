@@ -39,7 +39,7 @@ test("detect common features on a real AAV plasmid and add them to the map", asy
   const table = page.getByTestId("detect-table");
   await expect(table).toBeVisible({ timeout: 30_000 });
   await expect(page.getByTestId("detect-identity")).toHaveValue("95");
-  for (const name of ["SaCas9", "U6 promoter", "AmpR", "AAV2 ITR (truncated)", "ori"]) {
+  for (const name of ["SaCas9", "U6 promoter (human)", "AmpR", "AAV2 ITR (truncated)", "ori"]) {
     await expect(table).toContainText(name);
   }
   await expect(table).toContainText("PZ629150.1:581..3925");   // provenance is shown
@@ -52,7 +52,7 @@ test("detect common features on a real AAV plasmid and add them to the map", asy
   await page.getByTestId("view-features").click();
   const features = page.locator(".ve-propertiesPanel");
   await expect(features.getByText("SaCas9", { exact: true }).first()).toBeVisible();
-  await expect(features.getByText("U6 promoter", { exact: true }).first()).toBeVisible();
+  await expect(features.getByText("U6 promoter (human)", { exact: true }).first()).toBeVisible();
 
   await page.getByTestId("view-map").click();
   await expect(page.locator(".veCircularView")).toContainText("SaCas9");

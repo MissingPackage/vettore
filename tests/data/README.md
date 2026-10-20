@@ -67,11 +67,11 @@ The records the entries come from:
 
 | File | Record | Element and the coordinates the entry cites |
 |---|---|---|
-| `features-OQ427862.1.fasta` | OQ427862.1, vector pLKO.1-ZsGreen1 (Tokuma, direct submission) | human PGK promoter, 1..511 |
-| `features-MH325104.1.fasta` | MH325104.1, vector pLVX.TRE3G.eGFP (Berman et al., J Am Chem Soc 2018;140:18093) | mouse PGK promoter, 3321..3820 |
-| `features-OL870463.1.fasta` | OL870463.1, vector pLenti-hACE2 (Katzman et al., Viruses 2021;14:11) | UbC promoter, 1096..2299 |
-| `features-AY640634.1.fasta` | AY640634.1, siRNA vector pAAV9(5)-hSyn-DsRed2N1-EGFP-siRNA (Michel et al., Biochem Biophys Res Commun 2005;326:307) | H1 promoter, 1543..1758 |
-| `features-PY046810.1.fasta` | PY046810.1, sequence 103 from patent US 12370253 B2 (Pauza et al.) | 7SK promoter, 1..243 |
+| `features-OQ427862.1.fasta` | OQ427862.1, vector pLKO.1-ZsGreen1 (Tokuma, direct submission) | PGK promoter (human), 1..511 |
+| `features-MH325104.1.fasta` | MH325104.1, vector pLVX.TRE3G.eGFP (Berman et al., J Am Chem Soc 2018;140:18093) | PGK promoter (mouse), 3321..3820 |
+| `features-OL870463.1.fasta` | OL870463.1, vector pLenti-hACE2 (Katzman et al., Viruses 2021;14:11) | UbC promoter (human), 1096..2299 |
+| `features-AY640634.1.fasta` | AY640634.1, siRNA vector pAAV9(5)-hSyn-DsRed2N1-EGFP-siRNA (Michel et al., Biochem Biophys Res Commun 2005;326:307) | H1 promoter (human), 1543..1758 |
+| `features-PY046810.1.fasta` | PY046810.1, sequence 103 from patent US 12370253 B2 (Pauza et al.) | 7SK promoter (human), 1..243 |
 | `features-KJ697750.1.fasta` | KJ697750.1, cloning vector pRRL-sffv-eGFP-cmv-hsCDNF (Cordero Llana, direct submission) | SFFV promoter, 6155..6637 |
 | `features-ON012604.1.fasta` | ON012604.1, targeting vector AAVS1 CAG iRFP720 (Feher et al., Sci Rep 2022;12:9874) | CAG promoter (full length), 4799..6471 |
 
@@ -79,10 +79,10 @@ The independent records:
 
 | File | Record | Element it cross-checks |
 |---|---|---|
-| `features-MT921016.1.fasta` | MT921016.1, vector pTTC_FusionRed_eGFP_3UTR (Dolskiy et al., direct submission) | human PGK promoter, annotated there at 3754..4264 |
-| `features-MT891341.1.fasta` | MT891341.1, cloning vector pT-PGK-mCherry (Frei et al., Nat Commun 2020;11:4641) | mouse PGK promoter, annotated there at 345..848 |
-| `features-MN389527.1.fasta` | MN389527.1, cloning vector pMG_DV (Stach et al., ACS Synth Biol 2019) | UbC promoter, annotated there at 583..1799 |
-| `features-FJ687158.1.fasta` | FJ687158.1, RNAi expression vector pUC18-H1 (Mathupala et al., Neurosurgery 2004;55:1410) | H1 promoter, annotated there at complement(414..633) |
-| `features-MQ296444.1.fasta` | MQ296444.1, sequence 123 from patent WO 2021216503 (Kmiec et al.) | 7SK promoter, the record's own 7SK promoter sequence |
+| `features-MT921016.1.fasta` | MT921016.1, vector pTTC_FusionRed_eGFP_3UTR (Dolskiy et al., direct submission) | PGK promoter (human), annotated there at 3754..4264 |
+| `features-MT891341.1.fasta` | MT891341.1, cloning vector pT-PGK-mCherry (Frei et al., Nat Commun 2020;11:4641) | PGK promoter (mouse), annotated there at 345..848 |
+| `features-MN389527.1.fasta` | MN389527.1, cloning vector pMG_DV (Stach et al., ACS Synth Biol 2019) | UbC promoter (human), annotated there at 583..1799 |
+| `features-FJ687158.1.fasta` | FJ687158.1, RNAi expression vector pUC18-H1 (Mathupala et al., Neurosurgery 2004;55:1410) | H1 promoter (human), annotated there at complement(414..633) |
+| `features-MQ296444.1.fasta` | MQ296444.1, sequence 123 from patent WO 2021216503 (Kmiec et al.) | 7SK promoter (human), the record's own 7SK promoter sequence |
 | `features-MP040844.1.fasta` | MP040844.1, sequence 35 from patent WO 2018206791 (Duchateau et al.) | SFFV promoter, the record's own SFFV promoter sequence |
 | `features-HG530138.1.fasta` | HG530138.1, cloning vector pTAL7B (Frank, Skryabin & Greber) | CAG promoter (full length), annotated there at 3272..4948 |
