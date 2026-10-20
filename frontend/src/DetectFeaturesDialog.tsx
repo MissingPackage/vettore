@@ -180,9 +180,11 @@ export default function DetectFeaturesDialog(props: { doc: OpenDoc; onClose: () 
             <span className="vt-notice-title">
               {doubtfulLabels(result)} label{doubtfulLabels(result) === 1 ? "" : "s"} may be wrong
             </span>
-            The sequence under {doubtfulLabels(result) === 1 ? "it is" : "them is"} a different
-            element from the one the label names. The rows marked below say which; they are not
-            ticked, so nothing changes unless you tick one to add the element under its own name.
+            {doubtfulLabels(result) === 1
+              ? "The sequence under it is a different element from the one the label names. "
+              : "The sequence under each is a different element from the one its label names. "}
+            The rows marked below say which; they are not ticked, so nothing changes unless you
+            tick one to add the element under its own name.
           </div>
         )}
         {result && result.features.length > 0 && (
