@@ -174,6 +174,50 @@ def test_an_unrelated_sequence_is_left_out_with_a_reason():
     assert "stranger" in out["warnings"][0] and "left out" in out["warnings"][0]
 
 
+def test_a_chance_match_is_left_out_without_running_the_alignment(monkeypatch):
+    """Two unrelated plasmids that share one 16 bp stretch: a row with '100 % identity' over
+    16 bp would read as 'similar'. They are left out, and the alignment itself (seconds on
+    plasmid-sized sequences) is never run."""
+    shared = REF[700:716]
+    stranger = clean_dna(1000, 4243) + shared + clean_dna(1000, 4244)
+    aligner = al._aligner
+    sizes = []
+
+    def small_alignments_only(mode):
+        real = aligner(mode)
+
+        class Guarded:
+            def align(self, target, query):
+                sizes.append(len(target) * len(query))
+                assert len(target) < 500 and len(query) < 500, "whole alignment was run"
+                return real.align(target, query)
+
+        return Guarded()
+
+    monkeypatch.setattr(al, "_aligner", small_alignments_only)
+    out = payload(doc("ref", REF, False), doc("stranger", stranger, True))
+    assert out["sequences"] == [] and out["alignmentTracks"] == []
+    [warning] = out["warnings"]
+    assert warning.startswith("“stranger” was left out: it has nothing recognisably in common "
+                              "with “ref”")
+    assert "their best match pairs only 16 bp" in warning
+    assert sizes      # the shared stretch was looked at, in a small window
+
+
+def test_a_short_oligo_and_a_shared_cassette_are_still_aligned():
+    """Short is not the same as meaningless: a 20 bp oligo found whole in the reference, and a
+    120 bp cassette shared by two otherwise unrelated plasmids, are real matches."""
+    oligo = REF[300:320]
+    cassette = clean_dna(900, 4245) + REF[1000:1120] + clean_dna(900, 4246)
+    out = payload(doc("ref", REF, False), doc("oligo", oligo, False),
+                  doc("cassette", cassette, False))
+    rows = {s["name"]: s for s in out["sequences"]}
+    assert (rows["oligo"]["start"], rows["oligo"]["end"]) == (301, 320)
+    assert rows["cassette"]["mode"] == "local"
+    assert (rows["cassette"]["start"], rows["cassette"]["end"]) == (1001, 1120)
+    assert out["warnings"] == []
+
+
 def test_tracks_share_one_coordinate_system():
     out = payload(doc("ref", REF, False), doc("variant", VARIANT, False),
                   doc("frag", REF[700:1100], False), doc("rc", rc(VARIANT), True))
@@ -224,6 +268,20 @@ def test_aav9_capsid_aligns_end_to_end_with_aav2_capsid():
     assert reverse["strand"] == -1 and reverse["differences"] == forward["differences"]
     # Every difference falls inside the capsid region.
     assert all(2203 <= d["start"] <= 4410 for d in forward["differences"])
+
+
+def test_unrelated_plasmids_are_left_out_against_a_viral_genome():
+    """The reported case: the AAV2 genome as reference and plasmids that share nothing with it
+    gave rows like '93.75 % identity' over 16 bp. They are left out with the reason."""
+    genome = record("analysis-NC_001401.2.gb")
+    plasmids = list(SeqIO.parse(DATA / "exchange-plasmids.fasta", "fasta"))
+    pbr322 = SeqIO.read(DATA / "exchange-pBR322.embl", "embl")
+    others = [doc(p.id, str(p.seq).upper(), True) for p in plasmids[:2]]
+    others.append(doc("pBR322", str(pbr322.seq).upper(), True))
+    out = payload(doc("AAV2", genome, False), *others)
+    assert out["sequences"] == []
+    assert len(out["warnings"]) == len(others)
+    assert all("nothing recognisably in common with “AAV2”" in w for w in out["warnings"])
 
 
 # ---- limits and HTTP ----------------------------------------------------------------------
