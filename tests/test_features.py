@@ -160,3 +160,27 @@ def test_http_route():
     short = client.post("/api/features/detect", headers={TOKEN_HEADER: "t0ken"},
                         json={"sequenceData": {"sequence": "ACGT"}})
     assert short.status_code == 422
+
+
+def test_the_lightly_annotated_sample_vector_gets_its_backbone_named():
+    """pUC19 is offered on the welcome screen as the construct to try feature detection on, so
+    detection has to find something useful in it."""
+    from vettore import app_info
+
+    [sample] = [s for s in app_info.SAMPLES if s.id == "puc19"]
+    [doc] = app_info.sample_documents(sample)
+    found = names(detect(doc["sequence"].upper(), doc["circular"]))
+    assert "AmpR" in found and "ori" in found
+
+
+def test_an_unannotated_aav_cassette_gives_the_packaging_check_two_itrs():
+    """The AAV packaging check falls back on this search when a document has no ITR feature."""
+    [itr] = [f for f in catalogue() if f.name == "AAV2 ITR"]
+    filler = clean_dna(2000, 11)
+    matches = [m for m in detect(itr.sequence + filler + itr.sequence, circular=True)
+               if m.type == "repeat_region"]
+    assert len(matches) == 2
+    assert matches[0].start == 0
+    assert matches[1].start == len(itr.sequence) + len(filler)
+    # ITR to ITR, ITRs included — the number the check reports.
+    assert matches[1].end - matches[0].start + 1 == 2 * len(itr.sequence) + len(filler)

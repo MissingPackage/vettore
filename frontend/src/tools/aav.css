@@ -1,0 +1,61 @@
+/* AAV packaging check. Colours come from theme/tokens.css. */
+.vt-aav-itrs {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vt-space-1);
+}
+
+.vt-aav-hint {
+  margin: var(--vt-space-2) 0 0;
+  font-size: 12px;
+}
+
+/* How full the capsid is: the fill, with a marker at the packaging limit. */
+.vt-aav-bar {
+  position: relative;
+  height: 26px;
+  margin: var(--vt-space-4) 0 var(--vt-space-1);
+  background: var(--vt-surface-sunken);
+  border-radius: var(--vt-radius);
+  overflow: hidden;
+}
+
+.vt-aav-fill {
+  height: 100%;
+  transition: width 120ms ease-out;
+}
+
+.vt-aav-ok { background: var(--vt-success); }
+.vt-aav-tight { background: var(--vt-warning); }
+.vt-aav-over { background: var(--vt-danger); }
+
+.vt-aav-limit {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--vt-text-strong);
+}
+
+.vt-aav-bar-text {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  color: var(--vt-text-strong);
+}
+
+.vt-aav-scale {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  margin: 0 0 var(--vt-space-4);
+}
+
+.vt-aav-sources {
+  font-size: 11px;
+  line-height: 1.5;
+  margin-top: var(--vt-space-3);
+}
