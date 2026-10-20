@@ -3,6 +3,15 @@
 Offline desktop plasmid editor and cloning simulator with a familiar workflow.
 Runs on Windows 10/11 and Linux, without cloud services, accounts or Docker.
 
+### ⬇ Download
+
+**[Vettore for Windows](https://github.com/MissingPackage/vettore/releases/latest/download/Vettore-windows-x64.zip)**
+ · [Vettore for Linux](https://github.com/MissingPackage/vettore/releases/latest/download/Vettore-linux-x64.zip)
+
+Unzip anywhere, then run `Vettore.exe` (Windows) or `Vettore` (Linux). Nothing is installed and
+no account is needed. On Windows, SmartScreen warns about an unsigned app the first time:
+choose **More info → Run anyway**. Start here: **[user guide](docs/USER-GUIDE.md)**.
+
 Vettore is built on open,
 tested libraries — [Open Vector Editor](https://github.com/TeselaGen/tg-oss) for the editor UI and
 [pydna](https://github.com/pydna-group/pydna), [Biopython](https://biopython.org) and
