@@ -1,10 +1,10 @@
 # HANDOFF — Vettore
 
-**Objective:** an offline plasmid editor for daily bench work without a commercial licence. Familiar
-workflow and layout; biology computed by tested engines (pydna/Biopython/primer3).
+**Objective:** an offline plasmid editor that a molecular biologist can use daily without a
+licence fee, keeping the workflow and layout bench scientists already know, with the
+biology computed by tested engines (pydna / Biopython / primer3).
 
-
-**Repo:** github.com/MissingPackage/vettore (private) · **Guide:** `docs/USER-GUIDE.md` ·
+**Repo:** github.com/MissingPackage/vettore · **Guide:** `docs/USER-GUIDE.md` ·
 **Spec:** `specs/vettore.md` · **Research:** `docs/research/`
 
 ## State (2026-10-20 06:35 UTC) — v0.3.0 released
@@ -24,7 +24,7 @@ restriction cloning, compute a Tm) and takes a screenshot of the Windows window.
 Releases v0.1.0, v0.2.0, v0.3.0 each carry `Vettore-windows-x64.zip` (39 MB) and
 `Vettore-linux-x64.zip` (387 MB).
 
-## Next steps, in order of value to her
+## Next steps, in order of value to a bench user
 
 1. **Sanger verification** (S3.2): read `.ab1` with Biopython, trim with Mott's algorithm,
    align with `PairwiseAligner`, show in OVE's `AlignmentView` (it supports chromatograms —
@@ -50,9 +50,8 @@ Releases v0.1.0, v0.2.0, v0.3.0 each carry `Vettore-windows-x64.zip` (39 MB) and
 
 ## Open questions (also in the spec)
 
-Which cloning methods she actually uses; whether writing `.dna` matters; Sanger priority;
-whether online import from NCBI/Addgene is acceptable; licence (bundling primer3-py implies
-GPL-3.0-or-later if the build is ever distributed outside the family).
+Which cloning methods are used most; whether writing `.dna` matters for exchanging files;
+how important Sanger verification is; whether online import from NCBI/Addgene is acceptable.
 
 ## Gotchas
 
@@ -64,5 +63,5 @@ GPL-3.0-or-later if the build is ever distributed outside the family).
   `packaging/vettore.spec`), caught only by the packaging smoke test.
 - pydna reports a fragment's 3' end on the opposite strand: compare overhangs with the
   reverse complement (`golden_gate.py`).
-- Background subagents hit the account's session limit on 2026-10-19 night; this work was
-  finished sequentially in the main session.
+- Parallel background agents hit an account session limit during the first build; the work was
+  finished sequentially instead.

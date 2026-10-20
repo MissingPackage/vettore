@@ -2,11 +2,11 @@
 
 ## Overview
 
-Vettore is for bench scientists who need a plasmid editor without a licence fee. Cloud tools (Benchling, hosted OpenCloning) and Docker-based tools
-are ruled out. Vettore is a desktop application for her personal Windows PC (and Linux) that
-follows the everyday cloning *workflow* — map / sequence / enzymes / features / primers / history
-views, cloning simulations, primer tools, gel simulation, Sanger verification — so she can work
-without retraining.
+Vettore is a desktop application for Windows and Linux that follows the everyday cloning *workflow*
+— map / sequence / enzymes / features / primers / history views, cloning simulations, primer
+tools, gel simulation, Sanger verification — with the layout and terminology bench
+scientists already use, and without a licence fee. Cloud tools and Docker-based tools are out of
+scope: everything runs locally.
 
 Clean-room rule: functionality is rebuilt from public documentation and open libraries only.
 No third-party binaries are downloaded, decompiled or inspected; no third-party names, icons, artwork
@@ -117,7 +117,7 @@ creates a new document for the product, and records the operation in the History
 
 ### S3 — Verification tools
 
-**S3.1 Simulate agarose gel.** Lanes = digests of opened documents with chosen enzymes or uncut; ladders: NEB 1 kb, NEB 1 kb Plus, NEB 100 bp, GeneRuler 1 kb, GeneRuler 1 kb Plus, GeneRuler 100 bp Plus [ASSUMED: these are the ladders she uses]; gel % 0.7–2.0; export PNG.
+**S3.1 Simulate agarose gel.** Lanes = digests of opened documents with chosen enzymes or uncut; ladders: NEB 1 kb, NEB 1 kb Plus, NEB 100 bp, GeneRuler 1 kb, GeneRuler 1 kb Plus, GeneRuler 100 bp Plus [ASSUMED: these are the ladders the user uses]; gel % 0.7–2.0; export PNG.
 
 **S3.2 Align to reference (Sanger).** Import one or more `.ab1` reads, trim low-quality ends, align to the current sequence, show chromatograms, mismatches/indels highlighted, coverage summary.
 

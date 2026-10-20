@@ -3,6 +3,8 @@ name = "vettore"
 version = "0.1.0"
 description = "Offline plasmid editor and cloning simulator with a familiar workflow"
 readme = "README.md"
+license = "GPL-3.0-or-later"
+license-files = ["LICENSE", "licenses/*"]
 requires-python = ">=3.12,<3.14"
 dependencies = [
     "biopython>=1.88",

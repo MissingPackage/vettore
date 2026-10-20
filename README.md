@@ -60,3 +60,11 @@ On Linux the native window uses Qt WebEngine and needs the usual X11/xcb librari
 | Biology engine | pydna, Biopython, primer3-py (`src/vettore/`) |
 | Window | pywebview: Edge WebView2 on Windows, Qt WebEngine on Linux (`src/vettore/app.py`) |
 | Packaging | PyInstaller (`packaging/`), built and smoke-tested in GitHub Actions |
+
+## Licence
+
+GPL-3.0-or-later — see [`LICENSE`](LICENSE). The packaged build links primer3-py
+(GPL-2.0-or-later) in-process, so the whole distributed work is under the GNU GPL.
+Third-party components and data sources are listed in
+[`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md).
+
