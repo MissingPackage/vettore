@@ -16,8 +16,10 @@ import {
   DEFAULT_FORM,
   defaultProductRange,
   orderingText,
+  pairAlreadyIn,
   primerNames,
   range,
+  roomProblem,
   regionLength,
   validate,
   type PrimerForm,
@@ -114,11 +116,12 @@ function Designer(props: ToolProps & { doc: OpenDoc }) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [chosen, setChosen] = useState(0);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [notice, setNotice] = useState<{ kind: "copied" | "added"; text: string } | null>(null);
   const { copy: copyText, fallbackDialog } = useCopyText();
   const request = useRef(0);
 
   const errors = validate(form, length, circular);
+  const noRoom = roomProblem(form, length, circular, doc.name);
   const region = regionLength(form, length, circular);
   const body = useMemo(
     () => buildRequest(form, { ...data, name: doc.name, circular } as any),
@@ -169,8 +172,15 @@ function Designer(props: ToolProps & { doc: OpenDoc }) {
   };
 
   const pair = result?.pairs[chosen] ?? null;
-  const existingNames = asList<OveAnnotation>((doc.data() as SequenceData).primers).map((p) => p.name);
-  const [forwardName, reverseName] = primerNames(prefix, existingNames);
+  const existing = asList<OveAnnotation>((doc.data() as SequenceData).primers);
+  const existingNames = existing.map((p) => p.name);
+  // A pair already in the file (added a moment ago, or on an earlier visit) is not added twice.
+  const already = pair ? pairAlreadyIn(pair.forward.sequence, pair.reverse.sequence, existing) : null;
+  // The feature stays shown in the picker while the region is its own.
+  const pickedFeature = features.findIndex((f) => String(f.start + 1) === form.start.trim()
+    && String(f.end + 1) === form.end.trim());
+  // A pair already in the file is copied under the names it has there.
+  const [forwardName, reverseName] = already ?? primerNames(prefix, existingNames);
 
   const copy = async () => {
     if (!pair) return;
@@ -180,7 +190,7 @@ function Designer(props: ToolProps & { doc: OpenDoc }) {
     ]);
     setNotice(null);
     if (await copyText(text, "Primers to order")) {
-      setNotice(`Copied ${forwardName} and ${reverseName}: paste them into the order form.`);
+      setNotice({ kind: "copied", text: `Copied ${forwardName} and ${reverseName}: paste them into the order form.` });
     }
   };
 
@@ -203,7 +213,7 @@ function Designer(props: ToolProps & { doc: OpenDoc }) {
     props.logHistory(doc.editorName, "Added primers (primer3)",
       `${forwardName} ${pair.forward.sequence}, ${reverseName} ${pair.reverse.sequence}; `
       + `product ${pair.product_size} bp`);
-    setNotice(`Added ${forwardName} and ${reverseName} to ${doc.name}; they are listed in the Primers view.`);
+    setNotice({ kind: "added", text: `Added ${forwardName} and ${reverseName} to ${doc.name}; they are listed in the Primers view.` });
   };
 
   const defaults = region !== null && !errors.size
@@ -222,7 +232,8 @@ function Designer(props: ToolProps & { doc: OpenDoc }) {
           <Field label="Region to amplify">
             {features.length > 0 && (
               <div className="bp3-html-select bp3-fill">
-                <select data-testid="pd-feature" value="" onChange={(e) => useFeature(e.target.value)}>
+                <select data-testid="pd-feature" value={pickedFeature >= 0 ? String(pickedFeature) : ""}
+                        onChange={(e) => useFeature(e.target.value)}>
                   <option value="">Pick a feature…</option>
                   {features.map((f, i) => (
                     <option key={i} value={i}>{f.name} ({range(f.start, f.end)})</option>
@@ -294,8 +305,11 @@ function Designer(props: ToolProps & { doc: OpenDoc }) {
               {errors.gc && <span className="vt-pd-invalid">{errors.gc}</span>}
             </Field>
             <Field label="Max Tm difference (°C)">
-              <input className="bp3-input bp3-small" inputMode="decimal" aria-label="Max Tm difference"
-                     value={form.maxTmDifference} onChange={(e) => set({ maxTmDifference: e.target.value })} />
+              <div className="vt-pd-inline">
+                <input className="bp3-input bp3-small" inputMode="decimal" aria-label="Max Tm difference"
+                       data-testid="pd-maxTmDifference" value={form.maxTmDifference}
+                       onChange={(e) => set({ maxTmDifference: e.target.value })} />
+              </div>
               {errors.tmDiff && <span className="vt-pd-invalid">{errors.tmDiff}</span>}
             </Field>
           </div>
@@ -312,8 +326,11 @@ function Designer(props: ToolProps & { doc: OpenDoc }) {
 
         <div className="vt-pd-result">
           {busy && <p className="vt-pd-muted" data-testid="pd-busy">Designing…</p>}
-          {!bodyKey && !busy && (
+          {!bodyKey && !busy && !noRoom && (
             <p className="vt-pd-muted">Choose the region on the left: the primer pairs appear here.</p>
+          )}
+          {noRoom && (
+            <Callout intent="warning" title="No room for primers" data-testid="pd-no-room">{noRoom}</Callout>
           )}
           {error && (
             <Callout intent="danger" title="No primer pair" data-testid="pd-error">{error}</Callout>
@@ -389,7 +406,13 @@ function Designer(props: ToolProps & { doc: OpenDoc }) {
               </p>
             </>
           )}
-          {notice && <Callout intent="success" data-testid="pd-notice">{notice}</Callout>}
+          {notice && <Callout intent="success" data-testid="pd-notice">{notice.text}</Callout>}
+          {already && notice?.kind !== "added" && (
+            <p className="vt-pd-muted" data-testid="pd-already">
+              Pair {pair?.rank} is already in {doc.name} as {already[0]} and {already[1]}: choose another
+              pair to add it as well.
+            </p>
+          )}
         </div>
       </div>
       {fallbackDialog}
@@ -399,8 +422,9 @@ function Designer(props: ToolProps & { doc: OpenDoc }) {
           <Button icon="duplicate" data-testid="pd-copy" disabled={!pair || busy} onClick={copy}>
             Copy for Ordering
           </Button>
-          <Button intent="primary" data-testid="pd-add" disabled={!pair || busy} onClick={add}>
-            Add to Sequence
+          <Button intent="primary" data-testid="pd-add" disabled={!pair || busy || !!already} onClick={add}
+                  icon={already ? "tick" : undefined}>
+            {already ? "Added" : "Add to Sequence"}
           </Button>
         </div>
       </div>

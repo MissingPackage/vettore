@@ -34,6 +34,20 @@ async function expectInside(inner: Locator, outer: Locator, what: string) {
   expect(a!.x + a!.width, what).toBeLessThanOrEqual(b!.x + b!.width + 1);
 }
 
+test("Design PCR Primers keeps every input inside the form column", async ({ page }) => {
+  await page.goto(`/?token=${TOKEN}`);
+  await page.getByTestId("file-input").setInputFiles(data("pFA-KanMX4.dna"));
+  await expect(page.locator(".veCircularView")).toBeVisible();
+  await menu(page, "Primers", "Design PCR Primers…");
+  const dialog = page.getByTestId("primer-design-dialog");
+  await expect(dialog).toBeVisible();
+  const column = dialog.locator(".vt-pd-form");
+  await expectInside(dialog.getByTestId("pd-maxTmDifference"), column, "Max Tm difference input");
+  for (const input of await column.locator("input, select").all()) {
+    await expectInside(input, column, `input ${await input.getAttribute("aria-label") ?? ""}`);
+  }
+});
+
 test("the Gibson insert region stays on one line", async ({ page }) => {
   await page.goto(`/?token=${TOKEN}`);
   await page.getByTestId("file-input").setInputFiles(data("pFA-KanMX4.dna"));
