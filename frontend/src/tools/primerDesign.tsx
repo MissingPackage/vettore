@@ -9,6 +9,7 @@ import { call, type OveAnnotation, type SequenceData } from "../api";
 import { store } from "../store";
 import type { OpenDoc } from "../cloning/types";
 import { Field } from "../cloning/inputs";
+import { useCopyText } from "../cloning/useCopyText";
 import type { Tool, ToolProps } from "./types";
 import {
   buildRequest,
@@ -114,6 +115,7 @@ function Designer(props: ToolProps & { doc: OpenDoc }) {
   const [busy, setBusy] = useState(false);
   const [chosen, setChosen] = useState(0);
   const [notice, setNotice] = useState<string | null>(null);
+  const { copy: copyText, fallbackDialog } = useCopyText();
   const request = useRef(0);
 
   const errors = validate(form, length, circular);
@@ -170,13 +172,16 @@ function Designer(props: ToolProps & { doc: OpenDoc }) {
   const existingNames = asList<OveAnnotation>((doc.data() as SequenceData).primers).map((p) => p.name);
   const [forwardName, reverseName] = primerNames(prefix, existingNames);
 
-  const copy = () => {
+  const copy = async () => {
     if (!pair) return;
-    navigator.clipboard?.writeText(orderingText([
+    const text = orderingText([
       { name: forwardName, sequence: pair.forward.sequence },
       { name: reverseName, sequence: pair.reverse.sequence },
-    ]));
-    setNotice(`Copied ${forwardName} and ${reverseName}: paste them into the order form.`);
+    ]);
+    setNotice(null);
+    if (await copyText(text, "Primers to order")) {
+      setNotice(`Copied ${forwardName} and ${reverseName}: paste them into the order form.`);
+    }
   };
 
   const add = () => {
@@ -387,6 +392,7 @@ function Designer(props: ToolProps & { doc: OpenDoc }) {
           {notice && <Callout intent="success" data-testid="pd-notice">{notice}</Callout>}
         </div>
       </div>
+      {fallbackDialog}
       <div className={Classes.DIALOG_FOOTER}>
         <div className={Classes.DIALOG_FOOTER_ACTIONS}>
           <Button data-testid="pd-close" onClick={props.onClose}>Close</Button>

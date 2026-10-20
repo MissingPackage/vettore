@@ -5,6 +5,7 @@ import { SimpleCircularOrLinearView } from "@teselagen/ove";
 import { api } from "../api";
 import type { CloningAction } from "./registry";
 import type { CloningResult, Oligo, OpenDoc, Product } from "./types";
+import { useCopyText } from "./useCopyText";
 import "./cloning.css";
 
 // Blueprint 3 typings predate React 18 (no implicit `children`).
@@ -29,6 +30,8 @@ export default function CloningDialog(props: {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [chosen, setChosen] = useState(0);
+  const [copied, setCopied] = useState<string | null>(null);
+  const { copy, fallbackDialog } = useCopyText();
   const request = useRef(0);
   // Depend on the serialised body: forms rebuild it on every render.
   const bodyKey = body ? JSON.stringify(body) : "";
@@ -70,6 +73,14 @@ export default function CloningDialog(props: {
   const productName = product?.doc.name ?? "";
   useEffect(() => setName(productName), [productName]);
   const oligos = result ? (result.oligos.length ? result.oligos : product?.oligos ?? []) : [];
+  const oligoText = oligosAsText(oligos);
+  // A confirmation belongs to the primers it was given for.
+  useEffect(() => setCopied(null), [oligoText]);
+  const copyOligos = async () => {
+    if (await copy(oligoText, "Primers to order")) {
+      setCopied(`Copied ${oligos.length} primer${oligos.length === 1 ? "" : "s"}: paste them into the order form.`);
+    }
+  };
   const { Form } = action;
 
   return (
@@ -141,9 +152,10 @@ export default function CloningDialog(props: {
                 <div className="vt-oligos">
                   <div className="vt-row">
                     <b>Primers to order</b>
-                    <Button small minimal icon="duplicate" onClick={() => navigator.clipboard?.writeText(oligosAsText(oligos))}>
+                    <Button small minimal icon="duplicate" data-testid="cloning-copy" onClick={copyOligos}>
                       Copy all (name ⇥ sequence)
                     </Button>
+                    {copied && <span className="vt-copied" role="status" data-testid="cloning-copied">{copied}</span>}
                   </div>
                   <table className="bp3-html-table bp3-html-table-condensed vt-table" data-testid="cloning-oligos">
                     <thead>
@@ -167,6 +179,7 @@ export default function CloningDialog(props: {
           )}
         </div>
       </div>
+      {fallbackDialog}
       <div className={Classes.DIALOG_FOOTER}>
         <div className={Classes.DIALOG_FOOTER_ACTIONS}>
           <Button onClick={props.onClose}>Cancel</Button>

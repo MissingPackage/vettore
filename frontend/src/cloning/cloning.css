@@ -28,3 +28,5 @@
 .vt-busy { display: flex; align-items: center; gap: var(--vt-space-2); color: var(--vt-text-muted); }
 .vt-help { color: var(--vt-text-muted); margin: 0 0 var(--vt-space-1); }
 .vt-help-more { color: var(--vt-text-muted); font-size: 11px; margin: 0; }
+/* Confirmation next to a copy button, shown only once the text is on the clipboard. */
+.vt-copied { color: var(--vt-success); font-size: var(--vt-font-size-sm); }

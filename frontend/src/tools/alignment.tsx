@@ -7,6 +7,7 @@ import { Button, Classes } from "@blueprintjs/core";
 import { AlignmentView, addAlignment } from "@teselagen/ove";
 import { call } from "../api";
 import { store } from "../store";
+import { useCopyText } from "../cloning/useCopyText";
 import type { Tool, ToolProps } from "./types";
 import {
   choiceProblem,
@@ -73,6 +74,7 @@ function AlignMultipleSequences(props: ToolProps) {
   const [busy, setBusy] = useState(false);
   const [selected, setSelected] = useState(0);
   const [copied, setCopied] = useState(false);
+  const { copy: copyText, fallbackDialog } = useCopyText();
   const request = useRef(0);
 
   useEffect(() => {
@@ -136,11 +138,13 @@ function AlignMultipleSequences(props: ToolProps) {
   };
 
   const row = result?.sequences[selected] ?? null;
-  const copy = () => {
+  const copy = async () => {
     if (!row) return;
-    navigator.clipboard?.writeText(differencesAsTsv(row.name, row.differences));
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
+    setCopied(false);
+    if (await copyText(differencesAsTsv(row.name, row.differences), `Differences of ${row.name}`)) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    }
   };
 
   return (
@@ -285,7 +289,7 @@ function AlignMultipleSequences(props: ToolProps) {
                   </span>
                   {row.differences.length > 0 && (
                     <Button small minimal icon="duplicate" data-testid="msa-copy" onClick={copy}>
-                      {copied ? "Copied" : "Copy list (for a spreadsheet)"}
+                      {copied ? "Copied: paste it into a spreadsheet" : "Copy list (for a spreadsheet)"}
                     </Button>
                   )}
                 </div>
@@ -317,6 +321,7 @@ function AlignMultipleSequences(props: ToolProps) {
           </>
         )}
       </div>
+      {fallbackDialog}
       <div className={Classes.DIALOG_FOOTER}>
         <div className={Classes.DIALOG_FOOTER_ACTIONS}>
           <Button onClick={props.onClose}>Close</Button>
