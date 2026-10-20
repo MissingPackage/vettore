@@ -67,12 +67,32 @@ def call(path: str, body: dict | None = None) -> dict:
         return json.loads(res.read())
 
 
+def hand_over(exe: str, env: dict) -> None:
+    """A double-click while Vettore runs: ``Vettore <file>`` gives the file to the running copy
+    (the server under test, started with --single-instance) and exits. This script plays the
+    page that takes it."""
+    sample = (FIXTURES / "MT612431.1.gb").resolve()
+    second = subprocess.Popen([exe, str(sample)], env=env)
+    try:
+        taken: list = []
+        deadline = time.monotonic() + 120
+        while not taken and time.monotonic() < deadline:
+            taken = call("startup-files")["results"]
+            time.sleep(0.2)
+        assert [r["path"] for r in taken] == [str(sample)], taken
+        assert second.wait(timeout=60) == 0, second.returncode
+    finally:
+        if second.poll() is None:   # it opened a window instead of handing the file over
+            second.kill()
+
+
 def main() -> int:
     exe = sys.argv[1]
     work = Path(tempfile.mkdtemp(prefix="vettore-smoke-"))
     # Recent files and the last folder go to a throwaway home, not the runner's.
     env = {**os.environ, "VETTORE_HOME": str(work / "home")}
-    proc = subprocess.Popen([exe, "--no-window", "--port", str(PORT), "--token", TOKEN], env=env)
+    proc = subprocess.Popen([exe, "--no-window", "--single-instance", "--port", str(PORT),
+                             "--token", TOKEN], env=env)
     try:
         deadline = time.monotonic() + 90
         while True:
@@ -143,12 +163,23 @@ def main() -> int:
         assert len(sample_doc["sequence"]) > 1000, len(sample_doc["sequence"])
         detected = call("features/detect", {"sequenceData": sample_doc})
         assert detected["catalogue_size"] >= 20 and detected["features"], detected.get("catalogue_size")
+        # Opening sequence files on double-click is offered by the packaged app only. Checked
+        # without writing anything: a dry run lists the writes, and the status is unchanged.
+        assoc = call("desktop/file-associations")
+        assert assoc["available"] is True, assoc
+        planned = call("desktop/file-associations", {"enabled": True, "dry_run": True})["plan"]
+        assert any(Path(exe).name in line for line in planned), planned
+        assert all(any(ext in line for line in planned) for ext in assoc["extensions"]), planned
+        assert call("desktop/file-associations") == assoc
+        hand_over(exe, env)
         saved_files = work / "saved"
         saved_files.mkdir()
         checked = round_trips(saved_files)
         print("smoke test passed: server up, .dna parsed (3941 bp, 9 features), UI served, "
               f"restriction cloning, Tm, primer design, alignment, Sanger reads, samples and feature "
-              f"detection work, {checked} open-and-save round trips "
+              "detection work, file associations reachable (dry run), a second start hands its "
+              f"file to the running copy, {checked} open-and-save "
+              "round trips "
               f"({len(EXCHANGE)} formats x GenBank/FASTA/.dna)")
         return 0
     finally:

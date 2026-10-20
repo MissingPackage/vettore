@@ -22,6 +22,7 @@ from . import alignment, app_info, fileio, gel, primer_design, sanger, settings,
 from . import features as common_features
 from .cloning.api import router as cloning_router
 from .cloning.base import CloningError, dna_sequence
+from .desktop import associations
 from .desktop.instance import HAND_OVER_WAIT, TOKEN_HEADER, Inbox
 
 ALLOWED_HOSTS = {"127.0.0.1", "localhost"}
@@ -95,6 +96,14 @@ class HandOver(BaseModel):
     paths: list[str] = []
 
 
+class FileAssociationsChange(BaseModel):
+    """Open sequence files with Vettore on double-click (``enabled``), or undo it.
+    ``dry_run`` only lists what would be written."""
+
+    enabled: bool
+    dry_run: bool = False
+
+
 class TmRequest(BaseModel):
     sequence: str
 
@@ -152,6 +161,7 @@ ACTIONS: tuple[tuple[str, str], ...] = (
     ("/api/app/samples", "Opening the sample"),
     ("/api/unsaved", "Counting the documents with unsaved changes"),
     ("/api/hand-over", "Opening the file"),
+    ("/api/desktop/file-associations", "Changing which program opens sequence files"),
 )
 
 
@@ -311,6 +321,37 @@ def create_app(token: str, static_dir: Path | None,
         if on_hand_over:
             on_hand_over()
         return {"delivered": inbox.wait_or_withdraw(ticket, hand_over_wait)}
+
+    @app.get("/api/desktop/file-associations")
+    def file_associations() -> dict[str, Any]:
+        """Whether sequence files open with this copy of Vettore on double-click, and whether
+        it can offer that at all (only the packaged application can)."""
+        target = associations.for_this_system()
+        return target.status() if target else associations.unavailable_status()
+
+    @app.post("/api/desktop/file-associations")
+    def set_file_associations(body: FileAssociationsChange) -> dict[str, Any]:
+        target = associations.for_this_system()
+        if target is None:
+            raise HTTPException(409, associations.unavailable_status()["reason"])
+        if body.dry_run:
+            return {**target.status(), "plan": target.plan()}
+        try:
+            if body.enabled:
+                target.enable()
+            else:
+                target.disable()
+        except OSError as exc:
+            log.error("Could not change the file associations: %r", exc)
+            # enable() undoes a partial change itself; disable() may stop half way.
+            outcome = ("Nothing was changed." if body.enabled else
+                       "Some sequence files may still open with Vettore: try again.")
+            raise HTTPException(
+                422, "Vettore could not change which program opens sequence files"
+                     f"{': ' + exc.strerror if exc.strerror else ''}. {outcome} If it happens "
+                     f"again, please send the log file {app_info.log_path()} to the "
+                     "developers.") from exc
+        return target.status()
 
     @app.post("/api/open-path")
     def open_path(body: OpenPath) -> dict[str, Any]:
