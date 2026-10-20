@@ -1,4 +1,4 @@
-// Document view tabs mapped onto Open Vector Editor panels.
+// Document view tabs (Map, Sequence, Enzymes, ...) mapped onto Open Vector Editor panels.
 import { actions } from "@teselagen/ove";
 import { store } from "./store";
 

@@ -4,13 +4,13 @@ Nearest-neighbour Tm from Biopython (``Bio.SeqUtils.MeltingTemp.Tm_NN``) with ex
 named conditions. The same primer differs by several degrees between tools, so every value is
 reported together with the preset that produced it.
 
-Presets (see docs/research/open-data-and-algorithms.md, section 4):
+Presets:
 
-- ``standard``: SantaLucia & Hicks 2004 parameters,
-  50 mM Na+, 250 nM primer. The
-  SantaLucia 1998 entropy correction is used.
-- ``neb_q5``: tracks NEB's Tm calculator for Q5 / high-fidelity within ~1.5 °C on a
-  10-primer benchmark (Owczarzy 2008 with 2 mM Mg2+, 500 nM primer).
+- ``standard``: SantaLucia & Hicks 2004 nearest-neighbour parameters (Annu Rev Biophys
+  33:415), 50 mM Na+, 250 nM primer, SantaLucia 1998 entropy salt correction — the textbook
+  conditions for a PCR primer.
+- ``neb_q5``: tracks NEB's Tm calculator for Q5 / high-fidelity polymerases within ~1.5 °C on
+  a 10-primer benchmark against NEB's own API (Owczarzy 2008 with 2 mM Mg2+, 500 nM primer).
 - ``neb_taq``: tracks NEB's calculator for Taq within ~1.2 °C (Owczarzy 2004, 50 mM Na+).
 """
 

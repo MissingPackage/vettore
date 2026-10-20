@@ -1,8 +1,8 @@
 """Build the common-feature database from public NCBI records.
 
-Every entry is a real subsequence of a public GenBank record, taken at the coordinates listed
-in docs/research/open-data-and-algorithms.md section 1.4, so each annotation Vettore makes can
-be traced back to a record and a coordinate range. Nothing here is typed from memory.
+Every entry is a real subsequence of a public GenBank record, taken at the coordinates that
+record's own FEATURES table gives for the element, so each annotation Vettore makes can be
+traced back to a record and a coordinate range. Nothing here is typed from memory.
 
 Run (needs network):
     python -I scripts/build_feature_database.py > src/vettore/data/common_features.json
@@ -37,7 +37,7 @@ class Entry:
     strand: int = 1
 
 
-#: Only entries whose coordinates the research marked as verified are included.
+#: Only elements whose coordinates were checked against the record's FEATURES table.
 ENTRIES: list[Entry] = [
     # The two ends of the AAV genome carry the same inverted repeat, so one entry covers both.
     Entry("AAV2 ITR", "repeat_region", "NC_001401.2", 1, 145,
@@ -128,7 +128,7 @@ def main() -> None:
         })
     payload = {
         "source": "NCBI GenBank/RefSeq records fetched with E-utilities; coordinates from "
-                  "docs/research/open-data-and-algorithms.md section 1.4",
+                  "each record's FEATURES table",
         "features": sorted(features, key=lambda f: (-f["length"], f["name"])),
     }
     json.dump(payload, sys.stdout, indent=1)

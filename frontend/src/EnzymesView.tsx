@@ -6,7 +6,7 @@ import { store } from "./store";
 
 type SortKey = "name" | "sites" | "location";
 
-/** Enzymes view: enzymes of the chosen set with number of sites and cut locations. */
+/** Enzymes view: enzymes of the chosen set with number of sites, cut locations and ends. */
 export default function EnzymesView({ editorName, set }: { editorName: string; set: EnzymeSetId }) {
   const { sequence, circular } = useSelector(
     (state: any) => ({

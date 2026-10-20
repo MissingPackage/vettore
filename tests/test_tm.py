@@ -5,8 +5,8 @@ from vettore.tm import PRESETS, all_presets, primer_tm
 SEQ = "ACGTAGCTAGCTAGGCTATCGGATCCTA"
 
 
-def test_q5_preset_matches_research_benchmark_value():
-    # docs/research/open-data-and-algorithms.md §4.2: 70.53 °C for this 28-mer.
+def test_q5_preset_matches_the_benchmarked_value():
+    # Benchmarked against NEB's Tm API when the preset was calibrated: 70.53 °C for this 28-mer.
     assert primer_tm(SEQ, "neb_q5") == pytest.approx(70.53, abs=0.01)
 
 

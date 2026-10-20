@@ -2,15 +2,15 @@
 
 ## Overview
 
-Vettore is a desktop application for Windows and Linux that follows the everyday cloning *workflow*
-— map / sequence / enzymes / features / primers / history views, cloning simulations, primer
-tools, gel simulation, Sanger verification — with the layout and terminology bench
-scientists already use, and without a licence fee. Cloud tools and Docker-based tools are out of
-scope: everything runs locally.
+Vettore is a desktop application for Windows and Linux that follows the everyday molecular
+cloning workflow — map / sequence / enzymes / features / primers / history views, cloning
+simulations, primer tools, gel simulation, Sanger verification — with the layout and
+terminology bench scientists already use, and without a licence fee. Cloud tools and
+Docker-based tools are out of scope: everything runs locally.
 
-Clean-room rule: functionality is rebuilt from public documentation and open libraries only.
-No third-party binaries are downloaded, decompiled or inspected; no third-party names, icons, artwork
-or proprietary databases are copied. Familiar layout and terminology of the field are fine.
+Independence rule: functionality is built from published methods, public documentation and
+open libraries only. No third-party binaries are decompiled or inspected, and no third-party
+names, icons, artwork or proprietary databases are reused.
 
 Correctness rule: every molecular operation (digest, ligation, assembly, PCR, Tm, alignment)
 runs on a published, tested engine (pydna, Biopython, primer3) and is covered by tests against
@@ -29,7 +29,7 @@ known reference results. The UI never computes biology on its own.
 | Native file format | Read `.dna`, `.gb/.gbk/.ape`, `.fasta`, `.ab1`; save GenBank (`.gb`) | Every sequence tool reads GenBank; it is the lossless open standard |
 | `.dna` reading | Biopython (sequence, features, primer sites after hybridization filtering) + sgffp 0.22 (MIT) for feature colours, full primer sequences, description | Biopython alone drops colours and primer 5′ tails |
 | Enzyme data | Nonredundant commercial set generated from REBASE via Biopython (`vettore.enzymes` → `frontend/src/data/enzymes.json`), fed to OVE | OVE's default list contains isoschizomers with uncharacterised cuts (seen: Atu1II GGATCC shown as blunt); OVE's cut engine is cross-checked against Biopython in tests |
-| Tm | Biopython `Tm_NN` with named presets: Standard (default), NEB Q5, NEB Taq; all shown in the tooltip | Values differ by several °C between tools; the method is always shown |
+| Tm | Biopython `Tm_NN` with named presets: Standard (SantaLucia & Hicks 2004, default), NEB Q5, NEB Taq; all shown in the tooltip | Values differ by several °C between tools; the method is always shown |
 
 ## Slices
 
@@ -137,3 +137,58 @@ AAV helper: ITR-to-ITR cargo size with a warning above 4.7 kb.
 
 | What | Where | Why |
 |---|---|---|
+| Module docstrings | `src/vettore/*.py`, `src/vettore/cloning/*.py` | Each engine states its model, its sources and its limits |
+| Data builders | `scripts/build_feature_database.py`, `scripts/build_methylation_table.py` | Where the bundled NCBI and REBASE data come from |
+| OVE README | `frontend/node_modules/@teselagen/ove/README.md` | Editor props, data model, alignment/chromatogram model |
+| Test fixtures | `tests/data/` | `.dna` and `.ab1` samples from Biopython's test suite (BSD) |
+
+## Non-goals
+
+- No cloud sync, accounts, telemetry or auto-update.
+- No writing of `.dna` files in S0–S3 (GenBank is the save format).
+- No protein structure, CRISPR guide scoring, or codon optimisation.
+- No third-party names, logos, icons or proprietary databases.
+- No macOS build (not requested) — the code should not block one later.
+
+## Hard constraints
+
+- Runs fully offline on Windows 10/11 x64 and Linux x64; no Docker, no admin rights to install (unzip and run).
+- Unsigned executable is acceptable (personal PC).
+- Repository: `MissingPackage/vettore`. All repo content in English.
+- Deadline: S1 ships as soon as it is green, without waiting for S2 — the editor is useful on its own.
+- Biology results must match the reference engine; any operation without tests is not shipped.
+
+## Status (2026-10-20)
+
+- **S0 done**: Windows and Linux builds from CI; the Windows native window is verified by a
+  screenshot taken in CI on every build.
+- **S1 done**: shell, views, editing, save/export, enzymes, Tm. Released as v0.1.0.
+- **S2 mostly done**: restriction cloning (insert/delete fragment, digest), PCR, primer design,
+  mutagenesis, Gibson/NEBuilder HiFi/In-Fusion, Golden Gate. Released as v0.2.0 (without
+  Golden Gate). **Not implemented: Gateway BP/LR and TA/GC/TOPO** — the forms exist but are
+  hidden from the menu (`ready` flag in `frontend/src/cloning/registry.ts`). Gateway needs
+  real att-site sequences that nobody has verified yet, and shipping unverified recombination
+  would be worse than not shipping it.
+- **S3 in progress**: agarose gel simulation, Sanger (.ab1) alignment to a reference and
+  detection of common features are done. Still missing: multiple sequence alignment and
+  annealing oligos.
+- **S4 not started**.
+
+Tests at this point: 126 pytest, 13 vitest, 12 Playwright end-to-end, plus a packaging smoke
+test that runs the packaged binary on both platforms in CI.
+
+## Resolved
+
+- UI language: English, the language of the field's tools and protocols.
+
+## Open questions
+
+1. (resolved — see above)
+2. [ASSUMED: save as GenBank `.gb`; `.dna` is read-only] — writing `.dna` is technically possible with sgffp (MIT), but nobody has verified that sgffp-written files reopen correctly in other tools. Is writing `.dna` important for exchanging files with colleagues? If yes: add `.dna` export and verify the round trip first.
+3. [ASSUMED: S2 priority order = restriction cloning, Gibson/HiFi, PCR, mutagenesis, Golden Gate, Gateway, In-Fusion, TA/TOPO] — which methods are used most?
+4. [ASSUMED: Sanger `.ab1` verification is high priority] — confirm.
+5. [ASSUMED: ladders listed in S3.1] — which ladder brands are used in the lab?
+6. [ASSUMED: optional online import from NCBI/Addgene by accession is welcome — only public data is downloaded, nothing is uploaded] — or strictly no network at all?
+7. [ASSUMED: delivery = the zip from the GitHub Releases page] — fine?
+8. [ASSUMED: name "Vettore"] — rename freely.
+9. Licence: primer3-py (GPL-2.0-or-later) is bundled in-process, so a distributed build must be GPL-3.0-or-later (Apache-2.0 components rule out GPLv2). Resolved: the repository is GPL-3.0-or-later.

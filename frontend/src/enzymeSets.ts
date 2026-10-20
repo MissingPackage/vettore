@@ -1,4 +1,4 @@
-// Applies enzyme sets to an OVE editor (pure logic lives in enzymeLogic.ts).
+// Applies enzyme sets (unique cutters, 6+ cutters, ...) to an OVE editor; pure logic in enzymeLogic.ts.
 import { actions } from "@teselagen/ove";
 import { enzymesInSet, type EnzymeSetId } from "./enzymeLogic";
 import { store } from "./store";

@@ -13,6 +13,8 @@ from pathlib import Path
 from Bio import Restriction, SeqIO
 from Bio.Seq import Seq
 
+from vettore.fileio import DNA_FILE_FORMAT
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -20,7 +22,7 @@ def sequences() -> list[dict]:
     rng = random.Random(20261019)
     out = []
     for name, circular in (("pFA-KanMX4.dna", True), ("sample-d.dna", False)):
-        record = SeqIO.read(ROOT / "tests" / "data" / name, "snapgene")
+        record = SeqIO.read(ROOT / "tests" / "data" / name, DNA_FILE_FORMAT)
         out.append({"name": name, "sequence": str(record.seq).upper(), "circular": circular})
     for i in range(3):
         seq = "".join(rng.choice("ACGT") for _ in range(3000))

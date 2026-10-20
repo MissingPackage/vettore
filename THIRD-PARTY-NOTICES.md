@@ -51,4 +51,3 @@ the one published in their source repository, `TeselaGen/tg-oss`.
   these records.
 - **Test fixtures** in `tests/data/` — copied from the Biopython test suite (Biopython License /
   BSD-3-Clause); see `tests/data/README.md`.
-

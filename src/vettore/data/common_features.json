@@ -1,5 +1,5 @@
 {
- "source": "NCBI GenBank/RefSeq records fetched with E-utilities; coordinates from docs/research/open-data-and-algorithms.md section 1.4",
+ "source": "NCBI GenBank/RefSeq records fetched with E-utilities; coordinates from each record's FEATURES table",
  "features": [
   {
    "name": "SpCas9",

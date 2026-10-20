@@ -15,8 +15,11 @@ from .convert import ove_to_record, record_to_ove
 
 log = logging.getLogger(__name__)
 
+# Biopython's SeqIO name for the binary .dna format is fixed by that library.
+DNA_FILE_FORMAT = "snapgene"
+
 FORMATS = {
-    ".dna": "snapgene",
+    ".dna": DNA_FILE_FORMAT,
     ".gb": "genbank",
     ".gbk": "genbank",
     ".gbff": "genbank",
@@ -29,7 +32,7 @@ FORMATS = {
     ".ab1": "abi",
     ".abi": "abi",
 }
-BINARY_FORMATS = {"snapgene", "abi"}
+BINARY_FORMATS = {DNA_FILE_FORMAT, "abi"}
 
 
 class UnsupportedFile(ValueError):
@@ -62,7 +65,7 @@ def read_documents(filename: str, content: bytes) -> list[dict]:
     for i, record in enumerate(records):
         fallback = stem if len(records) == 1 else f"{stem} ({i + 1})"
         doc = record_to_ove(record, fallback_name=fallback)
-        if detect_format(filename) == "snapgene":
+        if detect_format(filename) == DNA_FILE_FORMAT:
             # .dna files carry no usable locus name; the file name is what users see.
             doc["name"] = fallback
             _enrich_dna_file(doc, content)

@@ -5,8 +5,8 @@ returned to the UI follow OVE: 0-based, end-inclusive, along the top strand, wit
 ``start > end`` for a fragment that spans the origin of a circular molecule. A fragment's
 ``length`` is measured between the two top-strand cuts (overhangs are reported separately).
 
-Products keep the vector's numbering when the vector origin lies in the backbone, so familiar
-coordinates are kept.
+Products keep the vector's numbering when the vector origin lies in the backbone, so a
+construct keeps the coordinates people already know for its parent vector.
 """
 
 from __future__ import annotations

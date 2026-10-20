@@ -1,8 +1,9 @@
 # Vettore — user guide
 
-Vettore is an offline plasmid editor and cloning simulator. It follows the way bench work flows —
-open, read, plan, order, verify — and runs entirely on your own
-computer: no account, no internet, no data leaves the machine.
+Vettore is an offline plasmid editor and cloning simulator. It follows the way bench work
+flows — open a construct, read its map and sites, plan the cloning, order the primers, verify
+the clone — and runs entirely on your own computer: no account, no internet, no data leaves
+the machine.
 
 ## Install (Windows)
 
@@ -71,8 +72,8 @@ says so rather than staying silent.
 Select any stretch of DNA and the status bar shows its Tm. Because different tools use
 different models, hover the Tm to see three values at once:
 
-- **Standard** — SantaLucia & Hicks 2004, 50 mM Na⁺, 250 nM primer (the default,
-  the textbook conditions for a PCR primer);
+- **Standard** — SantaLucia & Hicks 2004, 50 mM Na⁺, 250 nM primer: the textbook conditions
+  for a PCR primer, and the default;
 - **NEB Q5 / high-fidelity** and **NEB Taq** — the conditions NEB's Tm calculator uses.
 
 The Tm of a primer is always the Tm of the part that anneals: 5′ tails are excluded.
@@ -145,8 +146,8 @@ writing `.dna` files (saving is GenBank).
 
 ## Saving and sharing
 
-- **Save** / **Save As…** write **GenBank** (`.gb`), which Benchling, ApE and
-  Geneious all open. Features, colours, primers and topology are preserved.
+- **Save** / **Save As…** write **GenBank** (`.gb`), the exchange format every sequence tool
+  reads. Features, colours, primers and topology are preserved.
 - **File → Export** also writes FASTA, and the map as **SVG** (for figures) or **PNG**.
 
 ## Keyboard shortcuts
@@ -164,5 +165,4 @@ writing `.dna` files (saving is GenBank).
 The log is at `%USERPROFILE%\.vettore\vettore.log` on Windows (`~/.vettore/vettore.log` on
 Linux). Send it along with the file that caused the problem.
 
-Vettore is an independent program built on open-source
-libraries.
+Vettore is an independent program built on open-source libraries.

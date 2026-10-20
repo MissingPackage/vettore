@@ -8,8 +8,9 @@ simulation — it ignores field strength, buffer, run time, temperature and base
 A fragment outside the resolving range is drawn compressed near the well or near the dye
 front, as it would run on a real gel.
 
-Ladder band sizes are taken from the vendors' own product documentation; see
-docs/research/open-data-and-algorithms.md section 3.1 for the exact sources.
+Ladder band sizes are taken from the vendors' own product documentation: NEB product pages for
+N3232, N3200 and N3231, and the Thermo Fisher manuals MAN0013004 (SM0311), MAN0013047 (SM1331),
+MAN0013010 (SM0321 family) and MAN0000898 (Invitrogen 10787018).
 """
 
 from __future__ import annotations

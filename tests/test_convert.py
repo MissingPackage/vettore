@@ -17,7 +17,7 @@ def read_doc(name: str) -> dict:
     return doc
 
 
-def test_dna_file_file_is_read_with_features_and_topology():
+def test_dna_file_is_read_with_features_and_topology():
     doc = read_doc("pFA-KanMX4.dna")
     assert doc["name"] == "pFA-KanMX4"
     assert len(doc["sequence"]) == 3941
