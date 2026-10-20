@@ -7,7 +7,7 @@ biology computed by tested engines (pydna / Biopython / primer3).
 **Repo:** github.com/MissingPackage/vettore · **Guide:** `docs/USER-GUIDE.md` ·
 **Spec:** `specs/vettore.md` · **Research notes:** private repo `MissingPackage/vettore-notes`
 
-## State (2026-10-20) — v0.6.0 released
+## State (2026-10-20) — v0.1.0 released
 
 | Slice | State |
 |---|---|
@@ -19,8 +19,9 @@ biology computed by tested engines (pydna / Biopython / primer3).
 
 Evidence: 136 pytest, 20 vitest, 13 Playwright e2e, all green; CI builds Windows and Linux on
 every push, runs a packaging smoke test against the real binary and screenshots the Windows
-window. Every release carries `Vettore-windows-x64.zip` and `Vettore-linux-x64.zip`; the README
-links `releases/latest/download/...`, so the download link never changes.
+window. v0.1.0 is the first public release; every release carries `Vettore-windows-x64.zip` and
+`Vettore-linux-x64.zip`, and the README links `releases/latest/download/...`, so the download
+link never changes. Release notes come from the annotated tag message.
 
 ## Public-surface rule
 
