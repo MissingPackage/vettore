@@ -25,8 +25,9 @@ def region_length(length: int, start: int, end: int) -> int:
 def check_region(record: Dseqrecord, start: int, end: int, what: str) -> None:
     n = len(record)
     if not (0 <= start < n and 0 <= end < n):
-        raise CloningError(f"The {what} region 1..{n} does not contain "
-                           f"{start + 1}..{end + 1}")
+        raise CloningError(f"The region {start + 1:,}..{end + 1:,} is not on the {what} "
+                           f"“{record.name}”, which runs from 1 to {n:,}. Choose a region "
+                           "inside it")
     if start > end and not record.circular:
         raise CloningError(f"The {what} “{record.name}” is linear, so the region cannot span "
                            "the origin")

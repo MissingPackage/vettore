@@ -111,8 +111,10 @@ def test_designed_primers_on_a_region_spanning_the_origin():
 
 
 def test_region_outside_the_sequence_is_rejected():
-    with pytest.raises(CloningError, match="does not contain"):
+    with pytest.raises(CloningError) as err:
         design_primers(PLASMID, 10, 5000)
+    assert str(err.value) == ("The region 11..5,001 is not on the template “pTEST”, which runs "
+                              "from 1 to 1,200. Choose a region inside it")
 
 
 def test_http_routes():

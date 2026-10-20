@@ -30,6 +30,7 @@ router = APIRouter()
 
 TM_DIFFERENCE_WARNING = 5.0
 MIN_PRIMER_LENGTH = 12
+TARGET_TM_RANGE = (40.0, 80.0)   # °C: annealing temperatures a PCR is run at
 
 
 class PrimerIn(BaseModel):
@@ -178,6 +179,10 @@ def binding_warnings(annealed, oligos: list[Oligo]) -> list[str]:
 
 def design_primers(template_doc: SequenceDoc, start: int, end: int, target_tm: float = 60.0,
                    forward_tail: str = "", reverse_tail: str = "") -> CloningResult:
+    low, high = TARGET_TM_RANGE
+    if not low <= target_tm <= high:
+        raise CloningError(f"The target Tm must be between {low:.0f} and {high:.0f} °C; "
+                           f"{target_tm:g} °C is not a temperature a primer anneals at")
     template = to_dseqrecord(template_doc)
     check_region(template, start, end, "template")
     core = region_sequence(str(template.seq).upper(), start, end)
@@ -223,8 +228,13 @@ class DesignedAmplicon:
 def design_amplicon(core: str, target_tm: float, forward_tail: str = "",
                     reverse_tail: str = "", name: str = "product") -> DesignedAmplicon:
     """Primers whose annealing parts reach ``target_tm`` (Vettore's Tm preset), plus 5' tails."""
-    designed = primer_design(Dseqrecord(core, circular=False), target_tm=target_tm,
-                             tm_func=lambda seq: primer_tm(str(seq)))
+    try:
+        designed = primer_design(Dseqrecord(core, circular=False), target_tm=target_tm,
+                                 tm_func=lambda seq: primer_tm(str(seq)))
+    except ValueError as exc:      # a primer grew past the longest oligo a Tm is computed for
+        raise CloningError(f"No primer of up to 100 nt reaches {target_tm:g} °C on this region "
+                           "(it may be too AT-rich, or contain N); choose a lower target Tm or "
+                           "another region") from exc
     f_anneal = str(designed.forward_primer.seq).upper()
     r_anneal = str(designed.reverse_primer.seq).upper()
     return DesignedAmplicon(

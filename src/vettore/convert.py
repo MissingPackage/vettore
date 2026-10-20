@@ -120,11 +120,53 @@ def locus_name(name: str) -> str:
     return compact[:cut] if cut >= LOCUS_LENGTH // 2 else compact[:LOCUS_LENGTH]
 
 
-def _location(ann: dict[str, Any], seq_len: int) -> SimpleLocation | CompoundLocation:
+def _is_position(value: Any, length: int) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and 0 <= value < length
+
+
+def annotation_ranges(ann: Any, length: int, circular: bool) -> list[tuple[int, int]] | None:
+    """The inclusive (start, end) ranges of an OVE feature or primer, or None when its position
+    cannot be placed on the sequence (missing, not a number, outside the sequence, or across
+    the end of a linear sequence)."""
+    if not isinstance(ann, dict):
+        return None
+    locations = ann.get("locations")
+    if isinstance(locations, list) and locations:
+        raw = [(loc.get("start"), loc.get("end")) if isinstance(loc, dict) else (None, None)
+               for loc in locations]
+    else:
+        raw = [(ann.get("start"), ann.get("end"))]
+    for start, end in raw:
+        if not (_is_position(start, length) and _is_position(end, length)):
+            return None
+        if start > end and not circular:
+            return None
+    return raw
+
+
+def annotation_label(ann: Any, default: str) -> str:
+    name = ann.get("name") if isinstance(ann, dict) else None
+    return str(name or (ann.get("type") if isinstance(ann, dict) else None) or default)
+
+
+def unplaceable(data: dict[str, Any]) -> dict[str, list[str]]:
+    """Names of the features and primers whose position cannot be placed on the sequence,
+    by kind ("features", "primers"); conversion leaves them out."""
+    sequence = data.get("sequence")
+    length = len(sequence) if isinstance(sequence, str) else 0
+    circular = bool(data.get("circular"))
+    out: dict[str, list[str]] = {}
+    for kind, default in (("features", "feature"), ("primers", "primer")):
+        bad = [annotation_label(ann, default) for ann in _as_list(data.get(kind))
+               if annotation_ranges(ann, length, circular) is None]
+        if bad:
+            out[kind] = bad
+    return out
+
+
+def _location(ann: dict[str, Any], ranges: list[tuple[int, int]],
+              seq_len: int) -> SimpleLocation | CompoundLocation:
     strand = -1 if (ann.get("strand") == -1 or ann.get("forward") is False) else 1
-    ranges = [(loc["start"], loc["end"]) for loc in ann.get("locations") or []] or [
-        (ann["start"], ann["end"])
-    ]
     parts: list[SimpleLocation] = []
     for start, end in ranges:
         if start > end:  # crosses the origin
@@ -137,9 +179,19 @@ def _location(ann: dict[str, Any], seq_len: int) -> SimpleLocation | CompoundLoc
     return parts[0] if len(parts) == 1 else CompoundLocation(parts)
 
 
+def _qualifiers(notes: Any) -> dict[str, list[str]]:
+    if not isinstance(notes, dict):
+        return {}
+    return {str(k): [str(x) for x in v] if isinstance(v, (list, tuple)) else [str(v)]
+            for k, v in notes.items()}
+
+
 def ove_to_record(data: dict[str, Any]) -> SeqRecord:
-    """Convert OVE ``sequenceData`` back to a SeqRecord (GenBank-ready)."""
-    sequence = data.get("sequence", "")
+    """Convert OVE ``sequenceData`` back to a SeqRecord (GenBank-ready). Features and primers
+    whose position cannot be placed on the sequence are left out (see ``unplaceable``)."""
+    sequence = data.get("sequence")
+    sequence = sequence if isinstance(sequence, str) else ""
+    circular = bool(data.get("circular"))
     name = str(data.get("name") or "Untitled").strip() or "Untitled"
     locus = locus_name(name)
     description = str(data.get("description") or "").strip() or name
@@ -157,23 +209,27 @@ def ove_to_record(data: dict[str, Any]) -> SeqRecord:
     )
     for kind, default_type in (("features", "misc_feature"), ("primers", "primer_bind")):
         for ann in _as_list(data.get(kind)):
-            qualifiers = {k: list(v) for k, v in (ann.get("notes") or {}).items()}
-            qualifiers["label"] = [ann.get("name") or default_type]
+            ranges = annotation_ranges(ann, len(sequence), circular)
+            if ranges is None:
+                continue
+            qualifiers = _qualifiers(ann.get("notes"))
+            qualifiers["label"] = [str(ann.get("name") or default_type)]
             if ann.get("color"):
-                qualifiers["ApEinfo_fwdcolor"] = [ann["color"]]
+                qualifiers["ApEinfo_fwdcolor"] = [str(ann["color"])]
             if kind == "primers" and ann.get("bases"):
-                qualifiers["primer_sequence"] = [ann["bases"]]
+                qualifiers["primer_sequence"] = [str(ann["bases"])]
             record.features.append(
-                SeqFeature(_location(ann, len(sequence)), type=ann.get("type") or default_type,
-                           qualifiers=qualifiers)
+                SeqFeature(_location(ann, ranges, len(sequence)),
+                           type=str(ann.get("type") or default_type), qualifiers=qualifiers)
             )
     return record
 
 
-def _as_list(value: Any) -> list[dict[str, Any]]:
-    """OVE stores annotations either as a list or as a dict keyed by id."""
-    if value is None:
-        return []
+def _as_list(value: Any) -> list[Any]:
+    """OVE stores annotations either as a list or as a dict keyed by id; anything else holds
+    none."""
     if isinstance(value, dict):
         return list(value.values())
-    return list(value)
+    if isinstance(value, list):
+        return value
+    return []

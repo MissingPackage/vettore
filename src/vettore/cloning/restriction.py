@@ -289,6 +289,9 @@ def delete_fragment(doc: SequenceDoc, enzyme_names: list[str],
     record = to_dseqrecord(doc)
     enzymes = enzyme_objects(enzyme_names)
     frags = fragments(record, enzymes)
+    if fragment_index is not None and not 0 <= fragment_index < len(frags):
+        raise CloningError(f"Fragment {fragment_index + 1} does not exist (the digest gives "
+                           f"{plural(len(frags), 'fragment')}); choose one from the list")
     if record.circular:
         if len(frags) != 2:
             raise CloningError(f"The enzymes cut {times(len(frags))}; choose enzymes that cut "

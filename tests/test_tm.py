@@ -24,7 +24,7 @@ def test_tm_is_case_insensitive_and_accepts_u():
     assert primer_tm("acgu" + SEQ[4:].lower()) == pytest.approx(primer_tm(SEQ))
 
 
-@pytest.mark.parametrize("bad", ["", "ACGTN", "A" * 101])
+@pytest.mark.parametrize("bad", ["", "A", "ACGTN", "A" * 101])
 def test_tm_rejects_invalid_input(bad):
     with pytest.raises(ValueError):
         primer_tm(bad)

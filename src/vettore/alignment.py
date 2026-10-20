@@ -483,13 +483,21 @@ def _counts(diffs: list[dict[str, Any]]) -> dict[str, int]:
     }
 
 
-def alignment_payload(reference_doc: dict[str, Any], docs: list[dict[str, Any]]) -> dict:
-    reference_name = reference_doc.get("name") or "Reference"
-    reference = clean_sequence(reference_doc.get("sequence") or "", reference_name)
+def _name_and_sequence(doc: Any, fallback: str) -> tuple[str, str]:
+    """A document's name and cleaned sequence; a document without a readable sequence counts
+    as empty (and is then left out, or refused as the reference, with the reason)."""
+    doc = doc if isinstance(doc, dict) else {}
+    name = str(doc.get("name") or fallback)
+    sequence = doc.get("sequence")
+    return name, clean_sequence(sequence if isinstance(sequence, str) else "", name)
+
+
+def alignment_payload(reference_doc: dict[str, Any], docs: list[Any]) -> dict:
+    reference_name, reference = _name_and_sequence(reference_doc, "Reference")
+    reference_doc = reference_doc if isinstance(reference_doc, dict) else {}
     ref_circular = bool(reference_doc.get("circular"))
-    others = [(d.get("name") or f"Sequence {i + 1}",
-               clean_sequence(d.get("sequence") or "", d.get("name") or f"Sequence {i + 1}"))
-              for i, d in enumerate(docs)]
+    others = [_name_and_sequence(d, f"Sequence {i + 1}") for i, d in enumerate(docs)]
+    docs = [d if isinstance(d, dict) else {} for d in docs]
     check_limits(reference_name, reference, others)
 
     index = _reference_index(reference, ref_circular)

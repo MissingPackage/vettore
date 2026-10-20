@@ -99,7 +99,9 @@ def to_dseqrecord(doc: SequenceDoc | dict[str, Any]) -> Dseqrecord:
         raise CloningError(f"“{name}” has no sequence")
     data = {**data, "sequence": dna_sequence(name, sequence)}
     record: SeqRecord = ove_to_record(data)
-    return Dseqrecord(record, circular=bool(data.get("circular")))
+    molecule = Dseqrecord(record, circular=bool(data.get("circular")))
+    molecule.name = name           # messages name the document as the user sees it
+    return molecule
 
 
 def from_dseqrecord(record: Dseqrecord, name: str) -> dict[str, Any]:

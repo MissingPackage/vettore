@@ -21,6 +21,7 @@ from typing import Any
 
 from Bio.SeqUtils import MeltingTemp as mt
 
+MIN_LENGTH = 2      # the nearest-neighbour model needs at least one pair of bases
 MAX_LENGTH = 100
 
 
@@ -64,6 +65,8 @@ def primer_tm(sequence: str, preset: str = DEFAULT_PRESET) -> float:
     seq = sequence.upper().replace("U", "T")
     if not seq or any(c not in "ACGT" for c in seq):
         raise ValueError("Tm needs an unambiguous DNA sequence (A, C, G, T)")
+    if len(seq) < MIN_LENGTH:
+        raise ValueError(f"A Tm needs at least {MIN_LENGTH} bases")
     if len(seq) > MAX_LENGTH:
         raise ValueError(f"Tm is computed for oligos up to {MAX_LENGTH} nt")
     if preset not in PRESETS:
