@@ -100,6 +100,11 @@ export function AllToEachOther({ docs, active, names, lengths }: Props) {
       const { job: jobId } = await call<{ job: string }>("alignment/multiple/start", {
         sequences: ticked.map((d) => ({ ...d.data(), name: names[d.editorName] })),
       });
+      // Stopped, closed or started again while the request was on its way: stop it too.
+      if (id !== request.current) {
+        await call(`alignment/multiple/job/${jobId}/cancel`, {}).catch(() => undefined);
+        return;
+      }
       job.current = jobId;
       for (;;) {
         await wait(POLL_MS);
@@ -184,7 +189,8 @@ export function AllToEachOther({ docs, active, names, lengths }: Props) {
             <span className="vt-msa-meta">
               Up to {limits.max_sequences} sequences, each up to {bp(limits.max_length)} bp
               and {bp(limits.max_total)} bp in all. Strand and origin follow the first ticked
-              sequence; similar sequences end up next to each other.
+              circular sequence (else the first ticked); similar sequences end up next to each
+              other.
             </span>
           )}
         </div>
@@ -240,22 +246,25 @@ function Results({ result }: { result: MultipleResult }) {
   );
 }
 
-function ConservationBar({ conservation }: { conservation: number[] }) {
+function ConservationBar({ conservation }: { conservation: (number | null)[] }) {
   const bins = useMemo(() => conservationBins(conservation, BAR_BINS), [conservation]);
   const regions = useMemo(() => variableRegions(conservation), [conservation]);
-  const mean = conservation.reduce((a, c) => a + c, 0) / Math.max(1, conservation.length);
+  const counted = conservation.filter((c): c is number => c !== null);
+  const mean = counted.reduce((a, c) => a + c, 0) / Math.max(1, counted.length);
   return (
     <div className="vt-msa-field" data-testid="msa-conservation">
       <span className="vt-msa-label">
         Conservation <span className="vt-msa-meta">
-          ({Math.round(mean)} % on average; taller is more alike, hover a bar for its columns)
+          (share of the sequences with each column's most common base, {Math.round(mean)} % on
+          average; gaps never count as agreement; hover a bar for its columns)
         </span>
       </span>
       <svg className="vt-msa-conservation" viewBox={`0 0 ${bins.length} 100`}
            preserveAspectRatio="none" shapeRendering="crispEdges" role="img"
            aria-label={`Conservation along ${bp(conservation.length)} columns`}>
         {bins.map((b, i) => (
-          <rect key={i} x={i} width={1} y={100 - Math.max(2, b.mean)} height={Math.max(2, b.mean)}
+          <rect key={i} x={i} width={1} y={100 - Math.max(2, b.mean ?? 100)}
+                height={Math.max(2, b.mean ?? 100)}
                 className={`is-${conservationLevel(b.mean)}`}>
             <title>{describeBin(b)}</title>
           </rect>
@@ -264,7 +273,7 @@ function ConservationBar({ conservation }: { conservation: number[] }) {
       <span className="vt-msa-meta" data-testid="msa-variable">
         {regions.length
           ? `Most variable stretches (columns): ${regions.map((r) => `${bp(r.start)}–${bp(r.end)}`).join(", ")}.`
-          : "No stretch of 10 or more columns is less than 60 % identical."}
+          : "No stretch of 10 or more columns where fewer than 60 % of the sequences agree."}
       </span>
     </div>
   );
@@ -332,7 +341,17 @@ function PairDifferences({ rows }: { rows: MultipleResult["sequences"] }) {
               Over {rows[a].name}'s bases {bp(comparison.start ?? 0)}–{bp(comparison.end ?? 0)}:
               {" "}{comparison.identity.toFixed(2)} % identical; {summarizeCounts(comparison.counts)}.
               Positions and bases are given in {rows[a].name}'s own numbering and strand.
+              {comparison.unknown > 0 && ` ${bp(comparison.unknown)} position${comparison.unknown === 1 ? "" : "s"} with N (unknown base) are not counted as differences.`}
             </p>
+            {comparison.unrelated.length > 0 && (
+              <Callout intent="warning" data-testid="msa-pair-unrelated">
+                Not compared, because the two have nothing recognisably in common there (for
+                example different inserts in the same backbone):{" "}
+                {comparison.unrelated.map((u) => u.start === null
+                  ? `${bp(u.b_bases)} bp of ${rows[b].name} with no counterpart`
+                  : `${rows[a].name} ${bp(u.start)}–${bp(u.end ?? u.start)} against ${bp(u.b_bases)} bp of ${rows[b].name}`).join("; ")}.
+              </Callout>
+            )}
             {comparison.differences.length === 0 ? (
               <p className="vt-ok">Identical where they overlap.</p>
             ) : (

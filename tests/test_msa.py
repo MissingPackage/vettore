@@ -275,3 +275,104 @@ def test_limits_route(client):
     limits = client.get("/api/alignment/multiple/limits", headers={TOKEN_HEADER: TOKEN}).json()
     assert limits == {"max_sequences": 50, "max_length": 15_000, "max_total": 150_000,
                       "min_length": 15}
+
+
+# ---- regressions found by the adversarial review -----------------------------------------
+
+def test_strand_comes_from_the_closest_relative_not_an_inverted_shared_element():
+    # A and C share only a 150 bp element, inverted in C (a FLEx-like cassette); C matches B
+    # end to end. C must be turned by B, forward.
+    element, r1, y = clean_dna(150, 41), clean_dna(1500, 42), clean_dna(2000, 43)
+    variant = y[:1000] + ("A" if y[1000] != "A" else "C") + y[1001:]
+    result = msa.multiple_alignment([doc("A", element + r1, False),
+                                     doc("C", variant + rc(element), False),
+                                     doc("B", r1 + y, False)])
+    by_name = {s["name"]: s for s in result["sequences"]}
+    assert by_name["C"]["strand"] == 1
+    out = msa.compare(by_name["B"], by_name["C"])
+    assert out["counts"]["mismatches"] == 1 and out["counts"]["insertions"] == 0
+
+
+def test_a_fragment_across_the_origin_of_a_circle_lines_up_in_one_piece():
+    fragment = BASE[-600:] + BASE[:600]
+    result = msa.multiple_alignment([doc("P", BASE, True), doc("F", fragment, False)])
+    by_name = {s["name"]: s for s in result["sequences"]}
+    assert result["columns"] == len(BASE)
+    out = msa.compare(by_name["F"], by_name["P"])
+    assert (out["start"], out["end"], out["overlap"]) == (1, 1200, 1200)
+    # The circle was cut elsewhere, and says so.
+    assert by_name["P"]["origin_moved_to"] is not None
+
+
+def test_two_circles_with_an_indel_near_the_origin_start_together():
+    target = 2996 - 1005                                    # q[k] is BASE[1005 + k]
+    q = list(rotate(BASE, 1000)[5:-5])
+    q[target] = "A" if q[target] != "A" else "C"
+    result = msa.multiple_alignment([doc("P", BASE, True), doc("Q", "".join(q), True)])
+    by_name = {s["name"]: s for s in result["sequences"]}
+    out = msa.compare(by_name["P"], by_name["Q"])
+    deletion, mismatch = sorted(out["differences"], key=lambda d: d["kind"])
+    # BASE[995:1005] deleted (1-based 996-1005); equal flanking bases may slide it along.
+    assert deletion["kind"] == "deletion" and len(deletion["reference"]) == 10
+    assert 990 <= deletion["start"] <= 1000
+    assert (mismatch["kind"], mismatch["start"]) == ("mismatch", 2997)
+
+
+def test_n_runs_are_unknown_bases_not_indels_or_differences():
+    masked = BASE[:1000] + "N" * 200 + BASE[1200:]
+    result = msa.multiple_alignment([doc("a", BASE, False), doc("b", masked, False)])
+    assert result["columns"] == len(BASE)
+    by_name = {s["name"]: s for s in result["sequences"]}
+    out = msa.compare(by_name["a"], by_name["b"])
+    assert out["differences"] == [] and out["unknown"] == 200
+
+
+def test_anchors_keep_the_longest_identical_stretch():
+    long, blocks = clean_dna(3000, 51), [clean_dna(40, 60 + i) for i in range(4)]
+    chain = msa.anchors(long + "".join(blocks), "".join(blocks) + long)
+    assert max(n for _, _, n in chain) == 3000
+
+
+def test_unrelated_inserts_in_one_backbone_are_not_reported_as_mutations():
+    backbone = clean_dna(1500, 71)
+    gfp, cherry = clean_dna(700, 72), clean_dna(700, 73)
+    result = msa.multiple_alignment([doc("pGFP", backbone[:700] + gfp + backbone[700:], False),
+                                     doc("pCherry", backbone[:700] + cherry + backbone[700:],
+                                         False)])
+    by_name = {s["name"]: s for s in result["sequences"]}
+    out = msa.compare(by_name["pGFP"], by_name["pCherry"])
+    assert out["counts"]["mismatches"] < 5
+    [gap] = out["unrelated"]
+    assert abs(gap["start"] - 701) < 20 and abs(gap["end"] - 1400) < 20
+    assert out["identity"] > 99
+
+
+def test_a_divergent_homologous_gene_is_compared_all_along():
+    aav2 = _vp1("analysis-NC_001401.2.gb", 2202, 4410)
+    aav9 = _vp1("analysis-AY530579.1.gb")
+    result = msa.multiple_alignment([doc("AAV2", aav2, False), doc("AAV9", aav9, False)])
+    by_name = {s["name"]: s for s in result["sequences"]}
+    out = msa.compare(by_name["AAV2"], by_name["AAV9"])
+    assert out["unrelated"] == [] and (out["start"], out["end"]) == (1, len(aav2))
+
+
+def test_conservation_never_counts_gaps_as_agreement():
+    inserted = BASE[:500] + "ACGTACGTAC" + BASE[500:1500]
+    rows = [doc(f"s{i}", BASE[:1500], False) for i in range(9)] + [doc("ins", inserted, False)]
+    result = msa.multiple_alignment(rows)
+    low = [c for c in result["conservation"] if c is not None and c < 50]
+    assert len(low) == 10 and set(low) == {10}
+
+
+def test_columns_covered_by_one_sequence_have_no_conservation():
+    result = msa.multiple_alignment([doc("whole", BASE, False), doc("part", BASE[1000:2000],
+                                                                     False)])
+    assert result["conservation"][:1000] == [None] * 1000
+    assert result["conservation"][1000:2000] == [100] * 1000
+
+
+def test_a_new_alignment_stops_the_one_still_running():
+    first = msa.start([doc("a", BASE, False), doc("b", BASE, False)])
+    second = msa.start([doc("a", BASE, False), doc("b", BASE, False)])
+    assert msa.JOBS[first].cancelled or msa.JOBS[first].done.is_set()
+    msa.JOBS[second].done.wait(30)

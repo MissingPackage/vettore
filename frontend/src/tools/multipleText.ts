@@ -33,7 +33,8 @@ export interface MultipleResult {
   alignmentTracks: unknown[];
   sequences: MultipleRow[];
   consensus: string;
-  conservation: number[];
+  /** Per column, 0-100; null where fewer than two sequences cover the column. */
+  conservation: (number | null)[];
   columns: number;
   warnings: string[];
 }
@@ -45,6 +46,11 @@ export interface Comparison {
   start: number | null;
   end: number | null;
   overlap: number;
+  /** Stretches between compared segments with nothing in common, in the first sequence's
+   *  numbering (start and end null when it has no bases there). */
+  unrelated: { start: number | null; end: number | null; a_bases: number; b_bases: number }[];
+  /** Positions where one of the two has N: not counted as differences. */
+  unknown: number;
 }
 
 const n = (value: number) => value.toLocaleString("en-US");
@@ -99,52 +105,58 @@ export interface ConservationBin {
   /** First and last alignment column of the bin, 1-based. */
   start: number;
   end: number;
-  /** Average conservation of the bin's columns, 0-100. */
-  mean: number;
-  /** The least conserved column's value, 0-100. */
-  min: number;
+  /** Average conservation of the bin's columns, 0-100; null when no column has one. */
+  mean: number | null;
+  /** The least conserved column's value, 0-100 (null as for ``mean``). */
+  min: number | null;
 }
 
-/** The conservation of every column folded into at most ``bins`` bars. */
-export function conservationBins(conservation: number[], bins: number): ConservationBin[] {
+/** The conservation of every column folded into at most ``bins`` bars. Columns covered by
+ *  a single sequence (null) compare nothing and are left out of the averages. */
+export function conservationBins(conservation: (number | null)[], bins: number): ConservationBin[] {
   const count = Math.max(1, Math.min(bins, conservation.length));
   const out: ConservationBin[] = [];
   for (let b = 0; b < count; b++) {
     const start = Math.floor((b * conservation.length) / count);
     const end = Math.floor(((b + 1) * conservation.length) / count);
     if (end <= start) continue;
-    const slice = conservation.slice(start, end);
+    const slice = conservation.slice(start, end).filter((c): c is number => c !== null);
     out.push({
       start: start + 1,
       end,
-      mean: slice.reduce((a, c) => a + c, 0) / slice.length,
-      min: Math.min(...slice),
+      mean: slice.length ? slice.reduce((a, c) => a + c, 0) / slice.length : null,
+      min: slice.length ? Math.min(...slice) : null,
     });
   }
   return out;
 }
 
-/** "Columns 1,201–1,225: 84 % identical on average (lowest 50 %)". */
+/** "Columns 1,201–1,225: on average 84 % of the sequences share the most common base
+ *  (lowest 50 %)". A gap is never agreement. */
 export function describeBin(bin: ConservationBin): string {
   const where = bin.start === bin.end ? `Column ${n(bin.start)}` : `Columns ${n(bin.start)}–${n(bin.end)}`;
+  if (bin.mean === null) return `${where}: only one sequence covers ${bin.start === bin.end ? "it" : "them"}`;
   const lowest = bin.start === bin.end || bin.min === Math.round(bin.mean) ? "" : ` (lowest ${bin.min} %)`;
-  return `${where}: ${Math.round(bin.mean)} % identical on average${lowest}`;
+  const share = bin.start === bin.end ? "" : "on average ";
+  return `${where}: ${share}${Math.round(bin.mean)} % of the sequences share the most common base${lowest}`;
 }
 
 /** Bar class by conservation: the eye goes to the variable stretches. */
-export function conservationLevel(mean: number): "high" | "mid" | "low" {
+export function conservationLevel(mean: number | null): "high" | "mid" | "low" | "none" {
+  if (mean === null) return "none";
   if (mean >= 90) return "high";
   if (mean >= 60) return "mid";
   return "low";
 }
 
 /** Stretches of at least ``minLength`` columns below ``threshold`` %, longest first. */
-export function variableRegions(conservation: number[], threshold = 60, minLength = 10, max = 5)
+export function variableRegions(conservation: (number | null)[], threshold = 60, minLength = 10, max = 5)
   : { start: number; end: number }[] {
   const regions: { start: number; end: number }[] = [];
   let start = -1;
   for (let i = 0; i <= conservation.length; i++) {
-    const low = i < conservation.length && conservation[i] < threshold;
+    const value = conservation[i];
+    const low = i < conservation.length && value !== null && value < threshold;
     if (low && start < 0) start = i;
     if (!low && start >= 0) {
       if (i - start >= minLength) regions.push({ start: start + 1, end: i });

@@ -55,24 +55,33 @@ describe("conservation", () => {
       { start: 5, end: 6, mean: 50, min: 20 },
     ]);
     expect(conservationBins([90, 80], 400)).toHaveLength(2);
+    // A column covered by one sequence compares nothing: left out, not counted as conserved.
+    expect(conservationBins([null, 40, null, null], 2)).toEqual([
+      { start: 1, end: 2, mean: 40, min: 40 },
+      { start: 3, end: 4, mean: null, min: null },
+    ]);
   });
 
   it("describes a bar in words", () => {
     expect(describeBin({ start: 1201, end: 1225, mean: 84.2, min: 50 }))
-      .toBe("Columns 1,201–1,225: 84 % identical on average (lowest 50 %)");
-    expect(describeBin({ start: 7, end: 7, mean: 100, min: 100 })).toBe("Column 7: 100 % identical on average");
+      .toBe("Columns 1,201–1,225: on average 84 % of the sequences share the most common base (lowest 50 %)");
+    expect(describeBin({ start: 7, end: 7, mean: 100, min: 100 }))
+      .toBe("Column 7: 100 % of the sequences share the most common base");
+    expect(describeBin({ start: 7, end: 9, mean: null, min: null })).toBe("Columns 7–9: only one sequence covers them");
   });
 
   it("grades bars", () => {
     expect(conservationLevel(95)).toBe("high");
     expect(conservationLevel(70)).toBe("mid");
     expect(conservationLevel(30)).toBe("low");
+    expect(conservationLevel(null)).toBe("none");
   });
 
   it("finds the longest variable stretches", () => {
     const c = [...Array(5).fill(100), ...Array(12).fill(40), ...Array(5).fill(100), ...Array(20).fill(50), 100];
     expect(variableRegions(c)).toEqual([{ start: 23, end: 42 }, { start: 6, end: 17 }]);
     expect(variableRegions(Array(50).fill(100))).toEqual([]);
+    expect(variableRegions([...Array(12).fill(null), ...Array(12).fill(30)])).toEqual([{ start: 13, end: 24 }]);
   });
 });
 

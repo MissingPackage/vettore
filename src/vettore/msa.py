@@ -61,13 +61,15 @@ from pydantic import BaseModel
 from .alignment import (
     MIN_LENGTH,
     AlignmentError,
-    _chain,
+    Placement,
     _counts,
+    _hits,
     _name_and_sequence,
     _reference_index,
     differences,
     place,
     rc,
+    rotate,
 )
 
 log = logging.getLogger(__name__)
@@ -79,6 +81,9 @@ MAX_TOTAL = 150_000          # bp, all sequences together
 DISTANCE_WORD = 8            # word length of the guide-tree distances
 ANCHOR_WORD = 12             # word length of the anchors between two groups
 MIN_ANCHOR = 24              # bp of identical sequence on one diagonal to anchor a merge
+REFINE_WINDOW = 500          # bp after a circular anchor's base 1 that decide where a circle starts
+REFINE_DRIFT = 300           # ... from words on a diagonal this close to the majority one
+SPAN_MARGIN = 50             # bp kept clear on each side of a fragment when cutting circles
 CONSENSUS_SHARE = 0.25       # bases rarer than this in a column do not shape its summary
 MIN_OVERLAP = 0.5            # of the shorter group's columns, else redone with end gaps scored
 # Scores of EMBOSS needle's defaults (EDNAFULL matrix, gap open 10, extend 0.5). On the
@@ -87,6 +92,13 @@ MIN_OVERLAP = 0.5            # of the shorter group's columns, else redone with 
 # alignment must open the gaps of every member, and blastn's costly gaps resist that.
 MATCH, MISMATCH, PARTIAL = 5.0, -4.0, 1.0
 GAP_OPEN, GAP_EXTEND = -10.0, -0.5
+#: A segment of a pairwise comparison must score this much (blastn scores, see
+#: ``_column_scores``) to count as homology: about 30 identical bases.
+SEGMENT_MIN = 60.0
+#: A homologous stretch ends where its score falls this far below its best: unrelated inserts
+#: of 100 bp cost 104-158 in tests, 200 bp 199-300; the most divergent stretch of AAV2 against
+#: AAV9 VP1 costs 90. Shorter unrelated stretches are reported as differences.
+X_DROP = 150.0
 PROFILE_MAX = 3_000          # columns; longer stretches between anchors use the summaries
 
 IUPAC = "ACGTRYSWKMBDHVN"
@@ -120,6 +132,8 @@ BASE_SCORES = np.full((4, 4), MISMATCH) + np.eye(4) * (MATCH - MISMATCH)
 #: bases it stands for; a gap is none).
 WEIGHTS = np.zeros((256, 4))
 for _code, _bases in CODE_BASES.items():
+    if _code == "N":          # an unknown base scores 0 against anything, as in MATRIX
+        continue
     for _base in _bases:
         WEIGHTS[ord(_code), "ACGT".index(_base)] = 1.0 / len(_bases)
 
@@ -173,37 +187,130 @@ def check_limits(members: list[tuple[str, str]]) -> None:
 
 # ---- step 1: strand and origin ---------------------------------------------------------
 
-def orient(members: list[Member], tick: Callable[[str], None]) -> list[str]:
-    """Turn every sequence to the strand and origin of the first one (or of another already
-    turned, when it shares nothing with the first). Returns warnings for those left out."""
-    first = members[0]
-    first.oriented = first.sequence
-    placed = [first]
-    indexes = {first.index: _reference_index(first.oriented, first.circular)}
-    pending = members[1:]
-    # A sequence unrelated to the first may be related to one placed later: go round again
-    # until a round places nothing new.
-    progress = True
-    while progress:
-        progress = False
+def _refine_circular(anchor: str, oriented: str, index: dict[str, list[int]]) -> int:
+    """Extra turn for a circle already turned to a circular anchor by the majority vote.
+
+    The majority diagonal is that of the longest shared stretch; with an insertion or a
+    deletion between the anchor's base 1 and that stretch, the sequence would start a few
+    bases off and the bases next to the origin would hang over the ends. The words shared
+    just after the anchor's base 1, on a diagonal near the majority one, say where it
+    really starts."""
+    length = len(oriented)
+    near = []
+    for q, r in _hits(index, oriented, True):
+        shift = (q - r + length // 2) % length - length // 2
+        if r < REFINE_WINDOW and abs(shift) <= REFINE_DRIFT:
+            near.append((r, shift))
+    return min(near)[1] if near else 0
+
+
+def _fragment_span(placement: Placement, fragment: int, circle: int) -> tuple[int, int] | None:
+    """Where a linear fragment placed on a circular anchor lies on it, as (start, length),
+    or None when it is as long as the circle. ``place`` centres the fragment in the circle
+    turned by ``reference_shift``."""
+    if fragment >= circle:
+        return None
+    return (placement.reference_shift + (circle - fragment) // 2) % circle, fragment
+
+
+def _orient_from(root: Member, members: list[Member], tick: Callable[[str], None]
+                 ) -> list[tuple[int, int]]:
+    """Place every member on the frame of ``root`` (already oriented). Each round takes the
+    pairing of a pending member with a placed one that shares the most words, so a
+    sequence is turned by its closest relative, not by whichever was placed first: two
+    constructs sharing only an inverted element (a FLEx cassette, a loxP, a promoter) do not
+    flip each other while a sequence matching end to end is there. Returns the spans of
+    linear fragments on circular anchors (see ``_fragment_span``)."""
+    for member in members:
+        if member is not root:
+            member.oriented = ""
+    placed = [root]
+    pending = [m for m in members if m is not root]
+    indexes: dict[int, dict[str, list[int]]] = {}
+    tried: dict[tuple[int, int], Any] = {}
+    spans = []
+    while pending:
+        best = None
         for member in pending:
-            if member.oriented:
-                continue
-            tick(f"Finding the strand of sequence {member.index + 1} of {len(members)}")
             for anchor in placed:
-                index = indexes.setdefault(anchor.index,
-                                           _reference_index(anchor.oriented, anchor.circular))
-                found = place(anchor.oriented, anchor.circular, member.sequence,
-                              member.circular, index, local=True)
-                if found is not None:
-                    placement, _, oriented = found
-                    member.strand, member.rotation, member.oriented = (
-                        placement.strand, placement.rotation, oriented)
-                    placed.append(member)
-                    progress = True
-                    break
+                key = (member.index, anchor.index)
+                if key not in tried:
+                    tick(f"Finding the strand of “{member.name}”")
+                    if anchor.index not in indexes:
+                        indexes[anchor.index] = _reference_index(anchor.oriented,
+                                                                 anchor.circular)
+                    index = indexes[anchor.index]
+                    tried[key] = place(anchor.oriented, anchor.circular, member.sequence,
+                                       member.circular, index, local=True)
+                found = tried[key]
+                if found is not None and (best is None or found[0].votes > best[0]):
+                    best = (found[0].votes, member, anchor, found)
+        if best is None:
+            break
+        _, member, anchor, (placement, _, oriented) = best
+        member.strand, member.rotation, member.oriented = (placement.strand,
+                                                           placement.rotation, oriented)
+        if member.circular and anchor.circular:
+            turn = _refine_circular(anchor.oriented, oriented, indexes[anchor.index])
+            if turn:
+                member.rotation = (member.rotation + turn) % len(oriented)
+                member.oriented = rotate(oriented, turn)
+        elif anchor.circular and (span := _fragment_span(placement, len(member.sequence),
+                                                          len(anchor.oriented))):
+            spans.append(span)
+        placed.append(member)
+        pending.remove(member)
+    return spans
+
+
+def _uncovered_middle(spans: list[tuple[int, int]], circle: int) -> int | None:
+    """The middle of the longest stretch of the circle that no span covers, or None when
+    the spans cover all of it."""
+    covered = [False] * circle
+    for start, length in spans:
+        for k in range(start - SPAN_MARGIN, start + length + SPAN_MARGIN):
+            covered[k % circle] = True
+    if all(covered):
+        return None
+    first = covered.index(False)
+    best = (0, 0)       # length, start
+    run_start, run = first, 0
+    for step in range(circle):
+        k = (first + step) % circle
+        if covered[k]:
+            if run > best[0]:
+                best = (run, run_start)
+            run = 0
+        else:
+            if run == 0:
+                run_start = k
+            run += 1
+    if run > best[0]:
+        best = (run, run_start)
+    return (best[1] + best[0] // 2) % circle
+
+
+def orient(members: list[Member], tick: Callable[[str], None]) -> list[str]:
+    """Turn every sequence to the strand and origin of the first circular one ticked (the
+    first one, when none is circular). A circle has no ends, so when a linear fragment
+    (an amplicon, a read) crosses its base 1 the circles are all cut elsewhere instead, in
+    the middle of the longest stretch no fragment covers, and the fragment lines up in one
+    piece. Returns warnings for the sequences left out."""
+    root = next((m for m in members if m.circular), members[0])
+    root.strand, root.rotation, root.oriented = 1, 0, root.sequence
+    spans = _orient_from(root, members, tick)
+    circle = len(root.sequence)
     warnings = []
-    for member in pending:
+    if root.circular and any(start + length > circle for start, length in spans):
+        cut = _uncovered_middle(spans, circle)
+        if cut is None:
+            warnings.append(f"The linear sequences cover all of “{root.name}” between them, "
+                            "so one of them crosses its base 1 and part of it is shown past "
+                            "the end of the circle.")
+        else:
+            root.rotation, root.oriented = cut, rotate(root.sequence, cut)
+            _orient_from(root, members, tick)
+    for member in members:
         if not member.oriented:
             warnings.append(f"“{member.name}” was left out: it has nothing recognisably in "
                             "common with the other sequences on either strand, so it cannot "
@@ -343,17 +450,46 @@ def anchors(x: str, y: str) -> list[tuple[int, int, int]]:
             blocks.append([i, i + diagonal, i, i])   # x start, y start, first word, last word
     blocks = [(x0, y0, last - first + ANCHOR_WORD) for x0, y0, first, last in blocks
               if last - first + ANCHOR_WORD >= MIN_ANCHOR]
-    length = {(x0, y0): n for x0, y0, n in blocks}
-    chained = []
+    return _heaviest_chain(blocks)
+
+
+def _heaviest_chain(blocks: list[tuple[int, int, int]]) -> list[tuple[int, int, int]]:
+    """The collinear chain of blocks that anchors the most bases. A block may overlap the
+    one before it on either sequence (a repeat around an indel); the overlap is trimmed from
+    its start and not counted. Weighing bases, not blocks, keeps a 3 kb identical stretch
+    rather than four short blocks of a rearranged cassette."""
+    if not blocks:
+        return []
+    blocks = sorted(blocks)
+    xs = np.array([b[0] for b in blocks])
+    ys = np.array([b[1] for b in blocks])
+    ns = np.array([b[2] for b in blocks])
+    score = np.zeros(len(blocks))
+    parent = np.full(len(blocks), -1)
+    for i in range(len(blocks)):
+        score[i] = ns[i]
+        if i:
+            overlap = np.maximum(np.maximum(xs[:i] + ns[:i] - xs[i], ys[:i] + ns[:i] - ys[i]), 0)
+            usable = (xs[:i] < xs[i]) & (ys[:i] < ys[i]) & (overlap <= ns[i] - ANCHOR_WORD)
+            if usable.any():
+                gain = np.where(usable, score[:i] + ns[i] - overlap, -1.0)
+                j = int(np.argmax(gain))
+                if gain[j] > score[i]:
+                    score[i], parent[i] = gain[j], j
+    chain = []
+    i = int(np.argmax(score))
+    while i != -1:
+        chain.append(i)
+        i = int(parent[i])
+    out = []
     end_x = end_y = 0
-    for x0, y0 in _chain([(x0, y0) for x0, y0, _ in blocks]):
-        n = length[x0, y0]
-        overlap = max(end_x - x0, end_y - y0, 0)   # trim the start so blocks do not overlap
+    for i in reversed(chain):
+        x0, y0, n = int(xs[i]), int(ys[i]), int(ns[i])
+        overlap = max(end_x - x0, end_y - y0, 0)
         x0, y0, n = x0 + overlap, y0 + overlap, n - overlap
-        if n >= ANCHOR_WORD:
-            chained.append((x0, y0, n))
-            end_x, end_y = x0 + n, y0 + n
-    return chained
+        out.append((x0, y0, n))
+        end_x, end_y = x0 + n, y0 + n
+    return out
 
 
 def frequencies(rows: list[str]) -> np.ndarray:
@@ -362,7 +498,8 @@ def frequencies(rows: list[str]) -> np.ndarray:
     return WEIGHTS[table].sum(axis=0) / len(rows)
 
 
-def align_columns(x: str, y: str, fx: np.ndarray, fy: np.ndarray, free_ends: bool = True
+def align_columns(x: str, y: str, fx: np.ndarray, fy: np.ndarray, free_ends: bool = True,
+                  check: Callable[[], None] = lambda: None
                   ) -> list[tuple[int | None, int | None]]:
     """Columns of x paired with columns of y: anchors kept, stretches between them aligned,
     end gaps free on the outer stretches unless ``free_ends`` is false."""
@@ -370,6 +507,7 @@ def align_columns(x: str, y: str, fx: np.ndarray, fy: np.ndarray, free_ends: boo
     i = j = 0
 
     def stretch(x1: int, y1: int, left_free: bool, right_free: bool) -> None:
+        check()
         out.extend((a + i if a is not None else None, b + j if b is not None else None)
                    for a, b in _segment(x[i:x1], y[j:y1], fx[i:x1], fy[j:y1],
                                         left_free, right_free))
@@ -382,15 +520,16 @@ def align_columns(x: str, y: str, fx: np.ndarray, fy: np.ndarray, free_ends: boo
     return out
 
 
-def merge(a: list[str], b: list[str]) -> list[str]:
-    """Two groups of gapped rows aligned to each other, as one group."""
+def merge(a: list[str], b: list[str], check: Callable[[], None] = lambda: None) -> list[str]:
+    """Two groups of gapped rows aligned to each other, as one group. ``check`` is called
+    between stretches (it raises to stop)."""
     codes_a, codes_b, fa, fb = column_codes(a), column_codes(b), frequencies(a), frequencies(b)
-    pairs = align_columns(codes_a, codes_b, fa, fb)
+    pairs = align_columns(codes_a, codes_b, fa, fb, check=check)
     paired = sum(1 for i, j in pairs if i is not None and j is not None)
     if paired < MIN_OVERLAP * min(len(codes_a), len(codes_b)):
         # Every sequence here is related to another (step 1), so two groups that slid apart
         # along their free end gaps did so because distant groups score little per column.
-        pairs = align_columns(codes_a, codes_b, fa, fb, free_ends=False)
+        pairs = align_columns(codes_a, codes_b, fa, fb, free_ends=False, check=check)
     rows = ["".join(row[i] if i is not None else "-" for i, _ in pairs) for row in a]
     rows += ["".join(row[j] if j is not None else "-" for _, j in pairs) for row in b]
     return rows
@@ -405,11 +544,14 @@ def _span(row: str) -> tuple[int, int]:
     return first, last
 
 
-def consensus_and_conservation(rows: list[str]) -> tuple[str, list[int]]:
+def consensus_and_conservation(rows: list[str]) -> tuple[str, list[int | None]]:
     """The consensus row (the most common base of each column, an IUPAC code for a tie, a gap
     where most sequences have one) and the conservation of each column: the percentage of
-    the sequences covering it that hold its most common base. A sequence does not cover the
-    columns before its first base or after its last (a fragment's ends)."""
+    the sequences covering it that hold its most common base. A gap or an N is never
+    agreement, so an insertion carried by one sequence in ten is 10 % conserved, not 90 %.
+    A sequence does not cover the columns before its first base or after its last (a
+    fragment's ends); a column covered by fewer than two sequences compares nothing and
+    has no conservation (None)."""
     spans = [_span(r) for r in rows]
     consensus, conservation = [], []
     for k, column in enumerate(zip(*rows)):
@@ -418,7 +560,7 @@ def consensus_and_conservation(rows: list[str]) -> tuple[str, list[int]]:
         gaps = len(covering) - sum(counts.values())
         if not counts:
             consensus.append("-")
-            conservation.append(0)
+            conservation.append(0 if len(covering) > 1 else None)
             continue
         top = max(counts.values())
         if gaps > top:
@@ -430,7 +572,9 @@ def consensus_and_conservation(rows: list[str]) -> tuple[str, list[int]]:
             else:
                 bases = frozenset("".join(CODE_BASES.get(c, "ACGT") for c in tied))
                 consensus.append(BASES_CODE.get(bases, "N"))
-        conservation.append(round(100 * max(top, gaps) / len(covering)))
+        agreeing = max((n for c, n in counts.items() if c != "N"), default=0)
+        conservation.append(round(100 * agreeing / len(covering)) if len(covering) > 1
+                            else None)
     return "".join(consensus), conservation
 
 
@@ -485,6 +629,10 @@ def multiple_alignment(docs: list[Any], report: Callable[[float, str], None] | N
             report(min(0.99, steps["done"] / total), message)
         steps["done"] += weight
 
+    def stop_if_cancelled() -> None:
+        if cancelled():
+            raise Cancelled()
+
     warnings += orient(members, tick)
     if len(members) < 2:
         raise AlignmentError("None of the chosen sequences has anything recognisably in "
@@ -497,7 +645,7 @@ def multiple_alignment(docs: list[Any], report: Callable[[float, str], None] | N
     rows: dict[int, list[str]] = {i: [m.oriented] for i, m in enumerate(members)}
     for k, (a, b) in enumerate(joins):
         tick(f"Aligning: step {k + 1} of {len(joins)}", 3)
-        rows[n + k] = merge(rows.pop(a), rows.pop(b))
+        rows[n + k] = merge(rows.pop(a), rows.pop(b), stop_if_cancelled)
         groups[n + k] = groups.pop(a) + groups.pop(b)
     (root,) = groups
     gapped = dict(zip(groups[root], rows[root]))
@@ -529,8 +677,9 @@ def multiple_alignment(docs: list[Any], report: Callable[[float, str], None] | N
             "strand": m.strand,
             "rotation": m.rotation,
             # Circular sequence: which of its own bases now comes first.
-            "origin_moved_to": (None if not m.rotation else
-                                m.rotation + 1 if m.strand == 1
+            # A reverse-complemented circle starts at its own last base even unturned.
+            "origin_moved_to": (None if not m.circular or (m.strand == 1 and not m.rotation)
+                                else m.rotation + 1 if m.strand == 1
                                 else len(m.sequence) - m.rotation),
             "row": gapped[i],
             "first_column": first + 1,
@@ -549,9 +698,83 @@ def multiple_alignment(docs: list[Any], report: Callable[[float, str], None] | N
 
 # ---- differences between two rows ------------------------------------------------------
 
+def _column_scores(columns: list[tuple[str, str, int | None]]) -> list[float]:
+    """The blastn score of each column, as in the star alignment (reward 2, penalty -3, gap
+    open 5 + extend 2 on the first gap of a run, 2 on the others; N scores 0, it says
+    nothing). Not the alignment's own scores: their cheap gaps, right for lining up many
+    sequences, let two unrelated stretches score above zero once aligned."""
+    out = []
+    gap = None
+    for x, y, _ in columns:
+        if x == "-" or y == "-":
+            side = "a" if x == "-" else "b"
+            out.append(-2.0 if gap == side else -7.0)
+            gap = side
+            continue
+        gap = None
+        out.append(0.0 if "N" in (x, y) else 2.0 if x == y else -3.0)
+    return out
+
+
+def maximal_segments(scores: list[float]) -> list[tuple[int, int, float]]:
+    """All maximal scoring segments (Ruzzo & Tompa 1999, ISMB 7:234) as (start, end
+    exclusive, score): the stretches a local alignment would report one after another."""
+    segments: list[list[float]] = []      # [start, end, left cumulative, right cumulative]
+    total = 0.0
+    for k, score in enumerate(scores):
+        before = total
+        total += score
+        if score <= 0:
+            continue
+        current = [k, k + 1, before, total]
+        while True:
+            j = next((i for i in range(len(segments) - 1, -1, -1)
+                      if segments[i][2] < current[2]), None)
+            if j is None or segments[j][3] >= current[3]:
+                segments.append(current)
+                break
+            current = [segments[j][0], current[1], segments[j][2], current[3]]
+            del segments[j:]
+    return [(int(a), int(b), r - lft) for a, b, lft, r in segments]
+
+
+def homologous_segments(scores: list[float], offset: int = 0) -> list[tuple[int, int]]:
+    """The stretches of a pairwise comparison that are homologous, as (start, end exclusive):
+    maximal scoring segments of at least SEGMENT_MIN, each split wherever its running score
+    drops by more than X_DROP below the best it reached before (BLAST's X-drop rule)."""
+    out = []
+    for i, j, _ in maximal_segments(scores):
+        part = scores[i:j]
+        if sum(part) < SEGMENT_MIN:
+            continue
+        total = peak = 0.0
+        peak_at, drop, cut = 0, 0.0, None
+        for k, score in enumerate(part):
+            total += score
+            if total > peak:
+                peak, peak_at = total, k + 1
+            elif peak - total > drop:
+                drop, cut = peak - total, (peak_at, k + 1)
+        if drop <= X_DROP:
+            out.append((offset + i, offset + j))
+            continue
+        p, t = cut
+        out += homologous_segments(part[:p], offset + i)
+        out += homologous_segments(part[t:], offset + i + t)
+    return sorted(out)
+
+
 def compare(a: dict[str, Any], b: dict[str, Any]) -> dict[str, Any]:
     """Differences of row b from row a, in a's own numbering (1-based, on a's strand as
-    stored in its file), over the columns both cover."""
+    stored in its file), over the columns both cover.
+
+    A multiple alignment lines up every column, related or not: two plasmids that share a
+    backbone but carry different inserts face each other insert against insert. Such a
+    stretch is not a list of mutations. Only homologous segments are compared
+    (``homologous_segments``); what lies between two of them is reported as unrelated. A
+    divergent but homologous loop costs less than X_DROP (the variable regions of AAV2 and
+    AAV9 VP1 cost 90 at most) and stays compared; an unrelated stretch of ~150 bp or more
+    costs more. N facing a base is not a difference; such positions are counted apart."""
     row_a, row_b = str(a["row"]), str(b["row"])
     if len(row_a) != len(row_b):
         raise AlignmentError("The two rows come from different alignments. Align again.")
@@ -562,30 +785,49 @@ def compare(a: dict[str, Any], b: dict[str, Any]) -> dict[str, Any]:
         row_a, row_b = rc(row_a), rc(row_b)
         rotation = (length - rotation) % length
     pairs = [(x, y) for x, y in zip(row_a, row_b) if not (x == "-" and y == "-")]
-    both = [k for k, (x, y) in enumerate(pairs) if x != "-" and y != "-"]
-    if not both:
-        return {"differences": [], "counts": _counts([]), "identity": 0.0, "start": None,
-                "end": None, "overlap": 0}
-    before = sum(1 for x, _ in pairs[:both[0]] if x != "-")
+    empty = {"differences": [], "counts": _counts([]), "identity": 0.0, "start": None,
+             "end": None, "overlap": 0, "unrelated": [], "unknown": 0}
     columns: list[tuple[str, str, int | None]] = []
-    position = before
-    for x, y in pairs[both[0]:both[-1] + 1]:
+    position = 0
+    for x, y in pairs:
         if x == "-":
             columns.append((x, y, None))
         else:
             columns.append((x, y, (position + rotation) % length))
             position += 1
-    diffs = sorted(differences(columns, length), key=lambda d: d["start"])
-    same = sum(1 for x, y, _ in columns if x == y)
-    first = next(p for _, _, p in columns if p is not None)
-    last = next(p for _, _, p in reversed(columns) if p is not None)
+    segments = homologous_segments(_column_scores(columns))
+    if not segments:
+        return empty
+    diffs: list[dict[str, Any]] = []
+    compared: list[tuple[str, str, int | None]] = []
+    unrelated = []
+    for k, (i, j) in enumerate(segments):
+        part = columns[i:j]
+        compared += part
+        diffs += differences(part, length)
+        if k:
+            between = columns[segments[k - 1][1]:i]
+            on_a = [p for _, _, p in between if p is not None]
+            unrelated.append({"start": on_a[0] + 1 if on_a else None,
+                              "end": on_a[-1] + 1 if on_a else None,
+                              "a_bases": len(on_a),
+                              "b_bases": sum(1 for _, y, _ in between if y != "-")})
+    unknown = [d for d in diffs if d["kind"] == "mismatch" and "N" in (d["reference"],
+                                                                      d["sequence"])]
+    diffs = sorted((d for d in diffs if d not in unknown), key=lambda d: d["start"])
+    same = sum(1 for x, y, _ in compared if x == y)
+    counted = len(compared) - len(unknown)
+    first = next(p for _, _, p in compared if p is not None)
+    last = next(p for _, _, p in reversed(compared) if p is not None)
     return {
         "differences": diffs,
         "counts": _counts(diffs),
-        "identity": round(100.0 * same / len(columns), 2),
+        "identity": round(100.0 * same / max(1, counted), 2),
         "start": first + 1,
         "end": last + 1,
-        "overlap": position - before,
+        "overlap": sum(1 for _, _, p in compared if p is not None),
+        "unrelated": unrelated,
+        "unknown": len(unknown),
     }
 
 
@@ -600,6 +842,11 @@ def start(docs: list[Any]) -> str:
     job = Job()
     job_id = uuid.uuid4().hex
     with JOBS_LOCK:
+        # One window, one alignment at a time: a new one stops any still running (a
+        # 10 x 15 kb alignment holds close to 1 GB while it runs).
+        for other in JOBS.values():
+            if not other.done.is_set():
+                other.cancelled = True
         finished = [k for k, j in JOBS.items() if j.done.is_set()]
         for k in finished[:max(0, len(JOBS) - MAX_JOBS + 1)]:
             del JOBS[k]

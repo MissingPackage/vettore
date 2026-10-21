@@ -60,3 +60,4 @@
 .vt-msa-conservation .is-mid { fill: var(--vt-border-strong); }
 .vt-msa-conservation .is-low { fill: var(--vt-warning); }
 .vt-msa-pair-pick { display: inline-flex; align-items: center; gap: var(--vt-space-2); flex-wrap: wrap; }
+.vt-msa-conservation .is-none { fill: var(--vt-surface-sunken); }
