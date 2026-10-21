@@ -165,6 +165,23 @@ digest that tells my correct clone apart from the usual wrong ones, so that one 
 - Tested on pBR322 digests worked out by hand from the published record, sizes cross-checked
   with the gel simulator's pydna digest.
 
+### S6.3 — Open from NCBI (online, explicit)
+
+As a bench scientist I want to open a GenBank record by its accession number, so that I do not
+have to download and save it first.
+
+- File → Open from NCBI… (and a link on the welcome screen) asks for an accession, fetches the
+  GenBank record (NCBI E-utilities `efetch`, `gbwithparts`) and opens it as an unsaved document
+  whose History starts with "Opened from NCBI". Only the accession is sent; no account.
+- The accession is checked before anything is sent (protein accessions refused, an accession
+  picked out of pasted text); offline, an uncheckable certificate, an unknown accession, NCBI
+  busy, a master record without sequence and a record over 2 Mb (read from the LOCUS line,
+  before downloading) each get one sentence saying what to do. The tab takes the record's
+  accession.version. Nothing else uses the
+  network (`src/vettore/ncbi.py` is the only module that does).
+- Preference "Allow Open from NCBI", on by default; off hides the menu item and the link.
+- Not included: uploading sequences anywhere (no BLAST).
+
 ## Read first
 
 | What | Where | Why |
@@ -183,7 +200,7 @@ digest that tells my correct clone apart from the usual wrong ones, so that one 
 
 ## Hard constraints
 
-- Runs fully offline on Windows 10/11 x64 and Linux x64; no Docker, no admin rights to install (unzip and run).
+- Runs fully offline on Windows 10/11 x64 and Linux x64 (the one exception, S6.3 File → Open from NCBI…, downloads a public record only when the user asks and sends only its accession); no Docker, no admin rights to install (unzip and run).
 - Unsigned executable is acceptable (personal PC).
 - Repository: `MissingPackage/vettore`. All repo content in English.
 - Deadline: S1 ships as soon as it is green, without waiting for S2 — the editor is useful on its own.
@@ -197,7 +214,7 @@ digest that tells my correct clone apart from the usual wrong ones, so that one 
 | S1 Daily driver | done (S1.1–S1.6), plus more formats (EMBL, `.xdna`, `.gck`, plain text), content-based format detection, `.dna` writing, clipboard exchange, vendor conventions (colour notes, non-standard and `regulatory` feature types) | — |
 | S2 Cloning | done: S2.1–S2.8 — restriction (one or several inserts), linear and circular ligation, Gibson/HiFi/In-Fusion, PCR, mutagenesis, Golden Gate, Gateway BP/LR including MultiSite LR with up to four entry clones (checked against published MultiSite vectors and a published three-fragment clone), TA/GC/TOPO, annealed oligos; History reopens every input; Create All | — |
 | S3 Verification | done: S3.1–S3.5 — gel, Sanger alignment with verdict and read quality, star alignment of several sequences, common features with label checks, primer3 pair design | progressive multiple alignment added in S6.2 (Align Multiple Sequences → All to each other) |
-| S4 Polish | mostly: preferences, shortcut list, sample constructs, help, AAV packaging check, consistent look, in-app quit dialog, one window for double-clicked files, per-user file associations (Windows and Linux) | history graph; printing in the Linux window; online import by accession (open question 6) |
+| S4 Polish | mostly: preferences, shortcut list, sample constructs, help, AAV packaging check, consistent look, in-app quit dialog, one window for double-clicked files, per-user file associations (Windows and Linux) | history graph; printing in the Linux window |
 
 Tests: 609 pytest (plus 4 opt-in Qt window tests), 110 vitest, 130 Playwright end-to-end, plus a packaging smoke test that runs the packaged binary on both
 platforms in CI (file round trips in every format, cloning, Tm, primer design, alignment,
@@ -215,7 +232,7 @@ start handing its file to the running copy).
 3. [ASSUMED: S2 priority order = restriction cloning, Gibson/HiFi, PCR, mutagenesis, Golden Gate, Gateway, In-Fusion, TA/TOPO] — which methods are used most? (All but Gateway and TA/TOPO are done.)
 4. (resolved — Sanger verification shipped)
 5. [ASSUMED: ladders listed in S3.1] — which ladder brands are used in the lab?
-6. [ASSUMED: optional online import from NCBI/Addgene by accession is welcome — only public data is downloaded, nothing is uploaded] — or strictly no network at all?
+6. Resolved 2026-10-21: online import from NCBI by accession, on by default as an explicit menu action (S6.3, File → Open from NCBI…); only the accession is sent, nothing is uploaded. A preference hides it.
 7. [ASSUMED: delivery = the zip from the GitHub Releases page] — fine?
 8. [ASSUMED: name "Vettore"] — rename freely.
 9. Licence: primer3-py (GPL-2.0-or-later) is bundled in-process, so a distributed build must be GPL-3.0-or-later (Apache-2.0 components rule out GPLv2). Resolved: the repository is GPL-3.0-or-later.

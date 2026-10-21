@@ -3,7 +3,8 @@
 Vettore is an offline plasmid editor and cloning simulator. It follows the way bench work
 flows — open a construct, read its map and sites, plan the cloning, order the primers, verify
 the clone — and runs entirely on your own computer: no account, no internet, no data leaves
-the machine.
+the machine. The one exception is **File → Open from NCBI…**, which downloads a public record
+when you ask for it and sends nothing but the accession number.
 
 ## Contents
 
@@ -107,6 +108,32 @@ open the same help you find in the Help menu once a file is open.
   [Preferences](#preferences-file--preferences).
 
 Your `.dna` files open with their features, colours, primers (including 5′ tails) and topology.
+
+### Opening a record from NCBI (File → Open from NCBI…)
+
+Type a GenBank accession number, such as `MT612431.1`, `M77789.2` or `NC_001422.1`, and press
+**Open** (or Enter). Vettore downloads the record from NCBI and opens it as a new tab, not yet
+saved (save it with Ctrl+S to keep it). The welcome screen has the same link.
+
+- This is the only thing in Vettore that uses the internet, and only when you press Open. Only
+  the accession number is sent: no sequence and no file leaves your computer, and no account is
+  needed.
+- Without a connection the dialog says so and stays open, so you can try again; everything
+  else in Vettore works offline as always.
+- A wrong or unknown accession is named in the message, and a protein accession is pointed
+  out as such. An accession copied with words around it ("GenBank: MT612431.1") works too.
+- Records over 2,000,000 bp (a bacterial genome or a chromosome) are refused before they are
+  downloaded: download the region you need from the NCBI website and open that file. The
+  master record of a sequencing project holds no sequence; open one of its contigs.
+- Vettore opens whole records. A region written after the accession
+  (`NC_045512.2:21563-25384`) is refused rather than silently opening the whole record: open
+  the record and select the region, or download a chromosome region from the NCBI website.
+  SRA, BioProject, BioSample and PubMed Central identifiers are pointed out as such.
+- Typed without a version (`M77789`), the record opens under the version NCBI sends
+  (`M77789.2`), so you know which one you have.
+- The tab's History starts with "Opened from NCBI" and the accession.
+- To hide the menu item, untick **Allow Open from NCBI** in
+  [Preferences](#preferences-file--preferences).
 
 ## Copy and paste sequences
 
@@ -575,6 +602,8 @@ What Vettore starts from, kept between sessions:
   shows their buffers. Empty by default.
 - **Minimum identity when detecting common features** — 95 % by default. Lower it to catch
   variants (a promoter a few bases off), raise it to 100 % to accept exact matches only.
+- **Allow Open from NCBI** — on by default. Untick it and **File → Open from NCBI…** (and its
+  link on the welcome screen) is hidden, so nothing in Vettore can use the internet.
 
 - **Open sequence files with Vettore when you double-click them** — only in the Vettore you
   downloaded. Tick it and `.dna`, `.gb`, `.gbk`, `.gbff`, `.ape`, `.embl`, `.fa`, `.fasta`,
