@@ -107,6 +107,9 @@ END_X_DROP = 15.0
 EDGE_RUN = 5
 #: An end is named unrelated only if at least this long and less than this identical.
 END_MIN, END_IDENTITY = 10, 0.5
+#: Without a run of ANCHOR_WORD identical columns, the shorter run that holds an end, and
+#: failing that the columns at each end whose differences are marked uncertain.
+END_WORD, END_MARGIN = 8, 30
 #: Largest stretch (cells of the dynamic programming matrix) realigned as a pair.
 PAIR_MAX_CELLS = 4_000_000
 PROFILE_MAX = 3_000          # columns; longer stretches between anchors use the summaries
@@ -1148,12 +1151,20 @@ def compare(a: dict[str, Any], b: dict[str, Any]) -> dict[str, Any]:
     # two linear sequences have nothing beyond them to hold the alignment: a cluster of
     # substitutions there reads as well as an insertion or deletion. Such differences are
     # listed, marked uncertain, for the user to check against the trace.
+    # Two divergent sequences (a codon-optimised gene against the native one) may share no
+    # such run: then a shorter one, END_WORD, holds the ends, and failing that the last
+    # END_MARGIN columns at each end are uncertain.
     inner = (0, len(columns))
     if not (a.get("circular") and b.get("circular")):
-        runs = [k for k in range(ANCHOR_WORD, len(columns) + 1)
-                if all(map(_identical, columns[k - ANCHOR_WORD:k]))]
-        if runs:
-            inner = (runs[0] - ANCHOR_WORD, runs[-1])
+        for word in (ANCHOR_WORD, END_WORD):
+            runs = [k for k in range(word, len(columns) + 1)
+                    if all(map(_identical, columns[k - word:k]))]
+            if runs:
+                inner = (runs[0] - word, runs[-1])
+                break
+        else:
+            margin = min(END_MARGIN, len(columns) // 2)
+            inner = (margin, len(columns) - margin)
     for i, j in merged:
         part = columns[i:j]
         compared += part

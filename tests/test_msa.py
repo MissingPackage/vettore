@@ -615,3 +615,30 @@ def test_differences_held_on_both_sides_are_certain():
     _, out = _two(BASE, other, circular=False)
     assert [(d["start"], d.get("uncertain", False)) for d in out["differences"]] == [
         (1031, False), (1771, False)]
+
+
+def test_ends_of_divergent_pairs_without_identical_runs_are_uncertain_too():
+    # Like a codon-optimised gene against the native one: most third bases changed, so the
+    # two may share no run of 12 identical bases. An end cluster of substitutions must
+    # still come out marked uncertain, whatever reading the alignment picked (the
+    # reviewer's probe; pairs too far apart to align are skipped, as the dialog would).
+    rng = random.Random(4)
+    checked = 0
+    for t in range(40):
+        n = rng.choice([400, 800])
+        bases = random.Random(5100 + t)
+        a = "".join(bases.choice("ACGT") for _ in range(n))
+        rate, mut = rng.choice([0.6, 0.7, 0.8]), random.Random(5200 + t)
+        b = list(a)
+        for k in range(2, n, 3):
+            if mut.random() < rate:
+                b[k] = mut.choice("ACGT".replace(a[k], ""))
+        b = _shifted("".join(b), [n - 9, n - 8, n - 6, n - 5, n - 3, n - 2])
+        try:
+            _, out = _two(a, b, circular=False)
+        except AlignmentError:
+            continue
+        checked += 1
+        near_end = [d for d in out["differences"] if d["start"] > n - 15]
+        assert all(d.get("uncertain") for d in near_end), t
+    assert checked >= 20
