@@ -41,7 +41,7 @@ release zip attached to a GitHub Release, and a short "what's new" note.
 - **S2 — Cloning simulations**: restriction & insertion, Gibson/HiFi/In-Fusion, PCR, mutagenesis, Golden Gate, Gateway, TA/TOPO, ligation; history.
 - **S3 — Verification tools**: simulate agarose gel, align Sanger reads (`.ab1`) to reference, multiple alignment, detect common features, primer design.
 - **S4 — Polish**: history graph, print/PDF, preferences, keyboard-shortcut parity, file associations, AAV helpers (ITR-to-ITR cargo size).
-- **S5 — Screening and lab memory**: S5.1 diagnostic digest planner (started); next S5.3 lab primer library, S5.2 Sanger contig, S5.4 human and mouse elements in the catalogue.
+- **S5 — Screening and lab memory**: S5.1 diagnostic digest planner (started); next S5.3 lab primer library, S5.2 Sanger contig, S5.4 human and mouse elements in the catalogue (60 entries, the ubiquitous promoters of the cell-line pretests included).
 
 ## User stories
 
@@ -124,7 +124,7 @@ creates a new document for the product, and records the operation in the History
 
 **S3.3 Multiple alignment** of DNA sequences.
 
-**S3.4 Detect common features** from an offline curated database (AAV-relevant set first: ITRs, CMV/CAG/hSyn/EF1a/CaMKIIa/GFAP, WPRE, polyA signals, AmpR/KanR, ori, f1 ori, fluorescent proteins, tags, lox/FRT, U6, Cas9).
+**S3.4 Detect common features** from an offline curated database (AAV-relevant set first: ITRs, CMV/CAG/CBh/hSyn/EF1a/EFS/CaMKIIa/GFAP, the ubiquitous promoters of cell-line pretests (SV40 early, human β-actin, HSV TK, RSV LTR) and the inducible TRE, WPRE and WPRE3, polyA signals, AmpR/KanR and the selection markers PuroR/BlastR/HygR/ZeoR, ori, f1 ori, fluorescent proteins, tags, lox/FRT sites, Cre/FLPe/FLPo, 2A peptides, EMCV IRES, U6, Cas9). Every entry cites the public record and coordinates it was taken from and is cross-checked against an independent record at ≥ 98 % identity.
 
 **S3.5 Primer design** (primer3): amplify a selected region with Tm, length and product-size constraints; results ranked, added to the primer list on click.
 

@@ -33,12 +33,24 @@ def names(matches) -> list[str]:
     return [m.name for m in matches]
 
 
+def cited(source: str) -> tuple[str, int, int, int]:
+    """(accession, start, end, strand) of a ``source`` such as ``X64410.1:429..598`` or, for
+    an element a record annotates on its minus strand, ``LT727488.1:complement(3997..4178)``.
+    Coordinates are 1-based and inclusive, as the record's FEATURES table prints them."""
+    accession, _, span = source.partition(":")
+    strand = 1
+    if span.startswith("complement(") and span.endswith(")"):
+        span, strand = span[len("complement("):-1], -1
+    start, _, end = span.partition("..")
+    assert accession and start.isdigit() and end.isdigit(), source
+    return accession, int(start), int(end), strand
+
+
 def test_every_catalogue_entry_cites_a_record_and_a_range():
     for feature in catalogue():
-        accession, _, span = feature.source.partition(":")
-        start, _, end = span.partition("..")
-        assert accession and start.isdigit() and end.isdigit(), feature.name
-        assert int(end) - int(start) + 1 == feature.length, feature.name
+        accession, start, end, _ = cited(feature.source)
+        assert accession, feature.name
+        assert end - start + 1 == feature.length, feature.name
         assert set(feature.sequence) <= set("ACGTRYSWKMBDHVN"), feature.name
 
 
@@ -583,6 +595,32 @@ CROSS_CHECKS = {
     "7SK promoter (human)": "MQ296444.1",
     "SFFV promoter": "MP040844.1",
     "CAG promoter": "HG530138.1",
+    # The ubiquitous promoters a construct carries while it is checked in a cell line, before
+    # it goes into neurons, and the parts those cassettes are built from.
+    "EFS promoter (human)": "MP933339.1",
+    "CBh promoter": "QQ167606.1",
+    "SV40 early promoter": "M83237.1",
+    "β-actin promoter (human)": "AY952326.1",
+    "HSV TK promoter": "AJ277960.1",
+    "RSV LTR promoter": "M83237.1",
+    "TRE promoter": "OQ427855.1",
+    "Cre": "AB542060.1",
+    "FLPe": "KM521212.1",
+    "FLPo": "MH493814.1",
+    "loxN": "KP686439.1",
+    "F3": "HQ333206.1",
+    "EMCV IRES": "PG196517.1",
+    "P2A": "LT962383.1",
+    "T2A": "PZ285977.1",
+    "WPRE3": "MQ017553.1",
+    "hGH polyA": "MP470633.1",
+    "rabbit β-globin polyA": "OP697988.1",
+    "PuroR (pac)": "PZ267690.1",
+    "BlastR (bsd)": "PZ267689.1",
+    "HygR (hph)": "U40398.1",
+    "ZeoR (ble)": "MW471125.1",
+    "Myc tag": "A05511.1",
+    "V5 tag": "AY682091.1",
 }
 
 
@@ -597,37 +635,41 @@ def record_sequence(accession: str) -> str:
 
 
 @pytest.mark.parametrize("element", sorted(CROSS_CHECKS))
-def test_a_catalogue_promoter_is_its_record_at_the_coordinates_it_cites(element):
+def test_a_catalogue_entry_is_its_record_at_the_coordinates_it_cites(element):
     """The entry's own record is here too, so the claim its ``source`` makes — these are the
     record's bases at these coordinates — is checked without the network, and the element is
     found there whole and exact."""
     feature = entry(element)
-    accession, _, span = feature.source.partition(":")
-    start, _, end = span.partition("..")
+    accession, start, end, strand = cited(feature.source)
     record = record_sequence(accession)
-    assert record[int(start) - 1 : int(end)] == feature.sequence, element
+    span = record[start - 1 : end]
+    assert (rc(span) if strand == -1 else span) == feature.sequence, element
     matches = [m for m in detect(record, False) if m.name == element]
-    assert len(matches) == 1, element
-    assert matches[0].identity == 100.0, element
-    assert matches[0].start == int(start) - 1, element
-    assert matches[0].end == int(end) - 1, element
+    # A vector can carry the same element twice (two loxN sites in one cassette), so the copy
+    # the source cites must be among the matches rather than the only one; each copy found is
+    # whole and exact.
+    assert matches, element
+    assert all(m.identity == 100.0 for m in matches), element
+    assert all(m.end - m.start + 1 == feature.length for m in matches), element
+    assert (start - 1, end - 1, strand) in {(m.start, m.end, m.strand) for m in matches}
 
 
 @pytest.mark.parametrize(("element", "accession"), sorted(CROSS_CHECKS.items()))
-def test_a_catalogue_promoter_is_found_in_an_independent_record(element, accession):
+def test_a_catalogue_entry_is_found_in_an_independent_record(element, accession):
     feature = entry(element)
     assert not feature.source.startswith(accession), element
     sequence = record_sequence(accession)
     matches = [m for m in detect(sequence, False) if m.name == element]
-    assert len(matches) == 1, element
-    assert matches[0].identity >= 98.0, element
-    found = matches[0].end - matches[0].start + 1
+    assert matches, element
+    assert all(m.identity >= 98.0 for m in matches), element
+    found = max(m.end - m.start + 1 for m in matches)
     assert found >= 0.9 * feature.length, element
 
 
-def test_the_new_promoters_are_all_found_side_by_side_in_one_construct():
-    """Seven promoters in one sequence: each is reported once, whole, at its own position and
-    at full identity, so none of them swallows or hides another."""
+def test_every_cross_checked_element_is_found_side_by_side_in_one_construct():
+    """Every cross-checked element in one sequence, promoters, recombinases, markers and tags
+    together: each is reported once, whole, at its own position and at full identity, so none
+    of them swallows or hides another."""
     filler = [clean_dna(300, 60 + i) for i in range(len(CROSS_CHECKS) + 1)]
     pieces: list[str] = []
     starts: dict[str, int] = {}
@@ -760,6 +802,143 @@ def test_a_label_naming_the_other_species_is_flagged(element, label, wrong):
     assert out["label_warnings"] == (1 if wrong else 0)
     if wrong:
         assert row["labelWarning"].startswith(f"Annotated as “{label}”, but the sequence is the {element}")
+
+
+# ---- the elements of the cell-line pretests ---------------------------------------------
+# The constructs are not used in neurons only: they are checked in a cell line first, and
+# those pretests drive the payload from a ubiquitous promoter (S5.4, group 1b). Each of those
+# promoters is in the catalogue, named like the rest.
+
+PRETEST_PROMOTERS = ("CMV promoter", "SV40 early promoter", "β-actin promoter (human)",
+                     "EFS promoter (human)", "HSV TK promoter", "RSV LTR promoter")
+
+
+def test_the_catalogue_carries_the_promoters_of_the_cell_line_pretests():
+    held = {f.name for f in catalogue()}
+    assert set(PRETEST_PROMOTERS) <= held
+    # The CMV/chicken β-actin hybrids the pretests also use, and the inducible promoter.
+    assert {"CAG promoter", "CAG promoter (truncated)", "CBh promoter", "TRE promoter"} <= held
+
+
+@pytest.mark.parametrize("element", PRETEST_PROMOTERS)
+def test_each_pretest_promoter_is_found_whole_on_either_strand(element):
+    feature = entry(element)
+    ahead = clean_dna(200, 31) + feature.sequence + clean_dna(200, 32)
+    behind = clean_dna(200, 33) + rc(feature.sequence) + clean_dna(200, 34)
+    [forward] = [m for m in detect(ahead, False) if m.name == element]
+    [reverse] = [m for m in detect(behind, False) if m.name == element]
+    assert (forward.strand, forward.start, forward.identity) == (1, 200, 100.0)
+    assert (reverse.strand, reverse.start, reverse.identity) == (-1, 200, 100.0)
+    assert forward.end - forward.start + 1 == feature.length
+
+
+def test_the_rsv_promoter_is_stored_as_a_vector_reads_it_though_its_record_is_reversed():
+    """LT727488.1 annotates the RSV U3 promoter on its minus strand, so the entry is the
+    reverse complement of the cited span and its source says ``complement(...)``. What the
+    catalogue holds is the promoter the way a vector carries it, pointing at its payload."""
+    feature = entry("RSV LTR promoter")
+    accession, start, end, strand = cited(feature.source)
+    assert (accession, start, end, strand) == ("LT727488.1", 3997, 4178, -1)
+    record = record_sequence(accession)
+    assert feature.sequence == rc(record[start - 1 : end])
+    # In the independent record the promoter reads forward, which is the orientation stored.
+    [match] = [m for m in detect(record_sequence("M83237.1"), False)
+               if m.name == "RSV LTR promoter"]
+    assert match.strand == 1 and match.identity >= 98.0
+
+
+def test_the_human_actb_promoter_is_not_the_chicken_one_inside_cag_and_cbh():
+    """CAG and CBh are built on the *chicken* β-actin promoter; the new entry is the human
+    ACTB promoter. Neither is found in the other, which is what makes them separate entries
+    rather than one element named twice."""
+    human = entry("β-actin promoter (human)")
+    for hybrid in ("CAG promoter", "CAG promoter (truncated)", "CBh promoter"):
+        assert not [m for m in detect(entry(hybrid).sequence, False) if m.name == human.name]
+        assert not [m for m in detect(human.sequence, False) if m.name == hybrid]
+
+
+def test_the_efs_core_is_not_reported_beside_the_whole_ef1a_promoter():
+    """EFS is the intron-less core of the EF-1α promoter and sits inside the longer entry, so
+    a cassette carrying the whole promoter shows one element; the core on its own is EFS."""
+    full, core = entry("EF-1α promoter (human)"), entry("EFS promoter (human)")
+    assert names(detect(clean_dna(300, 41) + full.sequence + clean_dna(300, 42), False)) \
+        == ["EF-1α promoter (human)"]
+    assert names(detect(clean_dna(300, 43) + core.sequence + clean_dna(300, 44), False)) \
+        == ["EFS promoter (human)"]
+
+
+def test_a_block_named_ef1a_is_not_a_wrong_label_for_the_efs_core():
+    """HOLDS lists the pair, so the label that names the whole promoter is read as naming its
+    core too."""
+    sequence, existing = _plasmid_with("EFS promoter (human)", "EF-1α promoter")
+    out = detect_payload(sequence, False, DEFAULT_MIN_IDENTITY, existing)
+    [row] = [r for r in out["features"] if r["name"] == "EFS promoter (human)"]
+    assert row["isNew"] is False and row["labelWarning"] is None
+
+
+def test_wpre3_and_the_full_length_wpre_are_told_apart():
+    """WPRE3 is the shortened element AAV cassettes carry, not a piece of the long one: each
+    is reported where it is and neither stands for the other."""
+    for element in ("WPRE", "WPRE3"):
+        sequence = clean_dna(200, 45) + entry(element).sequence + clean_dna(200, 46)
+        assert names(detect(sequence, False)) == [element]
+
+
+def test_flpe_and_flpo_are_two_entries_a_search_tells_apart():
+    """Vectors carry both the thermostable yeast gene and the mammalian codon-optimised one,
+    and they share too little for one entry to find the other."""
+    for element in ("FLPe", "FLPo"):
+        assert names(detect(entry(element).sequence, False)) == [element]
+
+
+def test_the_new_recombination_sites_are_exact_and_not_each_other():
+    """A single base in a lox or Flp site changes what the recombinase does with it, so the
+    new sites are matched exactly and no site is reported for another."""
+    for element in ("loxN", "F3"):
+        feature = entry(element)
+        assert feature.length <= SHORT_FEATURE, element
+        found = names(detect(clean_dna(200, 47) + feature.sequence + clean_dna(200, 48), False))
+        assert found == [element], found
+    for site in ("loxP", "lox2272", "loxN"):
+        others = {"loxP", "lox2272", "loxN"} - {site}
+        assert not others & set(names(detect(entry(site).sequence, False)))
+
+
+@pytest.mark.parametrize(("label", "element", "expected"), [
+    ("pac", "PuroR (pac)", True), ("PuroR", "PuroR (pac)", True),
+    ("hph", "HygR (hph)", True), ("HygR", "HygR (hph)", True),
+    ("bsd", "BlastR (bsd)", True), ("BlastR", "BlastR (bsd)", True),
+    ("Sh ble", "ZeoR (ble)", True), ("ZeoR", "ZeoR (ble)", True),
+    ("ACTB promoter", "β-actin promoter (human)", True),
+    ("hACTB", "β-actin promoter (human)", True),
+    ("beta-actin promoter", "β-actin promoter (human)", True),
+    ("EFS", "EFS promoter (human)", True), ("CBh", "CBh promoter", True),
+    ("myc tag", "Myc tag", True), ("V5", "V5 tag", True),
+    ("P2A", "P2A", True), ("T2A", "T2A", True),
+    ("pac", "NeoR/KanR", False), ("hph", "PuroR (pac)", False),
+    ("P2A", "T2A", False), ("Myc tag", "V5 tag", False),
+    ("CBh", "CAG promoter", False), ("WPRE", "WPRE3", False),
+])
+def test_the_markers_sites_and_tags_are_named_by_the_labels_vectors_use(label, element,
+                                                                       expected):
+    from vettore.features import _names_element
+
+    assert _names_element(label, element) is expected
+
+
+@pytest.mark.parametrize(("element", "label", "wrong"), [
+    ("β-actin promoter (human)", "hACTB promoter", False),
+    ("β-actin promoter (human)", "ACTB promoter", False),
+    ("β-actin promoter (human)", "mouse Actb promoter", True),
+    ("EFS promoter (human)", "mEFS", True),
+    ("EFS promoter (human)", "hEFS promoter", False),
+])
+def test_the_species_check_covers_the_new_entries(element, label, wrong):
+    sequence, existing = _plasmid_with(element, label)
+    out = detect_payload(sequence, False, DEFAULT_MIN_IDENTITY, existing)
+    [row] = [r for r in out["features"] if r["name"] == element]
+    assert row["isNew"] is False and row["annotatedAs"] == label
+    assert bool(row["labelWarning"]) is wrong
 
 
 # ---- detection speed --------------------------------------------------------------------
@@ -1658,6 +1837,44 @@ def test_an_element_present_verbatim_is_found_without_aligning_it():
     assert found.end == 400 + feature.length - 1
     # Only this element is searched for, so any pass at all would be this one being aligned.
     assert _alignment_work(sequence, circular=False, features=(feature,)) == (0, 0)
+
+
+#: The entries the catalogue gained with S5.4, packed the same way: the long recombinases and
+#: markers first, then the promoters of the cell-line pretests, then the short sites and tags.
+#: Named rather than taken by length, for the same reason as PACKED_ELEMENTS.
+GROWN_ELEMENTS = (
+    "FLPe", "FLPo", "Cre", "HygR (hph)", "CBh promoter", "PuroR (pac)", "EMCV IRES",
+    "β-actin promoter (human)", "hGH polyA", "BlastR (bsd)", "ZeoR (ble)",
+    "SV40 early promoter", "TRE promoter", "EFS promoter (human)", "WPRE3",
+    "RSV LTR promoter", "HSV TK promoter", "rabbit β-globin polyA", "P2A", "T2A",
+    "loxN", "F3", "Myc tag", "V5 tag",
+)
+
+
+def test_a_plasmid_packed_with_the_new_entries_keeps_the_two_second_budget():
+    """S5.4's budget against the entries the catalogue gained: 15 kb carrying every one of
+    them, which is the worst case the grown catalogue can be asked to search."""
+    parts = {f.name: f.sequence for f in catalogue()}
+    pieces = [parts[name] for name in GROWN_ELEMENTS]
+    assert sum(map(len, pieces)) <= 15_000, "the new elements no longer fit the budget"
+    sequence = ("".join(pieces) + clean_dna(15_000, 21))[:15_000]
+    detect(sequence, circular=True)          # warm the catalogue and the aligner
+    start = time.perf_counter()
+    matches = detect(sequence, circular=True)
+    elapsed = time.perf_counter() - start
+    assert elapsed < DETECTION_BUDGET, f"detection took {elapsed:.2f} s"
+    _, cells = _alignment_work(sequence)
+    assert cells <= MAX_ALIGNMENT_CELLS, f"{cells / 1e6:.1f} M cells of alignment"
+    # Every element packed in is reported: a budget kept by missing them would be no use.
+    assert {m.name for m in matches} >= set(GROWN_ELEMENTS)
+
+
+def test_the_catalogue_grew_without_slowing_the_plasmid_it_was_measured_on():
+    """The packed plasmid of the entries that were already there is searched against the
+    grown catalogue here: the same work as before, because the entries added to the catalogue
+    are not in this sequence and the seed search rules them out."""
+    _, cells = _alignment_work(_packed_plasmid())
+    assert cells <= MAX_ALIGNMENT_CELLS, f"{cells / 1e6:.1f} M cells of alignment"
 
 
 def test_both_copies_of_a_tandem_tag_are_reported():

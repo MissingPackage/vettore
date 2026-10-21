@@ -17,6 +17,14 @@ The download links in the README always point to the latest release.
 - When a match covers only part of the catalogue entry, the Size column and the feature's notes say which part ("708 bp · bases 4–711 of 711"), and how many bases the copy here has more or fewer than that part ("3 bp inserted").
 - An identity just below 100 % (one mismatch in SaCas9 is 99.97 %) is shown as 99.9 %, not 100.0 %.
 
+## Unreleased — 24 more elements in the catalogue
+
+- Detect Common Features knows 60 elements instead of 36. New: the promoters a construct is first checked with in a cell line (SV40 early, human β-actin, EFS, HSV TK, RSV LTR, and the compact CBh), the doxycycline-inducible TRE promoter, the recombinases Cre, FLPe and FLPo, the recombination sites loxN and F3, the EMCV IRES, the P2A and T2A self-cleaving peptides, WPRE3, the human growth hormone and rabbit β-globin polyA signals, the selection markers PuroR, BlastR, HygR and ZeoR, and the Myc and V5 tags.
+- Every new entry is a real subsequence of a public record at the coordinates that record annotates, and each was found again in an independent record — another laboratory or another applicant — at 98 % identity or better; both accessions are in the table Detect Common Features shows.
+- An element a record annotates on its minus strand is stored the way a vector reads it, and its provenance says so: `LT727488.1:complement(3997..4178)` for the RSV LTR promoter.
+- The label check knows the new names: "pac", "hph", "bsd", "Sh ble" and "ACTB promoter" all name their element, and a human β-actin promoter labelled "mActb" is flagged like any other wrong species.
+- Detection of a 15 kb plasmid packed with the new elements takes 0.3 s; the catalogue's growth adds 3.0 M cells of alignment to the worst case measured before it, which stays inside the two-second budget.
+
 ## Unreleased — opening a record from NCBI
 
 - File → Open from NCBI… opens a public GenBank record by its accession number (for example MT612431.1) as a new, unsaved document; the welcome screen has the same link. It is the only thing in Vettore that uses the internet, only when you press Open, and it sends nothing but the accession number; no account is needed.

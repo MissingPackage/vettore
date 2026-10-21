@@ -400,12 +400,17 @@ every later step will use to refer to this file.
 Opened a plasmid that arrives bare, or built one from scratch? This searches it, on both
 strands, for the elements AAV and lentiviral work use every day: AAV2 ITRs (including the
 truncated ones found in real vectors), the CMV enhancer and promoter, CAG (the full-length
-promoter and the shorter one of some AAV vectors), hSyn, EF-1α, CaMKIIα, GFAP, PGK, UbC and SFFV
-promoters, the RNA polymerase III promoters U6, H1 and 7SK, WPRE, bGH and SV40 polyA, AmpR and
-KanR, pUC and f1 origins, EGFP, mCherry, tdTomato, loxP, lox2272, FRT, SpCas9, SaCas9 and the
-FLAG and HA tags. When a promoter is used in vectors in more than one species, the name says
-which one it is: "PGK promoter (human)" and "PGK promoter (mouse)" are two entries, and the
-table tells you which one your plasmid carries.
+promoter and the shorter one of some AAV vectors) and the compact CBh, hSyn, EF-1α and its
+intron-less core EFS, CaMKIIα, GFAP, PGK, UbC and SFFV promoters, the RNA polymerase III
+promoters U6, H1 and 7SK, the promoters a construct is usually checked with in a cell line
+before it goes into neurons (SV40 early, human β-actin, HSV TK and RSV LTR), the inducible TRE
+promoter, WPRE and the shorter WPRE3, bGH, SV40, human growth hormone and rabbit β-globin
+polyA signals, AmpR, KanR and the selection markers PuroR, BlastR, HygR and ZeoR, pUC and f1
+origins, EGFP, mCherry, tdTomato, the recombinases Cre, FLPe and FLPo with the loxP, lox2272,
+loxN, FRT and F3 sites, the P2A and T2A self-cleaving peptides, the EMCV IRES, SpCas9, SaCas9
+and the FLAG, HA, Myc and V5 tags. When a promoter is used in vectors in more than one
+species, the name says which one it is: "PGK promoter (human)" and "PGK promoter (mouse)" are
+two entries, and the table tells you which one your plasmid carries.
 
 Every entry in the catalogue is a real subsequence of a public GenBank record. The table shows
 which record it came from and the percent identity of the match, so you can judge a hit
@@ -420,7 +425,15 @@ example "708 bp · bases 4–711 of 711" for an mCherry whose first codon is not
 feature's notes say the same; "798 bp · 3 bp inserted" says the copy here has bases the
 catalogue entry does not. A coding sequence with an insertion or deletion that breaks its
 reading frame is marked "Frameshift" and left unticked: the match can be over 99 % while the
-protein is different after the break.
+protein is different after the break. A record that annotates an element on its lower strand
+is cited as `LT727488.1:complement(3997..4178)`: the element is stored the way a vector reads
+it.
+
+A few elements are written in more than one codon version — the 2A peptides and the short
+epitope tags are the usual ones, and Flp comes as both FLPe and FLPo. The catalogue carries
+the version two unrelated vectors agree on (both are named in the entry's notes), so a
+construct built from a different codon version of a 2A peptide may not be recognised. When
+that happens, lower the identity threshold for one run, or annotate it by hand.
 
 Tick the ones you want and they are added to the map, coloured by type, with their provenance
 kept in the feature's notes.

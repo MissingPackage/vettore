@@ -567,11 +567,12 @@ GENERIC_WORDS = frozenset({
     "optimized", "optimised", "resistance", "marker", "cassette", "insert", "left", "right",
     "forward", "reverse", "fwd", "rev", "start", "stop", "binding", "misc", "feature", "variant",
     "short", "long", "copy", "upstream", "downstream", "fusion", "wild", "type", "wt", "new",
+    "rabbit",
 })
 
 #: Other spellings of a word, as found in vendors' and labs' labels.
 WORD_ALIASES = {"hcmv": "cmv", "hef1a": "ef1a", "camkii": "camkiia", "hsyn1": "hsyn",
-                "hpgk": "pgk"}
+                "hpgk": "pgk", "actb": "bactin"}
 
 #: Catalogue elements that hold another catalogue element, so a block named after the first is
 #: not a wrong label for the second (checked against the catalogue sequences in tests):
@@ -583,9 +584,13 @@ WORD_ALIASES = {"hcmv": "cmv", "hef1a": "ef1a", "camkii": "camkiia", "hsyn1": "h
 #:   chicken β-actin promoter that follows it is not a catalogue element of its own.
 #: - CAG promoter (truncated): the same elements, but it starts 131 bp inside the enhancer, so
 #:   only part of it is there and a search does not find the enhancer in it.
+#: - EF-1α promoter (human): the EFS promoter is its intron-less core, the first 232 bp of
+#:   the entry, so a search finds EFS inside it and a block named "EF-1α" is not a wrong
+#:   label for the core.
 HOLDS = {"SaCas9": frozenset({"3×HA"}),
          "CAG promoter": frozenset({"CMV enhancer"}),
-         "CAG promoter (truncated)": frozenset({"CMV enhancer"})}
+         "CAG promoter (truncated)": frozenset({"CMV enhancer"}),
+         "EF-1α promoter (human)": frozenset({"EFS promoter (human)"})}
 
 _LETTERS = str.maketrans({"α": "a", "β": "b", "γ": "g", "δ": "d", "Δ": "d", "κ": "k",
                           "×": "x", "′": "'", "’": "'"})
@@ -621,9 +626,12 @@ def _element_words() -> tuple[tuple[str, frozenset[str]], ...]:
 
 
 def _label_words(label: str) -> frozenset[str]:
-    """A label's identifying words, with a species prefix also read off ("mU6" names U6)."""
+    """A label's identifying words, with a species prefix also read off ("mU6" names U6).
+    What is left after the prefix is read like any other word, so a spelling ``WORD_ALIASES``
+    knows is understood there too ("hACTB" names the β-actin promoter)."""
     words = name_words(label)
-    return words | {w[1:] for w in words if w[:1] in "hm" and len(w) > 2}
+    stripped = {w[1:] for w in words if w[:1] in "hm" and len(w) > 2}
+    return words | {WORD_ALIASES.get(w, w) for w in stripped}
 
 
 def named_elements(label: str) -> set[str]:
