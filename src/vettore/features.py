@@ -32,10 +32,6 @@ DEFAULT_MIN_COVERAGE = 90.0  # how much of the catalogue feature must be found
 #: the 145 nt wild type, and shorter variants exist), so they are matched permissively.
 COVERAGE_BY_TYPE = {"repeat_region": 70.0}
 
-#: A local alignment stops at the first mismatched base, which can leave a start codon out of
-#: the match. A few bases are added back; a longer trim is a genuinely shorter feature (a
-#: truncated ITR, say) and is left alone.
-MAX_EXTENSION = 6
 
 
 @dataclass(frozen=True)
@@ -131,19 +127,14 @@ def _match_long(target: str, feature: CatalogueFeature, query: str, strand: int,
         matches = sum(1 for a, b in zip(aligned_ref, aligned_query) if a == b and a != "-")
         coverage = 100.0 * sum(1 for b in aligned_query if b != "-") / len(query)
         identity = 100.0 * matches / max(1, len(aligned_ref))
+        # The annotation is the aligned region and nothing else, so the identity tested here is
+        # the identity the user reads. Ends of the catalogue entry that the local alignment
+        # left out are not added back: under this scoring a dropped end is at least 40 %
+        # mismatches, and in real vectors it is the junction the element was cloned into (a
+        # BamHI site before an SV40 polyA, the linker of a GFP fusion), not the element.
         if identity >= min_identity and coverage >= min_coverage:
             start = window_start + int(best.coordinates[0][0])
             end = window_start + int(best.coordinates[0][-1]) - 1
-            head = int(best.coordinates[1][0])
-            tail = len(query) - int(best.coordinates[1][-1])
-            if head <= MAX_EXTENSION and tail <= MAX_EXTENSION:
-                extended_start = max(0, start - head)
-                extended_end = min(len(target) - 1, end + tail)
-                if extended_end - extended_start + 1 == len(query):
-                    start, end = extended_start, extended_end
-                    # Report identity over everything that is annotated, flanks included.
-                    span = target[start : end + 1]
-                    identity = 100.0 * sum(1 for a, b in zip(span, query) if a == b) / len(query)
             results.append((start, end, identity))
     del strand, feature
     return results

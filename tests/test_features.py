@@ -67,8 +67,43 @@ def test_a_gene_on_the_minus_strand_is_reported_as_reverse():
     assert egfp.strand == -1
     # Read on the other strand, the match carries EGFP's own first residues.
     assert "GGTGAGCAAGGGCGAGGAGCTGTTCACC" in rc(sequence[egfp.start : egfp.end + 1])
-    assert egfp.end - egfp.start + 1 == 720          # the whole CDS, not the aligned core only
-    assert 98.0 <= egfp.identity < 100.0             # two bases of the flank differ
+    # The EGFP here is fused at both ends (Gephyrin.FingR-GFP-CCR5TC): linker codons stand
+    # where the catalogue has ATG and AAG TAA. The annotation is the EGFP that is there, the
+    # 712 bp the record's own "GFP" feature (2147..2858) has, not padded with the linkers to
+    # the catalogue's 720.
+    assert egfp.end - egfp.start + 1 == 712
+    assert egfp.identity == 100.0
+
+
+# Both records carry an SV40 polyA cloned between sites that differ from the ones around the
+# catalogue entry; one base inside it differs too. (record, start, end), 0-based inclusive.
+SV40_POLYA_IN_RECORDS = [("HG530138.1", 6964, 7185), ("MT891341.1", 2008, 2229)]
+
+
+@pytest.mark.parametrize(("accession", "start", "end"), SV40_POLYA_IN_RECORDS)
+def test_an_element_is_annotated_without_the_junction_it_was_cloned_into(accession, start,
+                                                                        end):
+    """The bases around the element are the vector's, not the catalogue entry's (6 and 4 of
+    them, nearly all different), so they are not annotated as SV40 polyA, and the identity
+    shown is that of the 222 bp that are: 221 of them match. With the threshold at 98 % the
+    element is still found, and at the identity the threshold was tested on."""
+    sequence = record_sequence(accession)
+    for threshold in (95.0, 98.0):
+        [polya] = [m for m in detect(sequence, False, min_identity=threshold)
+                   if m.name == "SV40 polyA"]
+        assert (polya.start, polya.end) == (start, end), threshold
+        assert polya.identity == pytest.approx(100.0 * 221 / 222), threshold
+
+
+@pytest.mark.parametrize("threshold", [90.0, 95.0, 98.0, 99.0, 100.0])
+def test_no_match_is_shown_below_the_identity_threshold(threshold):
+    """The threshold filters the number the table shows, on every fixture record."""
+    sequences = [record_sequence(path.name.removeprefix("features-").removesuffix(".fasta"))
+                 for path in sorted(DATA.glob("features-*.fasta"))]
+    sequences += [plasmid(accession)[0] for accession in ("MT612431.1", "PZ629150.1")]
+    for sequence in sequences:
+        for match in detect(sequence, False, min_identity=threshold):
+            assert match.identity >= threshold, (match.name, match.identity)
 
 
 def test_a_truncated_itr_is_not_padded_to_full_length():
