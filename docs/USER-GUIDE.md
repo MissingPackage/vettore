@@ -414,8 +414,10 @@ the minimum identity you chose. Only the part of the element that is really ther
 annotated: the cloning sites around it are not counted as part of it, and a coding sequence is
 cut to whole codons of its own frame. When that is less than the whole catalogue entry, the
 Size column says which part, for example "705 bp · bases 4–708 of 711" for an mCherry whose
-first and last codons differ, and the feature's notes say the same. Tick the ones you want and they are added to the map, coloured by type, with their
-provenance kept in the feature's notes.
+first and last codons differ, and the feature's notes say the same.
+
+Tick the ones you want and they are added to the map, coloured by type, with their provenance
+kept in the feature's notes.
 
 Features already annotated are shown greyed and left unticked. This includes elements inside a
 larger feature named after them, however long that feature is: vendors often draw one "CMV
