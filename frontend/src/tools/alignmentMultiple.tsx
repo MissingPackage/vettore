@@ -29,6 +29,8 @@ import {
 } from "./multipleText";
 
 // Blueprint 3 typings predate React 18 (no implicit `children`).
+/** Identical bases in a row that hold the alignment of an end (ANCHOR_WORD in msa.py). */
+const ANCHOR_BASES = 12;
 const { Callout } = Blueprint as unknown as Record<string, React.ComponentType<any>>;
 
 const ALIGNMENT_ID = "vettore-progressive-alignment";
@@ -355,12 +357,23 @@ function PairDifferences({ rows }: { rows: MultipleResult["sequences"] }) {
                   : `${rows[a].name} ${bp(u.start)}–${bp(u.end ?? u.start)} against ${bp(u.b_bases)} bp of ${rows[b].name}`).join("; ")}.
               </Callout>
             )}
+            {comparison.differences.some((d) => d.uncertain) && (
+              <Callout intent="warning" data-testid="msa-pair-uncertain">
+                Differences marked <em>uncertain</em> lie in the last bases before an end of the
+                two, with no stretch of {ANCHOR_BASES} identical bases beyond them to hold the
+                alignment: the same bases could also be read as another mix of substitutions,
+                insertions and deletions. Check them against the trace.
+              </Callout>
+            )}
             {comparison.differences.length === 0 ? (
               <p className="vt-ok">Identical where they overlap.</p>
             ) : (
               <ul className="vt-msa-diffs" data-testid="msa-pair-differences">
                 {comparison.differences.slice(0, SHOWN_DIFFERENCES).map((d, i) => (
-                  <li key={i} className={`vt-msa-diff is-${d.kind}`}>{describeDifference(d)}</li>
+                  <li key={i} className={`vt-msa-diff is-${d.kind}`}>
+                    {describeDifference(d)}
+                    {d.uncertain && <span className="vt-msa-meta"> (near the end: uncertain)</span>}
+                  </li>
                 ))}
                 {comparison.differences.length > SHOWN_DIFFERENCES && (
                   <li className="vt-msa-meta">

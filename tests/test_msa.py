@@ -578,3 +578,40 @@ def test_a_short_barcode_tail_is_not_compared_rather_than_listed(side):
     assert out["differences"] == []
     [tail] = out["unrelated"]
     assert tail["a_bases"] == 10
+
+
+# ---- regressions found by the sixth adversarial review -----------------------------------
+
+def _shifted(seq: str, positions: list[int]) -> str:
+    out = list(seq)
+    for p in positions:
+        out[p] = {"A": "C", "C": "G", "G": "T", "T": "A"}[seq[p]]
+    return "".join(out)
+
+
+@pytest.mark.parametrize("circular", [True, False])
+def test_a_cluster_of_differences_at_an_amplicon_end_is_listed_as_uncertain(circular):
+    # Six substitutions in the last 9 bp read as well as an indel and substitutions: they
+    # are listed marked uncertain, or (half the end changed) named not compared; never
+    # listed as certain. A difference held by identical sequence on both sides stays certain.
+    amplicon = BASE[1000:1800]
+    cases = [_shifted(amplicon, [791, 792, 794, 795, 797, 798, 400]),
+             _shifted(amplicon[:788] + amplicon[792:], [400, 790, 791]),
+             _shifted(amplicon, [0, 2, 4, 6, 8, 10, 400])]
+    for other in cases:
+        result = msa.multiple_alignment([doc("a", BASE, circular), doc("b", other, False)])
+        by_name = {s["name"]: s for s in result["sequences"]}
+        out = msa.compare(by_name["a"], by_name["b"])
+        middle = [d for d in out["differences"] if d["start"] == 1401]
+        assert middle and not middle[0].get("uncertain")
+        ends = [d for d in out["differences"] if d["start"] != 1401]
+        assert all(d.get("uncertain") for d in ends)
+        assert ends or [(u["start"], u["end"]) for u in out["unrelated"]] == [(1001, 1011)]
+        assert all(u["start"] >= 1001 and u["end"] <= 1800 for u in out["unrelated"])
+
+
+def test_differences_held_on_both_sides_are_certain():
+    other = snp(snp(BASE[1000:1800], 30), 770)
+    _, out = _two(BASE, other, circular=False)
+    assert [(d["start"], d.get("uncertain", False)) for d in out["differences"]] == [
+        (1031, False), (1771, False)]

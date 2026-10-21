@@ -892,14 +892,27 @@ def _extend(scores: list[float], edge: int, step: int) -> int:
 
 def _unrelated_end(columns: list[tuple[str, str, int | None]]) -> bool:
     """Whether an end left out by ``_extend`` really is unrelated sequence: at least END_MIN
-    columns, less than END_IDENTITY of them identical. A shorter or more alike end (a SNP
+    columns, less than END_IDENTITY of them identical, aligned or side by side. A shorter or more alike end (a SNP
     at the last base, a divergent but homologous end of a gene) is compared."""
     if len(columns) < END_MIN:
         return False
-    return sum(map(_identical, columns)) < END_IDENTITY * len(columns)
+    if sum(map(_identical, columns)) >= END_IDENTITY * len(columns):
+        return False
+    # The columns may hold a shifted reading of a homologous end (a deletion and two SNPs in
+    # the last 15 bp, a cluster of SNPs): laid side by side without gaps, from either edge
+    # of the end, a homologous end is still alike where an adapter is not.
+    a = "".join(x for x, _, _ in columns if x != "-")
+    b = "".join(y for _, y, _ in columns if y != "-")
+    n = min(len(a), len(b))
+    if n == 0:
+        return True
+    for x, y in ((a[:n], b[:n]), (a[-n:], b[-n:])):
+        if sum(p == q != "N" for p, q in zip(x, y)) >= END_IDENTITY * n:
+            return False
+    return True
 
 
-def _realign_pairwise(columns: list[tuple[str, str, int | None]], free_ends: bool
+def _realign_pairwise(columns: list[tuple[str, str, int | None]]
                       ) -> list[tuple[str, str, int | None]]:
     """The two rows aligned to each other again between their runs of ANCHOR_WORD identical
     columns. Two rows of a multiple alignment carry the gaps the other members needed: two
@@ -909,9 +922,10 @@ def _realign_pairwise(columns: list[tuple[str, str, int | None]], free_ends: boo
     so the differences are those of the two sequences alone. Between divergent sequences
     the list can therefore group differences unlike the stacked view, which was built for
     all of them (a gap there may be a mismatch here).
-    End gaps are free at the ends of two linear sequences (``free_ends``), never across the
-    join of two circles. Stretches too large to realign (PAIR_MAX_CELLS), or that do
-    do not come out as alike (unrelated inserts), are kept as they are."""
+    End gaps are scored like any other: the columns given begin and end where both have
+    bases, and free end gaps would trade a cluster of substitutions at an amplicon's end
+    for an indel and a base past the end. Stretches too large to realign (PAIR_MAX_CELLS),
+    or that do not come out as alike (unrelated inserts), are kept as they are."""
     k = ANCHOR_WORD
     anchored = [False] * len(columns)
     run = 0
@@ -937,10 +951,6 @@ def _realign_pairwise(columns: list[tuple[str, str, int | None]], free_ends: boo
                 and len(a) * len(b) <= PAIR_MAX_CELLS):
             # Free end gaps only where the stretch is an end of the comparison.
             aligner = Align.PairwiseAligner(scoring="blastn")
-            if free_ends and i == 0:
-                aligner.left_gap_score = 0.0
-            if free_ends and j == len(columns):
-                aligner.right_gap_score = 0.0
             pairs = _columns_of(aligner.align("".join(x for x, _ in a), b)[0].coordinates)
             redone = [(a[p][0] if p is not None else "-", b[q] if q is not None else "-",
                        a[p][1] if p is not None else None) for p, q in pairs]
@@ -955,6 +965,12 @@ def _realign_pairwise(columns: list[tuple[str, str, int | None]], free_ends: boo
         out += stretch
         i = j
     return out
+
+
+def _overlap(columns: list[tuple[str, str, int | None]]) -> list[tuple[str, str, int | None]]:
+    """The columns from the first to the last where both rows have a base."""
+    both = [k for k, (x, y, _) in enumerate(columns) if x != "-" and y != "-"]
+    return columns[both[0]:both[-1] + 1] if both else []
 
 
 def _gap_runs(columns: list[tuple[str, str, int | None]]) -> int:
@@ -1072,9 +1088,9 @@ def compare(a: dict[str, Any], b: dict[str, Any]) -> dict[str, Any]:
         # Columns where only one of the two has begun or still goes on (a fragment's ends,
         # an overhang) are not compared, as in the star alignment.
         columns = columns[both[0]:both[-1] + 1]
-    columns = _realign_pairwise(columns, not (a.get("circular") and b.get("circular")))
-    # Free end gaps can leave a few bases of one sequence before the other begins: those
-    # are an overhang, not compared, as above.
+    columns = _realign_pairwise(columns)
+    # A realigned stretch can begin or end with a gap: those bases of one sequence face
+    # nothing of the other, an overhang, not compared, as above.
     both = [k for k, (x, y, _) in enumerate(columns) if x != "-" and y != "-"]
     if both:
         columns = columns[both[0]:both[-1] + 1]
@@ -1128,10 +1144,26 @@ def compare(a: dict[str, Any], b: dict[str, Any]) -> dict[str, Any]:
     for k in range(0, len(edges), 2):
         if edges[k] < edges[k + 1]:
             unrelated.append(_stretch(columns[edges[k]:edges[k + 1]]))
+    # Before the first and after the last run of ANCHOR_WORD identical columns, the ends of
+    # two linear sequences have nothing beyond them to hold the alignment: a cluster of
+    # substitutions there reads as well as an insertion or deletion. Such differences are
+    # listed, marked uncertain, for the user to check against the trace.
+    inner = (0, len(columns))
+    if not (a.get("circular") and b.get("circular")):
+        runs = [k for k in range(ANCHOR_WORD, len(columns) + 1)
+                if all(map(_identical, columns[k - ANCHOR_WORD:k]))]
+        if runs:
+            inner = (runs[0] - ANCHOR_WORD, runs[-1])
     for i, j in merged:
         part = columns[i:j]
         compared += part
-        diffs += differences(part, length)
+        found = differences(part, length)
+        # Events never span an identical column, so counting the events up to each edge
+        # of ``inner`` tells which of them lie beyond it.
+        lead = len(differences(columns[i:inner[0]], length)) if i < inner[0] else 0
+        core = len(differences(columns[i:inner[1]], length)) if inner[1] < j else len(found)
+        diffs += [{**d, "uncertain": True} if k < lead or k >= core else d
+                  for k, d in enumerate(found)]
     unknown = [d for d in diffs if d["kind"] == "mismatch" and "N" in (d["reference"],
                                                                       d["sequence"])]
     diffs = sorted((d for d in diffs if d not in unknown), key=lambda d: d["start"])
