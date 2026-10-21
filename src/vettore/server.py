@@ -16,7 +16,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from . import (
     alignment,
@@ -66,7 +66,8 @@ class SavePath(BaseModel):
 
 
 class Paths(BaseModel):
-    paths: list[str]
+    # Bounded here, before the body is parsed: the paths come from a file's own content.
+    paths: list[str] = Field(default_factory=list, max_length=200)
 
 
 class SaveBinary(BaseModel):
@@ -398,12 +399,24 @@ def create_app(token: str, static_dir: Path | None,
 
     @app.post("/api/paths-exist")
     def paths_exist(body: Paths) -> dict[str, list[str]]:
-        """Which of these files are still on disk: the Lineage view offers to open the file
-        itself only for those, and the snapshot kept in the History for the rest."""
+        r"""Which of these files are still on disk: the Lineage view offers to open the file
+        itself only for those, and the snapshot kept in the History for the rest.
+
+        The paths come from the lineage block of a file, so they are outside content: only a
+        plain absolute path to a sequence file on this computer is looked at. A relative path
+        would be read against wherever the engine happens to run; a network path
+        (\host\share) would send this computer's credentials to whichever host the file
+        names; and anything that is not a file Vettore opens has no business being probed.
+        All three are refused without being touched.
+        """
         existing = []
-        for raw in body.paths[:200]:
+        for raw in body.paths:
+            if not raw or len(raw) > 4096 or raw.startswith(("\\\\", "//")):
+                continue
             try:
-                if raw and Path(raw).is_file():
+                path = Path(raw)
+                if (path.is_absolute() and path.suffix.lower() in fileio.FORMATS
+                        and path.is_file()):
                     existing.append(raw)
             except OSError:  # an unreadable or impossible path is simply not there
                 continue

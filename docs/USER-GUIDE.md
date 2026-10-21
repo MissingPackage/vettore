@@ -604,11 +604,20 @@ changed since or was never saved. **Copy** puts the step — parameters and prim
 clipboard for your notebook.
 
 The History is written into the files you save, in a comment that other programs ignore, so a
-file you open months later still knows where the construct came from. **File → Preferences →
-History in saved files** turns that off if you would rather save plain files; the History then
-lasts as long as the document stays open. A file whose History is very large (many steps, each
-with a copy of a large plasmid) keeps the steps and leaves the copies out, and says so where a
-copy would be.
+file you open months later still knows where the construct came from.
+
+What that comment contains is worth knowing before you send the file to someone else: besides
+the steps and their parameters, it holds **a full copy of the sequence and features of every
+input** of every step, and **the path of the file each input was open from** on your computer
+(`C:\Users\you\plasmids\backbone.gb`), which is what lets Vettore offer to open that file
+again later. A construct's file therefore also carries its parents' sequences and something of
+your folder layout, and is larger than the sequence alone.
+
+**File → Preferences → History in saved files** turns all of that off if you would rather save
+plain files, for sharing or for a vendor's order; the History then lasts as long as the
+document stays open. A file whose History is very large (many steps, each with a copy of a
+large plasmid) keeps the nearest copies and leaves the furthest out, and says so where a copy
+would be.
 
 ## Where a construct came from (the Lineage tab)
 
@@ -636,8 +645,10 @@ What Vettore starts from, kept between sessions:
   does not know are pointed out. **Tools → Find Diagnostic Digest…** tries these first and
   shows their buffers. Empty by default.
 - **History in saved files** — on by default: a saved file carries the document's History and
-  its lineage in a comment other programs ignore, with a copy of everything each step was run
-  on. Untick it to save files that carry the sequence and its features only.
+  its lineage in a comment other programs ignore, with a copy of the sequence and features of
+  everything each step was run on and the path each input was open from. Untick it to save
+  files that carry the sequence and its features only — worth doing before you send a
+  construct outside the lab.
 - **Minimum identity when detecting common features** — 95 % by default. Lower it to catch
   variants (a promoter a few bases off), raise it to 100 % to accept exact matches only.
 - **Allow Open from NCBI** — on by default. Untick it and **File → Open from NCBI…** (and its

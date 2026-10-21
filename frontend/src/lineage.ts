@@ -34,9 +34,14 @@ export function sizeOf(data: SequenceData | undefined): string {
   return `${bp} bp, ${data.circular ? "circular" : "linear"}`;
 }
 
-/** The newest step of a History, which says what the document last went through. */
-function newest(history: HistoryEntry[]): HistoryEntry | undefined {
-  return history.length ? history[history.length - 1] : undefined;
+/**
+ * The step a document came out of: the newest step that was run on inputs (a cloning), or
+ * else the first step of all, which is how the document came into being — opened from a file,
+ * created, pasted. Never the newest step of all, because saving, exporting and printing are
+ * steps too: a construct that was cloned and then saved came out of the cloning.
+ */
+function madeBy(history: HistoryEntry[]): HistoryEntry | undefined {
+  return stepsWithParents(history)[0] ?? history[0];
 }
 
 /** Every step that was run on inputs, newest first: one branch of the tree each. */
@@ -47,7 +52,7 @@ function stepsWithParents(history: HistoryEntry[]): HistoryEntry[] {
 function parentNode(parent: HistoryParent, step: HistoryEntry, id: string,
                     depth: number): LineageNode {
   const own = parent.history ?? [];
-  const made = newest(own);
+  const made = madeBy(own);
   return {
     id,
     name: parent.name,
@@ -80,7 +85,7 @@ function childrenOf(history: HistoryEntry[], prefix: string, depth: number): Lin
  * root shows its current size even while the snapshots below it show the inputs as they were.
  */
 export function buildLineage(doc: Doc, data: SequenceData | undefined): LineageNode {
-  const made = newest(doc.history);
+  const made = madeBy(doc.history);
   return {
     id: "root",
     name: doc.name,
@@ -98,7 +103,8 @@ export function buildLineage(doc: Doc, data: SequenceData | undefined): LineageN
 
 /** How many steps the tree goes back, counting the document as one. */
 export function lineageDepth(node: LineageNode): number {
-  return 1 + Math.max(0, ...node.children.map(lineageDepth));
+  // Folded rather than spread: a file can carry more inputs than a call takes arguments.
+  return 1 + node.children.reduce((deepest, child) => Math.max(deepest, lineageDepth(child)), 0);
 }
 
 /** The lineage as plain lines, for the clipboard (the indentation shows the tree). */

@@ -153,3 +153,86 @@ describe("the History a file carries", () => {
     expect(dataToSave(seq("p", 10), doc("p", []), true).history).toBeUndefined();
   });
 });
+
+describe("a History from a file is outside content", () => {
+  it("does not throw on more inputs than a function call takes arguments", () => {
+    // 150,000 parents in one step used to take the whole window down: Math.max(...children).
+    const parents = Array.from({ length: 150_000 }, (_, i) => ({ name: `a${i}` }));
+    const history = cleanHistory([{ time: "t", action: "Gibson assembly", parents }]);
+    expect(history[0].parents?.length).toBe(100);
+    const tree = buildLineage(doc("p", history), seq("p", 10));
+    expect(() => lineageDepth(tree)).not.toThrow();
+    expect(lineageDepth(tree)).toBe(2);
+  });
+
+  it("cuts the number of steps and the length of what a step says", () => {
+    const many = Array.from({ length: 900 }, (_, i) => ({ time: "t", action: `step ${i}` }));
+    expect(cleanHistory(many)).toHaveLength(500);
+    const [step] = cleanHistory([{ time: "t", action: "A".repeat(5_000_000), detail: "B".repeat(5_000_000) }]);
+    expect(step.action.length).toBe(4000);
+    expect(step.detail?.length).toBe(4000);
+  });
+
+  it("drops a snapshot that is not shaped like a document the editor can open", () => {
+    const parents = [
+      { name: "good", data: seq("good", 10) },
+      { name: "no features", data: { name: "x", sequence: "ACGT" } },
+      { name: "features are not annotations", data: { name: "x", sequence: "ACGT", features: "nope", primers: [] } },
+      { name: "no sequence", data: { name: "x", features: [], primers: [] } },
+    ];
+    const [step] = cleanHistory([{ time: "t", action: "Cloning", parents }]);
+    expect(step.parents?.map((p) => !!p.data)).toEqual([true, false, false, false]);
+    // A missing copy is marked, so the view says so instead of offering a dead button.
+    expect(step.parents?.slice(1).every((p) => p.snapshots_dropped)).toBe(true);
+  });
+
+  it("keeps the wrong clones of a step only when every one of them is a document", () => {
+    const real = [{ name: "empty vector", data: seq("empty vector", 4000, true) }];
+    expect(cleanHistory([{ time: "t", action: "Cloning", wrongClones: real }])[0].wrongClones)
+      .toHaveLength(1);
+    for (const junk of [[{ evil: "yes" }], [{ name: "x" }], [{ name: "x", data: { sequence: 1 } }]]) {
+      expect(cleanHistory([{ time: "t", action: "Cloning", wrongClones: junk }])[0].wrongClones)
+        .toBeUndefined();
+    }
+  });
+});
+
+describe("the step a node came out of", () => {
+  it("is the cloning, not the save that followed it", () => {
+    // Saving, exporting and printing are history entries too; none of them made the document.
+    const history: HistoryEntry[] = [
+      { time: "t1", action: "Opened", detail: "backbone.gb" },
+      { time: "t2", action: "Restriction cloning", detail: "EcoRI + BamHI",
+        parents: [{ name: "vector", data: seq("vector", 4000, true), history: [] }] },
+      { time: "t3", action: "Saved", detail: "/lab/pProduct.gb (GenBank)" },
+      { time: "t4", action: "Exported", detail: "/lab/pProduct.fasta (FASTA)" },
+    ];
+    const tree = buildLineage(doc("pProduct", history), seq("pProduct", 5200, true));
+    expect(tree.operation).toBe("Restriction cloning");
+    expect(tree.time).toBe("t2");
+  });
+
+  it("is how it came into being when no step was run on inputs", () => {
+    const history: HistoryEntry[] = [
+      { time: "t1", action: "Opened", detail: "pBR322.gb" },
+      { time: "t2", action: "Saved", detail: "/lab/pBR322.gb" },
+    ];
+    expect(buildLineage(doc("pBR322", history), seq("x", 4361, true)).operation).toBe("Opened");
+  });
+
+  it("is the cloning for an input that was saved after it was made", () => {
+    const vectorHistory: HistoryEntry[] = [
+      { time: "t0", action: "Gibson assembly", detail: "2 fragments",
+        parents: [{ name: "fragment", data: seq("fragment", 500), history: [] }] },
+      { time: "t1", action: "Saved", detail: "/lab/vector.gb (GenBank)" },
+    ];
+    const history: HistoryEntry[] = [{
+      time: "t2", action: "Restriction cloning",
+      parents: [{ name: "vector", path: "/lab/vector.gb", data: seq("vector", 4000, true),
+                  history: vectorHistory }],
+    }];
+    const [vector] = buildLineage(doc("p", history), seq("p", 4500, true)).children;
+    expect(vector.operation).toBe("Gibson assembly");
+    expect(vector.usedBy).toBe("Restriction cloning");
+  });
+});

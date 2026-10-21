@@ -32,35 +32,72 @@ export interface HistoryEntry {
 /** How deep the Lineage view follows a tree: the spec's "readable for 20 steps". */
 export const LINEAGE_DEPTH = 20;
 
+/** Limits on a History read from a file. Real work never meets them: a cloning has a handful
+ * of inputs, a construct a few dozen steps, and a step's description is a sentence. A file
+ * that does meet them is read in part rather than shown as it asks to be. */
+const MAX_STEPS = 500;
+const MAX_PARENTS = 100;
+const MAX_TEXT = 4000;
+
+/** A string from a file, cut to a length a view can draw. */
+function text(value: unknown, fallback = ""): string {
+  return typeof value === "string" ? value.slice(0, MAX_TEXT) : fallback;
+}
+
+/**
+ * A snapshot kept only when it is shaped like a document the editor can open: a sequence, and
+ * features and primers in the shape the editor reads. A snapshot that is not goes to the
+ * editor's store the moment someone opens it, so it is dropped here instead.
+ */
+function snapshot(value: unknown): SequenceData | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const data = value as Record<string, unknown>;
+  if (typeof data.sequence !== "string") return undefined;
+  const annotations = (kind: unknown) =>
+    Array.isArray(kind) || (!!kind && typeof kind === "object");
+  if (!annotations(data.features) || !annotations(data.primers)) return undefined;
+  if (typeof data.name !== "string") return undefined;
+  return data as unknown as SequenceData;
+}
+
+/** The wrong clones of a step, kept only where each one is shaped as the planner reads it. */
+function wrongClones(value: unknown): WrongClone[] | undefined {
+  if (!Array.isArray(value) || !value.length || value.length > MAX_PARENTS) return undefined;
+  const kept = value.filter((clone) => {
+    if (!clone || typeof clone !== "object") return false;
+    const { name, data } = clone as Record<string, unknown>;
+    return typeof name === "string" && !!snapshot(data);
+  });
+  return kept.length === value.length ? (kept as WrongClone[]) : undefined;
+}
+
 /**
  * The History of a document as it was read from a file: a file is outside content, so only
- * entries that look like History are kept, and the tree is followed to `LINEAGE_DEPTH`.
+ * entries that look like History are kept, each within the limits above, and the tree is
+ * followed to `LINEAGE_DEPTH`.
  */
 export function cleanHistory(stored: unknown, depth = LINEAGE_DEPTH): HistoryEntry[] {
   if (!Array.isArray(stored) || depth <= 0) return [];
   const out: HistoryEntry[] = [];
-  for (const raw of stored) {
+  for (const raw of stored.slice(0, MAX_STEPS)) {
     if (!raw || typeof raw !== "object") continue;
     const step = raw as Record<string, unknown>;
     if (typeof step.action !== "string" || !step.action) continue;
-    const entry: HistoryEntry = {
-      time: typeof step.time === "string" ? step.time : "",
-      action: step.action,
-    };
-    if (typeof step.detail === "string") entry.detail = step.detail;
-    if (Array.isArray(step.wrongClones)) entry.wrongClones = step.wrongClones as WrongClone[];
+    const entry: HistoryEntry = { time: text(step.time), action: text(step.action) };
+    if (typeof step.detail === "string") entry.detail = text(step.detail);
+    const clones = wrongClones(step.wrongClones);
+    if (clones) entry.wrongClones = clones;
     if (Array.isArray(step.parents)) {
       const parents: HistoryParent[] = [];
-      for (const rawParent of step.parents) {
+      for (const rawParent of step.parents.slice(0, MAX_PARENTS)) {
         if (!rawParent || typeof rawParent !== "object") continue;
         const parent = rawParent as Record<string, unknown>;
-        const data = parent.data as SequenceData | undefined;
+        const data = snapshot(parent.data);
         parents.push({
-          name: typeof parent.name === "string" ? parent.name : "an input",
-          ...(data && typeof data === "object" && typeof data.sequence === "string"
-            ? { data } : {}),
-          ...(typeof parent.path === "string" ? { path: parent.path } : {}),
-          ...(parent.snapshots_dropped ? { snapshots_dropped: true } : {}),
+          name: text(parent.name, "an input"),
+          ...(data ? { data } : {}),
+          ...(typeof parent.path === "string" ? { path: text(parent.path) } : {}),
+          ...(parent.snapshots_dropped || !data ? { snapshots_dropped: true } : {}),
           history: cleanHistory(parent.history, depth - 1),
         });
       }

@@ -272,8 +272,6 @@ export default function App() {
           ...(source ? { saveInPlace: !!result.path && !!result.writable, source } : {}),
           // Pasted text and a download exist nowhere else; a file or an untouched sample does.
           neverSaved: origin === null || !!accession,
-          // Pasted text exists nowhere else; a file or an untouched sample does.
-          neverSaved: origin === null,
           history,
         },
       );

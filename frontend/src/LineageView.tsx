@@ -83,7 +83,8 @@ export default function LineageView({ doc, data, onReopen, onOpenFile }: {
   const tree = useMemo(() => buildLineage(doc, data), [doc, data]);
   const [existing, setExisting] = useState<Set<string>>(new Set());
   const { copy, fallbackDialog } = useCopyText();
-  const paths = useMemo(() => [...new Set(pathsIn(tree))], [tree]);
+  // Capped: the paths come from the file's own lineage block, and the engine takes 200.
+  const paths = useMemo(() => [...new Set(pathsIn(tree))].slice(0, 200), [tree]);
 
   useEffect(() => {
     if (!paths.length) {

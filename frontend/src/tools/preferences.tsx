@@ -329,9 +329,11 @@ function PreferencesDialog(props: ToolProps) {
           </label>
           <span className="vt-field-hint" id="pref-save-history-hint">
             The History goes into a comment that other programs ignore, so reopening the file
-            months later still shows where the construct came from, with a copy of everything
-            each step was run on. Turn it off to save plain files that carry the sequence and
-            its features only; the History then lasts as long as the document stays open.
+            months later still shows where the construct came from. The comment holds a copy of
+            the sequence and features of everything each step was run on, and the path each
+            input was open from on this computer, so a file you share carries its parents'
+            sequences too. Turn it off to save plain files with the sequence and its features
+            only; the History then lasts as long as the document stays open.
           </span>
         </div>
 

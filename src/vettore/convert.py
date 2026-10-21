@@ -306,7 +306,24 @@ def record_to_ove(record: SeqRecord, fallback_name: str = "Untitled") -> dict[st
         doc["history"] = history         # the History the file was saved with (S6.1)
     if kept := lineage.strip(comment):
         doc["comment"] = kept            # the file's own comment, written back on save
+    if structured := _structured_comment(record.annotations.get("structured_comment")):
+        # The ##…-START##/##…-END## tables NCBI records carry (assembly method, sequencing
+        # technology): kept whole so a save does not throw a record's provenance away.
+        doc["structured_comment"] = structured
     return doc
+
+
+def _structured_comment(value: Any) -> dict[str, dict[str, str]]:
+    """A record's structured comment as plain strings, from a file or from the editor."""
+    if not isinstance(value, dict):
+        return {}
+    out = {}
+    for name, table in value.items():
+        if isinstance(name, str) and isinstance(table, dict):
+            entries = {str(k): str(v) for k, v in table.items() if isinstance(k, str)}
+            if entries:
+                out[name] = entries
+    return out
 
 
 def record_comment(record: SeqRecord) -> str:
@@ -430,6 +447,8 @@ def ove_to_record(data: dict[str, Any]) -> SeqRecord:
     comment = lineage.add_to_comment(str(data.get("comment") or ""), data.get("history"))
     if comment:
         record.annotations["comment"] = comment
+    if structured := _structured_comment(data.get("structured_comment")):
+        record.annotations["structured_comment"] = structured
     for kind, default_type in (("features", "misc_feature"), ("primers", "primer_bind")):
         for ann in _as_list(data.get(kind)):
             ranges = annotation_ranges(ann, len(sequence), circular)
