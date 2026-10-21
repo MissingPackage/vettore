@@ -3,6 +3,8 @@ import type { SequenceData } from "./api";
 
 /** Phred Q30, one wrong call in 1,000: one read this good confirms a difference on its own. */
 export const CONFIRMING_QUALITY = 30;
+/** Phred Q20: two reads this good confirm a difference together; one this good against it is enough to doubt it. */
+export const SUPPORTING_QUALITY = 20;
 
 export interface ContigDifference {
   kind: "mismatch" | "insertion" | "deletion";
@@ -37,7 +39,11 @@ export interface Contig {
   consensus_length: number;
   /** Runs of 0 (no read), 1 (one strand) or 2 (both strands), 1-based inclusive; start > end across the origin. */
   coverage: { start: number; end: number; strands: number }[];
-  covered: { start: number; end: number; reads: number }[];
+  covered: { start: number; end: number }[];
+  /** Covered, clearly called, nothing left to check; `reads` is the fewest reads over any base. */
+  verified: { start: number; end: number; reads: number }[];
+  /** Covered positions where no read makes a clear call: the reference is kept there. */
+  unclear: number;
   differences: ContigDifference[];
   disagreements: Disagreement[];
   document?: SequenceData;
@@ -79,10 +85,10 @@ export function describeDifference(d: ContigDifference): string {
 
 /** Why a difference is trusted, or why to look at its trace. */
 export function evidence(d: ContigDifference): string {
-  if (d.reads > 1) return `seen in ${n(d.reads)} reads`;
-  return d.quality >= CONFIRMING_QUALITY
-    ? `1 read at Q${d.quality}`
-    : `1 read at Q${d.quality}, under Q${CONFIRMING_QUALITY}`;
+  const seen = d.reads > 1 ? `seen in ${n(d.reads)} reads, best Q${d.quality}` : `1 read at Q${d.quality}`;
+  if (d.confirmed) return seen;
+  if (d.reads === 1 && d.quality < CONFIRMING_QUALITY) return `${seen}, under Q${CONFIRMING_QUALITY}`;
+  return `${seen}; another read shows something else, or the reads are under Q${SUPPORTING_QUALITY}`;
 }
 
 /** One sentence that answers "is my clone right?" from the consensus of every read. */
@@ -90,13 +96,17 @@ export function contigVerdict(contig: Contig, referenceName: string, coveragePer
   const where = `${coveragePercent} % of ${referenceName}`;
   const total = contig.differences.length;
   const disputed = contig.disagreements.filter((d) => d.kind !== "no call").length;
-  const settled = disputed
-    ? ` The reads disagree at ${n(disputed)} position${disputed === 1 ? "" : "s"}; the consensus takes the`
-      + " better-quality call (listed under Contig)."
-    : "";
+  const settled = (disputed
+    ? ` The reads disagree at ${n(disputed)} place${disputed === 1 ? "" : "s"}; the consensus takes the call`
+      + " with the most quality behind it (listed under Contig)."
+    : "")
+    + (contig.unclear
+      ? ` ${n(contig.unclear)} covered position${contig.unclear === 1 ? " has" : "s have"} no clear call in any read:`
+        + " the plasmid's base is kept there, unverified."
+      : "");
   if (!total) {
     return {
-      ok: true,
+      ok: !contig.unclear,
       text: `No differences: the consensus of ${n(contig.reads)} reads matches ${referenceName} wherever they cover it`
         + ` (${where}).${settled}`,
     };
@@ -110,7 +120,8 @@ export function contigVerdict(contig: Contig, referenceName: string, coveragePer
   return {
     ok: false,
     text: `${n(total)} difference${total === 1 ? "" : "s"} between the consensus of ${n(contig.reads)} reads and`
-      + ` ${referenceName} (covering ${where}). ${how}: a difference counts as confirmed when two reads show it,`
-      + ` or one read at Q${CONFIRMING_QUALITY} or better.${settled}`,
+      + ` ${referenceName} (covering ${where}). ${how}: a difference counts as confirmed when two reads show it`
+      + ` at Q${SUPPORTING_QUALITY} or better, or one read at Q${CONFIRMING_QUALITY} or better, and no read at`
+      + ` Q${SUPPORTING_QUALITY} or better shows something else.${settled}`,
   };
 }

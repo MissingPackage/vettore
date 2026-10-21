@@ -11,7 +11,9 @@ function contig(over: Partial<Contig> = {}): Contig {
       { start: 862, end: 903, strands: 1 },
       { start: 904, end: 1125, strands: 0 },
     ],
-    covered: [{ start: 223, end: 903, reads: 2 }],
+    covered: [{ start: 223, end: 903 }],
+    verified: [{ start: 223, end: 903, reads: 1 }],
+    unclear: 0,
     differences: [],
     disagreements: [],
     ...over,
@@ -52,7 +54,7 @@ describe("contigVerdict", () => {
     expect(v.ok).toBe(false);
     expect(v.text).toContain("2 differences between the consensus of 2 reads and pCOI");
     expect(v.text).toContain("1 is confirmed, 1 needs a look at the trace");
-    expect(v.text).toContain("one read at Q30 or better");
+    expect(v.text).toContain("one read at Q30 or better, and no read at Q20 or better shows something else");
   });
 
   it("mentions positions where the reads disagreed, not those without a call", () => {
@@ -63,14 +65,22 @@ describe("contigVerdict", () => {
         { kind: "no call", position: 895, reference: "N", consensus: "N", calls: [call] },
       ],
     }), "pCOI", 61.4);
-    expect(v.text).toContain("The reads disagree at 1 position;");
+    expect(v.text).toContain("The reads disagree at 1 place;");
+  });
+
+  it("does not pass a clone where some covered bases have no clear call", () => {
+    const v = contigVerdict(contig({ unclear: 2 }), "pCOI", 61.4);
+    expect(v.ok).toBe(false);
+    expect(v.text).toContain("2 covered positions have no clear call in any read");
   });
 });
 
 describe("evidence", () => {
   it("says why a difference is trusted or not", () => {
-    expect(evidence(mismatch())).toBe("seen in 2 reads");
+    expect(evidence(mismatch())).toBe("seen in 2 reads, best Q50");
     expect(evidence(mismatch({ reads: 1, quality: 38 }))).toBe("1 read at Q38");
     expect(evidence(mismatch({ reads: 1, quality: 22, confirmed: false }))).toBe("1 read at Q22, under Q30");
+    expect(evidence(mismatch({ reads: 2, quality: 15, confirmed: false })))
+      .toBe("seen in 2 reads, best Q15; another read shows something else, or the reads are under Q20");
   });
 });

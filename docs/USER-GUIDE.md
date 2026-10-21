@@ -473,11 +473,11 @@ Next to each difference is the read quality at that base. Hover it to see the ch
 With two or more reads, the verdict is given on their **consensus**, and a **Contig** section appears under the table:
 
 - **Coverage.** A sentence and a strip under it say which stretches of the plasmid are read on both strands, on one strand only, or by no read at all, in plasmid numbering ("223–861 covered on both strands; 862–903 on one strand only; no read over 1–222 and 904–1,125").
-- **The consensus.** At each position the base comes from the read with the highest-quality call there. An `N` is no call and never wins. Where the reads disagree, the position is listed with every read's call and quality, so you can open those peaks.
-- **Differences, with a verdict.** A difference from the plasmid is **confirmed** when two reads show it, or when one read shows it at Q30 or better (1 wrong call in 1,000). Otherwise it says **check the trace**.
-- **Save consensus** opens the consensus as a new document: the plasmid's features (moved over any insertion or deletion), the covered stretch annotated "Sanger verified (n reads)", and each confirmed difference annotated where it is. Where no read reaches, the consensus keeps the plasmid's own sequence.
+- **The consensus.** At each position the reads vote with their quality: the qualities of reads that show the same base add up, so three good reads outweigh one slightly better read. An insertion or deletion is voted as one event, so a read never wins half of its own deletion. A call that is not A, C, G or T (`N`, or a mixed call such as `R`) is no call: it never wins, and where no read calls a base clearly the plasmid's base is kept and the verdict says so. Where the reads disagree, the position is listed with every read's call and quality, so you can open those peaks.
+- **Differences, with a verdict.** A difference from the plasmid is **confirmed** when two reads show it at Q20 or better, or one read at Q30 or better (1 wrong call in 1,000), and no read at Q20 or better shows something else there. Otherwise it says **check the trace**.
+- **Save consensus** opens the consensus as a new document: the plasmid's features (moved over any insertion or deletion), every difference annotated where it is (those still to check say so), the stretches with a clear, checked call annotated "Sanger verified (n reads)" (n is the fewest reads over any of their bases), and the bases no read called clearly annotated "Sanger: no clear call". Where no read reaches, the consensus keeps the plasmid's own sequence.
 
-Reads that do not come from this plasmid are listed apart, above the table, and never enter the consensus. The contig needs the expected plasmid: reads are not assembled without a reference.
+Reads that do not come from this plasmid are listed apart, above the table, and never enter the consensus. The same trace chosen twice (a copied file) is counted once. The contig needs the expected plasmid: reads are not assembled without a reference.
 
 ## Simulating a gel (Tools → Simulate Agarose Gel…)
 

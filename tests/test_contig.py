@@ -66,7 +66,7 @@ def test_the_pair_covers_the_insert_on_both_strands_and_one_end_on_one():
     [(one_start, one_end)] = strand_runs(result, 1)
     assert both_start == LEFT + 1 and one_start == both_end + 1
     assert strand_runs(result, 0) == [(1, LEFT), (one_end + 1, len(clone()))]
-    assert result["covered"] == [{"start": LEFT + 1, "end": one_end, "reads": 2}]
+    assert result["covered"] == [{"start": LEFT + 1, "end": one_end}]
 
 
 def test_reads_that_agree_with_the_reference_give_it_back_unchanged():
@@ -90,7 +90,7 @@ def test_one_read_confirms_a_difference_only_at_q30_or_better():
     result = contig(clone())
     [(start, end)] = strand_runs(result, 1)
     single = [p for p in range(start - 1, end - 10) if p in forward_calls()
-              and forward_calls()[p].value != "N"]
+              and forward_calls()[p].base != "N"]
     good = next(p for p in single if forward_calls()[p].quality >= CONFIRMING_QUALITY + 5)
     weak = next(p for p in single if forward_calls()[p].quality < CONFIRMING_QUALITY)
     for index, confirmed in ((good, True), (weak, False)):
@@ -135,24 +135,45 @@ def test_bases_missing_from_the_clone_are_one_deletion():
     assert variation["end"] - variation["start"] == 1         # the two bases around the gap
 
 
-def test_the_covered_stretch_is_annotated_as_verified():
+def test_verified_stretches_leave_out_the_positions_no_read_called():
+    """The forward read calls N at two places only it covers: the stretch is verified around
+    them, and they are marked instead."""
     result = contig(clone())
-    [verified] = [f for f in result["document"]["features"]
-                  if f["name"] == "Sanger verified (2 reads)"]
-    span = result["covered"][0]
-    assert (verified["start"], verified["end"]) == (span["start"] - 1, span["end"] - 1)
     assert result["document"]["name"] == "pCOI consensus"
+    features = result["document"]["features"]
+    verified = sorted((f["start"], f["end"], f["name"]) for f in features
+                      if f["name"].startswith("Sanger verified"))
+    unclear = sorted(f["start"] for f in features if f["name"] == "Sanger: no clear call")
+    assert result["unclear"] == 2 and len(unclear) == 2
+    [covered] = result["covered"]
+    assert verified[0][0] == covered["start"] - 1 and verified[-1][1] == covered["end"] - 1
+    assert len(verified) == 3
+    assert verified[0][2] == "Sanger verified (1 read)"  # the left end is read by one read
+    for position in unclear:
+        assert not any(start <= position <= end for start, end, _ in verified)
 
 
-def test_unconfirmed_differences_are_not_annotated():
+def test_a_difference_to_check_is_annotated_as_such_and_not_verified():
     result = contig(clone())
     [(start, end)] = strand_runs(result, 1)
     weak = next(p for p in range(start - 1, end - 10) if p in forward_calls()
-                and forward_calls()[p].value != "N"
+                and forward_calls()[p].base != "N"
                 and forward_calls()[p].quality < CONFIRMING_QUALITY)
     reference, _ = mutate(clone(), weak)
     features = contig(reference)["document"]["features"]
-    assert not [f for f in features if f["type"] == "variation"]
+    [variation] = [f for f in features if f["type"] == "variation"]
+    assert variation["name"].endswith("(Sanger, check the trace)")
+    assert variation["start"] == weak
+    assert not any(f["start"] <= weak <= f["end"] for f in features
+                   if f["name"].startswith("Sanger verified"))
+
+
+def test_the_same_trace_chosen_twice_is_counted_once():
+    reads = [*pair(), ("copy.ab1", FORWARD.read_bytes())]
+    payload = alignment_payload("pCOI", clone(), False, reads)
+    [warning] = payload["warnings"]
+    assert "copy.ab1" in warning and "counted once" in warning
+    assert payload["contig"]["reads"] == 2
 
 
 def test_a_read_from_another_plasmid_is_listed_apart_and_left_out():
@@ -221,14 +242,75 @@ def test_a_lone_low_quality_call_is_to_be_checked():
     assert difference["confirmed"] is False and difference["reads"] == 1
 
 
-def test_two_low_quality_reads_together_confirm_a_difference():
+def test_two_reads_confirm_a_difference_together_only_at_q20_or_better():
     insert = REFERENCE[200:500]
     other = "A" if insert[150] != "A" else "C"
     mutated = with_base(insert, 150, other)
-    quality = [45] * 150 + [15] + [45] * 149
-    [difference] = made_contig(made_read("a", mutated, quality),
-                               made_read("b", mutated, quality, -1))["differences"]
-    assert difference["confirmed"] is True and difference["reads"] == 2
+    for low, confirmed in ((22, True), (15, False)):
+        quality = [45] * 150 + [low] + [45] * 149
+        [difference] = made_contig(made_read("a", mutated, quality),
+                                   made_read("b", mutated, quality, -1))["differences"]
+        assert difference["reads"] == 2
+        assert difference["confirmed"] is confirmed
+
+
+def test_many_good_reads_outvote_one_better_read():
+    """Summed quality, as in phrap: three Q35 reads of the reference base beat one Q40 read."""
+    insert = REFERENCE[200:500]
+    other = "A" if insert[150] != "A" else "C"
+    result = made_contig(made_read("a", insert, 35), made_read("b", insert, 35, -1),
+                         made_read("c", insert[:290], 35),
+                         made_read("odd", with_base(insert, 150, other), 40, -1))
+    assert result["differences"] == []
+    [flag] = result["disagreements"]
+    assert flag["consensus"] == insert[150]
+
+
+def test_a_difference_a_good_read_contradicts_is_not_confirmed():
+    insert = REFERENCE[200:500]
+    other = "A" if insert[150] != "A" else "C"
+    result = made_contig(made_read("alt", with_base(insert, 150, other), 50),
+                         made_read("ref", insert, [45] * 150 + [25] + [45] * 149, -1))
+    [difference] = result["differences"]
+    assert difference["consensus"] == other and difference["confirmed"] is False
+
+
+def test_a_read_never_wins_half_of_its_own_deletion():
+    """Read A (Q40) lacks 2 bases; read B (Q45, then Q35) has them. Voted base by base the
+    consensus kept one and lost the other: a 1 bp frameshift no read shows."""
+    insert = REFERENCE[200:500]
+    deleted = insert[:150] + insert[152:]
+    b_quality = [40] * 150 + [45, 35] + [40] * 148
+    result = made_contig(made_read("A", deleted, 40), made_read("B", insert, b_quality, -1))
+    # Read A's whole deletion (Q40 at its flanks) against read B's weaker of the two bases
+    # (Q35): the deletion wins as one event, and B, a good read, keeps it unconfirmed.
+    [difference] = result["differences"]
+    assert difference["kind"] == "deletion" and difference["reference"] == insert[150:152]
+    assert difference["confirmed"] is False
+    assert len(result["document"]["sequence"]) == len(REFERENCE) - 2
+
+
+def test_a_mixed_iupac_call_is_no_call():
+    insert = REFERENCE[200:500]
+    result = made_contig(made_read("a", with_base(insert, 150, "R"), 40),
+                         made_read("b", with_base(insert, 150, "R"), 40, -1))
+    assert result["differences"] == []
+    assert [d["kind"] for d in result["disagreements"]] == ["no call"]
+
+
+def test_a_deletion_across_the_origin_is_one_event():
+    from vettore.contig import contig_payload
+
+    reference = clean_dna(600, 304)
+    clone_ = reference[2:-2]                     # 4 bases missing around the origin
+    read = clone_[-250:] + clone_[:250]
+    reads = [align_trace(reference, True, t) for t in (made_read("a", read, 40),
+                                                         made_read("b", read, 40, -1))]
+    result = contig_payload(reference, True, reads, doc("pRing", reference, True))
+    [difference] = result["differences"]
+    assert difference["kind"] == "deletion"
+    assert difference["reference"] == reference[-2:] + reference[:2]
+    assert len(result["document"]["sequence"]) == len(reference) - 4
 
 
 def test_an_n_is_no_call_and_never_enters_the_consensus():
@@ -249,3 +331,17 @@ def test_coverage_counts_strands_not_reads():
                          made_read("c", rc(insert[100:]), 40))
     assert [(r["start"], r["end"], r["strands"]) for r in result["coverage"]] == [
         (1, 200, 0), (201, 300, 1), (301, 400, 2), (401, 500, 1), (501, 700, 0)]
+
+
+def test_e2e_contig_fixture_is_up_to_date():
+    import subprocess
+    import sys
+
+    root = Path(__file__).resolve().parents[1]
+    fixture = root / "frontend" / "e2e" / "fixtures" / "contig-reference.txt"
+    out = subprocess.run([sys.executable, "-I", str(root / "scripts" / "make_contig_fixture.py")],
+                         capture_output=True, text=True, encoding="utf-8", check=True).stdout
+    assert out == fixture.read_text(encoding="utf-8"), (
+        "Regenerate: python -I scripts/make_contig_fixture.py > "
+        "frontend/e2e/fixtures/contig-reference.txt")
+    assert out.strip() == clone()

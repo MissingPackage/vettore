@@ -381,9 +381,18 @@ def alignment_payload(reference_name: str, reference: str, circular: bool,
     warnings: list[str] = []
     length = len(reference)
 
+    seen: dict[tuple[str, tuple[int, ...]], str] = {}
     for filename, content in reads:
         try:
             trace = read_trace(filename, content)
+            # The same trace chosen twice (a copied file, a re-download) is one read: counted
+            # twice it would confirm its own errors.
+            key = (trace.sequence, tuple(trace.quality))
+            if key in seen:
+                warnings.append(f"“{filename}” is the same trace as “{seen[key]}”: it is "
+                                "counted once.")
+                continue
+            seen[key] = filename
             aligned = align_trace(reference, circular, trace, cutoff,
                                   reference_name=reference_name)
         except TraceError as exc:
