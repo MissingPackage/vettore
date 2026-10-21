@@ -105,6 +105,10 @@ INDEL_SLACK = 5
 END_X_DROP = 15.0
 #: Identical columns a segment edge next to an unrelated stretch must end in.
 EDGE_RUN = 5
+#: An end is named unrelated only if at least this long and less than this identical.
+END_MIN, END_IDENTITY = 30, 0.5
+#: Largest stretch (cells of the dynamic programming matrix) realigned as a pair.
+PAIR_MAX_CELLS = 4_000_000
 PROFILE_MAX = 3_000          # columns; longer stretches between anchors use the summaries
 
 IUPAC = "ACGTRYSWKMBDHVN"
@@ -886,6 +890,81 @@ def _extend(scores: list[float], edge: int, step: int) -> int:
     return best_edge
 
 
+def _unrelated_end(columns: list[tuple[str, str, int | None]]) -> bool:
+    """Whether an end left out by ``_extend`` really is unrelated sequence: at least END_MIN
+    columns, less than END_IDENTITY of them identical. A shorter or more alike end (a SNP
+    at the last base, a divergent but homologous end of a gene) is compared."""
+    if len(columns) < END_MIN:
+        return False
+    return sum(map(_identical, columns)) < END_IDENTITY * len(columns)
+
+
+def _realign_pairwise(columns: list[tuple[str, str, int | None]]
+                      ) -> list[tuple[str, str, int | None]]:
+    """The two rows aligned to each other again between their runs of ANCHOR_WORD identical
+    columns. Two rows of a multiple alignment carry the gaps the other members needed: two
+    identical sequences can face each other as ``AGA-GAC`` / ``AGAG-AC`` around a third
+    one's deletion, an insertion and a deletion that are not there. Each stretch between
+    identical runs is aligned anew as a pair (blastn scores), so the differences are those
+    of the two sequences alone. Stretches too large to realign (PAIR_MAX_CELLS), or that do
+    do not come out as alike (unrelated inserts), are kept as they are."""
+    k = ANCHOR_WORD
+    anchored = [False] * len(columns)
+    run = 0
+    for i, column in enumerate(columns):
+        run = run + 1 if _identical(column) else 0
+        if run >= k:
+            for j in range(i - k + 1, i + 1):
+                anchored[j] = True
+    out: list[tuple[str, str, int | None]] = []
+    i = 0
+    while i < len(columns):
+        if anchored[i]:
+            out.append(columns[i])
+            i += 1
+            continue
+        j = i
+        while j < len(columns) and not anchored[j]:
+            j += 1
+        stretch = columns[i:j]
+        a = [(x, p) for x, _, p in stretch if x != "-"]
+        b = "".join(y for _, y, _ in stretch if y != "-")
+        if (a and b and any("-" in (x, y) for x, y, _ in stretch)
+                and len(a) * len(b) <= PAIR_MAX_CELLS):
+            # Free end gaps only where the stretch is an end of the comparison.
+            aligner = Align.PairwiseAligner(scoring="blastn")
+            if i == 0:
+                aligner.left_gap_score = 0.0
+            if j == len(columns):
+                aligner.right_gap_score = 0.0
+            pairs = _columns_of(aligner.align("".join(x for x, _ in a), b)[0].coordinates)
+            redone = [(a[p][0] if p is not None else "-", b[q] if q is not None else "-",
+                       a[p][1] if p is not None else None) for p, q in pairs]
+            # Kept only if it opens no more gaps than the rows had, and either scores as
+            # alike or has no gap at all (opposite gaps turned back into substitutions).
+            # Forced to align two unrelated inserts end to end, the pair alignment
+            # scatters gaps and chance matches next to the junctions, where they would
+            # read as differences in the flanking sequence.
+            runs = _gap_runs(redone)
+            if runs <= _gap_runs(stretch) and (runs == 0 or sum(_column_scores(redone)) > 0):
+                stretch = redone
+        out += stretch
+        i = j
+    return out
+
+
+def _gap_runs(columns: list[tuple[str, str, int | None]]) -> int:
+    """How many runs of gaps the two rows have between them (a gap in one, then the other,
+    are two runs)."""
+    runs, side = 0, None
+    for x, y, _ in columns:
+        now = "a" if x == "-" else "b" if y == "-" else None
+        if now and now != side:
+            runs += 1
+        side = now
+    return runs
+
+
 def _identical(column: tuple[str, str, int | None]) -> bool:
     return column[0] == column[1] != "-" and column[0] != "N"
 
@@ -989,6 +1068,7 @@ def compare(a: dict[str, Any], b: dict[str, Any]) -> dict[str, Any]:
         # Columns where only one of the two has begun or still goes on (a fragment's ends,
         # an overhang) are not compared, as in the star alignment.
         columns = columns[both[0]:both[-1] + 1]
+    columns = _realign_pairwise(columns)
     scores = _column_scores(columns)
     segments = [list(seg) for seg in homologous_segments(scores)]
     if not segments:
@@ -998,6 +1078,11 @@ def compare(a: dict[str, Any], b: dict[str, Any]) -> dict[str, Any]:
     # named as not compared: an adapter or a homology arm is not a list of mutations.
     segments[0][0] = _extend(scores, segments[0][0], -1)
     segments[-1][1] = _extend(scores, segments[-1][1], 1)
+    # ... but an end too short to judge, or still alike, is compared all the same.
+    if not _unrelated_end(columns[:segments[0][0]]):
+        segments[0][0] = 0
+    if not _unrelated_end(columns[segments[-1][1]:]):
+        segments[-1][1] = len(columns)
     # Between two segments: an insertion or deletion (bases on one side only, give or take
     # INDEL_SLACK) is a difference however long; so is a stretch that costs less than
     # X_DROP. Anything else is a replacement by unrelated sequence, named as such.

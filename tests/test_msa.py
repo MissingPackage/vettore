@@ -496,3 +496,60 @@ def test_an_insert_replaced_by_an_unrelated_stuffer_is_one_named_replacement(stu
     assert out["differences"] == []
     [swap] = out["unrelated"]
     assert abs(swap["start"] - 1501) <= 2 and swap["a_bases"] >= 995
+
+
+# ---- regressions found by the fourth adversarial review ----------------------------------
+
+def _substitute(seq: str, rate: float, seed: int) -> str:
+    rng = random.Random(seed)
+    return "".join(rng.choice("ACGT".replace(c, "")) if rng.random() < rate else c for c in seq)
+
+
+@pytest.mark.parametrize("circular", [True, False])
+def test_two_members_never_get_an_indel_the_others_needed(circular):
+    # Substitutions only, plus a third member with a real deletion: the gaps the others
+    # carry for each other must not read as an insertion and a deletion between two.
+    rng = random.Random(41)
+    members = [_substitute(BASE[:2500], rate, 400 + i) for i, rate in enumerate(
+        (0.01, 0.03, 0.06, 0.03, 0.06))]
+    members.append(BASE[:1200] + BASE[1230:2500])
+    docs = [doc(f"m{i}", rotate(s, rng.randrange(len(s))) if circular else s, circular)
+            for i, s in enumerate(members)]
+    by_name = {s["name"]: s for s in msa.multiple_alignment(docs)["sequences"]}
+    for i in range(5):
+        for j in range(i + 1, 5):
+            out = msa.compare(by_name[f"m{i}"], by_name[f"m{j}"])
+            assert {d["kind"] for d in out["differences"]} <= {"mismatch"}, (i, j)
+
+
+@pytest.mark.parametrize("circular", [True, False])
+@pytest.mark.parametrize("at", [0, 1, 797, 798, 799])
+def test_a_snp_at_the_end_of_an_amplicon_is_reported(circular, at):
+    amplicon = snp(BASE[1000:1800], at)
+    result = msa.multiple_alignment([doc("a", BASE, circular), doc("b", amplicon, False)])
+    by_name = {s["name"]: s for s in result["sequences"]}
+    out = msa.compare(by_name["a"], by_name["b"])
+    assert [(d["kind"], d["start"]) for d in out["differences"]] == [("mismatch", 1001 + at)]
+    assert out["unrelated"] == []
+
+
+def test_a_divergent_homologous_end_is_compared_not_named_unrelated():
+    other = _substitute(BASE[:1920], 0.1, 42) + _substitute(BASE[1920:2000], 0.35, 43)
+    _, out = _two(BASE[:2000], other, circular=False)
+    assert out["unrelated"] == []
+    assert (out["start"], out["end"]) == (1, 2000)
+    # At 35 % divergence a pair alignment may trade a few mismatches for an indel pair;
+    # what matters is that the end's differences are listed, not hidden.
+    expected = sum(1 for x, y in zip(BASE[:2000], other) if x != y)
+    assert out["counts"]["mismatches"] >= expected - 6
+    assert any(d["start"] > 1950 for d in out["differences"])
+
+
+@pytest.mark.parametrize("seed", range(8))
+def test_unrelated_inserts_leave_no_differences_at_the_junctions(seed):
+    a = BASE[:1500] + clean_dna(600, 600 + seed) + BASE[1500:]
+    b = BASE[:1500] + clean_dna(400, 700 + seed) + BASE[1500:]
+    _, out = _two(a, b, circular=False)
+    assert out["differences"] == []
+    [swap] = out["unrelated"]
+    assert swap["a_bases"] >= 590
