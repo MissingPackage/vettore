@@ -201,8 +201,11 @@ export const api = {
     get: () => call<LibraryFile>("primer-library"),
     /** Point the library at a .csv (kept in a shared folder) and read it. */
     setPath: (path: string) => call<LibraryFile>("primer-library/path", { path }),
-    /** Write the primers back to the shared .csv. */
-    save: (primers: object[]) => call<{ path: string; mtime: number; count: number }>("primer-library/save", { primers }),
+    /** Save the dialog's primers to the shared .csv, merged with the file as it is now: rows
+     * whose sequence is in `removed` go, rows a colleague added meanwhile stay. Returns the
+     * library as read back, with how many primers were written and kept from others. */
+    save: (primers: object[], removed: string[] = []) =>
+      call<LibraryFile & { count: number; kept: number; theirs: number }>("primer-library/save", { primers, removed }),
     /** Parse pasted or file text (name, sequence, notes…) without saving, so the dialog can show
      * what will be kept and what will be left out. */
     parse: (text: string) => call<{ primers: LibraryPrimer[]; rejected: RejectedRow[]; today: string }>("primer-library/parse", { text }),
@@ -215,8 +218,9 @@ export const api = {
       call<{ primers: { name: string; sequence: string; strand: number; start: number; end: number; reads_from: number }[] }>(
         "primer-library/sequencing", { sequenceData, start, end }),
     /** The library primer pair that already amplifies a product over a region, or null. */
-    product: (sequenceData: SequenceData, start: number, end: number) =>
+    product: (sequenceData: SequenceData, start: number, end: number,
+              productMin: number | null = null, productMax: number | null = null) =>
       call<{ product: { forward: string; reverse: string; size: number } | null }>(
-        "primer-library/product", { sequenceData, start, end }),
+        "primer-library/product", { sequenceData, start, end, product_min: productMin, product_max: productMax }),
   },
 };

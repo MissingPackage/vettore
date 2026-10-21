@@ -137,3 +137,9 @@
   align-self: center;
   font-size: 12px;
 }
+
+.vt-pl-discard-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}

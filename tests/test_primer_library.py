@@ -146,7 +146,7 @@ def test_csv_with_a_header_round_trips():
     assert rejected == [] and len(primers) == 1
     p = primers[0]
     assert p.name == "M13F" and p.sequence == "GTAAAACGACGGCCAGT" and p.location == "box 3 A4"
-    again, _ = pl.parse_csv(pl.to_csv(primers))
+    again, _ = pl.parse_csv(pl.merged_text(None, primers)[0])
     assert again == primers
 
 
@@ -304,8 +304,8 @@ def test_a_degenerate_primer_binds_every_base_it_stands_for():
 def test_a_primer_in_a_repeat_counts_once_and_too_many_sites_are_not_drawn():
     oligo_dt = "T" * 20
     seq = "GC" * 20 + "A" * 40 + "GC" * 20
-    # 21 overlapping 20-mers fit the 40-A stretch; only non-overlapping sites are kept (two).
-    assert len(pl.find_bindings(oligo_dt, seq, circular=False)) == 2
+    # 21 overlapping 20-mers fit the 40-A stretch: one site, the stretch is one repeat.
+    assert len(pl.find_bindings(oligo_dt, seq, circular=False)) == 1
     repeated = "".join(PRIMER + "ACACACACAC" for _ in range(12))
     [hit] = pl.library_on_sequence([pl.Primer("P", PRIMER)], repeated, circular=False)
     assert hit["sites"] == 12 and hit["bindings"] == []
@@ -337,3 +337,169 @@ def test_a_sequencing_primer_a_few_hundred_bases_upstream_is_listed():
     # Too close to read (the first ~40 bases after a primer are not readable), or too far.
     assert pl.sequencing_primers([pl.Primer("Seq", fwd)], seq, False, len(fwd) + 10, len(fwd) + 20) == []
     assert pl.sequencing_primers([pl.Primer("Seq", fwd)], seq, False, start, start + 700) == []
+
+
+# ---- second review: the shared file is kept as the lab wrote it ---------------------------
+
+def test_extra_columns_and_the_header_survive_a_save(library_file):
+    original = ("Nome;Sequenza;Tm;Lunghezza;Chi;Note\r\n"
+                "M13F;GTAAAACGACGGCCAGT;53;17;Anna;box 3\r\n")
+    library_file.write_bytes(original.encode("utf-8"))
+    result = pl.write_library([pl.Primer("M13F", "GTAAAACGACGGCCAGT", "box 4"),
+                               pl.Primer("KanR_F", "ATGATTGAACAAGATGGATTGCAC")])
+    text = library_file.read_bytes().decode("utf-8-sig")
+    lines = text.split("\r\n")
+    assert lines[0] == "Nome;Sequenza;Tm;Lunghezza;Chi;Note"            # header as written
+    assert lines[1] == "M13F;GTAAAACGACGGCCAGT;53;17;Anna;box 4"        # Tm, length, who stay
+    assert lines[2] == "KanR_F;ATGATTGAACAAGATGGATTGCAC;;;;"
+    assert result["count"] == 2
+
+
+def test_a_name_column_wins_over_an_id_column():
+    [p], _ = pl.parse_csv("ID,Name,Sequence\n17,M13F,GTAAAACGACGGCCAGT\n")
+    assert p.name == "M13F"
+
+
+def test_rows_stay_in_their_columns_whatever_the_column_order(library_file):
+    library_file.write_text("sequence,name,notes\nGTAAAACGACGGCCAGT,M13F,u\nnot-dna,Broken,fix me\n",
+                            encoding="utf-8")
+    before = pl.read_library()
+    pl.write_library([pl.Primer("M13F", "GTAAAACGACGGCCAGT", "u")])
+    pl.write_library([pl.Primer("M13F", "GTAAAACGACGGCCAGT", "u")])
+    after = pl.read_library()
+    assert [p["name"] for p in after["primers"]] == ["M13F"]   # the name never becomes a sequence
+    assert after["rejected"] == before["rejected"]
+    assert "not-dna,Broken,fix me" in library_file.read_text(encoding="utf-8-sig")
+
+
+def test_an_unchanged_file_is_written_back_byte_for_byte(library_file):
+    body = ('name;sequence;notes\r\n"M13F";gtaaaacgacggccagt;"5 µl; 4 °C"\r\n'
+            "Inosine;ACGTIACGT;keep\r\n")
+    library_file.write_bytes(b"\xef\xbb\xbf" + body.encode("utf-8"))
+    primers = [pl.Primer(**{k: p[k] for k in ("name", "sequence", "notes", "location", "added")})
+               for p in pl.read_library()["primers"]]
+    pl.write_library(primers)
+    assert library_file.read_bytes() == b"\xef\xbb\xbf" + body.encode("utf-8")   # lowercase kept
+
+
+def test_excels_sep_line_names_the_separator_and_stays(library_file):
+    library_file.write_text("sep=;\nname;sequence;notes\nM13F;GTAAAACGACGGCCAGT;a, b\n", encoding="utf-8")
+    lib = pl.read_library()
+    assert lib["delimiter"] == ";" and lib["primers"][0]["notes"] == "a, b"
+    pl.write_library([pl.Primer("M13F", "GTAAAACGACGGCCAGT", "a, b")])
+    assert library_file.read_text(encoding="utf-8-sig").startswith("sep=;")
+
+
+def test_a_tab_inside_a_note_does_not_make_the_file_tab_separated():
+    [p], rejected = pl.parse_csv("name,sequence,notes\nM13F,GTAAAACGACGGCCAGT,box\t3\n")
+    assert rejected == [] and p.notes == "box\t3"
+
+
+@pytest.mark.parametrize("data,words", [
+    (b"PK\x03\x04rest-of-a-workbook", "Excel workbook"),
+    ("name,sequence\nM13F,GTAAAACGACGGCCAGT\n".encode("utf-16"), None),
+    (b"LOCUS       pUC19   2686 bp    DNA     circular\nORIGIN\n        1 tcgcgcgttt\n//\n",
+     "not a primer library"),
+    (b"\x00\x01\x02binary", "not a text file"),
+])
+def test_files_that_are_not_a_primer_list_are_refused_and_left_alone(library_file, data, words):
+    library_file.write_bytes(data)
+    if words is None:                      # Excel's "Unicode text" (UTF-16) is read and kept so
+        assert pl.read_library()["primers"][0]["name"] == "M13F"
+        pl.write_library([pl.Primer("M13F", "GTAAAACGACGGCCAGT", "x")])
+        assert library_file.read_bytes().startswith((b"\xff\xfe", b"\xfe\xff"))
+        return
+    with pytest.raises(pl.PrimerLibraryError, match=words):
+        pl.read_library()
+    with pytest.raises(pl.PrimerLibraryError):
+        pl.write_library([pl.Primer("M13F", "GTAAAACGACGGCCAGT")])
+    assert library_file.read_bytes() == data
+
+
+def test_old_mac_line_endings_are_read():
+    primers, _ = pl.parse_csv("name,sequence\rM13F,GTAAAACGACGGCCAGT\rM13R,CAGGAAACAGCTATGAC\r")
+    assert [p.name for p in primers] == ["M13F", "M13R"]
+
+
+def test_a_library_path_must_be_a_csv(client):
+    r = client.post("/api/primer-library/path", json={"path": "/lab/pUC19.gb"}, headers=headers())
+    assert r.status_code == 422 and ".csv" in r.json()["detail"]
+
+
+def test_a_nul_in_pasted_text_is_a_rejected_row_not_a_crash(client):
+    r = client.post("/api/primer-library/parse", json={"text": "name,seq\nA,AC\x00GT\n"}, headers=headers())
+    assert r.status_code == 200 and len(r.json()["rejected"]) == 1
+
+
+def test_a_utf8_bom_before_windows_code_page_text_keeps_the_header(library_file):
+    library_file.write_bytes(b"\xef\xbb\xbf" + "Nome;Sequenza;Note\nM13F;GTAAAACGACGGCCAGT;5 µl\n".encode("cp1252"))
+    [p] = pl.read_library()["primers"]
+    assert (p["name"], p["notes"]) == ("M13F", "5 µl")
+
+
+def test_saving_merges_a_colleagues_additions(client):
+    library_file = settings.primer_library_path()
+    library_file.write_text("name;sequence\nM13F;GTAAAACGACGGCCAGT\nM13R;CAGGAAACAGCTATGAC\n", encoding="utf-8")
+    # The dialog loaded M13F and M13R; a colleague then adds T7 to the file.
+    with library_file.open("a", encoding="utf-8") as f:
+        f.write("T7;TAATACGACTCACTATAGGG\n")
+    r = client.post("/api/primer-library/save", headers=headers(), json={
+        "primers": [{"name": "M13F", "sequence": "GTAAAACGACGGCCAGT", "notes": "box 1"},
+                    {"name": "KanR_F", "sequence": "ATGATTGAACAAGATGGATTGCAC"}],
+        "removed": ["CAGGAAACAGCTATGAC"]})
+    assert r.status_code == 200
+    body = r.json()
+    assert [p["name"] for p in body["primers"]] == ["M13F", "T7", "KanR_F"]   # M13R removed
+    assert body["theirs"] == 1 and body["primers"][0]["notes"] == "box 1"
+
+
+def test_a_dinucleotide_repeat_is_one_site_and_long_n_primers_stay_fast():
+    import random
+    import time
+    rnd = random.Random(5)
+    seq = "".join(rnd.choice("ACGT") for _ in range(7000)) + "CA" * 60 + \
+        "".join(rnd.choice("ACGT") for _ in range(8000))
+    sites = pl.find_bindings("CA" * 10, seq, circular=True)
+    assert [b.strand for b in sites] == [1]           # one site, not 41
+    t = time.perf_counter()
+    assert len(pl.find_bindings("N" * 18, seq, circular=True)) == 2    # all one big "repeat"
+    assert time.perf_counter() - t < 2
+
+
+def test_a_repeat_across_the_origin_is_one_site():
+    seq = "A" * 30 + "GCGTCGATCGTAGCTAGCATCGAT" * 10 + "A" * 30
+    assert len([b for b in pl.find_bindings("T" * 20, seq, circular=True) if b.strand == -1]) == 1
+
+
+def test_primers_with_overlapping_footprints_still_make_a_product():
+    rnd_left = "GATCGATTGCAAGCTTGGCACTGGCCGTCGTTTTACAACG"
+    insert = "ACGTTGCATTCGAATGACCTGATTAACGTAGCTAGCATCGATCGGATCCAATTGC"   # 55 bp
+    seq = linear(rnd_left, insert, "TTTTCCCAGTCACGACGTTGTAAAACGACG")
+    f = insert[:30]                   # forward footprint 0..29 of the insert
+    r = rc(insert[15:])               # reverse footprint 15..54: overlaps the forward one
+    [product] = pl.amplified_products([pl.Primer("F", f), pl.Primer("R", r)], seq, circular=False)
+    assert product["size"] == 55
+
+
+def test_the_library_pair_must_fit_the_product_size_and_flank_the_region():
+    fwd, rev_site = "ACGTTGCATTCGAATGACCTG", "GGTTACCGATTACGCATTGCA"
+    seq = ("T" * 100 + fwd + "C" * 700 + rc(rev_site) + "G" * 1158).upper()   # product 742 bp
+    primers = [pl.Primer("F", fwd), pl.Primer("R", rev_site)]
+    assert pl.product_over_region(primers, seq, False, 300, 600) is not None
+    assert pl.product_over_region(primers, seq, False, 300, 600, 100, 500) is None   # too big
+    # A region under the forward primer: the product carries the primer there, not the template.
+    assert pl.product_over_region(primers, seq, False, 105, 400) is None
+
+
+def test_a_sequencing_read_reaches_exactly_800_bases():
+    fwd = "TTGCATTCGAATGACCTGAT"
+    seq = linear(fwd, "A" * 1000, "")
+    three = len(fwd) - 1
+    assert pl.sequencing_primers([pl.Primer("S", fwd)], seq, False, three + 40, three + 800)
+    assert not pl.sequencing_primers([pl.Primer("S", fwd)], seq, False, three + 40, three + 801)
+
+
+def test_a_reversed_region_on_a_linear_sequence_is_refused(client):
+    r = client.post("/api/primer-library/product", headers=headers(), json={
+        "sequenceData": {"sequence": "ACGT" * 100, "circular": False}, "start": 300, "end": 10})
+    assert r.status_code == 422

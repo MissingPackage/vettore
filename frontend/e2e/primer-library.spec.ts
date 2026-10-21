@@ -5,8 +5,8 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { TOKEN } from "../playwright.config";
 
-// Both tests write the same shared library file: run them one after the other, or the second
-// save rightly reports that the file changed on disk.
+// Both tests write the same shared library file: run them one after the other, so each test's
+// look at the file before it edits is still true when it saves.
 test.describe.configure({ mode: "serial" });
 
 const data = (name: string) => path.resolve(import.meta.dirname, "../../tests/data", name);
@@ -67,6 +67,13 @@ test("add a primer, import pasted rows, and keep it in the shared file", async (
   await page.getByTestId("pl-import-run").click();
   await expect(dialog.getByTestId("pl-notice")).toContainText("Imported 1");
   await expect(dialog.getByTestId("pl-notice")).toContainText("left out");
+
+  // Closing with unsaved changes asks first; Keep editing leaves everything as it was.
+  await page.getByTestId("pl-close").click();
+  await expect(dialog.getByTestId("pl-discard")).toBeVisible();
+  await dialog.getByTestId("pl-discard-no").click();
+  await expect(dialog.getByTestId("pl-discard")).toHaveCount(0);
+  await expect(dialog.getByTestId("pl-table")).toContainText("TestSeqP");
 
   // Save writes both to the shared file; a reload reads them back.
   await page.getByTestId("pl-save").click();

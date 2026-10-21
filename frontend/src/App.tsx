@@ -484,7 +484,7 @@ export default function App() {
   /** FASTA keeps only the sequence: say what the saved file does not contain. */
   const warnIfAnnotationsLost = useCallback((saved: SaveResult, data: SequenceData) => {
     const features = count(data.features);
-    const primers = count(data.primers);
+    const primers = removeOverlay(data.primers as any).length;   // library primers are a view
     if (saved.format !== "fasta" || !(features || primers)) return;
     const parts = [features && `${features} feature${features > 1 ? "s" : ""}`,
       primers && `${primers} primer${primers > 1 ? "s" : ""}`].filter(Boolean).join(" and ");

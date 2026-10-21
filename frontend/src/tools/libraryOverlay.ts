@@ -26,10 +26,13 @@ export function overlayAnnotations(bound: BoundPrimer[]): OveAnnotation[] {
         end: b.end,
         strand: b.strand,
         forward: b.strand === 1,
-        bases: p.sequence,
+        // The bases drawn are those that anneal (start..end); a 5′ tail does not sit on the
+        // template, so the whole primer is given in the note.
+        bases: p.sequence.slice(p.sequence.length - b.footprint),
         notes: {
           [OVERLAY_NOTE]: ["library"],
-          note: [`Lab library primer${p.location ? ` · ${p.location}` : ""}: ${bindingText(b)}`],
+          note: [`Lab library primer${p.location ? ` · ${p.location}` : ""}: ${bindingText(b)}`
+            + (b.tail ? `; whole primer 5′-${p.sequence}-3′` : "")],
         },
       });
     });

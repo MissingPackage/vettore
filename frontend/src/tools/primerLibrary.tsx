@@ -31,7 +31,7 @@ import "./primerLibrary.css";
 // Blueprint 3 typings predate React 18 (no implicit `children`).
 const { Dialog, Callout } = Blueprint as unknown as Record<string, React.ComponentType<any>>;
 
-const EMPTY: LibraryFile = { path: "", exists: false, mtime: null, primers: [], rejected: [] };
+const EMPTY: LibraryFile = { path: "", exists: false, mtime: null, delimiter: ";", primers: [], rejected: [] };
 type Notice = { intent: "success" | "warning" | "danger"; text: string } | null;
 
 function PrimerLibraryDialog(props: ToolProps) {
@@ -39,6 +39,11 @@ function PrimerLibraryDialog(props: ToolProps) {
   const [file, setFile] = useState<LibraryFile>(EMPTY);
   const [primers, setPrimers] = useState<LibraryPrimer[]>([]);
   const [dirty, setDirty] = useState(false);
+  // Sequences removed since the file was read: a save drops those rows and keeps every other
+  // row of the file as it is then, so a colleague's additions in the meantime are not lost.
+  const [removed, setRemoved] = useState<Set<string>>(new Set());
+  // An action that would drop unsaved changes, waiting for the user to confirm it.
+  const [pendingDiscard, setPendingDiscard] = useState<{ run: () => void; what: string } | null>(null);
   const [query, setQuery] = useState("");
   const [notice, setNotice] = useState<Notice>(null);
   const [error, setError] = useState<string | null>(null);
@@ -56,6 +61,7 @@ function PrimerLibraryDialog(props: ToolProps) {
       const got = await api.primerLibrary.get();
       setFile(got);
       setPrimers(got.primers);
+      setRemoved(new Set());
       setDirty(false);
       if (got.rejected.length) {
         setNotice({ intent: "warning", text: rejectedText(got.rejected, "file") });
@@ -99,29 +105,35 @@ function PrimerLibraryDialog(props: ToolProps) {
     setNotice(null);
   };
 
-  const save = async () => {
+  /** Save, merged with the file as it is now; true when it was written. */
+  const save = async (): Promise<boolean> => {
     setBusy(true);
     setError(null);
     try {
-      // The file may have changed under the user (a colleague saved it): warn rather than
-      // overwrite blindly.
-      const current = await api.primerLibrary.get();
-      if (file.mtime && current.mtime && current.mtime !== file.mtime) {
-        setNotice({ intent: "warning", text: "The library file changed on disk since you opened "
-          + "it. Reload to see the other changes, or Save to keep yours." });
-        setFile((f) => ({ ...f, mtime: current.mtime }));
-        setBusy(false);
-        return;
-      }
-      const saved = await api.primerLibrary.save(primers as unknown as object[]);
-      setFile((f) => ({ ...f, path: saved.path, exists: true, mtime: saved.mtime }));
+      // The engine re-reads the file and merges: rows a colleague added since it was loaded stay.
+      const saved = await api.primerLibrary.save(primers as unknown as object[], [...removed]);
+      setFile(saved);
+      setPrimers(saved.primers);
+      setRemoved(new Set());
       setDirty(false);
-      setNotice({ intent: "success", text: `Saved ${saved.count} primer${saved.count === 1 ? "" : "s"} to ${baseName(saved.path)}.` });
+      const theirs = saved.theirs
+        ? ` The file also had ${saved.theirs} primer${saved.theirs === 1 ? "" : "s"} added by someone else since you opened it: kept, and now listed.`
+        : "";
+      setNotice({ intent: "success", text: `Saved ${saved.count} primer${saved.count === 1 ? "" : "s"} to ${baseName(saved.path)}.${theirs}` });
+      return true;
     } catch (e) {
       setError(messageOf(e));
+      return false;
     } finally {
       setBusy(false);
     }
+  };
+
+  /** Run an action that re-reads the file or closes the window, asking first when there are
+   * unsaved changes it would drop. */
+  const guard = (what: string, run: () => void) => {
+    if (dirty) setPendingDiscard({ what, run });
+    else run();
   };
 
   const chooseFile = async () => {
@@ -138,6 +150,7 @@ function PrimerLibraryDialog(props: ToolProps) {
       const got = await api.primerLibrary.setPath(chosen);
       setFile(got);
       setPrimers(got.primers);
+      setRemoved(new Set());
       setDirty(false);
       setNotice({ intent: "success", text: `The library is now ${baseName(got.path)}. Keep it in a shared folder so your lab shares it.` });
     } catch (e) {
@@ -159,11 +172,14 @@ function PrimerLibraryDialog(props: ToolProps) {
       return;
     }
     change([...primers, newEntry(adding.name, seq, today, adding.notes.trim(), adding.location.trim())]);
+    setRemoved((r) => { const next = new Set(r); next.delete(seq); return next; });
     setAdding({ name: "", sequence: "", notes: "", location: "" });
   };
 
-  const remove = (primer: LibraryPrimer) =>
+  const remove = (primer: LibraryPrimer) => {
     change(primers.filter((p) => p !== primer));
+    setRemoved((r) => new Set(r).add(primer.sequence));
+  };
 
   const editField = (primer: LibraryPrimer, field: "notes" | "location", value: string) =>
     change(primers.map((p) => (p === primer ? { ...p, [field]: value } : p)));
@@ -175,6 +191,7 @@ function PrimerLibraryDialog(props: ToolProps) {
       const incoming = parsed.primers.map((p) => ({ ...p, added: p.added || today }));
       const { merged, added, duplicates } = mergeImport(primers, incoming);
       change(merged);
+      setRemoved((r) => { const next = new Set(r); incoming.forEach((p) => next.delete(p.sequence)); return next; });
       setImportText(null);
       const parts = [`Imported ${added} primer${added === 1 ? "" : "s"}`];
       if (duplicates) parts.push(`${duplicates} already in the library`);
@@ -197,7 +214,9 @@ function PrimerLibraryDialog(props: ToolProps) {
   };
 
   const exportCsv = async () => {
-    const text = toCsv(primers);
+    // The library file's separator (";" for Excel set to Italian) and a byte-order mark, so
+    // Excel opens the export in columns with accents and µ intact.
+    const text = "\ufeff" + toCsv(primers, file.delimiter);
     const d = (await whenDesktopReady(0)) ?? desktop();
     if (d) {
       const chosen = await d.save_dialog("lab-primers.csv", "", "csv");
@@ -225,8 +244,8 @@ function PrimerLibraryDialog(props: ToolProps) {
   };
 
   return (
-    <Dialog isOpen onClose={props.onClose} title="Primer Library" style={{ width: 1180, maxWidth: "95vw" }}
-            canOutsideClickClose={!dirty}>
+    <Dialog isOpen onClose={() => guard("close the window", props.onClose)} title="Primer Library"
+            style={{ width: 1180, maxWidth: "95vw" }} canOutsideClickClose={!dirty}>
       <div className={`${Classes.DIALOG_BODY} vt-primer-library`} data-testid="primer-library-dialog">
         <div className="vt-pl-head">
           <div>
@@ -241,12 +260,30 @@ function PrimerLibraryDialog(props: ToolProps) {
             </p>
           </div>
           <div className="vt-pl-head-actions">
-            <Button small data-testid="pl-choose-file" onClick={chooseFile}>Change file…</Button>
-            <Button small data-testid="pl-reload" onClick={load} disabled={busy}
+            <Button small data-testid="pl-choose-file"
+                    onClick={() => guard("choose another file", chooseFile)}>Change file…</Button>
+            <Button small data-testid="pl-reload" onClick={() => guard("reload the file", load)} disabled={busy}
                     title="Re-read the shared file (e.g. after a colleague changed it)">Reload</Button>
           </div>
         </div>
 
+        {pendingDiscard && (
+          <Callout intent="warning" data-testid="pl-discard">
+            You have changes that are not saved to the shared file. {pendingDiscard.what[0].toUpperCase()}
+            {pendingDiscard.what.slice(1)} without saving them?
+            <div className="vt-pl-discard-actions">
+              <Button small intent="primary" data-testid="pl-discard-save"
+                      onClick={async () => { const next = pendingDiscard; setPendingDiscard(null); if (await save()) next.run(); }}>
+                Save, then {pendingDiscard.what}
+              </Button>
+              <Button small intent="danger" data-testid="pl-discard-yes"
+                      onClick={() => { const next = pendingDiscard; setPendingDiscard(null); setDirty(false); next.run(); }}>
+                Discard my changes
+              </Button>
+              <Button small data-testid="pl-discard-no" onClick={() => setPendingDiscard(null)}>Keep editing</Button>
+            </div>
+          </Callout>
+        )}
         {error && <Callout intent="danger" data-testid="pl-error">{error}</Callout>}
         {notice && <Callout intent={notice.intent} data-testid="pl-notice">{notice.text}</Callout>}
 
@@ -363,8 +400,8 @@ function PrimerLibraryDialog(props: ToolProps) {
           {dirty ? "Unsaved changes — Save writes them to the shared file." : "Up to date with the shared file."}
         </div>
         <div className={Classes.DIALOG_FOOTER_ACTIONS}>
-          <Button data-testid="pl-close" onClick={props.onClose}>Close</Button>
-          <Button intent="primary" data-testid="pl-save" disabled={!dirty || busy} onClick={save}>Save to File</Button>
+          <Button data-testid="pl-close" onClick={() => guard("close the window", props.onClose)}>Close</Button>
+          <Button intent="primary" data-testid="pl-save" disabled={!dirty || busy} onClick={() => save()}>Save to File</Button>
         </div>
       </div>
     </Dialog>

@@ -62,6 +62,8 @@ export interface LibraryFile {
   path: string;
   exists: boolean;
   mtime: number | null;
+  /** The file's separator (";" when Excel is set to Italian), kept for Export. */
+  delimiter: string;
   primers: LibraryPrimer[];
   rejected: RejectedRow[];
 }
@@ -71,9 +73,12 @@ export const OVERLAY_NOTE = "vettore_overlay";
 
 const DNA = /^[ACGTRYSWKMBDHVN]+$/;
 
-/** A primer sequence cleaned for comparison: upper case, U→T, no spaces. "" when not DNA. */
+/** A primer sequence cleaned for comparison, as the engine does (primer_library.clean_sequence):
+ * upper case, U→T, no spaces or dashes, a 5′-…-3′ frame dropped. "" when not DNA. */
 export function cleanSequence(raw: string): string {
-  const seq = (raw || "").toUpperCase().replace(/U/g, "T").replace(/\s+/g, "");
+  let seq = (raw || "").toUpperCase().replace(/U/g, "T").replace(/\s+/g, "")
+    .replace(/[\u2019\u2032]/g, "'").replace(/-/g, "");
+  if (seq.startsWith("5'") && seq.endsWith("3'")) seq = seq.slice(2, -2);
   return DNA.test(seq) ? seq : "";
 }
 
@@ -126,14 +131,15 @@ export function orderingText(primers: { name: string; sequence: string }[]): str
 
 const CSV_COLUMNS = ["name", "sequence", "notes", "location", "added"] as const;
 
-function csvCell(value: string): string {
-  return /[",\r\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
+function csvCell(value: string, delimiter: string): string {
+  return value.includes(delimiter) || /["\r\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
 }
 
-/** The library as .csv text (header + one row per primer), for Export as .csv. */
-export function toCsv(primers: LibraryPrimer[]): string {
-  const rows = primers.map((p) => CSV_COLUMNS.map((c) => csvCell(String(p[c] ?? ""))).join(","));
-  return [CSV_COLUMNS.join(","), ...rows].join("\r\n") + "\r\n";
+/** The library as .csv text (header + one row per primer), for Export as .csv, separated by
+ * `delimiter` (the library file's own). */
+export function toCsv(primers: LibraryPrimer[], delimiter = ","): string {
+  const rows = primers.map((p) => CSV_COLUMNS.map((c) => csvCell(String(p[c] ?? ""), delimiter)).join(delimiter));
+  return [CSV_COLUMNS.join(delimiter), ...rows].join("\r\n") + "\r\n";
 }
 
 /** Add imported primers to the library, skipping any whose sequence is already there. Returns

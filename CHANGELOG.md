@@ -15,7 +15,7 @@ The download links in the README always point to the latest release.
 ## Unreleased — the lab primer library
 
 - Primers → Primer Library… keeps the primers your lab already has: name, sequence, notes, where they are kept ("box 3 A4") and the date added. Search by name or sequence, add a primer, or import a spreadsheet — paste the columns copied from Excel, or open a .csv/.tsv; rows that are not DNA are listed and left out. Export the library as .csv.
-- The library is one .csv file. Keep it in a shared folder (OneDrive, Dropbox, a lab drive) and your colleagues share it: Vettore reads it from there and writes it back, and offers to reload when the file changed on disk.
+- The library is one .csv file. Keep it in a shared folder (OneDrive, Dropbox, a lab drive) and your colleagues share it: Vettore reads it from there and writes back only what you changed: the header, your own columns and rows it cannot read stay as they are, and primers a colleague added while you had it open are kept. An Excel workbook or a file that is not a primer list is refused, never overwritten.
 - Primers → Show Library Primers draws the library primers that bind the open document on its map, on either strand, tails and up to two mismatches allowed. These are a view, not part of the file: they are never written to a saved document.
 - Design PCR Primers says when a library primer pair already amplifies the region ("You may already have KanR_F and KanR_R: product 1,086 bp"), and a designed pair can be Saved to Library (a sequence already there is refused with the name it has).
 

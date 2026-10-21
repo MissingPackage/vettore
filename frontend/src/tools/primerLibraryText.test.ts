@@ -29,6 +29,10 @@ describe("cleanSequence", () => {
   it("keeps IUPAC ambiguity codes", () => {
     expect(cleanSequence("acgryn")).toBe("ACGRYN");
   });
+  it("reads a 5′-…-3′ frame as the engine does", () => {
+    expect(cleanSequence("5'-ACG TAC-3'")).toBe("ACGTAC");
+    expect(cleanSequence("5′-ACGTAC-3′")).toBe("ACGTAC");
+  });
 });
 
 describe("filterPrimers", () => {
@@ -90,6 +94,12 @@ describe("toCsv", () => {
     expect(header).toBe("name,sequence,notes,location,added");
     expect(row).toContain('"reads, ""universal"""');
     expect(row.startsWith("M13F,ACGT,")).toBe(true);
+  });
+  it("uses the library's separator, quoting cells that contain it", () => {
+    const csv = toCsv([primer({ name: "M13F", sequence: "ACGT", notes: "5 µl; 4 °C, box 1" })], ";");
+    const [header, row] = csv.trim().split("\r\n");
+    expect(header).toBe("name;sequence;notes;location;added");
+    expect(row).toBe('M13F;ACGT;"5 µl; 4 °C, box 1";;');
   });
 });
 

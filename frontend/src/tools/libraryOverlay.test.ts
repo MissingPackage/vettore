@@ -39,6 +39,20 @@ describe("overlayAnnotations", () => {
   });
 });
 
+describe("a tailed primer", () => {
+  it("draws only the bases that anneal and names the whole primer in the note", () => {
+    const tailed: BoundPrimer = {
+      name: "BamF", sequence: "CGCGGATCC" + "GTAAAACGACGGCCAGT", notes: "", location: "", added: "",
+      length: 26, tm: null, sites: 1,
+      bindings: [{ start: 100, end: 116, strand: 1, footprint: 17, tail: 9, mismatches: 0 }],
+    };
+    const [a] = overlayAnnotations([tailed]);
+    expect(a.bases).toBe("GTAAAACGACGGCCAGT");
+    expect(a.bases!.length).toBe(a.end - a.start + 1);
+    expect((a.notes as Record<string, string[]>).note[0]).toContain("CGCGGATCCGTAAAACGACGGCCAGT");
+  });
+});
+
 describe("removeOverlay / withOverlay", () => {
   const own: any = [
     { name: "real-fwd", type: "primer_bind", start: 0, end: 15, strand: 1 },

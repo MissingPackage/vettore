@@ -19,6 +19,7 @@ import {
   orderingText,
   pairAlreadyIn,
   primerNames,
+  PRODUCT_SLACK,
   range,
   roomProblem,
   regionLength,
@@ -167,10 +168,13 @@ function Designer(props: ToolProps & { doc: OpenDoc }) {
     }
     let live = true;
     const req = JSON.parse(bodyKey);
-    call<{ product: { forward: string; reverse: string; size: number } | null }>(
-      "primer-library/product",
-      { sequenceData: { ...data, name: doc.name, circular }, start: req.start, end: req.end },
-    )
+    // The largest product asked for (or the dialog's default), and the smallest only when the
+    // user set one, so a library pair is offered only for a product primer design would accept.
+    const productMax: number | null = req.product_max
+      ?? (req.product_min !== null ? req.product_min + PRODUCT_SLACK
+        : region !== null ? defaultProductRange(region, req.size_min)[1] : null);
+    api.primerLibrary.product({ ...data, name: doc.name, circular } as any, req.start, req.end,
+                              req.product_min, productMax)
       .then((r) => live && setLibraryHit(r.product))
       .catch(() => live && setLibraryHit(null));
     return () => { live = false; };
@@ -256,7 +260,8 @@ function Designer(props: ToolProps & { doc: OpenDoc }) {
       const entries = toAdd.map((p) => ({
         name: p.name, sequence: p.sequence, notes: `designed on ${doc.name}`, location: "", added: today(),
       }));
-      await api.primerLibrary.save([...library.primers, ...entries]);
+      // Only the two new primers: the save merges them into the file as it is then.
+      await api.primerLibrary.save(entries);
       setNotice({ kind: "saved", text: `Saved ${forwardName} and ${reverseName} to the lab primer library.` });
     } catch (e) {
       setNotice({ kind: "saved", text: String((e as Error).message) });
