@@ -60,6 +60,8 @@ ANCHOR = 15
 MAX_MISMATCHES = 2
 #: Shorter primers are not searched: a 10-mer matches a plasmid by chance many times.
 MIN_LENGTH = ANCHOR
+#: Shorter oligos get no Tm: the nearest-neighbour model means nothing for a few bases.
+MIN_TM_LENGTH = 8
 #: A primer binding more places than this is listed with its count, not drawn.
 MAX_SITES = 10
 #: Two library primers make a product only when it is at least this long (shorter is a dimer).
@@ -119,6 +121,8 @@ class Primer:
 def _tm_or_none(sequence: str) -> float | None:
     """The primer's Tm (°C), or None when it has ambiguity codes or is too short to have one."""
     if not _is_plain_dna(sequence):
+        return None
+    if len(sequence) < MIN_TM_LENGTH:
         return None
     try:
         return round(tm.primer_tm(sequence), 1)
@@ -399,8 +403,7 @@ def _mark_doubtful_rows(rows: list[_Row], lines: list[str], delimiter: str, firs
     hand (one never closed, a ditto mark) makes the rows below it part of one cell, and a save
     that rewrote or removed that cell would lose them. From the text alone that cannot be told
     apart for sure from a note written on several lines in Excel, so every row running over
-    several lines, and every row longer than the others, is read but never changed (``held``):
-    it is edited in Excel. A quote still open at the end of the file is refused, since a primer
+    several lines is read but never changed (``held``): it is edited in Excel. A quote still open at the end of the file is refused, since a primer
     added after it would vanish into it."""
     tail = lines[-1] if lines else ""
     probe = [*lines, *([] if tail.endswith(("\n", "\r")) else ["\n"]), _SENTINEL + "\n"]
@@ -413,13 +416,11 @@ def _mark_doubtful_rows(rows: list[_Row], lines: list[str], delimiter: str, firs
         raise PrimerLibraryError(
             f"a quote (\") on or after line {line} is never closed, so everything below it "
             "reads as one cell. Open the file in a text editor and close or remove that quote.")
-    widths = [len(r.cells) for r in rows if len(_lines(r.raw)) == 1 and any(c.strip() for c in r.cells)]
-    usual = max(set(widths), key=widths.count) if widths else None
     line = first_line
     for row in rows:
         row.line = line
         lines_here = len(_lines(row.raw))
-        row.held = lines_here > 1 or (usual is not None and len(row.cells) > usual)
+        row.held = lines_here > 1
         line += lines_here
 
 
@@ -737,6 +738,13 @@ def _check_saved_text(current: LibraryText | None, text: str, counts: dict[str, 
     primer added reads back as its own row. Anything else (a quote typed by hand that takes in
     the rows after it) and nothing is written."""
     after = parse_text(text)
+    if current is not None and any(r.cells for r in current.rows) and (
+            after.delimiter != current.delimiter
+            or any(after.index.get(k) != v for k, v in current.index.items())):
+        raise PrimerLibraryError(
+            "Nothing was saved: after this change Vettore would read the file's columns "
+            "differently (it has no header row naming them). Add a header row "
+            "(name;sequence;notes) at the top of the file in Excel, then save again.")
     rows_after = [r.raw.rstrip("\r\n") for r in after.rows if any(c.strip() for c in r.cells)]
     before = [r.raw.rstrip("\r\n") for r in (current.rows if current else [])
               if any(c.strip() for c in r.cells)]

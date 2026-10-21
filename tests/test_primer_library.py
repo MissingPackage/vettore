@@ -844,3 +844,34 @@ def test_a_one_letter_sequence_does_not_break_the_library(client):
     assert r.status_code == 200
     got = client.get("/api/primer-library", headers=headers())
     assert got.status_code == 200 and got.json()["primers"][0]["tm"] is None
+
+
+# ---- tenth review ------------------------------------------------------------------------
+
+def test_a_primer_added_with_a_new_column_stays_editable(library_file):
+    library_file.write_text("Name;Sequence;Notes\nM13F;GTAAAACGACGGCCAGT;univ\n", encoding="utf-8")
+    pl.write_library([pl.Primer("GFP-F", "ATGGTGAGCAAGGGCGAGGAG", location="box 3")])
+    gfp = next(p for p in pl.read_library()["primers"] if p["name"] == "GFP-F")
+    assert gfp["held"] is False
+    r = pl.write_library([], removed=[pl.Change(gfp["sequence"], {k: gfp[k] for k in pl.EDITABLE})])
+    assert r["removed"] == 1
+
+
+def test_a_headerless_file_read_differently_after_a_save_is_not_written(library_file):
+    text = 'P0;GTAAAACGACGGCCAGT;n\nP1;TAATGGACCGTC;a,b\nP2;CAGGAAACAGCTATGAC;"q"\n'
+    library_file.write_text(text, encoding="utf-8")
+    lib = pl.read_library()
+    removed = [pl.Change(p["sequence"], {k: p[k] for k in pl.EDITABLE})
+               for p in lib["primers"] if p["name"] in ("P0", "P2")]
+    try:
+        pl.write_library([], removed=removed)
+    except pl.PrimerLibraryError as exc:
+        assert "Nothing was saved" in str(exc)
+        assert library_file.read_text(encoding="utf-8") == text
+    else:
+        assert [p["name"] for p in pl.read_library()["primers"]] == ["P1"]
+
+
+def test_very_short_oligos_have_no_tm():
+    assert pl.Primer("x", "AC").as_dict()["tm"] is None
+    assert pl.Primer("y", "ACGTACGT").as_dict()["tm"] is not None
