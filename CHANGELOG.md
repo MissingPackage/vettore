@@ -2,6 +2,13 @@
 
 The download links in the README always point to the latest release.
 
+## Unreleased — Detect Common Features keeps to its identity threshold
+
+- Fixed: with the minimum identity at 98 %, Detect Common Features could still list an element at 95 % (an SV40 polyA in pTAL7B and in pT-PGK-mCherry). The bases that differed were the cloning sites around the element, which were annotated as part of it. Only the part of the element that is really there is annotated now, the identity shown is over exactly those bases, and no row is below the threshold.
+- A coding sequence is annotated in whole codons of its own frame, so a NeoR whose start codon is followed by an inserted NcoI codon translates as NeoR instead of starting out of frame.
+- When a match covers only part of the catalogue entry, the Size column and the feature's notes say which part ("705 bp · bases 4–708 of 711").
+- An identity just below 100 % (one mismatch in SaCas9 is 99.97 %) is shown as 99.9 %, not 100.0 %.
+
 ## Unreleased — opening a record from NCBI
 
 - File → Open from NCBI… opens a public GenBank record by its accession number (for example MT612431.1) as a new, unsaved document; the welcome screen has the same link. It is the only thing in Vettore that uses the internet, only when you press Open, and it sends nothing but the accession number; no account is needed.

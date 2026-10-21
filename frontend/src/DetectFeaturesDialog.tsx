@@ -21,6 +21,10 @@ interface Detected {
   note: string;
   source: string;
   length: number;
+  /** The catalogue entry's length, and the bases of it (1-based) that the match covers. */
+  catalogueLength?: number;
+  catalogueFrom?: number;
+  catalogueTo?: number;
   isNew: boolean;
   /** The existing feature that already covers this match, under whatever name. */
   annotatedAs?: string | null;
@@ -36,6 +40,16 @@ function annotatedText(f: Detected): string {
   return f.annotatedAs && f.annotatedAs.toLowerCase() !== f.name.toLowerCase()
     ? `annotated as “${f.annotatedAs}”`
     : "already annotated";
+}
+
+/**
+ * "bases 4–708 of 711" when the match covers only part of the catalogue entry, so a 100 %
+ * over a shorter stretch is not read as the whole element; null when it covers all of it.
+ */
+function partText(f: Detected): string | null {
+  const { catalogueFrom: from, catalogueTo: to, catalogueLength: total } = f;
+  if (from == null || to == null || total == null || (from === 1 && to === total)) return null;
+  return `bases ${from}–${to} of ${total}`;
 }
 
 /** A message as a sentence, so another sentence can follow it. */
@@ -121,7 +135,9 @@ export default function DetectFeaturesDialog(props: { doc: OpenDoc; onClose: () 
       color: COLOR[f.type] ?? COLOR.misc_feature,
       notes: {
         note: [f.note || f.name],
-        detected_from: [`${f.source} (${f.identity.toFixed(1)}% identity)`],
+        detected_from: [
+          `${f.source} (${f.identity.toFixed(1)}% identity${partText(f) ? ` over ${partText(f)}` : ""})`,
+        ],
       },
     }));
     store.dispatch(
@@ -238,7 +254,15 @@ export default function DetectFeaturesDialog(props: { doc: OpenDoc; onClose: () 
                     <td className="vt-num">
                       {f.start + 1}…{f.end + 1} {f.forward ? "→" : "←"}
                     </td>
-                    <td className="vt-num">{f.length} bp</td>
+                    <td className="vt-num">
+                      {f.length} bp
+                      {partText(f) && (
+                        <span className="vt-muted" data-testid="detect-part"
+                              title={`The catalogue entry is ${f.catalogueLength} bp; only these bases of it match here`}>
+                          {" "}· {partText(f)}
+                        </span>
+                      )}
+                    </td>
                     <td className={f.identity === 100 ? "vt-num vt-ok" : "vt-num"}>{f.identity.toFixed(1)} %</td>
                     <td className="vt-muted" title={f.note}>{f.source}</td>
                   </tr>

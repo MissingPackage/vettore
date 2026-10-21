@@ -3,6 +3,7 @@ from pathlib import Path
 
 import pytest
 from Bio import SeqIO
+from Bio.Seq import Seq
 from cloning_helpers import clean_dna, rc
 
 from vettore.features import (
@@ -11,6 +12,7 @@ from vettore.features import (
     catalogue,
     detect,
     detect_payload,
+    shown_identity,
 )
 
 DATA = Path(__file__).parent / "data"
@@ -65,13 +67,14 @@ def test_a_gene_on_the_minus_strand_is_reported_as_reverse():
     sequence, circular = plasmid("MT612431.1")
     [egfp] = [m for m in detect(sequence, circular) if m.name == "EGFP"]
     assert egfp.strand == -1
-    # Read on the other strand, the match carries EGFP's own first residues.
-    assert "GGTGAGCAAGGGCGAGGAGCTGTTCACC" in rc(sequence[egfp.start : egfp.end + 1])
     # The EGFP here is fused at both ends (Gephyrin.FingR-GFP-CCR5TC): linker codons stand
-    # where the catalogue has ATG and AAG TAA. The annotation is the EGFP that is there, the
-    # 712 bp the record's own "GFP" feature (2147..2858) has, not padded with the linkers to
-    # the catalogue's 720.
-    assert egfp.end - egfp.start + 1 == 712
+    # where the catalogue has ATG and AAG TAA. The annotation is the EGFP that is there, codons
+    # 2 to 238 in its own frame (VSKGEE…MDELY in the record's translation), not padded with
+    # the linkers to the catalogue's 720 bp; the record's own "GFP" (2147..2858) is 712.
+    cds = rc(sequence[egfp.start : egfp.end + 1])
+    assert cds.startswith("GTGAGCAAGGGCGAGGAGCTGTTCACC") and cds.endswith("GACGAGCTGTAC")
+    assert egfp.end - egfp.start + 1 == 711
+    assert egfp.part == (4, 714) and egfp.entry_length == 720
     assert egfp.identity == 100.0
 
 
@@ -93,17 +96,52 @@ def test_an_element_is_annotated_without_the_junction_it_was_cloned_into(accessi
                    if m.name == "SV40 polyA"]
         assert (polya.start, polya.end) == (start, end), threshold
         assert polya.identity == pytest.approx(100.0 * 221 / 222), threshold
+        assert polya.part == (7, 228) and polya.entry_length == 232, threshold
 
 
 @pytest.mark.parametrize("threshold", [90.0, 95.0, 98.0, 99.0, 100.0])
 def test_no_match_is_shown_below_the_identity_threshold(threshold):
     """The threshold filters the number the table shows, on every fixture record."""
-    sequences = [record_sequence(path.name.removeprefix("features-").removesuffix(".fasta"))
-                 for path in sorted(DATA.glob("features-*.fasta"))]
-    sequences += [plasmid(accession)[0] for accession in ("MT612431.1", "PZ629150.1")]
-    for sequence in sequences:
-        for match in detect(sequence, False, min_identity=threshold):
+    sequences = [(record_sequence(path.name.removeprefix("features-").removesuffix(".fasta")),
+                  False) for path in sorted(DATA.glob("features-*.fasta"))]
+    sequences += [plasmid(accession) for accession in ("MT612431.1", "PZ629150.1")]
+    for sequence, circular in sequences:
+        for match in detect(sequence, circular, min_identity=threshold):
             assert match.identity >= threshold, (match.name, match.identity)
+            row = match.as_dict(len(sequence))
+            assert row["identity"] >= threshold, (match.name, row["identity"])
+
+
+def test_a_coding_sequence_is_annotated_in_its_own_frame():
+    """NeoR/KanR here starts ATG GGG ATT (an NcoI site put a codon in after the start), so
+    the alignment begins on the last G of that codon. The annotation starts at the next whole
+    codon of the catalogue entry, ATT, and so translates as NeoR; it says it covers bases 4 to
+    795 of the 795 bp entry."""
+    sequence, circular = plasmid("cloning-multisite-destination-r4r2")
+    [neo] = [m for m in detect(sequence, circular) if m.name == "NeoR/KanR"]
+    cds = rc(sequence[neo.start : neo.end + 1])
+    assert len(cds) % 3 == 0
+    assert str(Seq(cds).translate()).startswith("IEQDGLHAGSPA")
+    assert str(Seq(cds).translate()).endswith("LDEFF*")
+    assert neo.part == (4, 795)
+
+
+def test_a_match_tells_which_part_of_the_entry_it_covers():
+    """mCherry in MT891341.1 differs at its first and last codons (GTC for ATG, TAG for TAA):
+    the match is the 705 bp between them, at 100 %, and the row says it is bases 4 to 708
+    of the 711 bp entry rather than letting 100 % pass for the whole of it."""
+    sequence = record_sequence("MT891341.1")
+    [mcherry] = [m for m in detect(sequence, False) if m.name == "mCherry"]
+    row = mcherry.as_dict(len(sequence))
+    assert (row["length"], row["identity"]) == (705, 100.0)
+    assert (row["catalogueFrom"], row["catalogueTo"], row["catalogueLength"]) == (4, 708, 711)
+
+
+def test_one_mismatch_in_a_long_element_is_not_shown_as_100_percent():
+    assert shown_identity(100.0 * 3344 / 3345) == 99.9
+    assert shown_identity(98.0) == 98.0
+    assert shown_identity(100.0 * 49 / 50) == 98.0
+    assert shown_identity(100.0) == 100.0
 
 
 def test_a_truncated_itr_is_not_padded_to_full_length():

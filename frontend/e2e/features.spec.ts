@@ -162,3 +162,18 @@ test.describe("on a 1366 × 768 screen", () => {
     expect(select!.x + select!.width).toBeLessThanOrEqual(body!.x + body!.width + 1);
   });
 });
+
+test("a match that covers part of its catalogue entry says which bases", async ({ page }) => {
+  // mCherry in pT-PGK-mCherry differs from the catalogue at its first and last codons: the
+  // row shows the 705 bp that match, at 100 %, and that they are bases 4–708 of the entry.
+  const fasta = fs.readFileSync(data("features-MT891341.1.fasta"), "utf-8");
+  const bases = fasta.split("\n").filter((line) => !line.startsWith(">")).join("").toUpperCase();
+  await page.goto(`/?token=${TOKEN}`);
+  await newPlasmid(page, "pT-PGK-mCherry", bases);
+  await menu(page, "Features", "Detect Common Features…");
+  const row = page.getByTestId("detect-row").filter({ hasText: "mCherry" });
+  await expect(row).toBeVisible({ timeout: 30_000 });
+  await expect(row).toContainText("705 bp");
+  await expect(row.getByTestId("detect-part")).toHaveText("· bases 4–708 of 711");
+  await expect(row).toContainText("100.0 %");
+});

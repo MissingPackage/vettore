@@ -409,7 +409,12 @@ table tells you which one your plasmid carries.
 
 Every entry in the catalogue is a real subsequence of a public GenBank record. The table shows
 which record it came from and the percent identity of the match, so you can judge a hit
-yourself. Tick the ones you want and they are added to the map, coloured by type, with their
+yourself. The identity is over exactly the bases that are annotated, and no row is ever below
+the minimum identity you chose. Only the part of the element that is really there is
+annotated: the cloning sites around it are not counted as part of it, and a coding sequence is
+cut to whole codons of its own frame. When that is less than the whole catalogue entry, the
+Size column says which part, for example "705 bp · bases 4–708 of 711" for an mCherry whose
+first and last codons differ, and the feature's notes say the same. Tick the ones you want and they are added to the map, coloured by type, with their
 provenance kept in the feature's notes.
 
 Features already annotated are shown greyed and left unticked. This includes elements inside a
