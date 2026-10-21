@@ -1,0 +1,139 @@
+.vt-primer-library {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 78vh;
+}
+
+.vt-pl-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.vt-pl-head-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.vt-pl-intro {
+  margin: 0 0 4px;
+}
+
+.vt-pl-file {
+  margin: 0;
+  font-size: 12px;
+  word-break: break-all;
+}
+
+.vt-pl-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.vt-pl-toolbar .bp3-input {
+  width: 260px;
+}
+
+.vt-pl-spacer {
+  flex: 1;
+}
+
+.vt-pl-table-wrap {
+  overflow: auto;
+  border: 1px solid var(--vt-border, rgba(16, 22, 26, 0.15));
+  border-radius: 3px;
+  flex: 1;
+  min-height: 160px;
+}
+
+.vt-pl-table {
+  width: 100%;
+}
+
+.vt-pl-table th {
+  position: sticky;
+  top: 0;
+  background: var(--vt-surface, #fff);
+  z-index: 1;
+}
+
+.vt-pl-seq {
+  font-family: var(--vt-mono, monospace);
+  letter-spacing: 0.3px;
+  word-break: break-all;
+  max-width: 320px;
+}
+
+.vt-pl-edit {
+  width: 100%;
+  min-width: 90px;
+}
+
+.vt-pl-rowactions {
+  white-space: nowrap;
+  text-align: right;
+}
+
+.vt-pl-add {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.vt-pl-add-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.vt-pl-add-row .bp3-input {
+  width: 150px;
+}
+
+.vt-pl-add-seq {
+  flex: 1;
+  min-width: 200px;
+  font-family: var(--vt-mono, monospace);
+}
+
+.vt-pl-bound {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border-top: 1px solid var(--vt-border, rgba(16, 22, 26, 0.12));
+  padding-top: 8px;
+}
+
+.vt-pl-bound-list {
+  margin: 0;
+  padding-left: 18px;
+  max-height: 120px;
+  overflow: auto;
+}
+
+.vt-pl-bound-list li {
+  margin: 2px 0;
+}
+
+.vt-pl-import-text {
+  font-family: var(--vt-mono, monospace);
+  white-space: pre;
+}
+
+.vt-pl-import-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.vt-pl-footer-note {
+  flex: 1;
+  align-self: center;
+  font-size: 12px;
+}

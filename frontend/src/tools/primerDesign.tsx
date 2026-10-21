@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import * as Blueprint from "@blueprintjs/core";
 import { Button, Classes } from "@blueprintjs/core";
 import { actions } from "@teselagen/ove";
-import { call, type OveAnnotation, type SequenceData } from "../api";
+import { api, call, type OveAnnotation, type SequenceData } from "../api";
 import { store } from "../store";
 import type { OpenDoc } from "../cloning/types";
 import { Field } from "../cloning/inputs";
@@ -116,7 +116,8 @@ function Designer(props: ToolProps & { doc: OpenDoc }) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [chosen, setChosen] = useState(0);
-  const [notice, setNotice] = useState<{ kind: "copied" | "added"; text: string } | null>(null);
+  const [notice, setNotice] = useState<{ kind: "copied" | "added" | "saved"; text: string } | null>(null);
+  const [libraryHit, setLibraryHit] = useState<{ forward: string; reverse: string; size: number } | null>(null);
   const { copy: copyText, fallbackDialog } = useCopyText();
   const request = useRef(0);
 
@@ -155,6 +156,24 @@ function Designer(props: ToolProps & { doc: OpenDoc }) {
         .finally(() => id === request.current && setBusy(false));
     }, 400);
     return () => clearTimeout(timer);
+  }, [bodyKey]);
+
+  // Before designing a new pair, say when a library primer pair already amplifies this region.
+  useEffect(() => {
+    if (!body) {
+      setLibraryHit(null);
+      return;
+    }
+    let live = true;
+    const req = JSON.parse(bodyKey);
+    call<{ product: { forward: string; reverse: string; size: number } | null }>(
+      "primer-library/product",
+      { sequenceData: { ...data, name: doc.name, circular }, start: req.start, end: req.end },
+    )
+      .then((r) => live && setLibraryHit(r.product))
+      .catch(() => live && setLibraryHit(null));
+    return () => { live = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bodyKey]);
 
   const set = (patch: Partial<PrimerForm>) => setForm((f) => ({ ...f, ...patch }));
@@ -214,6 +233,34 @@ function Designer(props: ToolProps & { doc: OpenDoc }) {
       `${forwardName} ${pair.forward.sequence}, ${reverseName} ${pair.reverse.sequence}; `
       + `product ${pair.product_size} bp`);
     setNotice({ kind: "added", text: `Added ${forwardName} and ${reverseName} to ${doc.name}; they are listed in the Primers view.` });
+  };
+
+  // Keep the chosen pair in the lab library, so it is reused and not re-ordered. A sequence
+  // already in the library is refused with the name it has there.
+  const saveToLibrary = async () => {
+    if (!pair) return;
+    setNotice(null);
+    try {
+      const library = await api.primerLibrary.get();
+      const parsed = await api.primerLibrary.parse("");
+      const have = new Map(library.primers.map((p) => [p.sequence, p.name] as const));
+      const toAdd = [
+        { name: forwardName, sequence: pair.forward.sequence },
+        { name: reverseName, sequence: pair.reverse.sequence },
+      ];
+      const dup = toAdd.find((p) => have.has(p.sequence));
+      if (dup) {
+        setNotice({ kind: "saved", text: `That sequence is already in the library as “${have.get(dup.sequence)}”.` });
+        return;
+      }
+      const entries = toAdd.map((p) => ({
+        name: p.name, sequence: p.sequence, notes: `designed on ${doc.name}`, location: "", added: parsed.today,
+      }));
+      await api.primerLibrary.save([...library.primers, ...entries]);
+      setNotice({ kind: "saved", text: `Saved ${forwardName} and ${reverseName} to the lab primer library.` });
+    } catch (e) {
+      setNotice({ kind: "saved", text: String((e as Error).message) });
+    }
   };
 
   const defaults = region !== null && !errors.size
@@ -329,6 +376,12 @@ function Designer(props: ToolProps & { doc: OpenDoc }) {
           {!bodyKey && !busy && !noRoom && (
             <p className="vt-pd-muted">Choose the region on the left: the primer pairs appear here.</p>
           )}
+          {libraryHit && (
+            <Callout intent="primary" title="You may already have primers for this" data-testid="pd-library-hit">
+              The lab library already has <b>{libraryHit.forward}</b> and <b>{libraryHit.reverse}</b>:
+              product {bp(libraryHit.size)} bp over this region. Reuse them before designing new ones.
+            </Callout>
+          )}
           {noRoom && (
             <Callout intent="warning" title="No room for primers" data-testid="pd-no-room">{noRoom}</Callout>
           )}
@@ -421,6 +474,9 @@ function Designer(props: ToolProps & { doc: OpenDoc }) {
           <Button data-testid="pd-close" onClick={props.onClose}>Close</Button>
           <Button icon="duplicate" data-testid="pd-copy" disabled={!pair || busy} onClick={copy}>
             Copy for Ordering
+          </Button>
+          <Button icon="bookmark" data-testid="pd-save-library" disabled={!pair || busy} onClick={saveToLibrary}>
+            Save to Library
           </Button>
           <Button intent="primary" data-testid="pd-add" disabled={!pair || busy || !!already} onClick={add}
                   icon={already ? "tick" : undefined}>

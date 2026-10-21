@@ -20,6 +20,9 @@ export interface Preferences {
   /** The enzymes in the lab's freezer: Find Diagnostic Digest tries these first. Empty until
    * the user fills it in, and then the commercial set is used. */
   myEnzymes: string[];
+  /** Draw the lab-library primers that bind the open document on its map (Primers → Show
+   * Library Primers). Off by default; remembered between sessions. */
+  showLibraryPrimers: boolean;
 }
 
 export type ChromeTheme = "light" | "dark" | "system";
@@ -39,6 +42,7 @@ const DEFAULTS: Preferences = {
   detectMinIdentity: 95,
   chrome: "light",
   myEnzymes: [],
+  showLibraryPrimers: false,
 };
 
 function clean(stored: Partial<Preferences>): Preferences {
@@ -51,6 +55,7 @@ function clean(stored: Partial<Preferences>): Preferences {
   }
   if (!CHROME_THEMES.some((t) => t.id === prefs.chrome)) prefs.chrome = DEFAULTS.chrome;
   prefs.myEnzymes = knownEnzymes(prefs.myEnzymes);
+  prefs.showLibraryPrimers = !!prefs.showLibraryPrimers;
   return prefs;
 }
 

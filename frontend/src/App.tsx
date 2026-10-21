@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSelector } from "react-redux";
-import { Editor } from "@teselagen/ove";
+import { actions, Editor } from "@teselagen/ove";
+import { store } from "./store";
+import { removeOverlay, withOverlay } from "./tools/libraryOverlay";
 import {
   api,
   EngineError,
@@ -43,7 +45,7 @@ import { applyEnzymeSet, ENZYME_SETS, type EnzymeSetId } from "./enzymeSets";
 import { ENZYMES } from "./enzymeLogic";
 import { OVERLAY_VIEWS, showView, VIEWS, type ViewId } from "./views";
 import ViewTabs from "./ViewTabs";
-import { applyChrome, usePreferences } from "./preferences";
+import { applyChrome, savePreferences, usePreferences } from "./preferences";
 import { ACCEPT, dirName, SAVE_EXTENSION, safeFileName, type SaveKind } from "./files/formats";
 import { addNotice, dismissNotice, messageOf, type Notice, type NoticeKind } from "./files/notices";
 import NoticeStack from "./files/NoticeStack";
@@ -128,7 +130,8 @@ export default function App() {
   docsRef.current = docs;
 
   // Light or dark frame, as chosen in Preferences (theme/dark-chrome.css).
-  const { chrome } = usePreferences();
+  const prefs = usePreferences();
+  const { chrome } = prefs;
   useEffect(() => applyChrome(chrome), [chrome]);
 
   // Documents opened in the last two seconds: their tab glows once so the eye finds it (a new
@@ -710,6 +713,32 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, circular]);
 
+  // Draw (or take off) the lab-library primers that bind the active document. The overlay
+  // primers are tagged so the engine never writes them to a saved file; turning the toggle off
+  // removes them again.
+  useEffect(() => {
+    if (!active) return;
+    const data = editorState(active)?.sequenceData as SequenceData | undefined;
+    if (!data) return;
+    const put = (primers: unknown[]) =>
+      store.dispatch(actions.updateSequenceData({ ...data, primers }, { editorName: active }));
+    if (!prefs.showLibraryPrimers) {
+      const own = removeOverlay(data.primers);
+      const list = Array.isArray(data.primers) ? data.primers : Object.values(data.primers ?? {});
+      if (own.length !== list.length) put(own);
+      return;
+    }
+    let live = true;
+    api.primerLibrary.bindings(data)
+      .then((r) => {
+        const now = editorState(active)?.sequenceData as SequenceData | undefined;
+        if (live && now) put(withOverlay(now.primers, r.primers));
+      })
+      .catch(() => undefined);
+    return () => { live = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active, prefs.showLibraryPrimers, activeSequence]);
+
   // ---- command search ----------------------------------------------------------------------
   // The search box lives at the top of the Help menu; the editor's own shortcut for it is Cmd+/
   // only, and works only once Help has been opened. Ctrl+/ and the view bar's button open Help
@@ -840,12 +869,14 @@ export default function App() {
     detectFeatures: () => setDetectOpen(true),
     tool: (id: string) => setToolId(id),
     openSample,
+    toggleLibraryPrimers: () => savePreferences({ showLibraryPrimers: !prefs.showLibraryPrimers }),
+    showLibraryPrimers: prefs.showLibraryPrimers,
     recent,
     samples,
     hasDocument: !!activeDoc,
   };
   // menuFilter must be stable (OVE memoizes on it); handlers are read through the ref.
-  const menuFilter = useMemo(() => buildMenu(handlers), [recent, samples, !!activeDoc]); // eslint-disable-line react-hooks/exhaustive-deps
+  const menuFilter = useMemo(() => buildMenu(handlers), [recent, samples, !!activeDoc, prefs.showLibraryPrimers]); // eslint-disable-line react-hooks/exhaustive-deps
   const contextMenus = useMemo(() => rightClickOverrides(() => handlers.current.copyAsFasta()), []);
 
   const onSave = useCallback(

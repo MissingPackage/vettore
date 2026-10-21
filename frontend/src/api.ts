@@ -1,6 +1,7 @@
 // Bridge to the local Python engine (HTTP on 127.0.0.1, guarded by a session token).
 import { engineErrorText } from "./files/engineErrors";
 import type { PlannerResponse } from "./tools/digestPlannerText";
+import type { BoundPrimer, LibraryFile, LibraryPrimer, RejectedRow } from "./tools/primerLibraryText";
 
 export interface OveAnnotation {
   id?: string;
@@ -194,4 +195,26 @@ export const api = {
   /** File content for a browser download: text for GenBank/FASTA, base64 for .dna. */
   exportFile: (sequenceData: SequenceData, format: "genbank" | "fasta" | "dna") =>
     call<{ content?: string; content_b64?: string }>("export", { sequenceData, format }),
+  primerLibrary: {
+    /** The library at the chosen path: its primers, the path, its modification time and any
+     * rows that could not be read. */
+    get: () => call<LibraryFile>("primer-library"),
+    /** Point the library at a .csv (kept in a shared folder) and read it. */
+    setPath: (path: string) => call<LibraryFile>("primer-library/path", { path }),
+    /** Write the primers back to the shared .csv. */
+    save: (primers: object[]) => call<{ path: string; mtime: number; count: number }>("primer-library/save", { primers }),
+    /** Parse pasted or file text (name, sequence, notes…) without saving, so the dialog can show
+     * what will be kept and what will be left out. */
+    parse: (text: string) => call<{ primers: LibraryPrimer[]; rejected: RejectedRow[]; today: string }>("primer-library/parse", { text }),
+    /** Library primers that bind the given document, with their binding sites. */
+    bindings: (sequenceData: SequenceData) => call<{ primers: BoundPrimer[] }>("primer-library/bindings", { sequenceData }),
+    /** Library primers that read across a region (sequencing primers), in reading order. */
+    sequencing: (sequenceData: SequenceData, start: number, end: number) =>
+      call<{ primers: { name: string; sequence: string; strand: number; start: number; end: number; reads_from: number }[] }>(
+        "primer-library/sequencing", { sequenceData, start, end }),
+    /** The library primer pair that already amplifies a product over a region, or null. */
+    product: (sequenceData: SequenceData, start: number, end: number) =>
+      call<{ product: { forward: string; reverse: string; size: number } | null }>(
+        "primer-library/product", { sequenceData, start, end }),
+  },
 };

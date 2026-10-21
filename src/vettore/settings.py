@@ -55,6 +55,25 @@ def _state() -> dict:
     return state if isinstance(state, dict) else {}
 
 
+def primer_library_path() -> Path:
+    """The shared .csv the lab keeps its primers in. A path the user chose (kept in a shared
+    folder so colleagues share the file), or ``primers.csv`` in the settings folder until one
+    is chosen."""
+    chosen = _state().get("primer_library_path")
+    if isinstance(chosen, str) and chosen.strip():
+        return Path(chosen)
+    return home() / "primers.csv"
+
+
+def remember_primer_library_path(path: str | Path) -> None:
+    state = _state()
+    state["primer_library_path"] = str(path)
+    try:
+        _state_file().write_text(json.dumps(state, indent=1), encoding="utf-8")
+    except OSError:
+        pass
+
+
 def last_folder() -> str:
     """The folder of the last file opened or saved, so file dialogs start there."""
     folder = _state().get("last_folder")
