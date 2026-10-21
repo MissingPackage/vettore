@@ -68,9 +68,10 @@
   --vt-success-border: #a6f4c5;
 
   /* ---- shape, space, size ------------------------------------------------------------------ */
-  --vt-radius-sm: 3px;           /* controls (Blueprint's radius) */
-  --vt-radius: 4px;
-  --vt-radius-lg: 6px;           /* cards, panels, document tabs */
+  --vt-radius-sm: 4px;           /* controls, toolbar buttons, view tabs */
+  --vt-radius: 6px;              /* notices, segmented controls */
+  --vt-radius-lg: 8px;           /* cards, panels, document tabs */
+  --vt-radius-xl: 10px;          /* dialogs */
   --vt-space-0: 2px;
   --vt-space-1: 4px;
   --vt-space-2: 8px;
@@ -90,9 +91,14 @@
     0 2px 6px rgba(16, 24, 40, 0.1);   /* dialogs */
 
   /* ---- motion ------------------------------------------------------------------------------- */
-  --vt-duration: 120ms;
+  /* Motion is for the chrome (tabs, buttons, notices) and never for the map, the sequence or the
+     tables, which stay instant. docs/DESIGN.md has the full budget. */
+  --vt-duration: 120ms;          /* colour changes on hover */
+  --vt-duration-med: 180ms;      /* things that move: the view-tab pill, a new tab, a notice */
+  --vt-duration-data: 260ms;     /* data that changes shape: gel bands moving to new sizes */
+  --vt-ease-out: cubic-bezier(0.2, 0.7, 0.2, 1);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  :root { --vt-duration: 0ms; }
+  :root { --vt-duration: 0ms; --vt-duration-med: 0ms; --vt-duration-data: 0ms; }
 }

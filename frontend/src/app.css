@@ -8,22 +8,39 @@ body { overflow: hidden; }
 .vt-shell { display: flex; flex-direction: column; height: 100%; }
 
 /* ---- document tabs ------------------------------------------------------------------------- */
+/* Open documents are soft tabs on the sunken strip; the open one is white like the page below. */
 .vt-doctabs {
   display: flex; align-items: flex-end; gap: var(--vt-space-0); padding: 0 6px;
   background: var(--vt-surface-sunken); border-bottom: 1px solid var(--vt-border);
   overflow-x: auto; box-sizing: border-box;
 }
 .vt-doctab {
-  display: flex; align-items: center; gap: 6px; max-width: 240px; padding: 4px 6px 4px 12px;
-  border: 1px solid var(--vt-border); border-bottom: none; border-radius: var(--vt-radius-lg) var(--vt-radius-lg) 0 0;
-  background: var(--vt-surface-raised); color: var(--vt-text); cursor: pointer; white-space: nowrap;
+  position: relative; display: flex; align-items: center; gap: 6px; max-width: 240px; padding: 4px 6px 4px 12px;
+  border-radius: var(--vt-radius-lg) var(--vt-radius-lg) 0 0;
+  background: transparent; color: var(--vt-text); cursor: pointer; white-space: nowrap;
+  transition: background-color var(--vt-duration), color var(--vt-duration);
 }
 .vt-doctab span { overflow: hidden; text-overflow: ellipsis; }
-.vt-doctab:hover { background: var(--vt-surface-subtle); }
-/* The open document: white like the page below it, with the accent along its top edge. */
+.vt-doctab:hover { background: var(--vt-surface-raised); color: var(--vt-text-strong); }
 .vt-doctab.active {
   background: var(--vt-surface); color: var(--vt-text-strong); font-weight: var(--vt-weight-strong);
-  box-shadow: inset 0 2px 0 var(--vt-accent);
+  box-shadow: 0 -1px 0 var(--vt-border-subtle), 1px 0 0 var(--vt-border-subtle), -1px 0 0 var(--vt-border-subtle);
+}
+/* Unsaved changes: the bullet before the name, in the accent colour. */
+:root .vt-doctab .vt-doctab-unsaved { color: var(--vt-accent); font-weight: 700; overflow: visible; }
+/* A document that has just opened (a new product, a pasted sequence) slides up and its outline
+   glows for a moment, so the eye finds it among the others. */
+.vt-doctab-new { animation: vt-tab-in var(--vt-duration-med) var(--vt-ease-out) both; }
+.vt-doctab-new::after {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  box-shadow: inset 0 0 0 2px var(--vt-accent);
+  animation: vt-tab-glow 1.6s ease-out var(--vt-duration-med) both;
+}
+@keyframes vt-tab-in { from { opacity: 0; transform: translateY(6px); } }
+@keyframes vt-tab-glow { 0%, 40% { opacity: 1; } 100% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .vt-doctab-new { animation: none; }
+  .vt-doctab-new::after { animation: vt-tab-glow 1.6s steps(1, end) both; }
 }
 .vt-doctab-close {
   display: inline-flex; align-items: center; justify-content: center; flex: none;
@@ -37,24 +54,32 @@ body { overflow: hidden; }
 /* ---- view tabs, at the top of the document area --------------------------------------------- */
 .vt-viewbar {
   display: flex; align-items: center; justify-content: space-between; gap: var(--vt-space-3);
-  padding: 0 var(--vt-space-2); background: var(--vt-surface-subtle);
+  padding: 0 var(--vt-space-2); background: var(--vt-surface);
   border-bottom: 1px solid var(--vt-border-subtle); box-sizing: border-box;
 }
-.vt-viewtabs { display: flex; gap: var(--vt-space-0); }
+/* A segmented control: the open view sits on a white pill that slides between tabs. */
+.vt-viewtabs {
+  position: relative; display: flex; gap: 0; padding: 2px;
+  background: var(--vt-surface-raised); border-radius: var(--vt-radius);
+}
+.vt-viewtabs-pill {
+  position: absolute; top: 2px; bottom: 2px; left: 0; border-radius: var(--vt-radius-sm);
+  background: var(--vt-surface); box-shadow: var(--vt-shadow-1), 0 0 0 1px var(--vt-border-subtle);
+  pointer-events: none;
+}
+.vt-viewtabs-placed .vt-viewtabs-pill {
+  transition: transform var(--vt-duration-med) var(--vt-ease-out), width var(--vt-duration-med) var(--vt-ease-out);
+}
 .vt-viewtab {
-  font: inherit; line-height: var(--vt-line-height-tight); padding: 4px 14px;
-  border: 1px solid transparent; border-radius: var(--vt-radius);
-  background: transparent; color: var(--vt-text); cursor: pointer;
+  position: relative; font: inherit; line-height: var(--vt-line-height-tight); padding: 3px 14px;
+  border: none; border-radius: var(--vt-radius-sm);
+  background: transparent; color: var(--vt-text-muted); cursor: pointer;
   /* Only colours fade: a global rule from the editor's UI kit animates every property of every
      button, which made the previous tab look selected for a moment. */
-  transition: background-color var(--vt-duration), color var(--vt-duration), border-color var(--vt-duration);
+  transition: background-color var(--vt-duration), color var(--vt-duration);
 }
-.vt-viewtab:hover:not(:disabled) { background: var(--vt-surface-hover); color: var(--vt-text-strong); }
-.vt-viewtab.active {
-  background: var(--vt-surface); border-color: var(--vt-border); color: var(--vt-text-strong);
-  font-weight: var(--vt-weight-strong); box-shadow: inset 0 -2px 0 var(--vt-accent);
-}
-.vt-viewtab.active:hover { background: var(--vt-surface); }
+.vt-viewtab:hover:not(:disabled):not(.active) { background: var(--vt-overlay-hover); color: var(--vt-text-strong); }
+.vt-viewtab.active { color: var(--vt-text-strong); font-weight: var(--vt-weight-strong); }
 .vt-viewtab:disabled { color: var(--vt-text-faint); cursor: default; }
 .vt-enzyme-set { display: flex; align-items: center; color: var(--vt-text-muted); white-space: nowrap; }
 .vt-enzyme-set select {

@@ -41,6 +41,7 @@ import { exportMap } from "./mapExport";
 import { applyEnzymeSet, ENZYME_SETS, type EnzymeSetId } from "./enzymeSets";
 import { ENZYMES } from "./enzymeLogic";
 import { OVERLAY_VIEWS, showView, VIEWS, type ViewId } from "./views";
+import ViewTabs from "./ViewTabs";
 import { ACCEPT, dirName, SAVE_EXTENSION, safeFileName, type SaveKind } from "./files/formats";
 import { addNotice, dismissNotice, messageOf, type Notice, type NoticeKind } from "./files/notices";
 import NoticeStack from "./files/NoticeStack";
@@ -828,7 +829,10 @@ export default function App() {
             data-testid="doctab"
             data-unsaved={unsavedByEditor[d.editorName] ? "true" : undefined}
           >
-            <span>{unsavedByEditor[d.editorName] ? "• " : ""}{d.name}</span>
+            <span>
+              {unsavedByEditor[d.editorName] && <><span className="vt-doctab-unsaved" title="Unsaved changes">•</span>{" "}</>}
+              {d.name}
+            </span>
             <button className="vt-doctab-close" title="Close (Ctrl+W)" onClick={(e) => { e.stopPropagation(); closeDoc(d); }}>×</button>
           </div>
         ))}
@@ -838,22 +842,7 @@ export default function App() {
 
   const viewBar = (
       <div className="vt-viewbar" style={{ height: VIEWBAR_HEIGHT }}>
-        <div className="vt-viewtabs" role="tablist">
-          {VIEWS.map((v) => (
-            <button
-              key={v.id}
-              role="tab"
-              data-testid={`view-${v.id}`}
-              aria-selected={activeDoc?.view === v.id}
-              className={`vt-viewtab${activeDoc?.view === v.id ? " active" : ""}`}
-              disabled={!activeDoc}
-              title={`${v.label} (Ctrl+${v.hotkey})`}
-              onClick={() => selectView(v.id)}
-            >
-              {v.label}
-            </button>
-          ))}
-        </div>
+        <ViewTabs view={activeDoc?.view ?? null} onSelect={selectView} />
         {activeDoc && (
           <label className="vt-enzyme-set">
             Enzymes:&nbsp;
