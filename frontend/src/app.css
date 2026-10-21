@@ -103,7 +103,7 @@ body { overflow: hidden; }
 .vt-tm { cursor: help; text-decoration: underline dotted var(--vt-text-faint); text-underline-offset: 3px; }
 
 /* ---- welcome screen ------------------------------------------------------------------------- */
-.vt-welcome { max-width: 760px; margin: 60px auto; padding: 0 var(--vt-space-5); color: var(--vt-text); line-height: var(--vt-line-height); }
+.vt-welcome { max-width: 880px; margin: 60px auto; padding: 0 var(--vt-space-5); color: var(--vt-text); line-height: var(--vt-line-height); }
 .vt-welcome h1 {
   margin: 0 0 6px; color: var(--vt-text-strong); font-size: var(--vt-font-size-xl);
   font-weight: var(--vt-weight-strong); line-height: var(--vt-line-height-tight);
@@ -334,6 +334,16 @@ body { overflow: hidden; }
 @media (prefers-reduced-motion: reduce) {
   .vt-busy::before { animation: none; border-color: var(--vt-accent); border-right-color: var(--vt-border); }
 }
+
+/* A button whose action just worked ("Copied"): green for a moment, with a check. The label
+   itself says what happened; the colour only confirms it. */
+:root .vt-done, :root .vt-done.bp3-button.bp3-minimal {
+  color: var(--vt-success); background: var(--vt-success-bg);
+  box-shadow: inset 0 0 0 1px var(--vt-success-border);
+  animation: vt-done-in var(--vt-duration-med) var(--vt-ease-out) both;
+}
+:root .vt-done::before { content: "✓" / ""; margin-right: var(--vt-space-1); font-weight: var(--vt-weight-strong); }
+@keyframes vt-done-in { from { opacity: 0.4; } }
 
 /* Numbers that line up in columns and never wrap ("59.7 °C", "3,941 bp"). */
 .vt-num { font-variant-numeric: tabular-nums; white-space: nowrap; }

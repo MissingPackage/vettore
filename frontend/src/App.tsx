@@ -125,6 +125,20 @@ export default function App() {
   const docsRef = useRef(docs);
   docsRef.current = docs;
 
+  // Documents opened in the last two seconds: their tab glows once so the eye finds it (a new
+  // cloning product among several tabs).
+  const [fresh, setFresh] = useState<string[]>([]);
+  const seen = useRef(new Set<string>());
+  useEffect(() => {
+    const names = docs.map((d) => d.editorName);
+    const added = names.filter((n) => !seen.current.has(n));
+    seen.current = new Set(names);
+    if (!added.length) return;
+    setFresh((f) => [...f, ...added]);
+    // Not cleared when docs change again: every edit updates docs, and the glow must still end.
+    setTimeout(() => setFresh((f) => f.filter((n) => !added.includes(n))), 2000);
+  }, [docs]);
+
   const activeDoc = docs.find((d) => d.editorName === active) ?? null;
   // Edited since opened or saved, or never saved at all: the tab shows a dot, closing asks.
   const unsavedByEditor = useSelector((state: any) => {
@@ -430,7 +444,10 @@ export default function App() {
       parents,
     }, { neverSaved: true });
     addDocs([doc]);
-  }, [addDocs, distinctName]);
+    const bp = sequenceData.sequence.length.toLocaleString("en-US");
+    notify("info", `Created “${sequenceData.name}” (${bp} bp, ${sequenceData.circular ? "circular" : "linear"}) `
+      + "in a new tab. It is not saved to a file yet.");
+  }, [addDocs, distinctName, notify]);
 
   // ---- save ------------------------------------------------------------------------------
   /** Ask once whether to save a GenBank copy of a file that cannot be overwritten safely. */
@@ -822,7 +839,7 @@ export default function App() {
           <div
             key={d.editorName}
             ref={d.editorName === active ? revealActiveTab : undefined}
-            className={`vt-doctab${d.editorName === active ? " active" : ""}`}
+            className={`vt-doctab${d.editorName === active ? " active" : ""}${fresh.includes(d.editorName) ? " vt-doctab-new" : ""}`}
             onClick={() => setActive(d.editorName)}
             onAuxClick={(e) => e.button === 1 && closeDoc(d)}
             title={d.path ?? (d.neverSaved ? `${d.name} (not saved to a file yet)` : d.name)}

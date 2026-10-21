@@ -36,7 +36,11 @@
   border-radius: var(--vt-radius-lg);
   background: var(--vt-surface);
   color: var(--vt-text-strong);
+  box-shadow: var(--vt-shadow-2);
+  /* Slides in from the right edge; with reduced motion it simply appears. */
+  animation: vt-toast-in var(--vt-duration-med) var(--vt-ease-out) both;
 }
+@keyframes vt-toast-in { from { opacity: 0; transform: translateX(16px); } }
 .vt-toast-error { border-color: var(--vt-danger-border); border-left-color: var(--vt-danger); background: var(--vt-danger-bg); }
 .vt-toast-warning { border-color: var(--vt-border-subtle); border-left-color: var(--vt-warning); background: var(--vt-warning-bg); }
 .vt-toast-info { border-color: var(--vt-border-subtle); border-left-color: var(--vt-success); background: var(--vt-success-bg); }

@@ -61,7 +61,7 @@ export default function HistoryView({ doc, onReopen }: {
               <td>
                 {h.detail && (
                   <button
-                    className="bp3-button bp3-small bp3-minimal vt-history-copy"
+                    className={`bp3-button bp3-small bp3-minimal vt-history-copy${copied === i ? " vt-done" : ""}`}
                     data-testid="history-copy"
                     title="Copy this step (parameters and primers) to the clipboard"
                     onClick={() => copyStep(i, `${h.action}: ${h.detail}`)}
