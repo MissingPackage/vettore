@@ -329,7 +329,9 @@ def parse_text(text: str) -> LibraryText:
         unclosed = multiline and row is rows[-1] and row.raw.count('"') % 2 == 1
         for cell in row.cells:
             parts = re.split(r"\r\n|\r|\n", cell)
-            if unclosed or len(parts) > 1 and any(any(_is_oligo(c) for c in _split(part, delimiter))
+            # A later line of the cell that splits into cells like a row is a swallowed row,
+            # whatever it holds (a modified oligo, "to order", a short primer).
+            if unclosed or len(parts) > 1 and any(len(_split(part, delimiter)) > 1
                                                   for part in parts[1:]):
                 raise PrimerLibraryError(
                     f"a quote (\") opened on line {line} is never closed, so the rows below it "
@@ -437,18 +439,18 @@ def _find_row(rows: list[_Row], change: Change, taken: set[int], removal: bool) 
     The row whose fields are still those the dialog loaded is it. When the file had only one
     row with this oligo at load time, a colleague may have changed that row meanwhile: it is
     still the row with the loaded name, and for an edit (not a removal) the only row with the
-    oligo even if renamed. With two tubes at load, only an exact match counts."""
+    oligo even if renamed. With two tubes at load, or since, only an exact match counts."""
     rows_with = [i for i, r in enumerate(rows) if r.seq == change.sequence and i not in taken]
     for i in rows_with:
         if _same_fields(rows[i], change.was):
             return i
-    if change.twins > 1:
-        return None
+    every = [r for r in rows if r.seq == change.sequence]
+    if change.twins > 1 or len(every) > change.twins:
+        return None                       # a second tube, at load or since: exact match only
     name = (change.was.get("name") or "").strip()
     named = [i for i in rows_with if name and rows[i].fields.get("name") == name]
     if len(named) == 1:
         return named[0]
-    every = [r for r in rows if r.seq == change.sequence]
     if not removal and not named and len(rows_with) == 1 and len(every) == 1:
         return rows_with[0]
     return None
@@ -1040,6 +1042,13 @@ def _primers_from_payload(rows: list[dict[str, Any]]) -> list[Primer]:
     return primers
 
 
+def _count(value: Any) -> int:
+    try:
+        return max(1, int(value))
+    except (TypeError, ValueError):
+        return 1
+
+
 def _sequence_of(data: dict[str, Any]) -> tuple[str, bool]:
     sequence = data.get("sequence")
     return (sequence.upper() if isinstance(sequence, str) else ""), bool(data.get("circular"))
@@ -1084,7 +1093,7 @@ def save_library(body: SaveLibrary) -> dict[str, Any]:
         was = row.get("was") if isinstance(row.get("was"), dict) else {}
         return Change(sequence, {k: str(was.get(k) or "") for k in EDITABLE if k in was},
                       {k: str(row[k] or "") for k in EDITABLE if k in row}, bool(row.get("readd")),
-                      max(1, int(row.get("twins") or 1)))
+                      _count(row.get("twins")))
 
     edits = [change(row) for row in body.edited]
     removed = [change(row) for row in body.removed]

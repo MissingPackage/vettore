@@ -716,3 +716,33 @@ def test_a_pair_is_not_offered_when_one_primer_also_pairs_with_itself():
     seq = ("T" * 200 + f + "C" * 680 + rc(r) + "A" * 1100 + rc(f) + "G" * 500).upper()
     primers = [pl.Primer("F", f), pl.Primer("R", r)]
     assert pl.product_over_region(primers, seq, False, 300, 600) is None   # F with F: 2nd band
+
+
+# ---- sixth review ------------------------------------------------------------------------
+
+def test_a_stray_quote_over_modified_or_placeholder_rows_is_refused():
+    t = ('Name;Sequence;Notes\nA;ACGTACGTACGTACGTAA;"oops\nB;/5Phos/GGCCAATTGGCCAATTGG;box2\n'
+         'D;to order;3.5"\nE;TTGCATTCGAATGACCTGAT;x\n')
+    with pytest.raises(pl.PrimerLibraryError, match="never closed"):
+        pl.parse_text(t)
+
+
+def test_a_note_on_two_lines_is_still_fine():
+    [p], rejected = pl.parse_csv('Name;Sequence;Notes\nA;ACGTACGTACGTACGTAA;"line one\nline two"\n')
+    assert rejected == [] and p.notes == "line one\nline two"
+
+
+def test_a_tube_added_since_load_under_the_same_name_is_never_changed():
+    f = "name;sequence;location\nM13F-old;GTAAAACGACGGCCAGT;box1\nM13F;GTAAAACGACGGCCAGT;box2\n"
+    was = {"name": "M13F", "notes": "", "location": "box1", "added": ""}
+    lib = pl.parse_text(f)
+    text, counts = pl.merged_text(lib, [], [pl.Change("GTAAAACGACGGCCAGT", was, {"location": "x"})])
+    assert text == f and counts["gone"] == 1
+    text, counts = pl.merged_text(lib, [], [], [pl.Change("GTAAAACGACGGCCAGT", was)])
+    assert text == f and counts["gone"] == 1
+
+
+def test_a_malformed_twins_count_is_not_a_crash(client):
+    r = client.post("/api/primer-library/save", headers=headers(), json={
+        "removed": [{"sequence": "GTAAAACGACGGCCAGT", "was": {"name": "M13F"}, "twins": "two"}]})
+    assert r.status_code == 200

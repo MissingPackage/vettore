@@ -122,7 +122,7 @@ function PrimerLibraryDialog(props: ToolProps) {
       const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
       const extra = [
         saved.skipped && `${plural(saved.skipped, "primer you added was", "primers you added were")} already in the file (someone added the same oligo meanwhile): the file's entry is kept.`,
-        saved.gone && `${plural(saved.gone, "change was", "changes were")} not saved: someone had removed that primer, renamed it or changed its sequence meanwhile.`,
+        saved.gone && `${plural(saved.gone, "change was", "changes were")} not saved: someone had changed or removed that row of the file meanwhile.`,
         theirs && `${plural(theirs, "primer", "primers")} someone else added meanwhile ${theirs === 1 ? "is" : "are"} now listed.`,
         dropped > 0 && `${plural(dropped, "primer", "primers")} someone else removed meanwhile ${dropped === 1 ? "is" : "are"} no longer listed.`,
       ].filter(Boolean).join(" ");
@@ -140,6 +140,7 @@ function PrimerLibraryDialog(props: ToolProps) {
   /** Run an action that re-reads the file or closes the window, asking first when there are
    * unsaved changes it would drop. */
   const guard = (what: string, run: () => void) => {
+    if (busy) return;                     // never while a save is being written
     if (dirty) setPendingDiscard({ what, run });
     else run();
   };
@@ -305,7 +306,7 @@ function PrimerLibraryDialog(props: ToolProps) {
             {shown.length} of {primers.length} primer{primers.length === 1 ? "" : "s"}
           </span>
           <span className="vt-pl-spacer" />
-          <Button small data-testid="pl-import" onClick={() => setImportText("")}>Import…</Button>
+          <Button small data-testid="pl-import" disabled={busy} onClick={() => setImportText("")}>Import…</Button>
           <Button small data-testid="pl-export" disabled={!primers.length} onClick={exportCsv}>Export .csv</Button>
           <input ref={fileInput} type="file" accept=".csv,.tsv,.txt" style={{ display: "none" }}
                  data-testid="pl-file-input"
@@ -411,7 +412,7 @@ function PrimerLibraryDialog(props: ToolProps) {
           {dirty ? "Unsaved changes — Save writes them to the shared file." : "Up to date with the shared file."}
         </div>
         <div className={Classes.DIALOG_FOOTER_ACTIONS}>
-          <Button data-testid="pl-close" onClick={() => guard("close the window", props.onClose)}>Close</Button>
+          <Button data-testid="pl-close" disabled={busy} onClick={() => guard("close the window", props.onClose)}>Close</Button>
           <Button intent="primary" data-testid="pl-save" disabled={!dirty || busy} onClick={() => save()}>Save to File</Button>
         </div>
       </div>
