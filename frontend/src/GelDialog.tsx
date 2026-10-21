@@ -5,6 +5,7 @@ import { api } from "./api";
 import { loadPreferences } from "./preferences";
 import type { OpenDoc } from "./cloning/types";
 import { EnzymePicker, Field } from "./cloning/inputs";
+import "./gel.css";
 
 const { Dialog, Callout } = Blueprint as unknown as Record<string, React.ComponentType<any>>;
 
@@ -298,10 +299,12 @@ function Lane(props: { x: number; label: string; bands: GelBand[]; isLadder?: bo
       <rect x={props.x} y={WELL_Y - 8} width={width} height={7} fill="#3f3f46" rx={1} />
       {props.bands.map((band, i) => {
         const y = ys[i];
+        // Placed with a transform, not y, so a band slides to its new size when the enzymes
+        // change and the eye sees which fragment split (gel.css; instant with reduced motion).
         return (
           <g key={i}>
-            <rect x={props.x} y={y} width={width} height={band.reference ? 5 : 4} rx={1}
-                  fill="#e8f1c8" opacity={0.2 + 0.8 * band.intensity}>
+            <rect className="vt-gel-band" x={props.x} y={0} width={width} height={band.reference ? 5 : 4} rx={1}
+                  fill="#e8f1c8" style={{ transform: `translateY(${y}px)`, opacity: 0.2 + 0.8 * band.intensity }}>
               <title>{band.label}</title>
             </rect>
             {props.isLadder && labelled[i] && (
