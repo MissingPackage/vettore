@@ -42,17 +42,22 @@ export default function HistoryView({ doc, onReopen }: {
               <td>
                 {h.parents?.length ? (
                   <span className="vt-history-inputs">
-                    {h.parents.map((p, j) => (
+                    {h.parents.map((p, j) => (p.data ? (
                       <button
                         key={j}
                         className="bp3-button bp3-small bp3-minimal"
                         data-testid="history-reopen"
                         title={`Open “${p.name}” as it was when this step ran`}
-                        onClick={() => onReopen(p.data, `${h.action} in “${doc.name}”`)}
+                        onClick={() => onReopen(p.data as SequenceData, `${h.action} in “${doc.name}”`)}
                       >
                         Open “{p.name}”
                       </button>
-                    ))}
+                    ) : (
+                      // A saved file whose History did not fit kept the step, not the copy.
+                      <span key={j} className="vt-history-none" data-testid="history-no-snapshot">
+                        “{p.name}” (no copy was kept in the file)
+                      </span>
+                    )))}
                   </span>
                 ) : (
                   <span className="vt-history-none">—</span>

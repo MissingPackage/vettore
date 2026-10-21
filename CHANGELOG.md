@@ -16,6 +16,13 @@ The download links in the README always point to the latest release.
 - Offline, the dialog says so plainly and stays open; nothing else in Vettore changes. A mistyped, unknown or protein accession, a genome too large to open (over 2 Mb, refused before downloading) and a network that blocks secure connections each get one sentence saying what to do. An accession typed without its version opens under the version NCBI sends.
 - File → Preferences → Allow Open from NCBI (on by default) hides the menu item when unticked.
 
+## Unreleased — where a construct came from
+
+- A saved file carries the document's History: the steps, their parameters and a copy of everything each step was run on. GenBank files keep it in a comment that other programs ignore (and that survives a round trip through them); `.dna` files keep it in their notes. Reopening the file months later shows the History and reopens those copies.
+- The new **Lineage** tab (Ctrl+7) draws the document and, under it, the documents it was made from, each with its size and the step it came out of, up to 20 steps back. **Open the snapshot** opens an input as it was when the step ran; **Open the file** opens the file it was saved in, while that file is still there. **Copy the lineage** copies the tree for a notebook.
+- **File → Preferences → History in saved files** leaves the History out of saved files for anyone who would rather share plain ones — worth doing before a construct leaves the lab, because the comment also carries each input's sequence and the path it was open from, as the guide now says. A History too large for a file keeps the nearest copies and leaves the furthest out, saying so where a copy would be.
+- A comment Vettore does not understand is no longer lost when you save: the note the file came with, and the `##Assembly-Data##` tables of a record from NCBI, are written back as they were.
+
 ## Unreleased — a lighter, clearer frame
 
 - The frame is lighter: toolbar tools that are on are white keys with a thin blue outline instead of solid squares, document tabs lose their folder borders, and the view tabs (Map, Sequence, Enzymes…) are one segmented control whose white marker slides to the open view. Nothing moved: menus, tabs, panes and shortcuts are where they were.

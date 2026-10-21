@@ -1,5 +1,6 @@
 // Bridge to the local Python engine (HTTP on 127.0.0.1, guarded by a session token).
 import { engineErrorText } from "./files/engineErrors";
+import type { HistoryEntry } from "./documents";
 import type { PlannerResponse } from "./tools/digestPlannerText";
 
 export interface OveAnnotation {
@@ -24,6 +25,14 @@ export interface SequenceData {
   circular: boolean;
   features: OveAnnotation[] | Record<string, OveAnnotation>;
   primers: OveAnnotation[] | Record<string, OveAnnotation>;
+  /**
+   * The document's History as the file carries it (S6.1): read from a saved file, and sent
+   * back when the document is saved. It lives on the Doc, not in the editor, so it is taken
+   * off the data when a file is opened and put back on when one is written.
+   */
+  history?: HistoryEntry[];
+  /** The COMMENT the file was opened with, written back on save (without the History block). */
+  comment?: string;
 }
 
 export interface OpenResult {
@@ -185,6 +194,8 @@ export const api = {
   /** Files waiting to be opened: from the command line, then handed over by later starts. */
   startupFiles: () => call<{ results: OpenResult[]; errors: string[] }>("startup-files"),
   openPath: (path: string) => call<OpenResult>("open-path", { path }),
+  /** Which of these files are still on disk (the Lineage view links to those). */
+  pathsExist: (paths: string[]) => call<{ existing: string[] }>("paths-exist", { paths }),
   openContent: async (file: File) =>
     call<OpenResult>("open-content", { filename: file.name, content_b64: await toBase64(file) }),
   /** Pasted text (sequence, FASTA, GenBank or EMBL record), recognised like file content. */

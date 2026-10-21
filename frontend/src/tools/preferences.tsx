@@ -313,6 +313,28 @@ function PreferencesDialog(props: ToolProps) {
           </div>
         </Field>
 
+        <div className="vt-field" data-testid="pref-history-field">
+          <span className="vt-field-label">History in saved files</span>
+          <label className="bp3-control bp3-checkbox vt-pref-check">
+            <input
+              type="checkbox"
+              data-testid="pref-save-history"
+              checked={prefs.saveHistory}
+              aria-describedby="pref-save-history-hint"
+              onChange={(e) => change({ saveHistory: e.target.checked },
+                e.target.checked ? "Files will keep the History" : "Files will leave the History out")}
+            />
+            <span className="bp3-control-indicator" />
+            Keep the History and the Lineage inside the files you save
+          </label>
+          <span className="vt-field-hint" id="pref-save-history-hint">
+            The History goes into a comment that other programs ignore, so reopening the file
+            months later still shows where the construct came from, with a copy of everything
+            each step was run on. Turn it off to save plain files that carry the sequence and
+            its features only; the History then lasts as long as the document stays open.
+          </span>
+        </div>
+
         <MyEnzymes value={prefs.myEnzymes} buffers={prefs.enzymeBuffers} onChange={change} />
 
         <OpenWithVettore />

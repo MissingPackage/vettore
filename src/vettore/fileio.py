@@ -28,6 +28,7 @@ from Bio.Seq import Seq, UndefinedSequenceError, reverse_complement
 from Bio.SeqFeature import SeqFeature, SimpleLocation
 from Bio.SeqRecord import SeqRecord
 
+from . import lineage
 from .convert import (
     DIVISIONS,
     NEAR_WHITE,
@@ -43,6 +44,8 @@ log = logging.getLogger(__name__)
 
 # Biopython's SeqIO name for the binary .dna format is fixed by that library.
 DNA_FILE_FORMAT = "snapgene"
+# The note a .dna file Vettore wrote keeps the document's History in (S6.1).
+DNA_HISTORY_NOTE = "VettoreHistory"
 # Vettore's own reader for plain sequence text (raw or numbered sequence, FASTA without header).
 RAW = "raw"
 
@@ -507,6 +510,11 @@ def _enrich_dna_file(doc: dict, content: bytes) -> None:
             ann["bases"] = bases.upper()
             ann.setdefault("notes", {})["primer_sequence"] = [bases.upper()]
 
+    if hasattr(sg.notes, "get"):
+        stored = sg.notes.get(DNA_HISTORY_NOTE)
+        if isinstance(stored, str) and (history := lineage.decode(stored)):
+            doc["history"] = history
+
     description = sg.notes.get("Description") if hasattr(sg.notes, "get") else None
     if description and not doc.get("description"):
         doc["description"] = html.unescape(re.sub(r"<[^>]+>", " ", str(description))).strip()
@@ -616,6 +624,9 @@ def write_dna(data: dict) -> bytes:
     notes = {"UUID": str(uuid.uuid4()), "Type": "Synthetic", "ConfirmedExperimentally": "0",
              "Created": stamp, "LastModified": dict(stamp), "SequenceClass": "UNA",
              "TransformedInto": "unspecified"}
+    if history := lineage.payload(data.get("history")):
+        # The .dna format has no comment block; the History goes in the file's notes (S6.1).
+        notes[DNA_HISTORY_NOTE] = history
     if description := (data.get("description") or "").strip():
         # Stored as HTML, like the descriptions in the reference files.
         body = html.escape(_xml_text(description), quote=False)

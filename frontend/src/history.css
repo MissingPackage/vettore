@@ -4,3 +4,28 @@
 .vt-history-inputs { display: flex; flex-wrap: wrap; gap: var(--vt-space-1); align-items: center; }
 .vt-history-none { color: var(--vt-text-faint); }
 .vt-history-copy { white-space: nowrap; }
+
+/* Lineage tab: the tree from the document back to the files it was made from (S6.1). */
+.vt-lineage-tree, .vt-lineage-children { list-style: none; margin: 0; padding: 0; }
+.vt-lineage-children {
+  margin-left: var(--vt-space-3);
+  padding-left: var(--vt-space-3);
+  border-left: 1px solid var(--vt-border);
+}
+.vt-lineage-node { padding: var(--vt-space-1) 0; }
+.vt-lineage-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--vt-space-2);
+  align-items: baseline;
+}
+.vt-lineage-name { font-weight: 600; }
+.vt-lineage-size, .vt-lineage-time { color: var(--vt-text-muted); }
+.vt-lineage-step { color: var(--vt-text-muted); font-style: italic; }
+.vt-lineage-gone { color: var(--vt-text-muted); }
+.vt-lineage-detail {
+  color: var(--vt-text-muted);
+  max-width: 70ch;
+  margin-left: var(--vt-space-2);
+}
+.vt-lineage-used { color: var(--vt-text-muted); }

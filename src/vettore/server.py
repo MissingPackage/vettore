@@ -65,6 +65,10 @@ class SavePath(BaseModel):
     format: str | None = None
 
 
+class Paths(BaseModel):
+    paths: list[str]
+
+
 class SaveBinary(BaseModel):
     path: str
     content_b64: str
@@ -391,6 +395,19 @@ def create_app(token: str, static_dir: Path | None,
     @app.post("/api/open-path")
     def open_path(body: OpenPath) -> dict[str, Any]:
         return _open_path(Path(body.path))
+
+    @app.post("/api/paths-exist")
+    def paths_exist(body: Paths) -> dict[str, list[str]]:
+        """Which of these files are still on disk: the Lineage view offers to open the file
+        itself only for those, and the snapshot kept in the History for the rest."""
+        existing = []
+        for raw in body.paths[:200]:
+            try:
+                if raw and Path(raw).is_file():
+                    existing.append(raw)
+            except OSError:  # an unreadable or impossible path is simply not there
+                continue
+        return {"existing": existing}
 
     @app.post("/api/unsaved")
     def unsaved(body: Unsaved) -> dict[str, int]:
