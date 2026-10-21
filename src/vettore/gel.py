@@ -79,6 +79,12 @@ DEFAULT_PERCENT = 1.0
 #: approximation used only to place the "uncut" lane; it is labelled as apparent size.
 SUPERCOILED_FACTOR = 0.65
 
+#: Bands closer than this (relative migration) run together and are drawn as one.
+RESOLUTION = 0.012
+
+#: Smaller fragments are too faint to rely on in an ordinary ethidium or SYBR-stained gel.
+MIN_VISIBLE_BP = 150
+
 
 def resolving_range(percent: float) -> tuple[int, int]:
     nearest = min(RESOLVING_RANGE, key=lambda p: abs(p - percent))
@@ -113,7 +119,7 @@ class Band:
                 "intensity": self.intensity, "label": self.label}
 
 
-def _merge(bands: list[Band], resolution: float = 0.012) -> list[Band]:
+def _merge(bands: list[Band], resolution: float = RESOLUTION) -> list[Band]:
     """Bands that would run together on a real gel are drawn as one, brighter band."""
     merged: list[Band] = []
     for band in sorted(bands, key=lambda b: b.rf):

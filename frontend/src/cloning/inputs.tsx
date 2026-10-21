@@ -79,9 +79,11 @@ export function EnzymePicker(props: {
     <div className="vt-enzyme-picker">
       {props.value.map((n) => {
         const c = counts[n.toLowerCase()] ?? 0;
+        // Without a sequence (a list of enzymes, as in Preferences) there are no sites to count.
+        const intent = !props.sequence ? "" : c === 1 ? "bp3-intent-success" : "bp3-intent-warning";
         return (
-          <span key={n} className={`bp3-tag bp3-minimal ${c === 1 ? "bp3-intent-success" : "bp3-intent-warning"}`}>
-            {n} · {c} site{c === 1 ? "" : "s"}
+          <span key={n} className={`bp3-tag bp3-minimal ${intent}`}>
+            {n}{props.sequence ? ` · ${c} site${c === 1 ? "" : "s"}` : ""}
             <button className="bp3-tag-remove" onClick={() => props.onChange(props.value.filter((x) => x !== n))} />
           </span>
         );

@@ -63,6 +63,10 @@ class CloningResult(BaseModel):
     products: list[Product]
     warnings: list[str] = Field(default_factory=list)
     oligos: list[Oligo] = Field(default_factory=list)   # primers to order, if any were designed
+    # Wrong clones a colony screen must tell apart from the product (labelled: "insert in the
+    # other orientation", "empty vector, re-ligated", "parent vector"); the diagnostic digest
+    # planner starts from them.
+    screen_against: list[Product] = Field(default_factory=list)
 
 
 def plural(count: int, noun: str, many: str | None = None) -> str:

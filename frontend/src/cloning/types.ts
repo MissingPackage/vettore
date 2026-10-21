@@ -21,6 +21,14 @@ export interface CloningResult {
   products: Product[];
   warnings: string[];
   oligos: Oligo[];
+  /** Wrong clones a colony screen must tell apart from the product (labelled). */
+  screen_against?: Product[];
+}
+
+/** A molecule to tell apart from a clone in Find Diagnostic Digest, named as the gel lane. */
+export interface WrongClone {
+  name: string;
+  data: SequenceData;
 }
 
 /** An open document as seen by the cloning dialogs. */
@@ -30,6 +38,8 @@ export interface OpenDoc {
   data: () => SequenceData;
   /** Current selection in the editor, 0-based inclusive, or null. */
   selection: () => { start: number; end: number } | null;
+  /** When the document is a cloning product: the wrong clones of that simulation. */
+  wrongClones?: () => WrongClone[];
 }
 
 export interface FormProps {

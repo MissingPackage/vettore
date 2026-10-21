@@ -9,7 +9,7 @@ import "./gel.css";
 
 const { Dialog, Callout } = Blueprint as unknown as Record<string, React.ComponentType<any>>;
 
-interface GelBand {
+export interface GelBand {
   size: number;
   apparent_size: number;
   rf: number;
@@ -26,7 +26,7 @@ interface GelResult {
   percent: number;
 }
 
-interface LaneSetup {
+export interface LaneSetup {
   editorName: string | null;
   enzymes: string[];
 }
@@ -78,16 +78,25 @@ function labelledBands(ys: number[], reference: boolean[]): boolean[] {
   return keep;
 }
 
-/** Tools → Simulate Agarose Gel: lanes are digests of the open documents. */
-export default function GelDialog(props: { docs: OpenDoc[]; active: OpenDoc | null; onClose: () => void }) {
+/**
+ * Tools → Simulate Agarose Gel: lanes are digests of the open documents. Another tool can open
+ * it with lanes already set up (`initial`); its `docs` may then include molecules that are not
+ * open as documents, such as the wrong clones of a diagnostic digest.
+ */
+export default function GelDialog(props: {
+  docs: OpenDoc[];
+  active: OpenDoc | null;
+  onClose: () => void;
+  initial?: { lanes: LaneSetup[]; ladder: string; percent: number };
+}) {
   // The document in front is lane 1, uncut: that already draws a gel at the first click.
-  const [lanes, setLanes] = useState<LaneSetup[]>([
+  const [lanes, setLanes] = useState<LaneSetup[]>(props.initial?.lanes ?? [
     { editorName: props.active?.editorName ?? null, enzymes: [] },
   ]);
   // Ladder and agarose come from Preferences; the engine's defaults are the fallback.
   const preferences = loadPreferences();
-  const [ladder, setLadder] = useState(preferences.gelLadder);
-  const [percent, setPercent] = useState(preferences.gelPercent);
+  const [ladder, setLadder] = useState(props.initial?.ladder ?? preferences.gelLadder);
+  const [percent, setPercent] = useState(props.initial?.percent ?? preferences.gelPercent);
   const [ladders, setLadders] = useState<{ id: string; label: string }[]>([]);
   const [percentages, setPercentages] = useState<number[]>([0.7, 1.0, 1.2, 1.5, 2.0]);
   const [result, setResult] = useState<GelResult | null>(null);
@@ -99,8 +108,8 @@ export default function GelDialog(props: { docs: OpenDoc[]; active: OpenDoc | nu
       .then((r) => {
         setLadders(r.ladders);
         setPercentages(r.percentages);
-        if (!r.ladders.some((l) => l.id === preferences.gelLadder)) setLadder(r.default_ladder);
-        if (!r.percentages.includes(preferences.gelPercent)) setPercent(r.default_percent);
+        if (!r.ladders.some((l) => l.id === ladder)) setLadder(r.default_ladder);
+        if (!r.percentages.includes(percent)) setPercent(r.default_percent);
       })
       .catch(() => undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -142,8 +151,6 @@ export default function GelDialog(props: { docs: OpenDoc[]; active: OpenDoc | nu
 
   const update = (i: number, patch: Partial<LaneSetup>) =>
     setLanes((rows) => rows.map((r, j) => (j === i ? { ...r, ...patch } : r)));
-
-  const width = MARGIN_LEFT + ((result?.lanes.length ?? 1) + 1) * LANE_WIDTH + 14;
 
   return (
     <Dialog isOpen onClose={props.onClose} title="Simulate Agarose Gel" style={{ width: 1050, maxWidth: "95vw" }}>
@@ -229,15 +236,7 @@ export default function GelDialog(props: { docs: OpenDoc[]; active: OpenDoc | nu
           {busy && !result && <p className="vt-muted">Running the gel…</p>}
           {result && (
             <>
-              <svg width={width} height={GEL_HEIGHT + 16} className="vt-gel" data-testid="gel-image">
-                <rect x={MARGIN_LEFT - 4} y={WELL_Y - 14} width={width - MARGIN_LEFT + 4}
-                      height={GEL_HEIGHT - WELL_Y + 24} fill="#1b1b1b" rx={4} />
-                <Lane x={MARGIN_LEFT} label={result.ladder_label} bands={result.ladder} isLadder />
-                {result.lanes.map((lane, i) => (
-                  <Lane key={i} x={MARGIN_LEFT + (i + 1) * LANE_WIDTH} label={lane.name}
-                        bands={lane.bands} />
-                ))}
-              </svg>
+              <GelPicture ladderLabel={result.ladder_label} ladder={result.ladder} lanes={result.lanes} />
               <p className="vt-muted">
                 {result.percent.toFixed(1)} % agarose. Hover a band to read its size. Positions
                 are an approximation (semi-log migration), meant for reading a digest pattern
@@ -269,6 +268,26 @@ export default function GelDialog(props: { docs: OpenDoc[]; active: OpenDoc | nu
         </div>
       </div>
     </Dialog>
+  );
+}
+
+/** The gel itself: the ladder, then one lane per digest. */
+export function GelPicture(props: {
+  ladderLabel: string;
+  ladder: GelBand[];
+  lanes: { name: string; bands: GelBand[] }[];
+  testId?: string;
+}) {
+  const width = MARGIN_LEFT + (props.lanes.length + 1) * LANE_WIDTH + 14;
+  return (
+    <svg width={width} height={GEL_HEIGHT + 16} className="vt-gel" data-testid={props.testId ?? "gel-image"}>
+      <rect x={MARGIN_LEFT - 4} y={WELL_Y - 14} width={width - MARGIN_LEFT + 4}
+            height={GEL_HEIGHT - WELL_Y + 24} fill="#1b1b1b" rx={4} />
+      <Lane x={MARGIN_LEFT} label={props.ladderLabel} bands={props.ladder} isLadder />
+      {props.lanes.map((lane, i) => (
+        <Lane key={i} x={MARGIN_LEFT + (i + 1) * LANE_WIDTH} label={lane.name} bands={lane.bands} />
+      ))}
+    </svg>
   );
 }
 

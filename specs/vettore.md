@@ -41,6 +41,7 @@ release zip attached to a GitHub Release, and a short "what's new" note.
 - **S2 — Cloning simulations**: restriction & insertion, Gibson/HiFi/In-Fusion, PCR, mutagenesis, Golden Gate, Gateway, TA/TOPO, ligation; history.
 - **S3 — Verification tools**: simulate agarose gel, align Sanger reads (`.ab1`) to reference, multiple alignment, detect common features, primer design.
 - **S4 — Polish**: history graph, print/PDF, preferences, keyboard-shortcut parity, file associations, AAV helpers (ITR-to-ITR cargo size).
+- **S5 — Screening and lab memory**: S5.1 diagnostic digest planner (started); next S5.3 lab primer library, S5.2 Sanger contig, S5.4 human and mouse elements in the catalogue.
 
 ## User stories
 
@@ -132,6 +133,34 @@ creates a new document for the product, and records the operation in the History
 Print / PDF of map and sequence; preferences (Tm method, default enzyme set, colors); keyboard
 shortcuts for the common actions; Windows file association for `.dna`/`.gb`;
 AAV helper: ITR-to-ITR cargo size with a warning above 4.7 kb.
+
+### S5 — Screening and lab memory
+
+**S5.1 Diagnostic digest planner.** As a bench scientist I want Vettore to pick the restriction
+digest that tells my correct clone apart from the usual wrong ones, so that one gel answers
+"which colonies are right?".
+
+- Tools → Find Diagnostic Digest… opens on the active document as the expected clone. A product
+  of restriction cloning brings its wrong clones (insert in the other orientation, vector closed
+  without insert, parent vector) and the simulation's other products; any open file can be
+  added, any entry removed.
+- Candidates: single enzymes and pairs from "My enzymes" (a preference, empty by default) or,
+  while it is empty, the nonredundant commercial set. Enzymes that REBASE records as blocked by
+  Dam/Dcm methylation at one of their sites on these molecules are left out, unless the DNA is
+  from a dam−/dcm− strain.
+- A digest is diagnostic when every wrong clone has a band that runs apart from every band of
+  the expected clone (or the reverse) by at least the gel model's resolution (`gel.RESOLUTION`,
+  the distance at which the gel simulator merges bands). Bands under 150 bp or above the
+  resolving range of the agarose percentage do not count.
+- Ranking, deterministic: well-separated digests (every wrong clone at least twice the
+  resolution away, every lane cut) before digests at the limit of the gel; then fewer enzymes;
+  an expected lane of 2–5 visible bands; larger separation; enzymes most labs have. Identical
+  band patterns are one result. The top 10 are listed with one sentence each. [VERIFY: buffer
+  compatibility is not ranked — the bundled REBASE data has no buffer activity]
+- A result draws its gel next to the ladder; Send to Gel Simulation and Copy as Protocol.
+  When nothing works the dialog says why and offers the commercial set.
+- Tested on pBR322 digests worked out by hand from the published record, sizes cross-checked
+  with the gel simulator's pydna digest.
 
 ## Read first
 

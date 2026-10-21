@@ -26,6 +26,7 @@ import {
 import { buildMenu, type MenuHandlers } from "./menu";
 import NewSequenceDialog, { type NewSequence } from "./NewSequenceDialog";
 import CloningDialog from "./cloning/CloningDialog";
+import { wrongClonesOf } from "./cloning/wrongClones";
 import GelDialog from "./GelDialog";
 import SangerDialog from "./SangerDialog";
 import DetectFeaturesDialog from "./DetectFeaturesDialog";
@@ -428,6 +429,7 @@ export default function App() {
         ? { start: layer.start, end: layer.end }
         : null;
     },
+    wrongClones: () => d.history.find((h) => h.wrongClones)?.wrongClones ?? [],
   })), [docs]);
 
   const createProduct = useCallback((product: Product, result: CloningResult) => {
@@ -447,6 +449,7 @@ export default function App() {
       detail: `${product.details}. From: ${product.parents.join(", ")}.`
         + (oligos ? ` Primers: ${oligos}` : ""),
       parents,
+      wrongClones: wrongClonesOf(product, result),
     }, { neverSaved: true });
     addDocs([doc]);
     const bp = sequenceData.sequence.length.toLocaleString("en-US");

@@ -400,6 +400,7 @@ for (const size of SIZES) {
         ["49-design-pcr-primers", ["Primers", "Design PCR Primers…"]],
         ["50-align-multiple", ["Tools", "Align Multiple Sequences…"]],
         ["51-aav-packaging", ["Tools", "AAV Packaging Check…"]],
+        ["52-diagnostic-digest", ["Tools", "Find Diagnostic Digest…"]],
       ];
       for (const [name, path] of tools) {
         await menu(page, ...path);

@@ -1,6 +1,7 @@
 // Open documents: one OVE editor instance (editorName) per document.
 import { actions, updateEditor } from "@teselagen/ove";
 import type { SequenceData } from "./api";
+import type { WrongClone } from "./cloning/types";
 import { store } from "./store";
 import type { EnzymeSetId } from "./enzymeSets";
 import { loadPreferences } from "./preferences";
@@ -12,6 +13,9 @@ export interface HistoryEntry {
   detail?: string;
   /** Snapshots of the input documents of a cloning step, so they can be reopened later. */
   parents?: { name: string; data: SequenceData }[];
+  /** The other outcomes of that cloning step (other products, reverse insert, empty vector),
+   * offered by Find Diagnostic Digest as the wrong clones to tell apart. */
+  wrongClones?: WrongClone[];
 }
 
 /** The file a document was opened from, as the engine described it. */

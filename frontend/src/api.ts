@@ -1,5 +1,6 @@
 // Bridge to the local Python engine (HTTP on 127.0.0.1, guarded by a session token).
 import { engineErrorText } from "./files/engineErrors";
+import type { PlannerResponse } from "./tools/digestPlannerText";
 
 export interface OveAnnotation {
   id?: string;
@@ -159,6 +160,7 @@ export async function toBase64(blob: Blob): Promise<string> {
 export const api = {
   cloning: <T>(endpoint: string, body: object) => call<T>(`cloning/${endpoint}`, body),
   gel: <T>(body: object) => call<T>("gel", body),
+  diagnosticDigest: (body: object) => call<PlannerResponse>("diagnostic-digest", body),
   sangerAlign: <T>(body: object) => call<T>("sanger/align", body),
   detectFeatures: <T>(body: object) => call<T>("features/detect", body),
   gelLadders: () => call<{ ladders: { id: string; label: string }[]; percentages: number[];

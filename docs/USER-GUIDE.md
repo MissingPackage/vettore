@@ -22,6 +22,7 @@ the machine.
 - [Comparing several sequences](#comparing-several-sequences-tools--align-multiple-sequences)
 - [Verifying a clone by sequencing](#verifying-a-clone-by-sequencing-tools--align-to-reference-dna-sequence)
 - [Simulating a gel](#simulating-a-gel-tools--simulate-agarose-gel)
+- [Choosing a diagnostic digest](#choosing-a-diagnostic-digest-tools--find-diagnostic-digest)
 - [Saving and sharing](#saving-and-sharing)
 - [History of a file](#history-of-a-file)
 - [Preferences](#preferences-file--preferences)
@@ -476,6 +477,43 @@ migration model: good for predicting the *pattern* of a diagnostic digest and re
 against the ladder, not a physical simulation of your gel rig. Hover a band to see its size.
 Shortcut: Ctrl+Shift+G.
 
+## Choosing a diagnostic digest (Tools → Find Diagnostic Digest…)
+
+Which digest shows, on one gel, which colonies carry the right clone? The dialog opens on the
+file in front as the **expected clone** and compares it with the wrong clones in **Tell apart
+from**:
+
+- When the file is a product of Vettore's cloning, its wrong clones are already listed: the
+  insert in the other orientation (when the ends allow it), the vector closed on itself without
+  insert, the parent vector, and any other product the simulation showed. Remove the ones that
+  cannot happen in your hands.
+- **Add an open file…** adds any other file, for example the parent vector you opened.
+
+Vettore tries every single enzyme and every pair of enzymes, and keeps a digest only when each
+wrong clone gives at least one band that runs apart from the expected clone's bands on the gel
+you chose (the same migration model as Simulate Agarose Gel). Bands under 150 bp, or too large
+for the agarose percentage, are too faint or too compressed to count. The best ten are listed,
+each with one sentence such as "Expected clone: 4.2 kb + 1.1 kb; insert in the other
+orientation: 5.1 kb + 249 bp; parent vector: 4.4 kb". Digests whose bands are well apart come
+first, then single digests before double ones, then digests that give the expected clone two to
+five bands. A digest marked **close bands** works on paper but its bands run near each other:
+check them on the gel. Digests that give exactly the same bands are listed once, with the other
+enzymes named underneath.
+
+- **Enzymes to try**: **My enzymes** — the enzymes in your freezer, listed in
+  **File → Preferences… → My enzymes** — or all commercial enzymes. The list starts empty;
+  while it is empty, all commercial enzymes are tried.
+- **Methylation**: enzymes that Dam or Dcm methylation blocks at one of their sites on these
+  plasmids are left out (the dialog names them), because plasmid DNA from the usual E. coli
+  strains is methylated. Tick **DNA from a dam−/dcm− strain** if yours is not.
+- Choose a digest to see its gel next to your ladder. **Send to Gel Simulation** opens it in
+  Simulate Agarose Gel, one lane per outcome; **Copy as Protocol** copies the enzymes, the gel
+  and the expected sizes of every outcome for your notebook.
+
+When no digest works, the dialog says why: two molecules that differ by a few bases, or by a
+few base pairs in length, cannot be told apart on a gel (use colony PCR or sequencing); with
+**My enzymes** it offers to try all commercial enzymes.
+
 ## Saving and sharing
 
 - **Save** (Ctrl+S) writes back to the file you opened when that is safe. That means a GenBank or FASTA file holding just this one sequence, or a file Vettore saved itself.
@@ -515,6 +553,9 @@ What Vettore starts from, kept between sessions:
   every file you open next. Documents already open keep what you chose for them.
 - **Gel ladder** and **agarose percentage** — what **Tools → Simulate Agarose Gel…** opens on,
   so your usual gel is one click away.
+- **My enzymes** — the enzymes your lab has. Add them one by one, or paste a list copied from
+  a spreadsheet (names separated by commas, spaces or new lines); names Vettore does not know
+  are pointed out. **Tools → Find Diagnostic Digest…** tries these first. Empty by default.
 - **Minimum identity when detecting common features** — 95 % by default. Lower it to catch
   variants (a promoter a few bases off), raise it to 100 % to accept exact matches only.
 
