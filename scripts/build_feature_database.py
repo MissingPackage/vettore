@@ -37,7 +37,10 @@ class Entry:
     strand: int = 1
 
 
-#: Only elements whose coordinates were checked against the record's FEATURES table.
+#: Only elements whose coordinates were checked against the record's FEATURES table. A note
+#: that says "over the N bp the two share" means the independent record carries the element
+#: with a few bases less at one end: the identity is over the bases both records hold, and
+#: tests/test_features.py also requires that to be at least nine tenths of the entry.
 ENTRIES: list[Entry] = [
     # The two ends of the AAV genome carry the same inverted repeat, so one entry covers both.
     Entry("AAV2 ITR", "repeat_region", "NC_001401.2", 1, 145,
@@ -144,7 +147,8 @@ ENTRIES: list[Entry] = [
     # MP933339.1 (EP3789521, an unrelated applicant) carries the same core with 23 bp more at
     # one end, and MP864627.1 has it in reverse orientation.
     Entry("EFS promoter (human)", "promoter", "LP754738.1", 1, 252,
-          "intron-less core of the human EF-1α promoter; cross-check MP933339.1 (99.6 %)"),
+          "intron-less core of the human EF-1α promoter; "
+          "cross-check MP933339.1 (99.6 % over the 233 bp the two share)"),
     # CBh (Gray JL et al., Hum Gene Ther 2011;22:1143): a CMV enhancer fragment, the chicken
     # β-actin promoter and a shortened hybrid intron — the CAG of AAV vectors, made shorter
     # again. PY026696.1 (University of Texas) annotates the 796 bp as one misc_feature;
@@ -192,10 +196,10 @@ ENTRIES: list[Entry] = [
     # little for one entry to find the other, so each has its own.
     Entry("FLPe", "CDS", "GU253315.1", 2581, 3879,
           "thermostable Flp recombinase (FLPe) from the yeast 2-micron plasmid; "
-          "cross-check KM521212.1 (99.8 %)"),
+          "cross-check KM521212.1 (99.8 % over the 1272 bp the two share)"),
     Entry("FLPo", "CDS", "KX151728.1", 1842, 3140,
           "Flp recombinase codon-optimised for mammalian cells (FLPo); "
-          "cross-check MH493814.1 (100 %)"),
+          "cross-check MH493814.1 (100 % over the 1272 bp the two share)"),
     # loxN: a Cre site whose spacer differs from loxP, so Cre recombines it with itself and
     # not with loxP — the second site of a Brainbow-type cassette.
     Entry("loxN", "protein_bind", "OR242273.1", 3825, 3858,
@@ -242,7 +246,7 @@ ENTRIES: list[Entry] = [
           "cross-check PZ267689.1 (99.5 %)"),
     Entry("HygR (hph)", "CDS", "AJ439603.2", 884, 1903,
           "hph from Escherichia coli, hygromycin B resistance; "
-          "cross-check U40398.1 (99.6 %)"),
+          "cross-check U40398.1 (99.6 % over the 998 bp the two share)"),
     Entry("ZeoR (ble)", "CDS", "L36850.1", 5896, 6270,
           "Sh ble from Streptoalloteichus hindustanus, zeocin and phleomycin resistance; "
           "cross-check MW471125.1 (100 %)"),
@@ -263,8 +267,18 @@ def fetch(accession: str) -> str:
     if email := os.environ.get("NCBI_EMAIL"):
         params["email"] = email
     url = f"{EUTILS}?{urllib.parse.urlencode(params)}"
-    with urllib.request.urlopen(url, timeout=60) as response:
-        text = response.read().decode()
+    # E-utilities answers 429 when several callers share an address, and the whole run is
+    # wasted if one record fails, so a refusal is waited out rather than raised.
+    for attempt in range(5):
+        try:
+            with urllib.request.urlopen(url, timeout=60) as response:
+                text = response.read().decode()
+            break
+        except urllib.error.URLError as error:
+            if attempt == 4:
+                raise SystemExit(f"NCBI did not answer for {accession}: {error}") from error
+            print(f"{accession}: {error}; waiting {2 ** attempt} s", file=sys.stderr)
+            time.sleep(2 ** attempt)
     lines = [line.strip() for line in text.splitlines() if line and not line.startswith(">")]
     sequence = "".join(lines).upper()
     if not sequence:

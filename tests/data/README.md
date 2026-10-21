@@ -99,7 +99,7 @@ coordinates against the first and finds the element in the second at ≥ 98 % id
 
 | Element (entry) | The record it cites | The independent record |
 |---|---|---|
-| EFS promoter (human), `LP754738.1:1..252` | LP754738.1, sequence 14 from WO2018026976 (Editas Medicine) | MP933339.1, sequence 22 from EP3789521 (Shenzhen Istirbio), 99.6 % |
+| EFS promoter (human), `LP754738.1:1..252` | LP754738.1, sequence 14 from WO2018026976 (Editas Medicine) | MP933339.1, sequence 22 from EP3789521 (Shenzhen Istirbio), 99.6 % over the 233 bp the two share |
 | CBh promoter, `PY026696.1:1..796` | PY026696.1, sequence 25 from US 12359219 B2 (Gray & Sinnett, University of Texas) | QQ167606.1, JP 2024542950-A/60 (University of Pennsylvania), 99.9 % |
 | SV40 early promoter, `X85976.1:2537..2884` | X85976.1, plasmid pSG424 (Sadowski & Ptashne, Nucleic Acids Res 1989;17:7539) | M83237.1, vector RSV.5(neo) (Long et al., Hum Immunol 1991;31:229), 100 % |
 | β-actin promoter (human), `JN964682.1:20222..20741` | JN964682.1, targeted allele Vmp1:tm1e(KOMP)Wtsi (Skarnes et al., Nature 2011;474:337) | AY952326.1, β-actin GFP expression vector (Costa et al., Nat Methods 2005;2:259), 99.8 % |
@@ -107,8 +107,8 @@ coordinates against the first and finds the element in the second at ≥ 98 % id
 | RSV LTR promoter, `LT727488.1:complement(3997..4178)` | LT727488.1, vector pGal4-p65 (De Schamphelaire et al., direct submission) | M83237.1, vector RSV.5(neo), whose 5′ LTR holds it, 99.5 % |
 | TRE promoter, `MT891336.1:554..868` | MT891336.1, vector pGLM92 (Frei et al., Nat Commun 2020;11:4641) | OQ427855.1, vector Puro-iDEST-3×FLAG-hWFS1-WT (Tokuma, direct submission), 100 % |
 | Cre, `MK854762.1:215..1246` | MK854762.1, shuttle vector pBFS109 (Sakanaka et al., Sci Adv 2019;5:eaaw7696) | AB542060.1, Cre expression vector pTN75 (Nishiyama), 100 % |
-| FLPe, `GU253315.1:2581..3879` | GU253315.1, vector pLV.FLPe (Gonçalves et al., PLoS One 2010;5:e10954) | KM521212.1, cloning vector pECA102 (Cameron & Collins), 99.8 % |
-| FLPo, `KX151728.1:1842..3140` | KX151728.1, vector DBH-FLPo (Sun & Ray, PLoS One 2016;11:e0159474) | MH493814.1, vector pDC50/pT3TS-FLPo (Grajevskaja et al., PLoS One 2018;13:e0197293), 100 % |
+| FLPe, `GU253315.1:2581..3879` | GU253315.1, vector pLV.FLPe (Gonçalves et al., PLoS One 2010;5:e10954) | KM521212.1, cloning vector pECA102 (Cameron & Collins), 99.8 % over the 1272 bp the two share |
+| FLPo, `KX151728.1:1842..3140` | KX151728.1, vector DBH-FLPo (Sun & Ray, PLoS One 2016;11:e0159474) | MH493814.1, vector pDC50/pT3TS-FLPo (Grajevskaja et al., PLoS One 2018;13:e0197293), 100 % over the 1272 bp the two share |
 | loxN, `OR242273.1:3825..3858` | OR242273.1, vector AGG1741 (Carabajal Paladino et al., Front Bioeng Biotechnol 2023;11:1254863) | KP686439.1, vector pC-(lox2-attB2-SA-Hsp70)₃ (Diao et al., Cell Rep 2015;10:1410), 100 % |
 | F3, `LC086648.1:2498..2531` | LC086648.1, BPATrap vector (Yamanishi et al.) | HQ333206.1, cloning vector pEFFS-sigHA (Wilke et al., direct submission), 100 % |
 | EMCV IRES, `Z75185.1:1118..1693` | Z75185.1, vector pIRES-P (Hobbs et al., Biochem Biophys Res Commun 1998;252:368) | PG196517.1, JP 2023503636-A/3 (KRIBB), 99.7 % |
@@ -119,7 +119,7 @@ coordinates against the first and finds the element in the second at ≥ 98 % id
 | rabbit β-globin polyA, `MP470629.1:1..99` | MP470629.1, sequence 41 from WO2019243847 (Replimune) | OP697988.1, vector pCAG-rRBD-xrepEBNA1 (Green et al., BMC Biotechnol 2023;23:7), 99.0 % |
 | PuroR (pac), `PZ709769.1:1..600` | PZ709769.1, pac gene (de la Fuente & Simarro, direct submission) | PZ267690.1, clone UbC.WT-AcrIIA4.pLenti (Sabol et al.), 99.8 % |
 | BlastR (bsd), `GU474201.1:1..399` | GU474201.1, vector pYC6/CT bsd gene (Zhang et al., direct submission) | PZ267689.1, clone U6.gRNA.pLenti (Sabol et al.), 99.5 % |
-| HygR (hph), `AJ439603.2:884..1903` | AJ439603.2, chimaeric cloning vector (Benito et al., Eur J Plant Pathol 1998;104:207) | U40398.1, hygromycin cassette of a mammalian vector (Yin & Schimke, Cancer Res 1995;55:4922), 99.6 % |
+| HygR (hph), `AJ439603.2:884..1903` | AJ439603.2, chimaeric cloning vector (Benito et al., Eur J Plant Pathol 1998;104:207) | U40398.1, hygromycin cassette of a mammalian vector (Yin & Schimke, Cancer Res 1995;55:4922), 99.6 % over the 998 bp the two share |
 | ZeoR (ble), `L36850.1:5896..6270` | L36850.1, vector pZEO (Drocourt et al., Nucleic Acids Res 1990;18:4009) | MW471125.1, clone pCRISPR01-FnCpf1 (Abdulrachman & Pootanakit, direct submission), 100 % |
 | Myc tag, `AJ243205.1:147..179` | AJ243205.1, cloning vector pUR4546 (Harmsen et al., Mol Immunol 2000;37:579) | A05511.1, MYC tag sequence from WO 9005144-A1, 100 % |
 | V5 tag, `AM700585.1:70..111` | AM700585.1, V5-tagged FcεRIγ construct (Viertlböck et al., PNAS 2007;104:11718) | AY682091.1, DEC205 construct (Gurer et al., Blood 2008;112:1231), 100 % |

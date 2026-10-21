@@ -6,7 +6,7 @@ from typing import ClassVar
 from unittest import mock
 
 import pytest
-from Bio import SeqIO
+from Bio import Align, SeqIO
 from Bio.Seq import Seq
 from cloning_helpers import clean_dna, rc
 
@@ -654,6 +654,27 @@ def test_a_catalogue_entry_is_its_record_at_the_coordinates_it_cites(element):
     assert (start - 1, end - 1, strand) in {(m.start, m.end, m.strand) for m in matches}
 
 
+def shared_span(feature, found: str) -> tuple[float, float]:
+    """(identity, coverage) of a catalogue ``feature`` against a copy of it found in another
+    record, measured here rather than taken from the match: identity over the bases the two
+    share, coverage over the entry's own length. The two are reported apart because a second
+    record often carries the element with a few bases less at one end — the last 19 bp of the
+    EFS promoter, 27 of FLPe and FLPo, 22 of hph — and averaging a missing flank into an
+    identity would hide how well the bases that are there agree.
+
+    Computed with a plain local alignment, not with ``Match.identity``, so that this check
+    tests the sequences and not the engine that found them.
+    """
+    aligner = Align.PairwiseAligner(scoring="blastn")
+    aligner.mode = "local"
+    alignment = aligner.align(feature.sequence, found)[0]
+    reference, query = alignment[0], alignment[1]
+    same = sum(1 for a, b in zip(reference, query) if a == b and a != "-")
+    identity = 100.0 * same / len(reference)
+    aligned = sum(1 for a in reference if a != "-")
+    return identity, 100.0 * aligned / feature.length
+
+
 @pytest.mark.parametrize(("element", "accession"), sorted(CROSS_CHECKS.items()))
 def test_a_catalogue_entry_is_found_in_an_independent_record(element, accession):
     feature = entry(element)
@@ -664,6 +685,13 @@ def test_a_catalogue_entry_is_found_in_an_independent_record(element, accession)
     assert all(m.identity >= 98.0 for m in matches), element
     found = max(m.end - m.start + 1 for m in matches)
     assert found >= 0.9 * feature.length, element
+    # The same claim again, measured outside the engine: the bases the two records share
+    # agree at 98 % or better, over at least nine tenths of the entry.
+    best = max(matches, key=lambda m: m.identity)
+    copy = sequence[best.start : best.end + 1]
+    identity, coverage = shared_span(feature, rc(copy) if best.strand == -1 else copy)
+    assert identity >= 98.0, f"{element}: {identity:.1f} % over the shared bases"
+    assert coverage >= 90.0, f"{element}: {coverage:.1f} % of the entry found"
 
 
 def test_every_cross_checked_element_is_found_side_by_side_in_one_construct():
