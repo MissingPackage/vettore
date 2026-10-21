@@ -17,6 +17,7 @@ import {
   canSaveInPlace,
   createDocument,
   editorState,
+  isDirty,
   markSaved,
   needsSave,
   now,
@@ -713,26 +714,30 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, circular]);
 
-  // Draw (or take off) the lab-library primers that bind the active document. The overlay
-  // primers are tagged so the engine never writes them to a saved file; turning the toggle off
-  // removes them again.
+  // Draw (or take off) the lab-library primers that bind the active document. The overlay is a
+  // view, not an edit: it stays out of Undo, a document that had no unsaved changes still has
+  // none, and the engine never writes the tagged overlay primers to a saved file.
   useEffect(() => {
     if (!active) return;
+    const put = (data: SequenceData, primers: unknown[]) => {
+      const wasClean = !isDirty(editorState(active));
+      store.dispatch(actions.updateSequenceData({ ...data, primers },
+        { editorName: active, disregardUndo: true }));
+      if (wasClean) markSaved(active);
+    };
     const data = editorState(active)?.sequenceData as SequenceData | undefined;
     if (!data) return;
-    const put = (primers: unknown[]) =>
-      store.dispatch(actions.updateSequenceData({ ...data, primers }, { editorName: active }));
     if (!prefs.showLibraryPrimers) {
       const own = removeOverlay(data.primers);
       const list = Array.isArray(data.primers) ? data.primers : Object.values(data.primers ?? {});
-      if (own.length !== list.length) put(own);
+      if (own.length !== list.length) put(data, own);
       return;
     }
     let live = true;
     api.primerLibrary.bindings(data)
       .then((r) => {
         const now = editorState(active)?.sequenceData as SequenceData | undefined;
-        if (live && now) put(withOverlay(now.primers, r.primers));
+        if (live && now) put(now, withOverlay(now.primers, r.primers));
       })
       .catch(() => undefined);
     return () => { live = false; };

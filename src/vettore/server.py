@@ -18,7 +18,18 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import alignment, app_info, digest_planner, fileio, gel, primer_design, primer_library, sanger, settings, tm
+from . import (
+    alignment,
+    app_info,
+    digest_planner,
+    fileio,
+    gel,
+    primer_design,
+    primer_library,
+    sanger,
+    settings,
+    tm,
+)
 from . import features as common_features
 from .cloning.api import router as cloning_router
 from .cloning.base import CloningError, dna_sequence

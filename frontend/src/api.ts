@@ -206,8 +206,10 @@ export const api = {
     /** Parse pasted or file text (name, sequence, notes…) without saving, so the dialog can show
      * what will be kept and what will be left out. */
     parse: (text: string) => call<{ primers: LibraryPrimer[]; rejected: RejectedRow[]; today: string }>("primer-library/parse", { text }),
-    /** Library primers that bind the given document, with their binding sites. */
-    bindings: (sequenceData: SequenceData) => call<{ primers: BoundPrimer[] }>("primer-library/bindings", { sequenceData }),
+    /** Library primers that bind the given document, with their binding sites: those of
+     * `primers` when given (the dialog's unsaved list), otherwise those of the saved file. */
+    bindings: (sequenceData: SequenceData, primers?: object[]) =>
+      call<{ primers: BoundPrimer[] }>("primer-library/bindings", { sequenceData, primers }),
     /** Library primers that read across a region (sequencing primers), in reading order. */
     sequencing: (sequenceData: SequenceData, start: number, end: number) =>
       call<{ primers: { name: string; sequence: string; strand: number; start: number; end: number; reads_from: number }[] }>(

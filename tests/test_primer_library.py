@@ -218,3 +218,13 @@ def test_parse_route_reports_rejected_rows_without_saving(client):
     assert len(body["primers"]) == 1 and len(body["rejected"]) == 1 and body["today"]
     # Nothing was written: the library is still empty.
     assert client.get("/api/primer-library", headers=headers()).json()["primers"] == []
+
+
+def test_bindings_route_uses_the_dialogs_unsaved_list_when_given(client):
+    # Nothing saved, but the dialog sends its working list: the new primer binds at once.
+    seq = ("AAAACCCC" + PRIMER + "GGGGTTTT").upper()
+    r = client.post("/api/primer-library/bindings",
+                    json={"sequenceData": {"sequence": seq, "circular": False},
+                          "primers": [{"name": "Unsaved", "sequence": PRIMER}]}, headers=headers())
+    assert r.status_code == 200
+    assert [p["name"] for p in r.json()["primers"]] == ["Unsaved"]

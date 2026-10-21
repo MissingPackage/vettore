@@ -81,14 +81,15 @@ function PrimerLibraryDialog(props: ToolProps) {
       return;
     }
     let live = true;
-    // Bindings are computed against the saved shared file, so they refresh when the document
-    // changes or the file is saved or reloaded (its modification time changes).
-    api.primerLibrary.bindings(activeData)
-      .then((r) => live && setBound(r.primers))
-      .catch(() => live && setBound(null));
-    return () => { live = false; };
+    // The dialog's own list, saved or not, so a primer just added or imported shows at once.
+    const t = setTimeout(() => {
+      api.primerLibrary.bindings(activeData, primers as unknown as object[])
+        .then((r) => live && setBound(r.primers))
+        .catch(() => live && setBound(null));
+    }, 250);
+    return () => { live = false; clearTimeout(t); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeKey, file.mtime]);
+  }, [activeKey, primers]);
 
   const shown = useMemo(() => filterPrimers(primers, query), [primers, query]);
 

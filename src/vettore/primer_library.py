@@ -420,7 +420,11 @@ class ImportText(BaseModel):
 
 
 class OnSequence(BaseModel):
+    """A document, and optionally the primers to look for on it: the Primer Library dialog sends
+    its working list (with changes not yet saved); without one, the saved shared file is used."""
+
     sequenceData: dict[str, Any]
+    primers: list[dict[str, Any]] | None = None
 
 
 class SequencingRequest(BaseModel):
@@ -492,11 +496,14 @@ def parse(body: ImportText) -> dict[str, Any]:
 @router.post("/bindings")
 def bindings(body: OnSequence) -> dict[str, Any]:
     sequence, circular = _sequence_of(body.sequenceData)
-    try:
-        library = read_library()
-    except PrimerLibraryError as exc:
-        raise HTTPException(422, str(exc)) from exc
-    primers = _primers_from_payload(library["primers"])
+    if body.primers is not None:
+        rows = body.primers
+    else:
+        try:
+            rows = read_library()["primers"]
+        except PrimerLibraryError as exc:
+            raise HTTPException(422, str(exc)) from exc
+    primers = _primers_from_payload(rows)
     return {"primers": library_on_sequence(primers, sequence, circular)}
 
 

@@ -217,7 +217,7 @@ Choose **Primers → Primer Library…**. The table lists each primer with its n
 
 The library is **one .csv file**. Keep it in a shared folder — OneDrive, Dropbox, a lab drive — so everyone in the lab shares the same list. Vettore reads it from the path you choose (**Change file…**) and writes your changes back there when you press **Save to File**. Nothing is locked: if a colleague changed the file while you had it open, Vettore tells you and offers **Reload**.
 
-**Primers → Show Library Primers** draws the library primers that bind the open document on its map. A primer binds where its last 15 bases match exactly and the rest of it matches with at most two mismatches; a 5′ tail is allowed, and both strands are searched. These primers are a view, not part of the document — they are never written when you save the file. The Primer Library dialog also lists, for the open document, which library primers bind it and where.
+**Primers → Show Library Primers** draws the library primers that bind the open document on its map. A primer binds where its last 15 bases match exactly and the rest of it matches with at most two mismatches; a 5′ tail is allowed, and both strands are searched. These primers are a view, not part of the document: showing them does not count as a change, Undo leaves them alone, and they are never written when you save the file. The Primer Library dialog also lists, for the open document, which library primers bind it and where.
 
 ## Cloning simulations (Actions menu)
 
