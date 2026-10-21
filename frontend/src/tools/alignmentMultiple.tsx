@@ -263,8 +263,9 @@ function ConservationBar({ conservation }: { conservation: (number | null)[] }) 
            preserveAspectRatio="none" shapeRendering="crispEdges" role="img"
            aria-label={`Conservation along ${bp(conservation.length)} columns`}>
         {bins.map((b, i) => (
-          <rect key={i} x={i} width={1} y={100 - Math.max(2, b.mean ?? 100)}
-                height={Math.max(2, b.mean ?? 100)}
+          // A column only one sequence covers compares nothing: a thin grey stub, not a bar.
+          <rect key={i} x={i} width={1} y={100 - (b.mean === null ? 6 : Math.max(2, b.mean))}
+                height={b.mean === null ? 6 : Math.max(2, b.mean)}
                 className={`is-${conservationLevel(b.mean)}`}>
             <title>{describeBin(b)}</title>
           </rect>
@@ -338,8 +339,9 @@ function PairDifferences({ rows }: { rows: MultipleResult["sequences"] }) {
         ) : (
           <>
             <p className="vt-msa-meta" data-testid="msa-pair-summary">
-              Over {rows[a].name}'s bases {bp(comparison.start ?? 0)}–{bp(comparison.end ?? 0)}:
-              {" "}{comparison.identity.toFixed(2)} % identical; {summarizeCounts(comparison.counts)}.
+              Compared over {bp(comparison.overlap)} of {rows[a].name}'s {bp(rows[a].length)} bp
+              {comparison.overlap < rows[a].length && ` (from its base ${bp(comparison.start ?? 0)} to ${bp(comparison.end ?? 0)})`}:
+              {" "}{comparison.identity.toFixed(2)} % identical there; {summarizeCounts(comparison.counts)}.
               Positions and bases are given in {rows[a].name}'s own numbering and strand.
               {comparison.unknown > 0 && ` ${bp(comparison.unknown)} position${comparison.unknown === 1 ? "" : "s"} with N (unknown base) are not counted as differences.`}
             </p>

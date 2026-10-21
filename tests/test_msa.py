@@ -376,3 +376,67 @@ def test_a_new_alignment_stops_the_one_still_running():
     second = msa.start([doc("a", BASE, False), doc("b", BASE, False)])
     assert msa.JOBS[first].cancelled or msa.JOBS[first].done.is_set()
     msa.JOBS[second].done.wait(30)
+
+
+# ---- regressions found by the second adversarial review ----------------------------------
+
+def _two(a_seq, b_seq, circular=True):
+    result = msa.multiple_alignment([doc("a", a_seq, circular), doc("b", b_seq, circular)])
+    by_name = {s["name"]: s for s in result["sequences"]}
+    return result, msa.compare(by_name["a"], by_name["b"])
+
+
+def snp(seq: str, i: int) -> str:
+    return seq[:i] + ("A" if seq[i] != "A" else "C") + seq[i + 1:]
+
+
+def test_plasmids_with_inserts_of_different_length_are_compared_all_round():
+    backbone = clean_dna(3000, 81)
+    gfp, cherry = clean_dna(720, 82), clean_dna(1400, 83)
+    mutated = snp(snp(backbone, 120), 2500)
+    result, out = _two(backbone[:1000] + gfp + backbone[1000:],
+                       mutated[:1000] + cherry + mutated[1000:])
+    assert result["columns"] < 3000 + 720 + 1400
+    starts = sorted(d["start"] for d in out["differences"] if d["kind"] == "mismatch")
+    assert starts == [121, 2501 + 720]
+    [gap] = out["unrelated"]
+    assert abs(gap["start"] - 1001) < 5 and gap["a_bases"] > 700
+
+
+@pytest.mark.parametrize("change", ["snp1", "del5", "del50", "ins50"])
+def test_a_difference_next_to_base_1_of_two_circles_is_never_lost(change):
+    marker = 2000
+    other = snp(BASE, marker)
+    other = {"snp1": snp(other, 0), "del5": other[:4] + other[14:],
+             "del50": other[:20] + other[70:],
+             "ins50": other[:20] + clean_dna(50, 84) + other[20:]}[change]
+    _, out = _two(BASE, other)
+    kinds = sorted(d["kind"] for d in out["differences"])
+    expected = {"snp1": ["mismatch", "mismatch"], "del5": ["deletion", "mismatch"],
+                "del50": ["deletion", "mismatch"], "ins50": ["insertion", "mismatch"]}[change]
+    assert kinds == expected and out["unrelated"] == []
+    assert (out["start"], out["end"]) == (1, len(BASE))
+
+
+@pytest.mark.parametrize("size", [80, 150, 400])
+def test_long_deletions_are_deletions_not_unrelated_stretches(size):
+    _, out = _two(BASE, BASE[:1000] + BASE[1000 + size:], circular=False)
+    assert out["counts"]["deletions"] == 1 and out["counts"]["deleted_bases"] == size
+    assert out["unrelated"] == []
+
+
+def test_unrelated_ends_of_linear_sequences_are_named():
+    shared = BASE[:1200]
+    _, out = _two(clean_dna(800, 85) + shared, clean_dna(800, 86) + shared, circular=False)
+    [gap] = out["unrelated"]
+    assert gap["start"] < 200 and gap["end"] > 700   # before it, b has not begun yet
+
+
+def test_a_fragment_of_another_circle_does_not_reopen_the_first():
+    p = clean_dna(1500, 87)
+    q = clean_dna(2500, 88) + p + clean_dna(2000, 89)
+    fragment = q[3700:4300]                                  # inside q, crossing no origin
+    result = msa.multiple_alignment([doc("P", p, True), doc("Q", q, True),
+                                     doc("F", fragment, False)])
+    by_name = {s["name"]: s for s in result["sequences"]}
+    assert by_name["P"]["origin_moved_to"] is None
