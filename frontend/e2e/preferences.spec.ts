@@ -146,3 +146,25 @@ test("a refusal to change the file associations is explained under the option", 
   await expect(page.getByTestId("pref-open-with")).not.toBeChecked();
   await expect(page.getByTestId("pref-open-with")).toBeEnabled();
 });
+
+test("the dark appearance darkens the frame only, and survives a restart", async ({ page }) => {
+  await page.goto(`/?token=${TOKEN}`);
+  await page.getByTestId("file-input").setInputFiles(data("pFA-KanMX4.dna"));
+  await expect(page.locator(".veCircularView")).toBeVisible();
+  await expect(page.locator("html")).toHaveAttribute("data-chrome", "light");
+
+  await menu(page, "File", "Preferences…");
+  await page.getByTestId("pref-chrome").selectOption("dark");
+  await page.getByTestId("pref-close").click();
+  await expect(page.locator("html")).toHaveAttribute("data-chrome", "dark");
+
+  const bg = (selector: string) =>
+    page.locator(selector).first().evaluate((el) => getComputedStyle(el).backgroundColor);
+  expect(await bg(".vt-status-bar")).toBe("rgb(29, 35, 43)");
+  // The map stays on white: its feature and enzyme colours are drawn for a light page.
+  expect(await bg(".veCircularView")).not.toBe("rgb(29, 35, 43)");
+  await page.screenshot({ path: "test-results/preferences-dark.png" });
+
+  await page.reload();
+  await expect(page.locator("html")).toHaveAttribute("data-chrome", "dark");
+});

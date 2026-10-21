@@ -42,6 +42,7 @@ import { applyEnzymeSet, ENZYME_SETS, type EnzymeSetId } from "./enzymeSets";
 import { ENZYMES } from "./enzymeLogic";
 import { OVERLAY_VIEWS, showView, VIEWS, type ViewId } from "./views";
 import ViewTabs from "./ViewTabs";
+import { applyChrome, usePreferences } from "./preferences";
 import { ACCEPT, dirName, SAVE_EXTENSION, safeFileName, type SaveKind } from "./files/formats";
 import { addNotice, dismissNotice, messageOf, type Notice, type NoticeKind } from "./files/notices";
 import NoticeStack from "./files/NoticeStack";
@@ -124,6 +125,10 @@ export default function App() {
   const height = useWindowHeight();
   const docsRef = useRef(docs);
   docsRef.current = docs;
+
+  // Light or dark frame, as chosen in Preferences (theme/dark-chrome.css).
+  const { chrome } = usePreferences();
+  useEffect(() => applyChrome(chrome), [chrome]);
 
   // Documents opened in the last two seconds: their tab glows once so the eye finds it (a new
   // cloning product among several tabs).
