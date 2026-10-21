@@ -192,3 +192,24 @@ def test_route(tmp_path, monkeypatch):
     res = client.post("/api/diagnostic-digest", json=body, headers={TOKEN_HEADER: "t"})
     assert res.status_code == 422
     assert "wrong clone" in res.json()["detail"]
+
+
+def test_pairs_in_one_buffer_come_before_pairs_in_two():
+    mine = ["EcoRI", "PstI", "SphI", "HindIII", "NcoI", "SalI", "NdeI"]
+    plain = plan_for_cloning(enzymes=mine)
+    pairs = [r for r in plain["results"] if len(r["enzymes"]) == 2]
+    assert pairs, "the set gives double digests to rank"
+    first = pairs[0]["enzymes"]
+    # Put the first pair's enzymes in different buffers and every other enzyme in one buffer.
+    buffers = {e: "r3.1" if e == first[0] else "rCutSmart" for e in mine}
+    ranked = plan_for_cloning(enzymes=mine, buffers=buffers)
+    by_enzymes = {tuple(r["enzymes"]): r for r in ranked["results"]}
+    mixed = by_enzymes[tuple(first)]
+    assert mixed["mixed_buffers"] is True
+    assert mixed["buffers"] == ["r3.1", "rCutSmart"]
+    doubles = [r for r in ranked["results"] if len(r["enzymes"]) == 2]
+    assert doubles.index(mixed) > 0
+    assert all(not r["mixed_buffers"] for r in doubles[:doubles.index(mixed)])
+    # Unknown buffers never count as different.
+    assert not any(r["mixed_buffers"] for r in plan_for_cloning(enzymes=mine)["results"])
+    assert all(r["buffers"] == [None] * len(r["enzymes"]) for r in plain["results"])

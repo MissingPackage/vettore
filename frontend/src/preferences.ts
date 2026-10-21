@@ -20,6 +20,8 @@ export interface Preferences {
   /** The enzymes in the lab's freezer: Find Diagnostic Digest tries these first. Empty until
    * the user fills it in, and then the commercial set is used. */
   myEnzymes: string[];
+  /** The buffer the lab digests each of "My enzymes" in, by enzyme name ("rCutSmart"). */
+  enzymeBuffers: Record<string, string>;
 }
 
 export type ChromeTheme = "light" | "dark" | "system";
@@ -39,6 +41,7 @@ const DEFAULTS: Preferences = {
   detectMinIdentity: 95,
   chrome: "light",
   myEnzymes: [],
+  enzymeBuffers: {},
 };
 
 function clean(stored: Partial<Preferences>): Preferences {
@@ -51,11 +54,24 @@ function clean(stored: Partial<Preferences>): Preferences {
   }
   if (!CHROME_THEMES.some((t) => t.id === prefs.chrome)) prefs.chrome = DEFAULTS.chrome;
   prefs.myEnzymes = knownEnzymes(prefs.myEnzymes);
+  prefs.enzymeBuffers = cleanBuffers(prefs.enzymeBuffers);
   return prefs;
 }
 
 export function defaultPreferences(): Preferences {
-  return { ...DEFAULTS, myEnzymes: [] };
+  return { ...DEFAULTS, myEnzymes: [], enzymeBuffers: {} };
+}
+
+/** Buffers kept by the enzyme's database name; empty or unknown entries are dropped. */
+function cleanBuffers(stored: unknown): Record<string, string> {
+  if (!stored || typeof stored !== "object") return {};
+  const out: Record<string, string> = {};
+  for (const [raw, buffer] of Object.entries(stored as Record<string, unknown>)) {
+    const name = ENZYMES[raw.trim().toLowerCase()]?.name;
+    // Kept as typed (a space typed between two words must stay); blank entries are dropped.
+    if (name && typeof buffer === "string" && buffer.trim()) out[name] = buffer;
+  }
+  return out;
 }
 
 /** Enzyme names as the database writes them, each once; anything else is dropped. */
@@ -71,13 +87,32 @@ export function knownEnzymes(names: unknown): string[] {
 
 /**
  * Enzyme names typed or pasted as a list (commas, spaces, semicolons or new lines between
- * them, as copied from a spreadsheet): the names Vettore knows, and the words it does not.
+ * them): the names Vettore knows, and the words it does not. Two columns copied from a
+ * spreadsheet (enzyme, Tab, buffer) also give each enzyme its buffer.
  */
-export function parseEnzymeList(text: string): { known: string[]; unknown: string[] } {
-  const words = text.split(/[\s,;]+/).map((w) => w.trim()).filter(Boolean);
-  const known = knownEnzymes(words);
-  const unknown = words.filter((w) => !ENZYMES[w.toLowerCase()]);
-  return { known, unknown: [...new Set(unknown)] };
+export function parseEnzymeList(text: string): {
+  known: string[];
+  unknown: string[];
+  buffers: Record<string, string>;
+} {
+  const words: string[] = [];
+  const buffers: Record<string, string> = {};
+  for (const line of text.split(/\r?\n/)) {
+    const [first, ...rest] = line.split("\t");
+    const buffer = rest.join(" ").trim();
+    if (buffer) {
+      const name = first.trim();
+      words.push(name);
+      const known = ENZYMES[name.toLowerCase()]?.name;
+      if (known) buffers[known] = buffer;
+    } else {
+      words.push(...line.split(/[\s,;]+/));
+    }
+  }
+  const cleaned = words.map((w) => w.trim()).filter(Boolean);
+  const known = knownEnzymes(cleaned);
+  const unknown = cleaned.filter((w) => !ENZYMES[w.toLowerCase()]);
+  return { known, unknown: [...new Set(unknown)], buffers };
 }
 
 export function loadPreferences(): Preferences {

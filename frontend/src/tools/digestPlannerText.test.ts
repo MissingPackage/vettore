@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { parseEnzymeList } from "../preferences";
 import { blockedByMethylation, protocolText, type PlannerResult } from "./digestPlannerText";
 
 describe("blockedByMethylation", () => {
@@ -18,6 +19,8 @@ describe("blockedByMethylation", () => {
 describe("protocolText", () => {
   const result: PlannerResult = {
     enzymes: ["EcoRI", "PstI"],
+    buffers: [null, null],
+    mixed_buffers: false,
     same_pattern: [["XmnI", "PstI"]],
     sentence: "",
     clear: true,
@@ -36,5 +39,29 @@ describe("protocolText", () => {
     expect(text).toContain("Expected clone: 3,236 bp + 1,125 bp + 40 bp (too small to see)");
     expect(text).toContain("parent vector: 4,361 bp, not cut (a supercoiled plasmid runs ahead of its size)");
     expect(text).toContain("Same bands with: XmnI + PstI");
+    expect(text).not.toContain("Note:");
+  });
+
+  it("names each enzyme's buffer and says what to do when they differ", () => {
+    const mixed = { ...result, buffers: ["rCutSmart", "NEBuffer r3.1"], mixed_buffers: true };
+    const text = protocolText("pX", mixed, { percent: 1, ladderLabel: "L" }, [true, true]);
+    expect(text).toContain("Digest: EcoRI (rCutSmart) + PstI (NEBuffer r3.1) (double digest)");
+    expect(text).toContain("Note: EcoRI and PstI go in different buffers");
+  });
+});
+
+describe("parseEnzymeList", () => {
+  it("reads two columns copied from a spreadsheet as enzyme and buffer", () => {
+    const parsed = parseEnzymeList("EcoRI\trCutSmart\nsali\tNEBuffer r3.1\nPstI");
+    expect(parsed.known).toEqual(["EcoRI", "SalI", "PstI"]);
+    expect(parsed.buffers).toEqual({ EcoRI: "rCutSmart", SalI: "NEBuffer r3.1" });
+    expect(parsed.unknown).toEqual([]);
+  });
+
+  it("still reads a plain list and points out unknown names", () => {
+    const parsed = parseEnzymeList("EcoRI, PstI; Hind3");
+    expect(parsed.known).toEqual(["EcoRI", "PstI"]);
+    expect(parsed.unknown).toEqual(["Hind3"]);
+    expect(parsed.buffers).toEqual({});
   });
 });

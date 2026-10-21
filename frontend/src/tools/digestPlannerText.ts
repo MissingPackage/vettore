@@ -12,6 +12,10 @@ export interface PlannerLane {
 
 export interface PlannerResult {
   enzymes: string[];
+  /** The lab's buffer for each enzyme (File → Preferences → My enzymes), null when not set. */
+  buffers: (string | null)[];
+  /** The two enzymes go in different buffers. */
+  mixed_buffers: boolean;
   same_pattern: string[][];
   sentence: string;
   clear: boolean;
@@ -48,6 +52,19 @@ export function blockedByMethylation(molecules: { sequence: string; circular: bo
   return [...blocked].sort((a, b) => a.localeCompare(b));
 }
 
+/** "EcoRI (rCutSmart) + SalI (r3.1)": each enzyme with its buffer, when the lab gave one. */
+export function enzymesWithBuffers(result: Pick<PlannerResult, "enzymes" | "buffers">): string {
+  return result.enzymes
+    .map((e, i) => (result.buffers?.[i]?.trim() ? `${e} (${result.buffers[i]!.trim()})` : e))
+    .join(" + ");
+}
+
+/** What to do when the two enzymes of a double digest go in different buffers. */
+export function mixedBuffersAdvice(result: PlannerResult): string {
+  const [a, b] = result.enzymes;
+  return `${a} and ${b} go in different buffers: digest with one, then the other, or use a buffer both are active in.`;
+}
+
 const bp = (n: number) => `${n.toLocaleString("en-US")} bp`;
 
 function laneLine(lane: PlannerLane, circular: boolean): string {
@@ -67,7 +84,8 @@ export function protocolText(
   const kind = result.enzymes.length === 1 ? "single digest" : "double digest";
   const lines = [
     `Diagnostic digest for “${expectedName}”`,
-    `Digest: ${result.enzymes.join(" + ")} (${kind})`,
+    `Digest: ${enzymesWithBuffers(result)} (${kind})`,
+    ...(result.mixed_buffers ? [`Note: ${mixedBuffersAdvice(result)}`] : []),
     `Gel: ${gel.percent.toFixed(1)} % agarose, ladder ${gel.ladderLabel}`,
     "",
     "Expected bands:",

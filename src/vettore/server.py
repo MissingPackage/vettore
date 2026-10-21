@@ -102,6 +102,7 @@ class DiagnosticDigestRequest(BaseModel):
     excluded: list[str] = []
     ladder: str = gel.DEFAULT_LADDER
     percent: float = gel.DEFAULT_PERCENT
+    buffers: dict[str, str] = {}      # the lab's buffer per enzyme ("My enzymes")
 
 
 class Unsaved(BaseModel):
@@ -441,7 +442,7 @@ def create_app(token: str, static_dir: Path | None,
         return digest_planner.plan(
             (body.expected.name, body.expected.sequenceData),
             [(alt.name, alt.sequenceData) for alt in body.alternatives],
-            body.enzymes, body.excluded, body.percent, body.ladder)
+            body.enzymes, body.excluded, body.percent, body.ladder, body.buffers)
 
     @app.get("/api/recent")
     def recent() -> dict[str, list[str]]:
