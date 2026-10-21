@@ -31,6 +31,9 @@ import {
 // Blueprint 3 typings predate React 18 (no implicit `children`).
 /** Identical bases in a row that hold the alignment of an end (ANCHOR_WORD in msa.py). */
 const ANCHOR_BASES = 12;
+/** Below this, a shared stretch scores under what the engine needs to call it homologous
+ *  (SEGMENT_MIN in msa.py, about 30 identical bases): "no overlap" would be misleading. */
+const SHORT_TO_COMPARE = 40;
 const { Callout } = Blueprint as unknown as Record<string, React.ComponentType<any>>;
 
 const ALIGNMENT_ID = "vettore-progressive-alignment";
@@ -337,7 +340,12 @@ function PairDifferences({ rows }: { rows: MultipleResult["sequences"] }) {
       {error && <p className="vt-msa-invalid">{error}</p>}
       {comparison && (
         comparison.overlap === 0 ? (
-          <p className="vt-msa-meta">These two do not overlap in the alignment.</p>
+          <p className="vt-msa-meta">
+            {Math.min(rows[a].length, rows[b].length) < SHORT_TO_COMPARE
+              ? `At least one of the two is under ${SHORT_TO_COMPARE} bp: too short for the differences `
+                + "between them to be listed reliably. Look at the two rows in the alignment above."
+              : "These two do not overlap in the alignment."}
+          </p>
         ) : (
           <>
             <p className="vt-msa-meta" data-testid="msa-pair-summary">
