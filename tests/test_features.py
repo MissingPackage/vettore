@@ -603,14 +603,14 @@ CROSS_CHECKS = {
     "β-actin promoter (human)": "AY952326.1",
     "HSV TK promoter": "AJ277960.1",
     "RSV LTR promoter": "M83237.1",
-    "TRE promoter": "OQ427855.1",
+    "TRE promoter (tight)": "OQ427855.1",
     "Cre": "AB542060.1",
     "FLPe": "KM521212.1",
     "FLPo": "MH493814.1",
     "loxN": "KP686439.1",
     "F3": "HQ333206.1",
-    "EMCV IRES": "PG196517.1",
-    "P2A": "LT962383.1",
+    "EMCV IRES": "OQ427855.1",
+    "P2A": "MG880225.1",
     "T2A": "PZ285977.1",
     "WPRE3": "MQ017553.1",
     "hGH polyA": "MP470633.1",
@@ -619,7 +619,7 @@ CROSS_CHECKS = {
     "BlastR (bsd)": "PZ267689.1",
     "HygR (hph)": "U40398.1",
     "ZeoR (ble)": "MW471125.1",
-    "Myc tag": "A05511.1",
+    "Myc tag": "MF966512.1",
     "V5 tag": "AY682091.1",
 }
 
@@ -845,7 +845,8 @@ def test_the_catalogue_carries_the_promoters_of_the_cell_line_pretests():
     held = {f.name for f in catalogue()}
     assert set(PRETEST_PROMOTERS) <= held
     # The CMV/chicken β-actin hybrids the pretests also use, and the inducible promoter.
-    assert {"CAG promoter", "CAG promoter (truncated)", "CBh promoter", "TRE promoter"} <= held
+    assert {"CAG promoter", "CAG promoter (truncated)", "CBh promoter",
+            "TRE promoter (tight)"} <= held
 
 
 @pytest.mark.parametrize("element", PRETEST_PROMOTERS)
@@ -967,6 +968,44 @@ def test_the_species_check_covers_the_new_entries(element, label, wrong):
     [row] = [r for r in out["features"] if r["name"] == element]
     assert row["isNew"] is False and row["annotatedAs"] == label
     assert bool(row["labelWarning"]) is wrong
+
+
+@pytest.mark.parametrize(("element", "label"), [
+    # The CAG and CBh promoters are hybrids, and the labels their users write name the pieces
+    # they are made of. Each of those names belongs to a different catalogue entry — the human
+    # β-actin promoter, the rabbit β-globin polyA signal — and before the kind and species
+    # checks every one of these raised a wrong-label warning on a correctly labelled construct.
+    ("CAG promoter", "chicken beta-actin promoter"),
+    ("CAG promoter", "chicken β-actin promoter"),
+    ("CAG promoter", "rabbit beta-globin intron"),
+    ("CBh promoter", "chicken ACTB promoter"),
+    # WPRE3 is 246 bp of the WPRE, base for base, so its author's loose "WPRE" is not wrong.
+    ("WPRE3", "WPRE"),
+])
+def test_a_label_naming_what_a_hybrid_is_made_of_is_not_a_wrong_label(element, label):
+    sequence, existing = _plasmid_with(element, label)
+    out = detect_payload(sequence, False, DEFAULT_MIN_IDENTITY, existing)
+    [row] = [r for r in out["features"] if r["name"] == element]
+    assert not row["labelWarning"], row["labelWarning"]
+
+
+def test_a_label_of_the_wrong_kind_or_species_is_still_caught():
+    """The two new filters narrow the check; they do not switch it off. A block that really is
+    the human β-actin promoter and calls itself the chicken one is still a wrong label."""
+    from vettore.features import _kind_conflict, _names_another_element, _species_conflict
+
+    assert _species_conflict("chicken β-actin promoter", "β-actin promoter (human)")
+    assert _kind_conflict("rabbit β-globin intron", "rabbit β-globin polyA")
+    assert not _kind_conflict("rabbit β-globin polyA", "rabbit β-globin polyA")
+    # A promoter label over an enhancer is left alone on purpose: a CMV enhancer-and-promoter
+    # block is labelled either way and neither label is wrong.
+    assert not _kind_conflict("CMV promoter", "CMV enhancer")
+    assert _names_another_element("hSyn1 promoter", "CamKIIα promoter")
+
+    sequence, existing = _plasmid_with("β-actin promoter (human)", "chicken ACTB promoter")
+    out = detect_payload(sequence, False, DEFAULT_MIN_IDENTITY, existing)
+    [row] = [r for r in out["features"] if r["name"] == "β-actin promoter (human)"]
+    assert row["labelWarning"]
 
 
 # ---- detection speed --------------------------------------------------------------------
@@ -1278,6 +1317,16 @@ def _plasmid(element_names: tuple[str, ...], sites: int = 0,
 #: verbatim AAV vector costs almost nothing precisely because every element is exact, so 2 M
 #: is nearly six times its cost and still an eighth of the 15.3 M it costs without the
 #: shortcut that makes it cheap.
+#:
+#: Growing the catalogue from 36 entries to 60 moves only the stress and all-in-one figures,
+#: and by a few per cent: on the stress plasmid 3.0 M cells, and all of that is the CBh
+#: promoter, whose seeds land on the CAG promoter there and whose alignment is then thrown
+#: away. Thrown away for want of coverage, not identity: CBh and CAG agree on 96.2 % of the
+#: bases they align, which clears the 95 % the engine asks, but the alignment reaches only
+#: 87.8 % of the CBh entry, short of the 90 % a promoter must cover.
+#: `test_the_cbh_promoter_is_not_reported_on_a_cag_promoter` pins both figures, because an
+#: engine that let this pair through would call every CAG promoter a CBh as well. The cost is
+#: in the elements a sequence carries, not in how many entries the catalogue holds.
 #:
 #: Each shortcut the engine takes was removed on a scratch copy to see which bounds notice.
 #: The one that reports an exact copy without aligning it is reached only where an element is
@@ -1873,7 +1922,7 @@ def test_an_element_present_verbatim_is_found_without_aligning_it():
 GROWN_ELEMENTS = (
     "FLPe", "FLPo", "Cre", "HygR (hph)", "CBh promoter", "PuroR (pac)", "EMCV IRES",
     "β-actin promoter (human)", "hGH polyA", "BlastR (bsd)", "ZeoR (ble)",
-    "SV40 early promoter", "TRE promoter", "EFS promoter (human)", "WPRE3",
+    "SV40 early promoter", "TRE promoter (tight)", "EFS promoter (human)", "WPRE3",
     "RSV LTR promoter", "HSV TK promoter", "rabbit β-globin polyA", "P2A", "T2A",
     "loxN", "F3", "Myc tag", "V5 tag",
 )
@@ -1903,6 +1952,26 @@ def test_the_catalogue_grew_without_slowing_the_plasmid_it_was_measured_on():
     are not in this sequence and the seed search rules them out."""
     _, cells = _alignment_work(_packed_plasmid())
     assert cells <= MAX_ALIGNMENT_CELLS, f"{cells / 1e6:.1f} M cells of alignment"
+
+
+def test_the_cbh_promoter_is_not_reported_on_a_cag_promoter():
+    """Why the growth above costs what it costs, and why the cost is worth paying. CBh is a
+    CAG made shorter, so its seeds hit every CAG and the engine aligns the two in full. What
+    keeps it from reporting a CBh on every CAG is coverage, not identity: the two agree on
+    almost every base they align, and the alignment simply does not reach enough of the CBh
+    entry. Both figures are pinned, because a change that loosened either one would start
+    reporting an element the construct does not carry.
+    """
+    from vettore.features import COVERAGE_BY_TYPE, DEFAULT_MIN_COVERAGE
+
+    cbh, cag = entry("CBh promoter"), entry("CAG promoter")
+    identity, coverage = shared_span(cbh, cag.sequence)
+    needed = COVERAGE_BY_TYPE.get("promoter", DEFAULT_MIN_COVERAGE)
+    assert identity == pytest.approx(96.2, abs=0.1), identity
+    assert identity >= DEFAULT_MIN_IDENTITY, "identity alone would let the pair through"
+    assert coverage == pytest.approx(87.8, abs=0.1), coverage
+    assert coverage < needed, f"{coverage:.1f} % covered, {needed} % asked"
+    assert "CBh promoter" not in names(detect(cag.sequence, circular=False))
 
 
 def test_both_copies_of_a_tandem_tag_are_reported():

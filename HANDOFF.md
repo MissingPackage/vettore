@@ -52,14 +52,17 @@ annotated tag and the GitHub release notes.
    (lab primer library, a shared .csv) is next.
    Catalogue 0.3.1 added PGK (human, mouse), UbC, H1, 7SK, SFFV and full-length CAG; S5.4 added
    24 more (60 entries in all): the promoters of the cell-line pretests (SV40 early, human
-   β-actin, EFS, HSV TK, RSV LTR, CBh), TRE, Cre/FLPe/FLPo, loxN and F3, the EMCV IRES, P2A and
+   β-actin, EFS, HSV TK, RSV LTR, CBh), TRE (tight), Cre/FLPe/FLPo, loxN and F3, the EMCV IRES, P2A and
    T2A, WPRE3, hGH and rabbit β-globin polyA, PuroR/BlastR/HygR/ZeoR and the Myc and V5 tags.
    Still out, for want of evidence rather than want of work: mouse U6, H1, 7SK, UbC, Eef1a1 and
    Gfap and human CAMK2A (no public vector record annotates them); the MeCP2 promoter (none
    found at all); mDlx, Dre, rox and lox511 (one record or one patent family only — and one
    patent record labelled "lox511" carries loxP's spacer, so those annotations cannot be
-   trusted); E2A and F2A (no two independent records); 6×His (18–21 bp of CAC/CAT repeats, too
-   short to annotate without false hits). Each needs a second independent record before it can
+   trusted); E2A and F2A (no two independent records); iCre (the codon-optimised Cre: public records
+   hold two unrelated codon versions, and the only two records that agree on one are
+   MK773642.1 and MK773643.1, from a single submission, so neither version has a second
+   independent record — the catalogue carries the P1 gene instead); 6×His
+   (18–21 bp of CAC/CAT repeats, too short to annotate without false hits). Each needs a second independent record before it can
    be added — see the PR for S5.4 for the searches already run.
 4. Progressive multiple alignment (S6.2) is built in Python (`src/vettore/msa.py`,
    `frontend/src/tools/alignmentMultiple.tsx`), not a bundled aligner: nothing to package.

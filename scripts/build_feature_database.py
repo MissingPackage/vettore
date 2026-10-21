@@ -147,7 +147,8 @@ ENTRIES: list[Entry] = [
     # MP933339.1 (EP3789521, an unrelated applicant) carries the same core with 23 bp more at
     # one end, and MP864627.1 has it in reverse orientation.
     Entry("EFS promoter (human)", "promoter", "LP754738.1", 1, 252,
-          "intron-less core of the human EF-1α promoter; "
+          "intron-less core of the human EF-1α promoter, as the patent record gives it: its "
+          "first 5 bases are a cloning site that neither cross-check carries; "
           "cross-check MP933339.1 (99.6 % over the 233 bp the two share)"),
     # CBh (Gray JL et al., Hum Gene Ther 2011;22:1143): a CMV enhancer fragment, the chicken
     # β-actin promoter and a shortened hybrid intron — the CAG of AAV vectors, made shorter
@@ -161,7 +162,7 @@ ENTRIES: list[Entry] = [
     # same 348 bp as "SV40 early promoter and origin of replication".
     Entry("SV40 early promoter", "promoter", "X85976.1", 2537, 2884,
           "SV40 early promoter with the 72 bp enhancer repeats and the origin; "
-          "cross-check M83237.1 (100 %)"),
+          "cross-check M83237.1 (100 % over the 344 bp the two share)"),
     # The human ACTB promoter, the 520 bp fragment of β-actin-driven cassettes. Not the
     # chicken β-actin promoter of CAG and CBh, which is a different species' promoter and a
     # separate entry. JN964682.1 annotates the fragment; AY952326.1, from another laboratory,
@@ -172,17 +173,22 @@ ENTRIES: list[Entry] = [
     # selection cassettes. X64410.1 (pBLCAT2) and AJ277960.1 (pMAR) are unrelated vectors
     # and annotate the same 170 bp.
     Entry("HSV TK promoter", "promoter", "X64410.1", 429, 598,
-          "herpes simplex virus thymidine kinase promoter; cross-check AJ277960.1 (100 %)"),
-    # Rous sarcoma virus U3, annotated on the minus strand in LT727488.1, so the entry is the
-    # reverse complement of that span. M83237.1 annotates the whole 5′ LTR (528 bp) with this
-    # promoter inside it, which is why the shorter U3 fragment vectors use is taken here.
+          "herpes simplex virus thymidine kinase promoter; "
+          "cross-check AJ277960.1 (100 % over the 169 bp the two share)"),
+    # The promoter part of the Rous sarcoma virus LTR, annotated on the minus strand in
+    # LT727488.1 ("RSV-LTR", regulatory_class promoter), so the entry is the reverse complement
+    # of that span. It is not the whole LTR: M83237.1 annotates that as 528 bp (4581..5108) with
+    # these 182 bp inside it. Vectors carry this fragment, which is why it is the entry; which
+    # parts of U3, R and U5 fall inside it is not annotated in either record, so it is not said.
     Entry("RSV LTR promoter", "promoter", "LT727488.1", 3997, 4178,
-          "Rous sarcoma virus U3 (LTR) promoter; cross-check M83237.1 (99.5 %)", strand=-1),
+          "promoter fragment of the Rous sarcoma virus LTR, 182 bp of the 528 bp LTR; "
+          "cross-check M83237.1 (99.5 %)", strand=-1),
     # The tetracycline-responsive promoter: seven tet operators in front of a minimal CMV
     # promoter, the "tight" version with no residual activity. MT891336.1 and OQ427855.1 come
     # from different laboratories and give the same 315 bp.
-    Entry("TRE promoter", "promoter", "MT891336.1", 554, 868,
-          "7× tet operator and a minimal CMV promoter (TRE-tight), doxycycline-inducible; "
+    Entry("TRE promoter (tight)", "promoter", "MT891336.1", 554, 868,
+          "7× tet operator and a minimal CMV promoter, doxycycline-inducible; this is the "
+          "\"tight\" version both records annotate, not the 271 bp classic TRE; "
           "cross-check OQ427855.1 (100 %)"),
 
     # ---- Recombinases and their sites ---------------------------------------------------
@@ -192,13 +198,15 @@ ENTRIES: list[Entry] = [
     Entry("Cre", "CDS", "MK854762.1", 215, 1246,
           "Cre recombinase from bacteriophage P1; cross-check AB542060.1 (100 %)"),
     # Flp comes in two versions vectors use side by side: FLPe, the thermostable yeast gene,
-    # and FLPo, codon-optimised for mammalian cells. They share ~85 % of their bases, too
-    # little for one entry to find the other, so each has its own.
+    # and FLPo, codon-optimised for mammalian cells. Both spans are the nls-FLP fusion the two
+    # records annotate — an SV40 nuclear localisation signal in front of the 423-residue
+    # recombinase — so the two encode the same protein in two codon versions. They share 73 %
+    # of their bases, far too little for one entry to find the other, so each has its own.
     Entry("FLPe", "CDS", "GU253315.1", 2581, 3879,
-          "thermostable Flp recombinase (FLPe) from the yeast 2-micron plasmid; "
+          "thermostable Flp recombinase (FLPe), yeast gene, behind an SV40 NLS; "
           "cross-check KM521212.1 (99.8 % over the 1272 bp the two share)"),
     Entry("FLPo", "CDS", "KX151728.1", 1842, 3140,
-          "Flp recombinase codon-optimised for mammalian cells (FLPo); "
+          "Flp recombinase codon-optimised for mammalian cells (FLPo), behind an SV40 NLS; "
           "cross-check MH493814.1 (100 % over the 1272 bp the two share)"),
     # loxN: a Cre site whose spacer differs from loxP, so Cre recombines it with itself and
     # not with loxP — the second site of a Brainbow-type cassette.
@@ -211,18 +219,22 @@ ENTRIES: list[Entry] = [
 
     # ---- Expression parts ---------------------------------------------------------------
     # EMCV IRES, the 576 bp of the bicistronic vectors. Z75185.1 (pIRES-P) annotates it as
-    # "EMC IRES sequence"; PG196517.1, a patent sequence from another applicant, is the same
-    # element on its own.
+    # "EMC IRES sequence"; OQ427855.1, an unrelated laboratory's vector, carries it on its
+    # minus strand annotated "IRES2". Cross-checked against that vector rather than against
+    # the patent sequence PG196517.1, which is the element alone with nothing around it.
     Entry("EMCV IRES", "misc_feature", "Z75185.1", 1118, 1693,
           "encephalomyocarditis virus internal ribosome entry site; "
-          "cross-check PG196517.1 (99.7 %)"),
+          "cross-check OQ427855.1 (99.7 %)"),
     # P2A and T2A: the self-cleaving peptides of multi-gene cassettes. Both are short and
-    # written in several codon versions that share as little as 85 % of their bases, so an
-    # entry recognises the version it was taken from and the versions close to it. The two
-    # here are each annotated in unrelated vectors from different laboratories.
-    Entry("P2A", "misc_feature", "MG880225.1", 4014, 4079,
+    # written in many codon versions, so no single entry finds them all. Of the records in
+    # this repository's fixtures that annotate one, 15 annotate T2A in 6 distinct sequences
+    # and 15 annotate P2A in 13; the versions below are the ones detection finds in the most
+    # of those records (T2A 8 of 15, P2A 6 of 15), which is why they were chosen over the
+    # others. A construct whose 2A is written another way is not found, and the user guide
+    # says so.
+    Entry("P2A", "misc_feature", "LT962383.1", 1899, 1964,
           "porcine teschovirus-1 2A self-cleaving peptide, with its GSG linker; "
-          "cross-check LT962383.1 (98.5 %)"),
+          "cross-check MG880225.1 (98.5 %)"),
     Entry("T2A", "misc_feature", "ON417756.1", 739, 792,
           "Thosea asigna virus 2A self-cleaving peptide; cross-check PZ285977.1 (100 %)"),
     # WPRE3, the 246 bp WPRE: the shortened element of AAV cassettes, where the full 589 bp
@@ -253,7 +265,7 @@ ENTRIES: list[Entry] = [
     # The two tags, like the 2A peptides, exist in more than one codon version; these are the
     # versions two unrelated vectors share.
     Entry("Myc tag", "misc_feature", "AJ243205.1", 147, 179,
-          "c-Myc epitope tag; cross-check A05511.1 (100 %)"),
+          "c-Myc epitope tag; cross-check MF966512.1 (100 %)"),
     Entry("V5 tag", "misc_feature", "AM700585.1", 70, 111,
           "V5 epitope tag; cross-check AY682091.1 (100 %)"),
 ]

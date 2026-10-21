@@ -124,7 +124,7 @@ creates a new document for the product, and records the operation in the History
 
 **S3.3 Multiple alignment** of DNA sequences.
 
-**S3.4 Detect common features** from an offline curated database (AAV-relevant set first: ITRs, CMV/CAG/CBh/hSyn/EF1a/EFS/CaMKIIa/GFAP, the ubiquitous promoters of cell-line pretests (SV40 early, human β-actin, HSV TK, RSV LTR) and the inducible TRE, WPRE and WPRE3, polyA signals, AmpR/KanR and the selection markers PuroR/BlastR/HygR/ZeoR, ori, f1 ori, fluorescent proteins, tags, lox/FRT sites, Cre/FLPe/FLPo, 2A peptides, EMCV IRES, U6, Cas9). Every entry cites the public record and coordinates it was taken from and is cross-checked against an independent record at ≥ 98 % identity.
+**S3.4 Detect common features** from an offline curated database (AAV-relevant set first: ITRs, CMV/CAG/CBh/hSyn/EF1a/EFS/CaMKIIa/GFAP, the ubiquitous promoters of cell-line pretests (SV40 early, human β-actin, HSV TK, RSV LTR) and the inducible TRE (tight), WPRE and WPRE3, polyA signals, AmpR/KanR and the selection markers PuroR/BlastR/HygR/ZeoR, ori, f1 ori, fluorescent proteins, tags, lox/FRT sites, Cre/FLPe/FLPo, 2A peptides, EMCV IRES, U6, Cas9). Every entry cites the public record and coordinates it was taken from and is cross-checked against an independent record at ≥ 98 % identity.
 
 **S3.5 Primer design** (primer3): amplify a selected region with Tm, length and product-size constraints; results ranked, added to the primer list on click.
 

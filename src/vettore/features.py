@@ -587,10 +587,13 @@ WORD_ALIASES = {"hcmv": "cmv", "hef1a": "ef1a", "camkii": "camkiia", "hsyn1": "h
 #: - EF-1α promoter (human): the EFS promoter is its intron-less core, the first 232 bp of
 #:   the entry, so a search finds EFS inside it and a block named "EF-1α" is not a wrong
 #:   label for the core.
+#: - WPRE: WPRE3 is 246 bp of it, base for base, so a cassette carrying the short element and
+#:   labelled "WPRE" by its author is labelled loosely, not wrongly.
 HOLDS = {"SaCas9": frozenset({"3×HA"}),
          "CAG promoter": frozenset({"CMV enhancer"}),
          "CAG promoter (truncated)": frozenset({"CMV enhancer"}),
-         "EF-1α promoter (human)": frozenset({"EFS promoter (human)"})}
+         "EF-1α promoter (human)": frozenset({"EFS promoter (human)"}),
+         "WPRE": frozenset({"WPRE3"})}
 
 _LETTERS = str.maketrans({"α": "a", "β": "b", "γ": "g", "δ": "d", "Δ": "d", "κ": "k",
                           "×": "x", "′": "'", "’": "'"})
@@ -649,15 +652,55 @@ def _names_element(label: str, element: str) -> bool:
 
 def _names_another_element(label: str, element: str) -> bool:
     """Whether ``label`` names a known element other than ``element`` and not one that holds
-    it (a "CAG" block holds the CMV enhancer, so that label is right)."""
-    others = named_elements(label)
+    it (a "CAG" block holds the CMV enhancer, so that label is right).
+
+    An element the label names but contradicts does not count, because the label is then
+    not claiming to be that element at all: it only shares a word with it. "chicken β-actin
+    promoter" shares "β-actin" with the human β-actin promoter and names the other species;
+    "rabbit β-globin intron" shares "β-globin" with the rabbit β-globin polyA signal and
+    names another kind of element. Both are right labels for the CAG promoter they sit on,
+    and before this both raised a wrong-label warning on every CAG a user annotated by hand.
+    """
+    others = {name for name in named_elements(label)
+              if not _species_conflict(label, name) and not _kind_conflict(label, name)}
     return bool(others) and not any(element in HOLDS.get(name, ()) for name in others)
 
 
+#: Kinds a label can name outright, where naming one rules the others out: a feature called
+#: "…intron" is not a polyA signal, whatever name it shares with one. Promoters and enhancers
+#: are deliberately absent, because a CMV enhancer-and-promoter block is labelled either way
+#: and neither label is wrong.
+_KIND_WORDS = {"intron": frozenset({"intron"}),
+               "polya": frozenset({"polyA_signal"}),
+               "polyadenylation": frozenset({"polyA_signal"})}
+
+
+def _kind_conflict(label: str, element: str) -> bool:
+    """Whether ``label`` says outright that it is a kind of element the catalogue ``element``
+    is not."""
+    types = _element_types()
+    if element not in types:
+        return False
+    tokens = {t for t in re.split(r"[^a-z0-9]+", label.translate(_LETTERS).lower()) if t}
+    claimed = frozenset().union(*(_KIND_WORDS[t] for t in tokens & _KIND_WORDS.keys())) \
+        if tokens & _KIND_WORDS.keys() else frozenset()
+    return bool(claimed) and types[element] not in claimed
+
+
+@lru_cache(maxsize=1)
+def _element_types() -> dict[str, str]:
+    """Each catalogue entry's name and type."""
+    return {feature.name: feature.type for feature in catalogue()}
+
+
 #: How labels say which species an element comes from: a word ("human", "murine"), or a
-#: one-letter prefix on the element's own word ("hPGK", "mU6").
+#: one-letter prefix on the element's own word ("hPGK", "mU6"). The species that are not
+#: human or mouse are here because a label naming one contradicts a "(human)" or "(mouse)"
+#: entry: "chicken β-actin promoter" is not the human β-actin promoter.
 _SPECIES_WORDS = {"human": "human", "homo": "human", "mouse": "mouse", "murine": "mouse",
-                  "mus": "mouse"}
+                  "mus": "mouse", "chicken": "chicken", "gallus": "chicken",
+                  "rabbit": "rabbit", "oryctolagus": "rabbit", "rat": "rat",
+                  "rattus": "rat", "bovine": "bovine", "woodchuck": "woodchuck"}
 _PREFIXES = {"h": "human", "m": "mouse"}
 
 

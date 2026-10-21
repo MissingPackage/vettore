@@ -403,8 +403,8 @@ truncated ones found in real vectors), the CMV enhancer and promoter, CAG (the f
 promoter and the shorter one of some AAV vectors) and the compact CBh, hSyn, EF-1α and its
 intron-less core EFS, CaMKIIα, GFAP, PGK, UbC and SFFV promoters, the RNA polymerase III
 promoters U6, H1 and 7SK, the promoters a construct is usually checked with in a cell line
-before it goes into neurons (SV40 early, human β-actin, HSV TK and RSV LTR), the inducible TRE
-promoter, WPRE and the shorter WPRE3, bGH, SV40, human growth hormone and rabbit β-globin
+before it goes into neurons (SV40 early, human β-actin, HSV TK and RSV LTR), the inducible
+TRE promoter (tight), WPRE and the shorter WPRE3, bGH, SV40, human growth hormone and rabbit β-globin
 polyA signals, AmpR, KanR and the selection markers PuroR, BlastR, HygR and ZeoR, pUC and f1
 origins, EGFP, mCherry, tdTomato, the recombinases Cre, FLPe and FLPo with the loxP, lox2272,
 loxN, FRT and F3 sites, the P2A and T2A self-cleaving peptides, the EMCV IRES, SpCas9, SaCas9
@@ -429,14 +429,21 @@ protein is different after the break. A record that annotates an element on its 
 is cited as `LT727488.1:complement(3997..4178)`: the element is stored the way a vector reads
 it.
 
-A few elements are written in more than one codon version — the 2A peptides and the short
-epitope tags are the usual ones, and Flp comes as both FLPe and FLPo. The catalogue carries
-the version two unrelated vectors agree on (both are named in the entry's notes), so a
-construct built from a different codon version of a 2A peptide may not be recognised. When
-that happens, lower the identity threshold for one run, or annotate it by hand.
+Tick the ones you want and they are added to the map, coloured by type, with their
+provenance kept in the feature's notes.
 
-Tick the ones you want and they are added to the map, coloured by type, with their provenance
-kept in the feature's notes.
+A few elements are written in more than one codon version, the 2A peptides and the short
+epitope tags above all; Flp comes as two whole genes, FLPe and FLPo, which share only 73 % of
+their bases, so each is its own entry. For the rest the catalogue carries the version two
+unrelated vectors agree on, both named in the entry's notes, and a construct built from
+another version may not be recognised. The 2A peptides are the common case and the most
+variable: of the public records this project checked against, the P2A entry is found in 6 of
+the 15 that annotate a P2A, and the T2A entry in 8 of 15. What to do depends on how long the
+element is. For the 2A peptides, the IRES and anything else over 50 bases, lower the identity
+threshold for one run and the near match is found. At 50 bases or shorter — the Myc and V5
+tags, and the loxP, lox2272, loxN, FRT and F3 sites — the search asks for an exact match and
+the threshold does nothing, because a 33-base tag found loosely would be found everywhere;
+annotate those by hand.
 
 Features already annotated are shown greyed and left unticked. This includes elements inside a
 larger feature named after them, however long that feature is: vendors often draw one "CMV
@@ -448,9 +455,15 @@ amber, for example: “Annotated as “PGK promoter”, but the sequence is the 
 identity). Check the label.” A notice at the top says how many labels to check. These rows are
 not ticked, so nothing changes unless you tick one: the element is then added under its
 catalogue name, and you can rename or delete the old feature in the Features view. The same check
-reads the species in a label — a word ("human", "mouse", "murine") or a prefix ("hPGK",
-"mU6") — so a mouse PGK promoter labelled "PGK promoter (human)" is flagged too. A feature
-whose name is not an element, such as "my insert", is never questioned.
+reads the species in a label — a word ("human", "mouse", "murine", "chicken", "rabbit") or a
+prefix ("hPGK", "mU6") — so a mouse PGK promoter labelled "PGK promoter (human)" is flagged
+too. A label that names what a hybrid promoter is made of is not questioned: the CAG and CBh
+promoters hold a chicken β-actin promoter and a rabbit β-globin intron, and a block a user
+labels with either of those names is right, even though the catalogue has a human β-actin
+promoter and a rabbit β-globin polyA signal under similar names. A feature whose name is not
+an element, such as "my insert", is never questioned. The check compares names and species, not
+kinds of element beyond that: an SV40 early promoter labelled "SV40 polyA" shares the name
+"SV40" with a catalogue entry and is not flagged.
 
 When a promoter or an ITR is a few bases off, loosen the identity threshold for one run; the
 default is a preference.
