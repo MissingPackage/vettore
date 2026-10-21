@@ -53,6 +53,16 @@ export interface Sample {
   description: string;
   /** GenBank accession.version of the record the sample comes from. */
   accession?: string;
+  length?: number;
+  circular?: boolean;
+  /** The longest features, for the thumbnail map on the welcome screen. */
+  features?: SampleFeature[];
+}
+
+export interface SampleFeature {
+  start: number;
+  end: number;
+  type: string;
 }
 
 /** Opening sequence files with Vettore on double-click (offered by the packaged application). */

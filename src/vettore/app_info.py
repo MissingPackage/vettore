@@ -104,10 +104,32 @@ def about() -> dict[str, Any]:
     }
 
 
+# The welcome screen draws a small map of each sample from its longest features.
+MINI_MAP_FEATURES = 12
+
+
+def sample_outline(sample: Sample) -> dict[str, Any]:
+    """Length, topology and the longest features of a sample, for its card on the welcome screen."""
+    document = sample_documents(sample)[0]
+    length = len(document["sequence"])
+    # A feature across the origin has end < start: the modulo gives its real length.
+    span = {id(f): (f["end"] - f["start"]) % length + 1 for f in document.get("features", [])}
+    # Records that annotate their whole backbone (pUC19's "pBR322") would draw a closed ring.
+    features = [f for f in document.get("features", [])
+                if f.get("type") != "source" and span[id(f)] <= length * 0.6]
+    features.sort(key=lambda f: span[id(f)], reverse=True)
+    return {
+        "length": length,
+        "circular": bool(document.get("circular")),
+        "features": [{"start": f["start"], "end": f["end"], "type": f.get("type", "misc_feature")}
+                     for f in features[:MINI_MAP_FEATURES]],
+    }
+
+
 @router.get("/samples")
 def samples() -> dict[str, Any]:
     return {"samples": [{"id": s.id, "label": s.label, "description": s.description,
-                         "accession": s.accession} for s in SAMPLES]}
+                         "accession": s.accession, **sample_outline(s)} for s in SAMPLES]}
 
 
 @router.get("/samples/{sample_id}")
