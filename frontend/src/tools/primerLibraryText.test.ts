@@ -8,6 +8,7 @@ import {
   orderingText,
   range,
   rejectedText,
+  saveChanges,
   sequenceAlreadyIn,
   today,
   toCsv,
@@ -122,6 +123,28 @@ describe("orderingText and newEntry", () => {
   it("stamps a new entry with today's date and cleans the sequence", () => {
     const e = newEntry("  KanR_F ", "acg t", "2026-10-21", "note", "box 1");
     expect(e).toMatchObject({ name: "KanR_F", sequence: "ACGT", added: "2026-10-21", location: "box 1", length: 4 });
+  });
+});
+
+describe("saveChanges", () => {
+  const a = primer({ name: "A", sequence: "AAAACCCCGG", notes: "n" });
+  const b = primer({ name: "B", sequence: "TTTTGGGGCC" });
+  it("sends only what changed: additions, changed fields, removals", () => {
+    const c = primer({ name: "C", sequence: "GGGGAAAATT" });
+    const changes = saveChanges([a, b], [{ ...a, notes: "new" }, c]);
+    expect(changes.added.map((p) => p.name)).toEqual(["C"]);
+    expect(changes.edited).toEqual([{ sequence: "AAAACCCCGG", notes: "new" }]);
+    expect(changes.removed).toEqual(["TTTTGGGGCC"]);
+  });
+  it("sends nothing when nothing changed", () => {
+    expect(saveChanges([a, b], [a, b])).toEqual({ added: [], edited: [], removed: [] });
+  });
+});
+
+describe("bindingText in a repeat", () => {
+  it("says the primer primes at several positions", () => {
+    expect(bindingText({ start: 0, end: 19, strand: 1, footprint: 20, tail: 0, mismatches: 0, positions: 6 }))
+      .toContain("primes at 6 overlapping positions");
   });
 });
 

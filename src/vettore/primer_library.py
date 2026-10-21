@@ -41,7 +41,7 @@ import csv
 import io
 import logging
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import date
 from typing import Any
 
@@ -141,15 +141,25 @@ def clean_sequence(raw: str) -> str:
 #: Extensions a library file may have: a spreadsheet saved as text.
 LIBRARY_SUFFIXES = (".csv", ".tsv", ".txt")
 _BOM = b"\xef\xbb\xbf"
+#: Rows looked at for the header: a title line or two may sit above it.
+_HEADER_SEARCH = 10
+#: Words that make a "Sequence …" header cell something else than the sequence itself.
+_NOT_THE_SEQUENCE = ("id", "length", "len", "lunghezza", "no", "no.", "number", "numero", "#", "nr")
 
 
 def _column_of(cell: str) -> tuple[str, int] | None:
     """The column a header cell names and how sure that is (0 best): "Name" beats "Primer",
-    which beats "ID", so a file with both an ID and a Name column takes names from Name."""
+    which beats "ID", so a file with both an ID and a Name column takes names from Name.
+    "Sequence name" is a name, and "Sequence ID" or "Sequence length" are not the sequence."""
     word = cell.strip().lower().strip("\"' ")
     if word in ("sequence", "seq", "sequenza"):
         return "sequence", 0
     if word.startswith("seq") or "sequence" in word or "sequenza" in word:
+        parts = set(re.split(r"[\s_.()/-]+", word))
+        if parts & {"name", "nome"}:
+            return "name", 1
+        if parts & set(_NOT_THE_SEQUENCE) or word.endswith("#"):
+            return None
         return "sequence", 1
     for column, words in _HEADER_WORDS.items():
         for rank, group in enumerate(words):
@@ -158,22 +168,26 @@ def _column_of(cell: str) -> tuple[str, int] | None:
     return None
 
 
-def _header_index(cells: list[str]) -> dict[str, int] | None:
-    """Columns of a header row, or None when the row is not a header (it has no name and
-    sequence columns, or its "sequence" cell is itself DNA)."""
+def _header_index(cells: list[str]) -> tuple[dict[str, int], list[int]] | None:
+    """Columns of a header row and every column that could hold the sequence (best first), or
+    None when the row is not a header (it has no name and sequence columns, or its "sequence"
+    cell is itself DNA)."""
     best: dict[str, tuple[int, int]] = {}
+    sequences: list[tuple[int, int]] = []
     for pos, cell in enumerate(cells):
         found = _column_of(cell)
-        if found and (found[0] not in best or found[1] < best[found[0]][0]):
+        if not found:
+            continue
+        if found[0] == "sequence":
+            sequences.append((found[1], pos))
+        if found[0] not in best or found[1] < best[found[0]][0]:
             best[found[0]] = (found[1], pos)
     index = {column: pos for column, (_, pos) in best.items()}
     if "name" not in index or "sequence" not in index:
         return None
-    try:
-        clean_sequence(cells[index["sequence"]])
+    if _is_dna(cells[index["sequence"]]):
         return None                      # "ACGT..." under the name column: data, not a header
-    except PrimerLibraryError:
-        return index
+    return index, [pos for _, pos in sorted(sequences)]
 
 
 def _split(line: str, delimiter: str) -> list[str]:
@@ -192,18 +206,28 @@ def _is_dna(cell: str) -> bool:
 
 
 def sniff_delimiter(lines: list[str]) -> str:
-    """The separator of a library or a paste: the one that turns the first line into a header;
-    without a header, the one that puts DNA in the second column of most rows (pasted columns
-    are name, sequence...); failing both, the one that splits the first line into most cells.
-    Excel writes ``;`` when the system uses a decimal comma, and pasted columns use tabs."""
+    """The separator of a library or a paste: the one that turns one of the first lines into a
+    header; without a header, the one that puts DNA in the first or second column of most rows
+    (pasted columns are name, sequence...); failing both, the one that splits the first line
+    into most cells. Excel writes ``;`` when the system uses a decimal comma, and pasted
+    columns use tabs."""
     rows = [line for line in lines if line.strip()][:20]
     if not rows:
         return ","
     candidates = (",", ";", "\t")
-    headed = [d for d in candidates if _header_index(_split(rows[0], d))]
-    if headed:
-        return max(headed, key=lambda d: len(_split(rows[0], d)))
-    dna = {d: sum(len(c := _split(r, d)) > 1 and _is_dna(c[1]) for r in rows) for d in candidates}
+    for row in rows[:_HEADER_SEARCH]:
+        headed = [d for d in candidates if _header_index(_split(row, d))]
+        if headed:
+            return max(headed, key=lambda d: len(_split(row, d)))
+
+    def dna_cells(d: str) -> int:
+        count = 0
+        for r in rows:
+            cells = _split(r, d)
+            count += len(cells) > 1 and (_is_dna(cells[1]) or _is_dna(cells[0]))
+        return count
+
+    dna = {d: dna_cells(d) for d in candidates}
     if max(dna.values()) > 0:
         return max(candidates, key=lambda d: (dna[d], -candidates.index(d)))
     return max(candidates, key=lambda d: (len(_split(rows[0], d)), -candidates.index(d)))
@@ -221,8 +245,8 @@ class _Row:
 
 @dataclass
 class LibraryText:
-    """A library file (or a paste) as read: the separator, any ``sep=`` line, the header and
-    every row in order, plus the primers and the rows that could not be read."""
+    """A library file (or a paste) as read: the separator, any ``sep=`` or title lines, the
+    header and every row in order, plus the primers and the rows that could not be read."""
 
     delimiter: str
     newline: str = "\r\n"
@@ -235,18 +259,29 @@ class LibraryText:
 
 
 def _lines(text: str) -> list[str]:
-    """The text's lines, each with its "\\n" ending (any newline style read as "\\n"); the last
-    one keeps none when the text does not end with a newline."""
-    text = text.replace("\r\n", "\n").replace("\r", "\n")
-    return re.findall(r"[^\n]*\n|[^\n]+$", text)
+    """The text's lines, each with its own line ending (\\r\\n, \\n or \\r); the last one keeps
+    none when the text does not end with a newline."""
+    return re.findall(r"[^\r\n]*(?:\r\n|\r|\n)|[^\r\n]+$", text)
+
+
+def _positional(body: list[_Row]) -> dict[str, int]:
+    """Columns of a file or paste without a header: name, sequence, notes, location, added;
+    or sequence first (then name) when it is the first column that holds DNA."""
+    rows = [r.cells for r in body if any(c.strip() for c in r.cells)][:50]
+    first = sum(bool(c) and _is_dna(c[0]) for c in rows)
+    second = sum(len(c) > 1 and _is_dna(c[1]) for c in rows)
+    if rows and first > second:
+        return {"sequence": 0, "name": 1, "notes": 2, "location": 3, "added": 4}
+    return {name: pos for pos, name in enumerate(COLUMNS)}
 
 
 def parse_text(text: str) -> LibraryText:
     """Read .csv/.tsv text (or columns pasted from a spreadsheet). A header naming the columns
-    is used when present; otherwise the columns are taken in order: name, sequence, notes,
-    location, added. Raises PrimerLibraryError when the text is not readable as columns."""
+    is used when present (title lines above it are kept as they are); otherwise the columns are
+    taken in order: name, sequence, notes, location, added. Raises PrimerLibraryError when the
+    text is not readable as columns (a quote that is never closed, for one)."""
     text = text.lstrip("﻿")
-    newline = "\r\n" if "\r\n" in text or "\n" not in text else "\n"
+    newline = next((nl for nl in ("\r\n", "\n", "\r") if nl in text), "\r\n")
     lines = _lines(text)
     preamble: list[str] = []
     forced = None
@@ -265,27 +300,35 @@ def parse_text(text: str) -> LibraryText:
             yield line
 
     try:
-        for cells in csv.reader(feed(), delimiter=delimiter):
+        for cells in csv.reader(feed(), delimiter=delimiter, strict=True):
             rows.append(_Row(cells, "".join(consumed)))
             consumed.clear()
     except csv.Error as exc:
+        line = sum(len(_lines(r.raw)) for r in rows) + 1
         raise PrimerLibraryError(
-            f"line {len(rows) + 1} could not be read as columns of a spreadsheet ({exc}).") from exc
+            f"the row starting on line {line + len(preamble)} could not be read as spreadsheet "
+            f"columns ({exc}); a quote (\") that is opened and never closed does this.") from exc
 
-    data_rows = [r for r in rows if any(c.strip() for c in r.cells)]
-    header_row = data_rows[0] if data_rows else None
-    index = _header_index(header_row.cells) if header_row else None
-    if index is not None:
-        lib.header, lib.index = header_row, index
-        body = rows[rows.index(header_row) + 1:]
-        lib.preamble += [r.raw for r in rows[:rows.index(header_row)]]
+    found = None
+    for pos, row in enumerate(rows):
+        if sum(any(c.strip() for c in r.cells) for r in rows[:pos]) >= _HEADER_SEARCH:
+            break
+        if any(c.strip() for c in row.cells) and (found := _header_index(row.cells)):
+            lib.header = row
+            lib.preamble += [r.raw for r in rows[:pos]]
+            lib.rows = rows[pos + 1:]
+            break
+    if found:
+        lib.index, sequence_columns = found
+        if len(sequence_columns) > 1:     # "Sequence (5'-3')" and "Sequence (RNA)": the DNA one
+            lib.index["sequence"] = max(sequence_columns, key=lambda pos: sum(
+                pos < len(r.cells) and _is_dna(r.cells[pos]) for r in lib.rows))
     else:
-        lib.index = {name: pos for pos, name in enumerate(COLUMNS)}
-        body = rows
-    lib.rows = body
+        lib.rows = rows
+        lib.index = _positional(rows)
 
     seen: dict[str, str] = {}
-    for row in body:
+    for row in lib.rows:
         if not any(c.strip() for c in row.cells):
             continue
         name = _cell(row.cells, lib.index, "name")
@@ -321,81 +364,100 @@ def parse_csv(text: str) -> tuple[list[Primer], list[dict[str, Any]]]:
     return lib.primers, lib.rejected
 
 
-def _write_row(cells: list[str], delimiter: str) -> str:
+def _write_row(cells: list[str], delimiter: str, newline: str) -> str:
     out = io.StringIO()
-    csv.writer(out, delimiter=delimiter, lineterminator="\n").writerow(cells)
+    csv.writer(out, delimiter=delimiter, lineterminator=newline).writerow(cells)
     return out.getvalue()
 
 
-def merged_text(current: LibraryText | None, primers: list[Primer],
+#: The fields of a primer the dialog can change.
+EDITABLE = ("name", "notes", "location", "added")
+
+
+def merged_text(current: LibraryText | None, added: list[Primer],
+                edits: dict[str, dict[str, str]] | None = None,
                 removed: set[str] = frozenset()) -> tuple[str, dict[str, int]]:
     """The file's new text after a save from the dialog. The file is read again at save time
-    and merged, so two people editing it never wipe each other's work:
+    and only the dialog's own changes are applied to it, so two people editing it never undo
+    each other's work:
 
-    - a row of a primer in ``primers`` takes its name, notes, location and date (its other
-      cells, any extra columns and the sequence as written stay);
+    - ``edits`` (sequence → the fields changed in the dialog) change only those cells of that
+      primer's row; its other cells, any extra columns and the sequence as written stay;
     - a row whose sequence is in ``removed`` (deleted in the dialog) goes;
-    - every other row stays exactly as it is: a primer a colleague added since the dialog
-      loaded the file, and any row Vettore could not read;
-    - primers not in the file yet are added at the end.
+    - ``added`` primers not in the file are added at the end (one already there is left as is);
+    - every other row stays exactly as it is, byte for byte: primers a colleague added, edited
+      or kept, and rows Vettore could not read. A primer a colleague deleted stays deleted.
 
-    Returns the text (lines ending in "\\n") and counts: ``count`` primers written by the
-    dialog, ``kept`` unreadable rows kept, ``theirs`` primers kept that the dialog did not have.
+    Returns the text and counts: ``count`` primers written (added or changed), ``kept``
+    unreadable rows kept, and ``gone`` edits not saved because someone had deleted that primer
+    meanwhile.
     """
+    edits = edits or {}
     lib = current or LibraryText(delimiter=";")
+    nl = lib.newline
     index = dict(lib.index)
     header = list(lib.header.cells) if lib.header else None
-    if current is None or (header is None and not lib.rows):
+    if current is None or (header is None and not any(r.cells for r in lib.rows)):
         header = list(COLUMNS)
         index = {name: pos for pos, name in enumerate(COLUMNS)}
-    wanted = {p.sequence: p for p in primers}
-    if header is not None:                # a column the file lacks, but a primer now needs
+    in_file = {row.key for row in lib.rows if row.key is not None}
+    fresh = [p for p in added if p.sequence not in in_file]
+    if header is not None:                # a column the file lacks, but the dialog now fills
+        width = max([len(header)] + [len(r.cells) for r in lib.rows])
         for column in COLUMNS:
-            if column not in index and any(getattr(p, column) for p in primers):
-                index[column] = len(header)
-                header.append(column)
+            needed = any(getattr(p, column) for p in fresh) or any(
+                e.get(column) for e in edits.values())
+            if column not in index and needed:
+                index[column] = width     # past every cell of every row: nothing is overwritten
+                header += [""] * (width - len(header)) + [column]
+                width += 1
 
-    def cells_for(p: Primer, base: list[str]) -> list[str]:
-        cells = list(base) + [""] * (max(index.values()) + 1 - len(base))
-        for column in COLUMNS:
+    def apply(cells: list[str], values: dict[str, str]) -> list[str]:
+        cells = list(cells)
+        for column, value in values.items():
             pos = index.get(column)
             if pos is None:
                 continue
-            if column == "sequence" and _is_dna(cells[pos]) and clean_sequence(cells[pos]) == p.sequence:
-                continue                  # the sequence as the lab wrote it (case, spaces)
-            cells[pos] = getattr(p, column)
+            now = cells[pos].strip() if pos < len(cells) else ""
+            if now == value or (column == "name" and value == "(unnamed)" and not now):
+                continue                  # unchanged: the cell stays as written
+            cells += [""] * (pos + 1 - len(cells))
+            cells[pos] = value
         return cells
 
-    out = [line for line in lib.preamble]
+    out = list(lib.preamble)
     if header is not None:
         same = lib.header is not None and header == lib.header.cells
-        out.append(lib.header.raw if same else _write_row(header, lib.delimiter))
-    used, counts = set(), {"count": 0, "kept": len(lib.rejected), "theirs": 0}
+        out.append(lib.header.raw if same else _write_row(header, lib.delimiter, nl))
+    counts = {"count": 0, "kept": len(lib.rejected), "gone": 0}
+    seen_edits = set()
     for row in lib.rows:
-        if row.key is not None and row.key in wanted:
-            cells = cells_for(wanted[row.key], row.cells)
-            out.append(row.raw if cells == row.cells else _write_row(cells, lib.delimiter))
-            used.add(row.key)
-            counts["count"] += 1
-        elif row.key is not None and row.key in removed:
+        if row.key is not None and row.key in removed:
             continue
-        else:
-            out.append(row.raw)
-            counts["theirs"] += row.key is not None
-    for p in primers:
-        if p.sequence not in used:
-            out.append(_write_row(cells_for(p, []), lib.delimiter))
-            counts["count"] += 1
+        if row.key is not None and row.key in edits:
+            seen_edits.add(row.key)
+            cells = apply(row.cells, {k: v for k, v in edits[row.key].items() if k in EDITABLE})
+            if cells != row.cells:
+                out.append(_write_row(cells, lib.delimiter, nl))
+                counts["count"] += 1
+                continue
+        out.append(row.raw)
+    counts["gone"] = len(set(edits) - seen_edits - removed)
+    for p in fresh:
+        values = {column: getattr(p, column) for column in COLUMNS}
+        out.append(_write_row(apply([], values), lib.delimiter, nl))
+        counts["count"] += 1
     for i, line in enumerate(out[:-1]):    # a last line without a newline, now followed by more
-        if not line.endswith("\n"):
-            out[i] = line + "\n"
+        if not line.endswith(("\n", "\r")):
+            out[i] = line + nl
     return "".join(out), counts
 
 
 def _decode(data: bytes) -> tuple[str, str]:
     """The file's text and how to write it back: UTF-16 (Excel's "Unicode text"), UTF-8 (with
     or without a byte-order mark), else the Windows code page Excel uses for .csv on Western
-    European systems. Workbooks and other binary files are refused, never rewritten."""
+    European systems, line by line (a UTF-8 file with a line added in Notepad keeps both).
+    Workbooks and other binary files are refused, never rewritten."""
     if data.startswith((b"\xff\xfe", b"\xfe\xff")):
         try:
             return data.decode("utf-16"), "utf-16"
@@ -408,12 +470,20 @@ def _decode(data: bytes) -> tuple[str, str]:
     if b"\x00" in data:
         raise PrimerLibraryError("it is not a text file.")
     body = data.removeprefix(_BOM)
-    for encoding in ("utf-8", "cp1252", "latin-1"):
-        try:
-            return body.decode(encoding), "utf-8-sig"
-        except UnicodeDecodeError:
-            continue
-    raise AssertionError("latin-1 decodes every byte")
+    try:
+        return body.decode("utf-8"), "utf-8-sig"
+    except UnicodeDecodeError:
+        pass
+
+    def line(raw: bytes) -> str:
+        for encoding in ("utf-8", "cp1252"):
+            try:
+                return raw.decode(encoding)
+            except UnicodeDecodeError:
+                continue
+        return raw.decode("latin-1")      # decodes every byte
+
+    return "".join(line(raw) for raw in body.splitlines(keepends=True)), "utf-8-sig"
 
 
 def _read_file() -> tuple[LibraryText | None, float | None, str]:
@@ -433,7 +503,9 @@ def _read_file() -> tuple[LibraryText | None, float | None, str]:
         text, encoding = _decode(data)
         lib = parse_text(text)
     except PrimerLibraryError as exc:
-        raise PrimerLibraryError(f"“{path.name}” is not a primer library: {exc}") from exc
+        raise PrimerLibraryError(
+            f"“{path.name}” cannot be used as the primer library: {exc} It is left as it is."
+        ) from exc
     if lib.header is None and not lib.primers and any(r.cells for r in lib.rows):
         raise PrimerLibraryError(
             f"“{path.name}” is not a primer library: no row has a name and a DNA sequence, and "
@@ -462,10 +534,11 @@ def read_library() -> dict[str, Any]:
             "primers": [p.as_dict() for p in lib.primers], "rejected": lib.rejected}
 
 
-def write_library(primers: list[Primer], removed: list[str] | tuple[str, ...] = ()) -> dict[str, Any]:
-    """Save the dialog's primers to the shared file, merged with the file as it is now (see
-    ``merged_text``): a colleague's additions and the rows Vettore could not read stay, and the
-    file keeps its separator, header and extra columns. Returns the library as read back."""
+def write_library(added: list[Primer], edits: dict[str, dict[str, str]] | None = None,
+                  removed: list[str] | tuple[str, ...] = ()) -> dict[str, Any]:
+    """Apply the dialog's changes to the shared file as it is now (see ``merged_text``): a
+    colleague's work and the rows Vettore could not read stay, and the file keeps its
+    separator, header and extra columns. Returns the library as read back, with the counts."""
     path = settings.primer_library_path()
     check_library_path(str(path))
     current, _, encoding = _read_file()
@@ -475,12 +548,11 @@ def write_library(primers: list[Primer], removed: list[str] | tuple[str, ...] = 
             gone.add(clean_sequence(raw))
         except PrimerLibraryError:
             continue
-    text, counts = merged_text(current, primers, gone)
-    newline = current.newline if current else "\r\n"
+    text, counts = merged_text(current, added, edits, gone)
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         tmp = path.with_name(f".{path.name}.vettore-tmp")
-        tmp.write_text(text.replace("\n", newline), encoding=encoding, newline="")
+        tmp.write_text(text, encoding=encoding, newline="")
         tmp.replace(path)
     except OSError as exc:
         log.error("Could not write the primer library %s: %r", path, exc)
@@ -511,7 +583,8 @@ class Binding:
     coordinate on both strands (``start > end`` crosses the origin). ``strand`` +1: the primer
     reads along the top strand, its 3′ end at ``end``; −1: along the bottom strand, its 3′ end
     at ``start``. ``footprint`` bases anneal, ``tail`` 5′ bases do not, and ``mismatches`` fall
-    inside the footprint."""
+    inside the footprint. ``positions`` > 1: the site is a repeat where the primer anneals,
+    overlapping itself, with its 3′ end at that many positions (it would prime a ladder)."""
 
     start: int
     end: int
@@ -519,6 +592,7 @@ class Binding:
     footprint: int
     tail: int
     mismatches: int
+    positions: int = 1
 
     @property
     def three_prime(self) -> int:
@@ -531,7 +605,8 @@ class Binding:
 
     def as_dict(self) -> dict[str, Any]:
         return {"start": self.start, "end": self.end, "strand": self.strand,
-                "footprint": self.footprint, "tail": self.tail, "mismatches": self.mismatches}
+                "footprint": self.footprint, "tail": self.tail, "mismatches": self.mismatches,
+                "positions": self.positions}
 
 
 def _rc(seq: str) -> str:
@@ -623,8 +698,8 @@ def _better(a: Binding, b: Binding) -> Binding:
 
 def find_bindings(primer: str, sequence: str, circular: bool) -> list[Binding]:
     """Every place the primer anneals on either strand (see the module docstring for the rule).
-    Hits of one primer on one strand whose footprints overlap (a primer inside a repeat) count
-    once, the best of them. Sorted by position, then strand. Primers shorter than MIN_LENGTH,
+    Hits of one primer on one strand whose footprints overlap (a primer inside a repeat) are one
+    site, the best of them, with ``positions`` saying how many 3′ ends it has there. Sorted by position, then strand. Primers shorter than MIN_LENGTH,
     and templates shorter than the primer, give none. Linear in the template's length."""
     primer = clean_sequence(primer)
     top = sequence.upper()
@@ -635,18 +710,20 @@ def find_bindings(primer: str, sequence: str, circular: bool) -> list[Binding]:
     kept: list[Binding] = []
     for strand in (1, -1):
         hits = sorted((h for h in candidates if h[1].strand == strand), key=lambda h: h[0])
-        clusters: list[list] = []          # [low, high, best] in unwrapped coordinates
+        clusters: list[list] = []          # [low, high, best, hits] in unwrapped coordinates
         for low, b in hits:
             high = low + b.footprint - 1
             if clusters and low <= clusters[-1][1]:
                 clusters[-1][1] = max(clusters[-1][1], high)
                 clusters[-1][2] = _better(clusters[-1][2], b)
+                clusters[-1][3] += 1
             else:
-                clusters.append([low, high, b])
+                clusters.append([low, high, b, 1])
         if circular and len(clusters) > 1 and clusters[-1][1] >= clusters[0][0] + n:
             last = clusters.pop()          # a repeat running across the origin
             clusters[0][2] = _better(clusters[0][2], last[2])
-        kept += [c[2] for c in clusters]
+            clusters[0][3] += last[3]
+        kept += [replace(best, positions=count) for _, _, best, count in clusters]
     return sorted(kept, key=lambda b: (b.start, b.strand))
 
 
@@ -657,8 +734,9 @@ def _span(low: int, high: int, n: int) -> int:
 
 def library_on_sequence(primers: list[Primer], sequence: str, circular: bool) -> list[dict[str, Any]]:
     """Every library primer that binds the sequence, with its binding sites (the map overlay and
-    the Primer Library dialog use this). A primer binding more than MAX_SITES places is listed
-    with ``sites`` and no bindings, so the map is not flooded."""
+    the Primer Library dialog use this). ``sites`` counts every 3′ position, those inside a
+    repeat included; a primer with more than MAX_SITES is listed with no bindings, so the map
+    is not flooded."""
     seq = sequence.upper()
     found = []
     for p in primers:
@@ -668,20 +746,24 @@ def library_on_sequence(primers: list[Primer], sequence: str, circular: bool) ->
             continue  # a malformed stored sequence never breaks the map
         if not bindings:
             continue
-        entry = {**p.as_dict(), "sites": len(bindings)}
-        entry["bindings"] = [] if len(bindings) > MAX_SITES else [b.as_dict() for b in bindings]
+        sites = sum(b.positions for b in bindings)
+        entry = {**p.as_dict(), "sites": sites}
+        entry["bindings"] = [] if sites > MAX_SITES else [b.as_dict() for b in bindings]
         found.append(entry)
     return found
 
 
 def _bindings_by_strand(primers: list[Primer], seq: str, circular: bool):
+    """Forward and reverse sites of the primers that bind specifically: a primer with more than
+    MAX_SITES sites, or one in a repeat (it would prime a ladder of products or mixed reads),
+    is not offered for products or sequencing."""
     forwards, reverses = [], []
     for p in primers:
         try:
             bindings = find_bindings(p.sequence, seq, circular)
         except PrimerLibraryError:
             continue
-        if len(bindings) > MAX_SITES:
+        if len(bindings) > MAX_SITES or any(b.positions > 1 for b in bindings):
             continue
         for b in bindings:
             (forwards if b.strand == 1 else reverses).append((p, b))
@@ -780,10 +862,12 @@ class SetPath(BaseModel):
 
 
 class SaveLibrary(BaseModel):
-    """The dialog's primers, and the sequences it removed since it read the file. The save is
-    merged with the file as it is now, so rows a colleague added in the meantime stay."""
+    """What the dialog changed since it read the file: primers it added, the fields it changed
+    on primers it had (``edited``: each with its ``sequence`` and only the changed fields), and
+    the sequences it removed. Only those are applied to the file as it is at save time."""
 
-    primers: list[dict[str, Any]]
+    added: list[dict[str, Any]] = []
+    edited: list[dict[str, Any]] = []
     removed: list[str] = []
 
 
@@ -860,18 +944,27 @@ def set_path(body: SetPath) -> dict[str, Any]:
         check_library_path(raw)
     except PrimerLibraryError as exc:
         raise HTTPException(422, str(exc)) from exc
+    previous = settings.primer_library_path()
     settings.remember_primer_library_path(raw)
     try:
         return read_library()
     except PrimerLibraryError as exc:
+        settings.remember_primer_library_path(str(previous))   # keep the library that worked
         raise HTTPException(422, str(exc)) from exc
 
 
 @router.post("/save")
 def save_library(body: SaveLibrary) -> dict[str, Any]:
-    primers = _primers_from_payload(body.primers)
+    added = _primers_from_payload(body.added)
+    edits: dict[str, dict[str, str]] = {}
+    for row in body.edited:
+        try:
+            sequence = clean_sequence(str(row.get("sequence", "")))
+        except PrimerLibraryError as exc:
+            raise HTTPException(422, f"“{row.get('name') or 'A primer'}”: {exc}") from exc
+        edits[sequence] = {k: str(row[k] or "").strip() for k in EDITABLE if k in row}
     try:
-        return write_library(primers, body.removed)
+        return write_library(added, edits, body.removed)
     except PrimerLibraryError as exc:
         raise HTTPException(422, str(exc)) from exc
 

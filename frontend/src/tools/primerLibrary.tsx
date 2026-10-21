@@ -23,6 +23,7 @@ import {
   type LibraryFile,
   type LibraryPrimer,
   rejectedText,
+  saveChanges,
   today as todayDate,
 } from "./primerLibraryText";
 import type { Tool, ToolProps } from "./types";
@@ -39,9 +40,6 @@ function PrimerLibraryDialog(props: ToolProps) {
   const [file, setFile] = useState<LibraryFile>(EMPTY);
   const [primers, setPrimers] = useState<LibraryPrimer[]>([]);
   const [dirty, setDirty] = useState(false);
-  // Sequences removed since the file was read: a save drops those rows and keeps every other
-  // row of the file as it is then, so a colleague's additions in the meantime are not lost.
-  const [removed, setRemoved] = useState<Set<string>>(new Set());
   // An action that would drop unsaved changes, waiting for the user to confirm it.
   const [pendingDiscard, setPendingDiscard] = useState<{ run: () => void; what: string } | null>(null);
   const [query, setQuery] = useState("");
@@ -61,7 +59,6 @@ function PrimerLibraryDialog(props: ToolProps) {
       const got = await api.primerLibrary.get();
       setFile(got);
       setPrimers(got.primers);
-      setRemoved(new Set());
       setDirty(false);
       if (got.rejected.length) {
         setNotice({ intent: "warning", text: rejectedText(got.rejected, "file") });
@@ -110,16 +107,21 @@ function PrimerLibraryDialog(props: ToolProps) {
     setBusy(true);
     setError(null);
     try {
-      // The engine re-reads the file and merges: rows a colleague added since it was loaded stay.
-      const saved = await api.primerLibrary.save(primers as unknown as object[], [...removed]);
+      // Only this window's changes, applied by the engine to the file as it is now: what a
+      // colleague added, edited or deleted since it was loaded stays as they left it.
+      const changes = saveChanges(file.primers, primers);
+      const saved = await api.primerLibrary.save(changes);
+      const mine = new Set([...primers, ...file.primers].map((p) => p.sequence));
+      const theirs = saved.primers.filter((p) => !mine.has(p.sequence)).length;
       setFile(saved);
       setPrimers(saved.primers);
-      setRemoved(new Set());
       setDirty(false);
-      const theirs = saved.theirs
-        ? ` The file also had ${saved.theirs} primer${saved.theirs === 1 ? "" : "s"} added by someone else since you opened it: kept, and now listed.`
-        : "";
-      setNotice({ intent: "success", text: `Saved ${saved.count} primer${saved.count === 1 ? "" : "s"} to ${baseName(saved.path)}.${theirs}` });
+      const extra = [
+        theirs && `${theirs} primer${theirs === 1 ? "" : "s"} someone else added since you opened the file ${theirs === 1 ? "is" : "are"} kept and now listed.`,
+        saved.gone && `${saved.gone} of your edits ${saved.gone === 1 ? "was" : "were"} not saved: someone had removed ${saved.gone === 1 ? "that primer" : "those primers"} from the file meanwhile.`,
+      ].filter(Boolean).join(" ");
+      setNotice({ intent: saved.gone ? "warning" : "success",
+                  text: `Saved to ${baseName(saved.path)}: ${changes.added.length} added, ${changes.edited.length} changed, ${changes.removed.length} removed.${extra ? " " + extra : ""}` });
       return true;
     } catch (e) {
       setError(messageOf(e));
@@ -150,7 +152,6 @@ function PrimerLibraryDialog(props: ToolProps) {
       const got = await api.primerLibrary.setPath(chosen);
       setFile(got);
       setPrimers(got.primers);
-      setRemoved(new Set());
       setDirty(false);
       setNotice({ intent: "success", text: `The library is now ${baseName(got.path)}. Keep it in a shared folder so your lab shares it.` });
     } catch (e) {
@@ -172,13 +173,18 @@ function PrimerLibraryDialog(props: ToolProps) {
       return;
     }
     change([...primers, newEntry(adding.name, seq, today, adding.notes.trim(), adding.location.trim())]);
-    setRemoved((r) => { const next = new Set(r); next.delete(seq); return next; });
     setAdding({ name: "", sequence: "", notes: "", location: "" });
   };
 
   const remove = (primer: LibraryPrimer) => {
     change(primers.filter((p) => p !== primer));
-    setRemoved((r) => new Set(r).add(primer.sequence));
+    // A second row of the file with the same oligo (a second tube) is not a primer of the list,
+    // so it stays in the file and becomes the library's entry for that oligo after saving.
+    const twin = file.rejected.find((r) => cleanSequence(r.sequence) === primer.sequence);
+    if (twin) {
+      setNotice({ intent: "warning", text: `Another row of the file has the same oligo (“${twin.name || "unnamed"}”). `
+        + "It stays in the file, and after saving it is listed in place of the one you removed." });
+    }
   };
 
   const editField = (primer: LibraryPrimer, field: "notes" | "location", value: string) =>
@@ -191,7 +197,6 @@ function PrimerLibraryDialog(props: ToolProps) {
       const incoming = parsed.primers.map((p) => ({ ...p, added: p.added || today }));
       const { merged, added, duplicates } = mergeImport(primers, incoming);
       change(merged);
-      setRemoved((r) => { const next = new Set(r); incoming.forEach((p) => next.delete(p.sequence)); return next; });
       setImportText(null);
       const parts = [`Imported ${added} primer${added === 1 ? "" : "s"}`];
       if (duplicates) parts.push(`${duplicates} already in the library`);

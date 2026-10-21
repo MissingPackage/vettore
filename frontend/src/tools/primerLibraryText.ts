@@ -31,6 +31,8 @@ export interface Binding {
   footprint: number;
   tail: number;
   mismatches: number;
+  /** More than 1: a repeat where the primer's 3′ end fits that many overlapping positions. */
+  positions?: number;
 }
 
 /** A library primer together with where it binds the open document. */
@@ -120,6 +122,7 @@ export function bindingText(b: Binding): string {
   const extras: string[] = [];
   if (b.mismatches) extras.push(`${b.mismatches} mismatch${b.mismatches > 1 ? "es" : ""}`);
   if (b.tail) extras.push(`${b.tail} nt 5′ tail`);
+  if ((b.positions ?? 1) > 1) extras.push(`in a repeat: primes at ${b.positions} overlapping positions`);
   const note = extras.length ? ` (${extras.join(", ")})` : " (exact)";
   return `${dir}, ${range(b.start, b.end)}${note}`;
 }
@@ -163,6 +166,29 @@ export function mergeImport(existing: LibraryPrimer[], incoming: LibraryPrimer[]
     added += 1;
   }
   return { merged, added, duplicates };
+}
+
+const EDITABLE = ["name", "notes", "location", "added"] as const;
+
+/** What the dialog changed since it read the file, as the engine's save takes it: primers
+ * added, only the changed fields of primers it had, and sequences removed. Applied to the file
+ * as it is then, so a colleague's own edits and deletions in the meantime stay. */
+export function saveChanges(loaded: LibraryPrimer[], current: LibraryPrimer[]): {
+  added: LibraryPrimer[];
+  edited: ({ sequence: string } & Partial<Record<(typeof EDITABLE)[number], string>>)[];
+  removed: string[];
+} {
+  const before = new Map(loaded.map((p) => [p.sequence, p]));
+  const now = new Set(current.map((p) => p.sequence));
+  const added = current.filter((p) => !before.has(p.sequence));
+  const edited = current.flatMap((p) => {
+    const was = before.get(p.sequence);
+    if (!was) return [];
+    const changed = Object.fromEntries(EDITABLE.filter((k) => p[k] !== was[k]).map((k) => [k, p[k]]));
+    return Object.keys(changed).length ? [{ sequence: p.sequence, ...changed }] : [];
+  });
+  const removed = loaded.filter((p) => !now.has(p.sequence)).map((p) => p.sequence);
+  return { added, edited, removed };
 }
 
 /** A primer added to the library now, with today's date (from the engine) and a location. */

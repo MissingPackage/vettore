@@ -257,11 +257,18 @@ function Designer(props: ToolProps & { doc: OpenDoc }) {
         setNotice({ kind: "saved", text: `That sequence is already in the library as “${have.get(dup.sequence)}”.` });
         return;
       }
+      const names = new Set(library.primers.map((p) => p.name));
+      const clash = toAdd.find((p) => names.has(p.name));
+      if (clash) {
+        setNotice({ kind: "saved", text: `The library already has a primer named “${clash.name}” with another `
+          + "sequence. Change the name prefix, then save." });
+        return;
+      }
       const entries = toAdd.map((p) => ({
         name: p.name, sequence: p.sequence, notes: `designed on ${doc.name}`, location: "", added: today(),
       }));
       // Only the two new primers: the save merges them into the file as it is then.
-      await api.primerLibrary.save(entries);
+      await api.primerLibrary.save({ added: entries });
       setNotice({ kind: "saved", text: `Saved ${forwardName} and ${reverseName} to the lab primer library.` });
     } catch (e) {
       setNotice({ kind: "saved", text: String((e as Error).message) });

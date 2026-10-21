@@ -192,7 +192,7 @@ def headers():
 
 def test_save_then_get_round_trips_through_the_file(client):
     rows = [{"name": "M13F", "sequence": "GTAAAACGACGGCCAGT", "notes": "", "location": "box 1", "added": "2024-01-02"}]
-    saved = client.post("/api/primer-library/save", json={"primers": rows}, headers=headers())
+    saved = client.post("/api/primer-library/save", json={"added": rows}, headers=headers())
     assert saved.status_code == 200 and saved.json()["count"] == 1
     got = client.get("/api/primer-library", headers=headers())
     assert got.status_code == 200
@@ -204,7 +204,7 @@ def test_save_then_get_round_trips_through_the_file(client):
 def test_bindings_route_finds_a_stored_primer_on_a_sequence(client):
     seq = ("AAAACCCC" + PRIMER + "GGGGTTTT").upper()
     client.post("/api/primer-library/save",
-                json={"primers": [{"name": "P1", "sequence": PRIMER}]}, headers=headers())
+                json={"added": [{"name": "P1", "sequence": PRIMER}]}, headers=headers())
     r = client.post("/api/primer-library/bindings",
                     json={"sequenceData": {"sequence": seq, "circular": False}}, headers=headers())
     assert r.status_code == 200
@@ -282,7 +282,7 @@ def test_saving_keeps_unreadable_rows_and_the_files_separator(library_file):
     lib = pl.read_library()
     assert [p["name"] for p in lib["primers"]] == ["M13F"] and len(lib["rejected"]) == 2
     new = pl.Primer("KanR_F", "ATGATTGAACAAGATGGATTGCAC")
-    result = pl.write_library([pl.Primer("M13F", "GTAAAACGACGGCCAGT", "box 3"), new])
+    result = pl.write_library([new], {"GTAAAACGACGGCCAGT": {"notes": "box 3"}})
     assert result["kept"] == 2
     raw = library_file.read_bytes()
     assert raw.startswith(b"\xef\xbb\xbf")             # a BOM, so Excel shows µ and accents
@@ -305,7 +305,8 @@ def test_a_primer_in_a_repeat_counts_once_and_too_many_sites_are_not_drawn():
     oligo_dt = "T" * 20
     seq = "GC" * 20 + "A" * 40 + "GC" * 20
     # 21 overlapping 20-mers fit the 40-A stretch: one site, the stretch is one repeat.
-    assert len(pl.find_bindings(oligo_dt, seq, circular=False)) == 1
+    [site] = pl.find_bindings(oligo_dt, seq, circular=False)
+    assert site.positions == 26        # every place its 3′ 15 nt fit the stretch
     repeated = "".join(PRIMER + "ACACACACAC" for _ in range(12))
     [hit] = pl.library_on_sequence([pl.Primer("P", PRIMER)], repeated, circular=False)
     assert hit["sites"] == 12 and hit["bindings"] == []
@@ -345,13 +346,13 @@ def test_extra_columns_and_the_header_survive_a_save(library_file):
     original = ("Nome;Sequenza;Tm;Lunghezza;Chi;Note\r\n"
                 "M13F;GTAAAACGACGGCCAGT;53;17;Anna;box 3\r\n")
     library_file.write_bytes(original.encode("utf-8"))
-    result = pl.write_library([pl.Primer("M13F", "GTAAAACGACGGCCAGT", "box 4"),
-                               pl.Primer("KanR_F", "ATGATTGAACAAGATGGATTGCAC")])
+    result = pl.write_library([pl.Primer("KanR_F", "ATGATTGAACAAGATGGATTGCAC")],
+                              {"GTAAAACGACGGCCAGT": {"notes": "box 4"}})
     text = library_file.read_bytes().decode("utf-8-sig")
     lines = text.split("\r\n")
     assert lines[0] == "Nome;Sequenza;Tm;Lunghezza;Chi;Note"            # header as written
     assert lines[1] == "M13F;GTAAAACGACGGCCAGT;53;17;Anna;box 4"        # Tm, length, who stay
-    assert lines[2] == "KanR_F;ATGATTGAACAAGATGGATTGCAC;;;;"
+    assert lines[2] == "KanR_F;ATGATTGAACAAGATGGATTGCAC"
     assert result["count"] == 2
 
 
@@ -364,8 +365,8 @@ def test_rows_stay_in_their_columns_whatever_the_column_order(library_file):
     library_file.write_text("sequence,name,notes\nGTAAAACGACGGCCAGT,M13F,u\nnot-dna,Broken,fix me\n",
                             encoding="utf-8")
     before = pl.read_library()
-    pl.write_library([pl.Primer("M13F", "GTAAAACGACGGCCAGT", "u")])
-    pl.write_library([pl.Primer("M13F", "GTAAAACGACGGCCAGT", "u")])
+    pl.write_library([], {"GTAAAACGACGGCCAGT": {"notes": "v"}})
+    pl.write_library([], {"GTAAAACGACGGCCAGT": {"notes": "u"}})
     after = pl.read_library()
     assert [p["name"] for p in after["primers"]] == ["M13F"]   # the name never becomes a sequence
     assert after["rejected"] == before["rejected"]
@@ -376,9 +377,9 @@ def test_an_unchanged_file_is_written_back_byte_for_byte(library_file):
     body = ('name;sequence;notes\r\n"M13F";gtaaaacgacggccagt;"5 µl; 4 °C"\r\n'
             "Inosine;ACGTIACGT;keep\r\n")
     library_file.write_bytes(b"\xef\xbb\xbf" + body.encode("utf-8"))
-    primers = [pl.Primer(**{k: p[k] for k in ("name", "sequence", "notes", "location", "added")})
-               for p in pl.read_library()["primers"]]
-    pl.write_library(primers)
+    # The dialog sends every field of every primer as it has them: nothing differs, nothing moves.
+    edits = {p["sequence"]: {k: p[k] for k in pl.EDITABLE} for p in pl.read_library()["primers"]}
+    pl.write_library([], edits)
     assert library_file.read_bytes() == b"\xef\xbb\xbf" + body.encode("utf-8")   # lowercase kept
 
 
@@ -386,7 +387,7 @@ def test_excels_sep_line_names_the_separator_and_stays(library_file):
     library_file.write_text("sep=;\nname;sequence;notes\nM13F;GTAAAACGACGGCCAGT;a, b\n", encoding="utf-8")
     lib = pl.read_library()
     assert lib["delimiter"] == ";" and lib["primers"][0]["notes"] == "a, b"
-    pl.write_library([pl.Primer("M13F", "GTAAAACGACGGCCAGT", "a, b")])
+    pl.write_library([], {"GTAAAACGACGGCCAGT": {"notes": "a, b; c"}})
     assert library_file.read_text(encoding="utf-8-sig").startswith("sep=;")
 
 
@@ -406,7 +407,7 @@ def test_files_that_are_not_a_primer_list_are_refused_and_left_alone(library_fil
     library_file.write_bytes(data)
     if words is None:                      # Excel's "Unicode text" (UTF-16) is read and kept so
         assert pl.read_library()["primers"][0]["name"] == "M13F"
-        pl.write_library([pl.Primer("M13F", "GTAAAACGACGGCCAGT", "x")])
+        pl.write_library([], {"GTAAAACGACGGCCAGT": {"notes": "x"}})
         assert library_file.read_bytes().startswith((b"\xff\xfe", b"\xfe\xff"))
         return
     with pytest.raises(pl.PrimerLibraryError, match=words):
@@ -437,20 +438,25 @@ def test_a_utf8_bom_before_windows_code_page_text_keeps_the_header(library_file)
     assert (p["name"], p["notes"]) == ("M13F", "5 µl")
 
 
-def test_saving_merges_a_colleagues_additions(client):
+def test_saving_applies_only_this_windows_changes(client):
     library_file = settings.primer_library_path()
-    library_file.write_text("name;sequence\nM13F;GTAAAACGACGGCCAGT\nM13R;CAGGAAACAGCTATGAC\n", encoding="utf-8")
-    # The dialog loaded M13F and M13R; a colleague then adds T7 to the file.
-    with library_file.open("a", encoding="utf-8") as f:
-        f.write("T7;TAATACGACTCACTATAGGG\n")
-    r = client.post("/api/primer-library/save", headers=headers(), json={
-        "primers": [{"name": "M13F", "sequence": "GTAAAACGACGGCCAGT", "notes": "box 1"},
-                    {"name": "KanR_F", "sequence": "ATGATTGAACAAGATGGATTGCAC"}],
-        "removed": ["CAGGAAACAGCTATGAC"]})
-    assert r.status_code == 200
-    body = r.json()
-    assert [p["name"] for p in body["primers"]] == ["M13F", "T7", "KanR_F"]   # M13R removed
-    assert body["theirs"] == 1 and body["primers"][0]["notes"] == "box 1"
+    library_file.write_text("name;sequence;notes\nM13F;GTAAAACGACGGCCAGT;orig\n"
+                            "M13R;CAGGAAACAGCTATGAC;\nT7;TAATACGACTCACTATAGGG;\n", encoding="utf-8")
+    # B edits M13F's notes and removes T7; A, who loaded the same file, only adds SP6.
+    b = client.post("/api/primer-library/save", headers=headers(), json={
+        "edited": [{"sequence": "GTAAAACGACGGCCAGT", "notes": "B's note"}],
+        "removed": ["TAATACGACTCACTATAGGG"]})
+    assert b.status_code == 200
+    a = client.post("/api/primer-library/save", headers=headers(), json={
+        "added": [{"name": "SP6", "sequence": "ATTTAGGTGACACTATAG"}]})
+    body = a.json()
+    assert [p["name"] for p in body["primers"]] == ["M13F", "M13R", "SP6"]   # T7 stays deleted
+    assert body["primers"][0]["notes"] == "B's note"                          # B's edit stays
+    # An edit to a primer someone deleted meanwhile is not saved, and is counted.
+    c = client.post("/api/primer-library/save", headers=headers(), json={
+        "edited": [{"sequence": "TAATACGACTCACTATAGGG", "notes": "too late"}]})
+    assert c.json()["gone"] == 1 and "T7" not in [p["name"] for p in c.json()["primers"]]
+
 
 
 def test_a_dinucleotide_repeat_is_one_site_and_long_n_primers_stay_fast():
@@ -460,7 +466,10 @@ def test_a_dinucleotide_repeat_is_one_site_and_long_n_primers_stay_fast():
     seq = "".join(rnd.choice("ACGT") for _ in range(7000)) + "CA" * 60 + \
         "".join(rnd.choice("ACGT") for _ in range(8000))
     sites = pl.find_bindings("CA" * 10, seq, circular=True)
-    assert [b.strand for b in sites] == [1]           # one site, not 41
+    assert [b.strand for b in sites] == [1]           # one site, not 41...
+    assert sites[0].positions > 10                    # ...where it primes at many positions
+    [hit] = pl.library_on_sequence([pl.Primer("CA", "CA" * 10)], seq, circular=True)
+    assert hit["sites"] > pl.MAX_SITES and hit["bindings"] == []    # a repeat, not drawn
     t = time.perf_counter()
     assert len(pl.find_bindings("N" * 18, seq, circular=True)) == 2    # all one big "repeat"
     assert time.perf_counter() - t < 2
@@ -503,3 +512,93 @@ def test_a_reversed_region_on_a_linear_sequence_is_refused(client):
     r = client.post("/api/primer-library/product", headers=headers(), json={
         "sequenceData": {"sequence": "ACGT" * 100, "circular": False}, "start": 300, "end": 10})
     assert r.status_code == 422
+
+
+# ---- third review: the merge, odd files, repeats -----------------------------------------
+
+def test_a_new_column_goes_past_cells_the_header_does_not_name(library_file):
+    library_file.write_text("Name;Sequence\nM13F;GTAAAACGACGGCCAGT;box 3\nM13R;CAGGAAACAGCTATGAC;box 4\n",
+                            encoding="utf-8")
+    pl.write_library([], {"GTAAAACGACGGCCAGT": {"notes": "NEW"}})
+    text = library_file.read_text(encoding="utf-8-sig")
+    assert "M13F;GTAAAACGACGGCCAGT;box 3;NEW" in text and "M13R;CAGGAAACAGCTATGAC;box 4\n" in text
+    assert text.startswith("Name;Sequence;;notes")
+
+
+def test_a_quote_never_closed_is_refused_not_swallowing_the_rows_below(library_file):
+    data = b'name;sequence;notes\nM13F;GTAAAACGACGGCCAGT;"box 3\nM13R;CAGGAAACAGCTATGAC;x\n'
+    library_file.write_bytes(data)
+    with pytest.raises(pl.PrimerLibraryError, match="quote"):
+        pl.read_library()
+    with pytest.raises(pl.PrimerLibraryError):
+        pl.write_library([], {"GTAAAACGACGGCCAGT": {"notes": "NEW"}})
+    assert library_file.read_bytes() == data
+
+
+def test_title_rows_above_the_header_are_kept(library_file):
+    body = "Lab primers 2024;;;\n;;;\nName;Tm;Sequence;Notes\nM13F;53;GTAAAACGACGGCCAGT;box 3\n"
+    library_file.write_text(body, encoding="utf-8")
+    [p] = pl.read_library()["primers"]
+    assert (p["name"], p["notes"]) == ("M13F", "box 3")
+    pl.write_library([], {"GTAAAACGACGGCCAGT": {"notes": "box 4"}})
+    assert library_file.read_text(encoding="utf-8-sig") == body.replace("box 3", "box 4")
+
+
+@pytest.mark.parametrize("header,row", [
+    ("Sequence name;Sequence;Notes", "M13F;GTAAAACGACGGCCAGT;box 3"),
+    ("Sequence ID;Name;Sequence (5'-3');Notes", "17;M13F;GTAAAACGACGGCCAGT;box 3"),
+    ("Name;Sequence length;Sequence;Notes", "M13F;17;GTAAAACGACGGCCAGT;box 3"),
+])
+def test_sequence_like_headers_that_are_not_the_sequence(header, row):
+    [p], rejected = pl.parse_csv(f"{header}\n{row}\n")
+    assert rejected == [] and (p.name, p.sequence, p.notes) == ("M13F", "GTAAAACGACGGCCAGT", "box 3")
+
+
+def test_a_no_op_save_leaves_odd_rows_exactly_as_written(library_file):
+    body = ('name;sequence;notes\r\n;GTAAAACGACGGCCAGT;nameless\r\n M13R ;CAGGAAACAGCTATGAC\r\n'
+            'T7;TAATACGACTCACTATAGGG;"line1\nline2"\r\n')
+    library_file.write_bytes(body.encode("utf-8"))
+    edits = {p["sequence"]: {k: p[k] for k in pl.EDITABLE} for p in pl.read_library()["primers"]}
+    pl.write_library([], edits)
+    assert library_file.read_bytes().decode("utf-8-sig") == body
+
+
+def test_a_headerless_file_is_not_padded_on_save(library_file):
+    library_file.write_text("M13F,GTAAAACGACGGCCAGT\nM13R,CAGGAAACAGCTATGAC\n", encoding="utf-8")
+    pl.write_library([pl.Primer("T7", "TAATACGACTCACTATAGGG")])
+    assert library_file.read_text(encoding="utf-8-sig") == (
+        "M13F,GTAAAACGACGGCCAGT\nM13R,CAGGAAACAGCTATGAC\nT7,TAATACGACTCACTATAGGG\n")
+
+
+def test_a_utf8_file_with_one_windows_line_keeps_both(library_file):
+    library_file.write_bytes("name;sequence;notes\nM13F;GTAAAACGACGGCCAGT;5 µM\n".encode()
+                             + "M13R;CAGGAAACAGCTATGAC;4 °C\n".encode("cp1252"))
+    notes = [p["notes"] for p in pl.read_library()["primers"]]
+    assert notes == ["5 µM", "4 °C"]
+
+
+def test_a_refused_file_does_not_become_the_library(client, tmp_path):
+    good = settings.primer_library_path()
+    bad = tmp_path / "workbook.csv"
+    bad.write_bytes(b"PK\x03\x04xlsx")
+    r = client.post("/api/primer-library/path", json={"path": str(bad)}, headers=headers())
+    assert r.status_code == 422 and settings.primer_library_path() == good
+
+
+@pytest.mark.parametrize("pasted", [
+    "GTAAAACGACGGCCAGT\nCAGGAAACAGCTATGAC\n",                 # one column of sequences
+    "GTAAAACGACGGCCAGT\tM13F\nCAGGAAACAGCTATGAC\tM13R\n",     # sequence, then name
+])
+def test_pastes_with_the_sequence_first(pasted):
+    primers, rejected = pl.parse_csv(pasted)
+    assert rejected == [] and [p.sequence for p in primers] == ["GTAAAACGACGGCCAGT", "CAGGAAACAGCTATGAC"]
+
+
+def test_a_primer_in_a_short_repeat_is_not_offered_as_a_product():
+    fwd = "ACGTTGCATTCGAATGACCTG"
+    rep = "ACACACACACACACACACAC"
+    seq = ("G" * 50 + fwd + "T" * 300 + rep + "ACAC" + "G" * 50).upper()
+    rev = rc(rep)
+    [site] = [b for b in pl.find_bindings(rev, seq, False) if b.strand == -1]
+    assert site.positions > 1
+    assert pl.amplified_products([pl.Primer("F", fwd), pl.Primer("R", rev)], seq, False) == []

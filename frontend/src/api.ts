@@ -201,11 +201,12 @@ export const api = {
     get: () => call<LibraryFile>("primer-library"),
     /** Point the library at a .csv (kept in a shared folder) and read it. */
     setPath: (path: string) => call<LibraryFile>("primer-library/path", { path }),
-    /** Save the dialog's primers to the shared .csv, merged with the file as it is now: rows
-     * whose sequence is in `removed` go, rows a colleague added meanwhile stay. Returns the
-     * library as read back, with how many primers were written and kept from others. */
-    save: (primers: object[], removed: string[] = []) =>
-      call<LibraryFile & { count: number; kept: number; theirs: number }>("primer-library/save", { primers, removed }),
+    /** Apply the dialog's changes (see primerLibraryText.saveChanges) to the shared .csv as it is
+     * now. Returns the library as read back, with how many primers were written and how many
+     * edits were lost because someone had deleted that primer. */
+    save: (changes: { added?: object[]; edited?: object[]; removed?: string[] }) =>
+      call<LibraryFile & { count: number; kept: number; gone: number }>(
+        "primer-library/save", changes),
     /** Parse pasted or file text (name, sequence, notes…) without saving, so the dialog can show
      * what will be kept and what will be left out. */
     parse: (text: string) => call<{ primers: LibraryPrimer[]; rejected: RejectedRow[]; today: string }>("primer-library/parse", { text }),
