@@ -2,8 +2,10 @@
 plain sentence for every way it can fail. NCBI itself is replaced by a stand-in: the tests run
 offline, like the rest of Vettore."""
 
+import http.client
 import io
 import socket
+import ssl
 import urllib.error
 import urllib.parse
 from pathlib import Path
@@ -79,7 +81,7 @@ def test_accessions_of_every_kind_are_accepted(accession):
     ("", "Type an accession number"),
     ("   ", "Type an accession number"),
     ("pUC19", "is not a GenBank accession number"),
-    ("MT612431.1; rm -rf", "is not a GenBank accession number"),
+    ("MT612431.1 or M77789.2", "is not a GenBank accession number"),
     ("ACGTACGTACGT", "is not a GenBank accession number"),
 ])
 def test_what_is_not_an_accession_is_never_sent(monkeypatch, typed, message):
@@ -133,3 +135,85 @@ def test_a_genome_is_refused_with_what_to_do(monkeypatch):
     res = fetch("NC_000001.11")
     assert res.status_code == 422
     assert "too large to open in Vettore" in res.json()["detail"]
+
+
+def test_an_accession_copied_with_words_around_it_is_picked_out():
+    assert ncbi.clean_accession("GenBank: MT612431.1") == "MT612431.1"
+    assert ncbi.clean_accession("MT612431.1 (circular)") == "MT612431.1"
+    # Only the accession is ever sent, whatever surrounds it.
+    assert ncbi.clean_accession("MT612431.1; rm -rf") == "MT612431.1"
+
+
+@pytest.mark.parametrize("accession", ["NP_000509.1", "XP_011544321", "WP_000123456.1",
+                                       "AAB12345.1", "CAA1234567"])
+def test_a_protein_accession_is_refused_before_anything_is_sent(monkeypatch, accession):
+    answer = Answer(monkeypatch, b"LOCUS")
+    res = fetch(accession)
+    assert res.status_code == 422
+    assert "is a protein accession" in res.json()["detail"]
+    assert answer.urls == []
+
+
+def test_an_accession_without_version_is_named_after_the_version_received(monkeypatch):
+    Answer(monkeypatch, (DATA / "MT612431.1.gb").read_bytes())
+    body = fetch("MT612431").json()
+    assert body["accession"] == "MT612431.1"
+    assert body["documents"][0]["name"] == "MT612431.1"
+
+
+def test_an_outage_page_is_not_reported_as_a_missing_record(monkeypatch):
+    Answer(monkeypatch, b"<html><body>Service unavailable</body></html>")
+    res = fetch("MT612431.1")
+    assert res.status_code == 502
+    assert "Try again in a few minutes" in res.json()["detail"]
+
+
+def test_a_download_cut_half_way_counts_as_offline(monkeypatch):
+    Answer(monkeypatch, error=http.client.IncompleteRead(b"LOCUS", 1000))
+    res = fetch("MT612431.1")
+    assert res.status_code == 503
+    assert "could not reach NCBI" in res.json()["detail"]
+
+
+def test_a_certificate_that_cannot_be_verified_is_named(monkeypatch):
+    Answer(monkeypatch, error=urllib.error.URLError(
+        ssl.SSLCertVerificationError(1, "certificate verify failed")))
+    res = fetch("MT612431.1")
+    assert res.status_code == 503
+    assert "could not verify NCBI's certificate" in res.json()["detail"]
+
+
+def test_a_genome_is_refused_from_its_locus_line_before_the_download(monkeypatch):
+    class Stream(io.BytesIO):
+        read_after_locus = False
+
+        def read(self, *args):
+            Stream.read_after_locus = True
+            return super().read(*args)
+
+    locus = b"LOCUS       NC_000913            4641652 bp    DNA     circular CON 09-MAR-2022\n"
+    monkeypatch.setattr(ncbi.urllib.request, "urlopen",
+                        lambda *a, **k: Stream(locus + b"x" * 100))
+    res = fetch("NC_000913.3")
+    assert res.status_code == 422
+    assert "4,641,652 bp" in res.json()["detail"]
+    assert not Stream.read_after_locus
+
+
+def test_a_sequencing_project_master_record_points_to_its_contigs(monkeypatch):
+    Answer(monkeypatch, b"LOCUS       AAAA02000000          8 rc    DNA     linear   PLN\n"
+                        b"VERSION     AAAA02000000.1\n"
+                        b"WGS         AAAA02000001-AAAA02050231\n//\n")
+    res = fetch("AAAA02000000")
+    assert res.status_code == 422
+    assert "master record" in res.json()["detail"]
+
+
+def test_a_record_that_cannot_be_read_does_not_talk_about_a_file(monkeypatch):
+    Answer(monkeypatch, b"LOCUS       MT612431    7204 bp    DNA     circular SYN\n"
+                        b"VERSION     MT612431.1\nORIGIN\n        1 zzzz\n")
+    res = fetch("MT612431.1")
+    assert res.status_code == 422
+    detail = res.json()["detail"]
+    assert "could not read the record NCBI sent" in detail
+    assert "colleague" not in detail

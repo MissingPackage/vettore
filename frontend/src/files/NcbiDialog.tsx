@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import * as Blueprint from "@blueprintjs/core";
 import { Button, Classes, InputGroup } from "@blueprintjs/core";
 import { api, type OpenResult } from "../api";
@@ -18,6 +18,13 @@ export default function NcbiDialog(props: {
   const [accession, setAccession] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Cancel while downloading: the record that arrives afterwards is dropped, not opened.
+  const closed = useRef(false);
+  useEffect(() => () => { closed.current = true; }, []);
+  const close = () => {
+    closed.current = true;
+    props.onClose();
+  };
 
   const open = async () => {
     if (!accession.trim() || busy) return;
@@ -25,15 +32,16 @@ export default function NcbiDialog(props: {
     setError(null);
     try {
       const result = await api.openFromNcbi(accession);
-      props.onOpen(result, result.accession);
+      if (!closed.current) props.onOpen(result, result.accession);
     } catch (e) {
+      if (closed.current) return;
       setError(messageOf(e));
       setBusy(false);
     }
   };
 
   return (
-    <Dialog isOpen onClose={props.onClose} title="Open from NCBI" style={{ width: 560 }}>
+    <Dialog isOpen onClose={close} title="Open from NCBI" style={{ width: 560 }}>
       <div className={Classes.DIALOG_BODY} data-testid="ncbi-dialog">
         <p className="vt-dialog-intro">
           Downloads a GenBank record from NCBI by its accession number and opens it as a new file,
@@ -63,7 +71,7 @@ export default function NcbiDialog(props: {
       </div>
       <div className={Classes.DIALOG_FOOTER}>
         <div className={Classes.DIALOG_FOOTER_ACTIONS}>
-          <Button onClick={props.onClose}>Cancel</Button>
+          <Button data-testid="ncbi-cancel" onClick={close}>Cancel</Button>
           <Button intent="primary" data-testid="ncbi-open" disabled={!accession.trim()} loading={busy}
                   onClick={open}>
             Open

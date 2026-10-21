@@ -120,9 +120,13 @@ saved (save it with Ctrl+S to keep it). The welcome screen has the same link.
   needed.
 - Without a connection the dialog says so and stays open, so you can try again; everything
   else in Vettore works offline as always.
-- A wrong or unknown accession is named in the message. Records of a whole chromosome or
-  genome (more than 16 MB) are too large to open here: download the region you need from the
-  NCBI website and open that file.
+- A wrong or unknown accession is named in the message, and a protein accession is pointed
+  out as such. An accession copied with words around it ("GenBank: MT612431.1") works too.
+- Records over 2,000,000 bp (a bacterial genome or a chromosome) are refused before they are
+  downloaded: download the region you need from the NCBI website and open that file. The
+  master record of a sequencing project holds no sequence; open one of its contigs.
+- Typed without a version (`M77789`), the record opens under the version NCBI sends
+  (`M77789.2`), so you know which one you have.
 - The tab's History starts with "Opened from NCBI" and the accession.
 - To hide the menu item, untick **Allow Open from NCBI** in
   [Preferences](#preferences-file--preferences).

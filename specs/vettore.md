@@ -173,8 +173,11 @@ have to download and save it first.
 - File → Open from NCBI… (and a link on the welcome screen) asks for an accession, fetches the
   GenBank record (NCBI E-utilities `efetch`, `gbwithparts`) and opens it as an unsaved document
   whose History starts with "Opened from NCBI". Only the accession is sent; no account.
-- The accession is checked before anything is sent; offline, an unknown accession, NCBI busy
-  and a record over 16 MB each get one sentence saying what to do. Nothing else uses the
+- The accession is checked before anything is sent (protein accessions refused, an accession
+  picked out of pasted text); offline, an uncheckable certificate, an unknown accession, NCBI
+  busy, a master record without sequence and a record over 2 Mb (read from the LOCUS line,
+  before downloading) each get one sentence saying what to do. The tab takes the record's
+  accession.version. Nothing else uses the
   network (`src/vettore/ncbi.py` is the only module that does).
 - Preference "Allow Open from NCBI", on by default; off hides the menu item and the link.
 - Not included: uploading sequences anywhere (no BLAST).

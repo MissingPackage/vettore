@@ -109,3 +109,27 @@ test("turned off in Preferences, the menu item is hidden", async ({ page }) => {
   await expect(page.getByTestId("welcome")).toBeVisible();
   await expect(page.getByTestId("welcome-ncbi")).toHaveCount(0);
 });
+
+test("Cancel during the download drops the record that arrives afterwards", async ({ page }) => {
+  let release: () => void = () => {};
+  const held = new Promise<void>((resolve) => { release = resolve; });
+  let answered = false;
+  await page.route("**/api/ncbi/fetch", async (route) => {
+    await held;
+    await answerWithRecord(page, route);
+    answered = true;
+  });
+  await page.goto(`/?token=${TOKEN}`);
+  await page.getByTestId("welcome-ncbi").click();
+  await page.getByTestId("ncbi-accession").fill("MT612431.1");
+  await page.getByTestId("ncbi-open").click();
+  await expect(page.getByTestId("ncbi-busy")).toBeVisible();
+  await page.getByTestId("ncbi-cancel").click();
+  await expect(page.getByTestId("ncbi-dialog")).toBeHidden();
+
+  release();
+  await expect.poll(() => answered).toBe(true);
+  await page.waitForTimeout(300);
+  await expect(page.locator(".vt-doctab")).toHaveCount(0);
+  await expect(page.getByTestId("welcome")).toBeVisible();
+});
