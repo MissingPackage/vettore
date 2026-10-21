@@ -154,9 +154,12 @@ digest that tells my correct clone apart from the usual wrong ones, so that one 
   resolving range of the agarose percentage do not count.
 - Ranking, deterministic: well-separated digests (every wrong clone at least twice the
   resolution away, every lane cut) before digests at the limit of the gel; then fewer enzymes;
-  an expected lane of 2–5 visible bands; larger separation; enzymes most labs have. Identical
-  band patterns are one result. The top 10 are listed with one sentence each. [VERIFY: buffer
-  compatibility is not ranked — the bundled REBASE data has no buffer activity]
+  one buffer before two (below); an expected lane of 2–5 visible bands; larger separation; enzymes most labs have. Identical
+  band patterns are one result. The top 10 are listed with one sentence each.
+- Buffers [DECIDED 2026-10-21: the lab's own, not a vendor table]: each enzyme of "My enzymes"
+  carries the buffer the lab digests it in. Results show it next to the enzyme, pairs in one
+  buffer rank before pairs in two (right after "fewer enzymes"), and a pair in two buffers is
+  flagged with what to do. Enzymes without a buffer never count as different.
 - A result draws its gel next to the ladder; Send to Gel Simulation and Copy as Protocol.
   When nothing works the dialog says why and offers the commercial set.
 - Tested on pBR322 digests worked out by hand from the published record, sizes cross-checked

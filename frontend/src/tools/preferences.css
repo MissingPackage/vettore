@@ -28,3 +28,22 @@
   font-size: var(--vt-font-size-xs);
   font-weight: var(--vt-weight-medium);
 }
+
+/* My enzymes: one row per enzyme with the buffer the lab digests it in. */
+.vt-preferences .vt-my-enzymes {
+  width: 100%;
+}
+
+.vt-preferences .vt-my-enzymes td:first-child {
+  white-space: nowrap;
+  width: 1%;
+}
+
+.vt-preferences .vt-my-enzymes-paste {
+  align-items: flex-start;
+}
+
+.vt-preferences .vt-my-enzymes-paste textarea {
+  resize: vertical;
+  font-family: var(--vt-font);
+}

@@ -495,8 +495,10 @@ you chose (the same migration model as Simulate Agarose Gel). Bands under 150 bp
 for the agarose percentage, are too faint or too compressed to count. The best ten are listed,
 each with one sentence such as "Expected clone: 4.2 kb + 1.1 kb; insert in the other
 orientation: 5.1 kb + 249 bp; parent vector: 4.4 kb". Digests whose bands are well apart come
-first, then single digests before double ones, then digests that give the expected clone two to
-five bands. A digest marked **close bands** works on paper but its bands run near each other:
+first, then single digests before double ones, then double digests whose two enzymes go in
+the same buffer, then digests that give the expected clone two to five bands. Next to each
+enzyme is the buffer you gave it in **My enzymes**; a pair that needs two different buffers is
+marked **different buffers**, with what to do about it. A digest marked **close bands** works on paper but its bands run near each other:
 check them on the gel. Digests that give exactly the same bands are listed once, with the other
 enzymes named underneath.
 
@@ -553,9 +555,11 @@ What Vettore starts from, kept between sessions:
   every file you open next. Documents already open keep what you chose for them.
 - **Gel ladder** and **agarose percentage** — what **Tools → Simulate Agarose Gel…** opens on,
   so your usual gel is one click away.
-- **My enzymes** — the enzymes your lab has. Add them one by one, or paste a list copied from
-  a spreadsheet (names separated by commas, spaces or new lines); names Vettore does not know
-  are pointed out. **Tools → Find Diagnostic Digest…** tries these first. Empty by default.
+- **My enzymes** — the enzymes your lab has, each with the buffer you digest it in (type it
+  next to the enzyme). Add them one by one, or paste a list (names separated by commas, spaces
+  or new lines) or two columns copied from a spreadsheet, enzyme and buffer; names Vettore
+  does not know are pointed out. **Tools → Find Diagnostic Digest…** tries these first and
+  shows their buffers. Empty by default.
 - **Minimum identity when detecting common features** — 95 % by default. Lower it to catch
   variants (a promoter a few bases off), raise it to 100 % to accept exact matches only.
 

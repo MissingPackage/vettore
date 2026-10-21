@@ -17,7 +17,8 @@ The download links in the README always point to the latest release.
 - Tools → Find Diagnostic Digest… finds the single or double digest that tells the expected clone apart from the wrong ones on one gel, and lists the best ten with one sentence each ("Expected clone: 4.2 kb + 1.1 kb; parent vector: 4.4 kb"). Choosing one draws its gel next to your ladder; Send to Gel Simulation opens it with one lane per outcome, and Copy as Protocol copies enzymes, gel and expected sizes.
 - A product of restriction cloning remembers its wrong clones (insert in the other orientation, vector closed without insert, parent vector, and the simulation's other products), and the digest planner starts from them.
 - Enzymes that Dam or Dcm methylation blocks on the plasmids are left out and named, unless the DNA comes from a dam−/dcm− strain.
-- File → Preferences → My enzymes keeps the enzymes in your freezer (empty until you fill it in; a list can be pasted from a spreadsheet); the digest planner tries them first.
+- File → Preferences → My enzymes keeps the enzymes in your freezer, each with the buffer you digest it in (empty until you fill it in; a list, or two columns enzyme and buffer, can be pasted from a spreadsheet); the digest planner tries them first.
+- Find Diagnostic Digest shows each enzyme's buffer next to it, ranks double digests in one buffer before those that need two, and says what to do when a pair needs two different buffers; the copied protocol carries the buffers too.
 
 ## 0.3.1 — more promoters, with their species
 

@@ -15,6 +15,8 @@ import { messageOf } from "../files/notices";
 import { usePreferences } from "../preferences";
 import {
   blockedByMethylation,
+  enzymesWithBuffers,
+  mixedBuffersAdvice,
   protocolText,
   type PlannerResponse,
   type PlannerResult,
@@ -103,8 +105,9 @@ function DigestPlannerDialog(props: ToolProps) {
       excluded: blocked,
       ladder,
       percent,
+      buffers: prefs.enzymeBuffers,
     };
-  }, [expectedData, wrong, tried, blocked, ladder, percent]);
+  }, [expectedData, wrong, tried, blocked, ladder, percent, prefs.enzymeBuffers]);
   const bodyKey = body ? JSON.stringify(body) : "";
 
   useEffect(() => {
@@ -319,8 +322,11 @@ function DigestPlannerDialog(props: ToolProps) {
                       <input type="radio" name="digest-result" checked={i === chosen} onChange={() => setChosen(i)}
                              data-testid="digest-result" />
                       <span>
-                        <b>{r.enzymes.join(" + ")}</b>
+                        <b data-testid="digest-result-enzymes">{enzymesWithBuffers(r)}</b>
                         {!r.clear && <span className="vt-warn"> · close bands, check on the gel</span>}
+                        {r.mixed_buffers && (
+                          <span className="vt-warn" data-testid="digest-mixed-buffers"> · different buffers</span>
+                        )}
                         <br />
                         <span className="vt-digest-sentence">{r.sentence}</span>
                         {r.same_pattern.length > 0 && (
@@ -334,6 +340,11 @@ function DigestPlannerDialog(props: ToolProps) {
                   </li>
                 ))}
               </ol>
+              {result?.mixed_buffers && (
+                <div className="vt-notice vt-notice-warning" role="status" data-testid="digest-buffer-note">
+                  {mixedBuffersAdvice(result)}
+                </div>
+              )}
               {result && (
                 <div className="vt-digest-gel">
                   <GelPicture testId="digest-gel" ladderLabel={response.ladder_label} ladder={response.ladder}

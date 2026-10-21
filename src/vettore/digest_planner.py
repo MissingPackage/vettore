@@ -15,9 +15,10 @@ Dam or Dcm methylation would block on these molecules as ``excluded``.
 
 Ranking, deterministic: diagnostic only; then clear results (every wrong clone at least twice
 the resolution away, every lane digested) before results at the limit of the gel; then fewer
-enzymes; then an expected lane of 2 to 5 visible bands; then larger separations; then names.
-Buffer compatibility is not ranked: the REBASE tables bundled with Vettore carry no buffer
-activity.
+enzymes; then pairs whose enzymes go in one buffer; then an expected lane of 2 to 5 visible
+bands; then larger separations; then names. The REBASE tables bundled with Vettore carry no
+buffer activity, so buffers are the lab's own: the buffer written next to each enzyme of "My
+enzymes" (the interface sends them as ``buffers``).
 """
 
 from __future__ import annotations
@@ -156,6 +157,16 @@ class Candidate:
     enzymes: tuple[str, ...]
     lanes: list[Lane]
     separations: list[float]      # per wrong clone
+    buffers: dict[str, str] = field(default_factory=dict)   # by lower-case enzyme name
+
+    def buffer(self, enzyme: str) -> str | None:
+        return self.buffers.get(enzyme.lower())
+
+    @property
+    def mixed_buffers(self) -> bool:
+        """The enzymes are known to want different buffers (unknown buffers never count)."""
+        known = {b.strip().lower() for e in self.enzymes if (b := self.buffer(e))}
+        return len(known) > 1
 
     @property
     def diagnostic(self) -> bool:
@@ -172,7 +183,7 @@ class Candidate:
 
     def rank(self) -> tuple:
         expected_bands = len(self.lanes[0].visible)
-        return (not self.diagnostic, not self.clear, len(self.enzymes),
+        return (not self.diagnostic, not self.clear, len(self.enzymes), self.mixed_buffers,
                 not 2 <= expected_bands <= 5, -round(self.min_separation, 4),
                 sum(e not in PREFERRED_NAMES for e in self.enzymes),
                 -sum(_suppliers(e) for e in self.enzymes),
@@ -188,6 +199,8 @@ class Candidate:
     def as_dict(self, same: list[Candidate] | None = None) -> dict[str, Any]:
         return {
             "enzymes": list(self.enzymes),
+            "buffers": [self.buffer(e) for e in self.enzymes],
+            "mixed_buffers": self.mixed_buffers,
             "same_pattern": [list(c.enzymes) for c in same or []],
             "sentence": self.sentence(),
             "clear": self.clear,
@@ -205,7 +218,8 @@ def _usable(mols: list[Molecule], name: str) -> bool:
     return any(m.cuts.get(name) for m in mols)
 
 
-def candidates(mols: list[Molecule], names: list[str], percent: float) -> list[Candidate]:
+def candidates(mols: list[Molecule], names: list[str], percent: float,
+               buffers: dict[str, str] | None = None) -> list[Candidate]:
     usable = [n for n in names if _usable(mols, n)]
     combos: list[tuple[str, ...]] = [(n,) for n in usable]
     for a, b in combinations(usable, 2):
@@ -216,7 +230,7 @@ def candidates(mols: list[Molecule], names: list[str], percent: float) -> list[C
     for combo in combos:
         lanes = [_lane(m, combo, percent) for m in mols]
         seps = [separation(lanes[0], other) for other in lanes[1:]]
-        out.append(Candidate(combo, lanes, seps))
+        out.append(Candidate(combo, lanes, seps, buffers or {}))
     return out
 
 
@@ -280,8 +294,9 @@ def _point_changes(a: Molecule, b: Molecule, limit: int = 30) -> int | None:
 
 def plan(expected: tuple[str, dict], alternatives: list[tuple[str, dict]],
          enzymes: list[str] | None, excluded: list[str], percent: float,
-         ladder: str) -> dict[str, Any]:
-    """Rank the diagnostic digests. ``enzymes`` None means the whole commercial set."""
+         ladder: str, buffers: dict[str, str] | None = None) -> dict[str, Any]:
+    """Rank the diagnostic digests. ``enzymes`` None means the whole commercial set;
+    ``buffers`` maps enzyme names to the buffer the lab digests them in."""
     if ladder not in gel.LADDERS:
         raise ValueError(gel.unknown_ladder(ladder))
     if not alternatives:
@@ -298,7 +313,8 @@ def plan(expected: tuple[str, dict], alternatives: list[tuple[str, dict]],
                            "methylation on these plasmids. Tick “DNA from a dam−/dcm− strain” "
                            "if yours is, or try all commercial enzymes.")
     _cut_positions(mols, names)
-    found = candidates(mols, names, percent)
+    lab_buffers = {n.lower(): b.strip() for n, b in (buffers or {}).items() if b and b.strip()}
+    found = candidates(mols, names, percent, lab_buffers)
     ranked = sorted((c for c in found if c.diagnostic), key=Candidate.rank)
     # Digests that give the very same bands are one result, listed with the best enzymes.
     groups: dict[tuple, list[Candidate]] = {}
