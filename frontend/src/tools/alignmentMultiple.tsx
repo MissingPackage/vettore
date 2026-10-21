@@ -340,15 +340,16 @@ function PairDifferences({ rows }: { rows: MultipleResult["sequences"] }) {
           <>
             <p className="vt-msa-meta" data-testid="msa-pair-summary">
               Compared over {bp(comparison.overlap)} of {rows[a].name}'s {bp(rows[a].length)} bp
-              {comparison.overlap < rows[a].length && ` (from its base ${bp(comparison.start ?? 0)} to ${bp(comparison.end ?? 0)})`}:
+              {comparison.overlap < rows[a].length && ` (from its base ${bp(comparison.start ?? 0)}${
+                (comparison.start ?? 0) > (comparison.end ?? 0) ? " round past base 1" : ""} to ${bp(comparison.end ?? 0)})`}:
               {" "}{comparison.identity.toFixed(2)} % identical there; {summarizeCounts(comparison.counts)}.
               Positions and bases are given in {rows[a].name}'s own numbering and strand.
               {comparison.unknown > 0 && ` ${bp(comparison.unknown)} position${comparison.unknown === 1 ? "" : "s"} with N (unknown base) are not counted as differences.`}
             </p>
             {comparison.unrelated.length > 0 && (
               <Callout intent="warning" data-testid="msa-pair-unrelated">
-                Not compared, because the two have nothing recognisably in common there (for
-                example different inserts in the same backbone):{" "}
+                Not compared, because the two carry unrelated sequence there (different inserts
+                in the same backbone, an adapter or tail):{" "}
                 {comparison.unrelated.map((u) => u.start === null
                   ? `${bp(u.b_bases)} bp of ${rows[b].name} with no counterpart`
                   : `${rows[a].name} ${bp(u.start)}–${bp(u.end ?? u.start)} against ${bp(u.b_bases)} bp of ${rows[b].name}`).join("; ")}.

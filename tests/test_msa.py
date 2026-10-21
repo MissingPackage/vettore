@@ -432,11 +432,67 @@ def test_unrelated_ends_of_linear_sequences_are_named():
     assert gap["start"] < 200 and gap["end"] > 700   # before it, b has not begun yet
 
 
-def test_a_fragment_of_another_circle_does_not_reopen_the_first():
+def test_circles_open_inside_what_they_share_and_fragments_stay_whole():
+    # P's base 1 is not in Q (Q holds P as a linear stretch): the circles are opened inside
+    # P, which both share, and a fragment of Q stays in one piece.
     p = clean_dna(1500, 87)
     q = clean_dna(2500, 88) + p + clean_dna(2000, 89)
-    fragment = q[3700:4300]                                  # inside q, crossing no origin
+    fragment = q[3700:4300]
     result = msa.multiple_alignment([doc("P", p, True), doc("Q", q, True),
                                      doc("F", fragment, False)])
     by_name = {s["name"]: s for s in result["sequences"]}
-    assert by_name["P"]["origin_moved_to"] is None
+    row = by_name["F"]["row"]
+    assert "-" not in row[by_name["F"]["first_column"] - 1:by_name["F"]["last_column"]]
+    out = msa.compare(by_name["P"], by_name["Q"])
+    [extra] = out["differences"]           # Q is P with 4.5 kb more: one insertion
+    assert extra["kind"] == "insertion" and len(extra["sequence"]) == 4500
+    assert out["overlap"] == len(p)
+
+
+def test_identical_circles_keep_their_origin():
+    result = msa.multiple_alignment([doc("a", BASE, True), doc("b", snp(BASE, 1500), True)])
+    assert all(s["origin_moved_to"] is None for s in result["sequences"])
+
+
+@pytest.mark.parametrize("insert_at", [0, 200, 2800])
+def test_a_root_starting_in_or_near_an_insert_the_other_lacks(insert_at):
+    insert = clean_dna(700, 90)
+    other = snp(snp(BASE, 10), 2900)
+    _, out = _two(BASE[:insert_at] + insert + BASE[insert_at:], other)
+    mism = sorted(d["start"] for d in out["differences"] if d["kind"] == "mismatch")
+    expected = sorted(k + 1 + (700 if k >= insert_at else 0) for k in (10, 2900))
+    assert mism == expected
+    deletions = [d for d in out["differences"] if d["kind"] == "deletion"]
+    assert len(deletions) == 1 and len(deletions[0]["reference"]) == 700
+    assert out["unrelated"] == []
+
+
+# ---- regressions found by the third adversarial review -----------------------------------
+
+@pytest.mark.parametrize("change, size", [("ins", 500), ("del", 290), ("ins", 310),
+                                          ("del", 500)])
+def test_an_indel_next_to_base_1_of_two_circles_is_one_event(change, size):
+    other = (BASE[:20] + clean_dna(size, 91) + BASE[20:] if change == "ins"
+             else BASE[:20] + BASE[20 + size:])
+    _, out = _two(BASE, other)
+    [event] = out["differences"]
+    assert event["kind"] == ("insertion" if change == "ins" else "deletion")
+    assert len(event["sequence"] or event["reference"]) == size
+    assert out["unrelated"] == []
+
+
+def test_an_adapter_tail_is_not_compared_rather_than_listed_as_mutations():
+    _, out = _two(BASE[500:1400] + clean_dna(150, 92), BASE, circular=False)
+    assert out["differences"] == []
+    [tail] = out["unrelated"]
+    assert tail["start"] == 901 and tail["a_bases"] == 150
+
+
+@pytest.mark.parametrize("stuffer", [30, 95, 120])
+def test_an_insert_replaced_by_an_unrelated_stuffer_is_one_named_replacement(stuffer):
+    a = BASE[:1500] + clean_dna(1000, 93) + BASE[1500:]
+    b = BASE[:1500] + clean_dna(stuffer, 94) + BASE[1500:]
+    _, out = _two(a, b, circular=False)
+    assert out["differences"] == []
+    [swap] = out["unrelated"]
+    assert abs(swap["start"] - 1501) <= 2 and swap["a_bases"] >= 995

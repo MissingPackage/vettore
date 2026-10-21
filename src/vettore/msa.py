@@ -59,13 +59,10 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from .alignment import (
-    DIAGONAL_SLACK,
     MIN_LENGTH,
-    MIN_VOTES,
     WORD,
     AlignmentError,
     _counts,
-    _hits,
     _name_and_sequence,
     _reference_index,
     differences,
@@ -83,8 +80,6 @@ MAX_TOTAL = 150_000          # bp, all sequences together
 DISTANCE_WORD = 8            # word length of the guide-tree distances
 ANCHOR_WORD = 12             # word length of the anchors between two groups
 MIN_ANCHOR = 24              # bp of identical sequence on one diagonal to anchor a merge
-REFINE_WINDOW = 500          # bp at the start of a circular anchor that decide where a circle starts
-JOIN_WINDOW = 300            # columns each side of two circles' cut aligned again by compare
 WRAP_IDENTITY = 0.8          # a fragment's overhang this identical to the circle's other end crosses it
 SPAN_MARGIN = 50             # bp kept clear on each side of a fragment when cutting circles
 CONSENSUS_SHARE = 0.25       # bases rarer than this in a column do not shape its summary
@@ -102,9 +97,14 @@ SEGMENT_MIN = 60.0
 #: of 100 bp cost 104-158 in tests, 200 bp 199-300; the most divergent stretch of AAV2 against
 #: AAV9 VP1 costs 90. Shorter unrelated stretches are reported as differences.
 X_DROP = 150.0
-#: A stretch with bases on one side only, give or take this many (or this share), is an
-#: insertion or deletion, reported as such however long.
-INDEL_SLACK, INDEL_SHARE = 5, 0.1
+#: A stretch with bases on one side only, give or take this many, is an insertion or
+#: deletion, reported as such however long.
+INDEL_SLACK = 5
+#: An end of a comparison stops extending when its score falls this far below its best
+#: (about 5 mismatches): a tail of unrelated sequence is not compared.
+END_X_DROP = 15.0
+#: Identical columns a segment edge next to an unrelated stretch must end in.
+EDGE_RUN = 5
 PROFILE_MAX = 3_000          # columns; longer stretches between anchors use the summaries
 
 IUPAC = "ACGTRYSWKMBDHVN"
@@ -193,32 +193,6 @@ def check_limits(members: list[tuple[str, str]]) -> None:
 
 # ---- step 1: strand and origin ---------------------------------------------------------
 
-def _refine_circular(oriented: str, index: dict[str, list[int]]) -> int:
-    """Extra turn for a circle already turned to a circular anchor by the majority vote.
-
-    The majority diagonal is that of the longer arc on either side of the largest insertion
-    or deletion between the two (a different insert in the same backbone), so the shorter
-    arc, up to half the plasmid, would be out of frame and hang over the ends. The circle
-    must start at the base that faces the anchor's base 1: the diagonal most voted for by
-    the words shared at the start of the anchor (the first REFINE_WINDOW bases that hold
-    at least MIN_VOTES words on one diagonal), however far it is from the majority one."""
-    length = len(oriented)
-    hits = sorted((r, (q - r + length // 2) % length - length // 2)
-                  for q, r in _hits(index, oriented, True))
-    start = 0
-    while start < (hits[-1][0] + 1 if hits else 0):
-        window = Counter(shift for r, shift in hits if start <= r < start + REFINE_WINDOW)
-        best, votes = 0, 0
-        for shift in sorted(window):
-            near = sum(window.get(shift + d, 0) for d in range(-DIAGONAL_SLACK, DIAGONAL_SLACK + 1))
-            if near > votes:
-                best, votes = shift, near
-        if votes >= MIN_VOTES:
-            return best
-        start += REFINE_WINDOW // 2
-    return 0
-
-
 def _orient_from(root: Member, members: list[Member], tick: Callable[[str], None]) -> None:
     """Place every member on the frame of ``root`` (already oriented). Each round takes the
     pairing of a pending member with a placed one that shares the most words, so a
@@ -253,11 +227,6 @@ def _orient_from(root: Member, members: list[Member], tick: Callable[[str], None
         _, member, anchor, (placement, _, oriented) = best
         member.strand, member.rotation, member.oriented = (placement.strand,
                                                            placement.rotation, oriented)
-        if member.circular and anchor.circular:
-            turn = _refine_circular(oriented, indexes[anchor.index])
-            if turn:
-                member.rotation = (member.rotation + turn) % len(oriented)
-                member.oriented = rotate(oriented, turn)
         placed.append(member)
         pending.remove(member)
         tick(f"Placed “{member.name}”")
@@ -317,14 +286,96 @@ def _wrap_share(overhang: str, root_end: str) -> float:
     return sum(a == b for a, b in zip(overhang, root_end)) / max(1, len(overhang))
 
 
+def _unique_words(seq: str, circular: bool) -> dict[str, int]:
+    """Words of ANCHOR_WORD bases found once in the sequence (read round when circular)."""
+    text = seq + seq[:ANCHOR_WORD - 1] if circular else seq
+    seen: dict[str, int] = {}
+    repeated = set()
+    for i in range(len(seq) if circular else len(seq) - ANCHOR_WORD + 1):
+        word = text[i:i + ANCHOR_WORD]
+        if word in seen:
+            repeated.add(word)
+        else:
+            seen[word] = i
+    return {w: i for w, i in seen.items() if w not in repeated and set(w) <= set("ACGT")}
+
+
+def open_circles(root: Member, members: list[Member],
+                 avoid: list[tuple[int, int]] | None = None) -> None:
+    """Open every circle at the same place, inside sequence they all share.
+
+    Rows are linear, circles are not: wherever the circles are cut, what lies on either side
+    of the cut is written at opposite ends of the rows. Cutting at the root's base 1 breaks
+    the alignment whenever the circles differ near it (an insert, a deletion, a file whose
+    base 1 lies inside a cassette the others lack). So the cut goes in the middle of the
+    longest stretch of the root whose words of ANCHOR_WORD bases are found, once, in as many
+    of the other circles as possible, and each circle is opened at the word that matches
+    it. ``avoid``: spans (start, length) of the root's current row that linear sequences
+    cover, kept clear so that no fragment is cut in two."""
+    circles = [m for m in members if m.circular and m is not root]
+    length = len(root.oriented)
+    if not root.circular or (not circles and not avoid):
+        return
+    in_root = _unique_words(root.oriented, True)
+    shared: list[dict[int, int]] = []
+    for member in circles:
+        mine = _unique_words(member.oriented, True)
+        shared.append({r: mine[w] for w, r in in_root.items() if w in mine})
+    count = [0] * length
+    for found in shared:
+        for r in found:
+            count[r] += 1
+    blocked = [False] * length
+    for start, span in avoid or []:
+        for k in range(start - SPAN_MARGIN, start + span + SPAN_MARGIN):
+            blocked[k % length] = True
+    best = max((c for c, b in zip(count, blocked) if not b), default=0)
+    allowed = [c == best and not b for c, b in zip(count, blocked)]
+    if not any(allowed):
+        return
+    if all(allowed[k % length] for k in range(-SPAN_MARGIN, SPAN_MARGIN + 1)):
+        cut = 0                  # base 1 already lies well inside shared sequence
+    elif all(allowed):
+        cut = _uncovered_middle(avoid or [], length) or 0
+    else:
+        # Longest run of allowed positions, read round the circle.
+        first = allowed.index(False)
+        run_start, run, top = 0, 0, (0, 0)
+        for step in range(1, length + 1):
+            k = (first + step) % length
+            if allowed[k]:
+                run_start, run = (k, 1) if run == 0 else (run_start, run + 1)
+                if run > top[0]:
+                    top = (run, run_start)
+            else:
+                run = 0
+        cut = (top[1] + top[0] // 2) % length
+    root.rotation = (root.rotation + cut) % len(root.sequence)
+    root.oriented = rotate(root.oriented, cut)
+    for member, found in zip(circles, shared):
+        if cut in found:
+            turn = found[cut]
+        else:
+            # This circle lacks the shared stretch: open it on the diagonal of the nearest
+            # word it shares after the cut.
+            ahead = [((r - cut) % length, r) for r in found]
+            if not ahead:
+                continue
+            gap, r = min(ahead)
+            turn = (found[r] - gap) % len(member.oriented)
+        member.rotation = (member.rotation + turn) % len(member.sequence)
+        member.oriented = rotate(member.oriented, turn)
+
+
 def crossing_cut(root: Member, members: list[Member], gapped: dict[int, str]
-                 ) -> tuple[int | None, list[str]]:
+                 ) -> tuple[int | None, list[str], list[tuple[int, int]]]:
     """A circle has no ends, but the rows of an alignment do. When a linear sequence (an
     amplicon, a read) crosses the root circle's base 1, part of it hangs past one end of the
     circle's row while it continues the circle's other end. Returns where to open the root
     instead (a turn of its current row: the middle of the longest stretch no linear sequence
     covers) and the names of the crossing sequences; the turn is None when nothing crosses,
-    or when the linear sequences cover the whole circle between them."""
+    or when the linear sequences cover the whole circle between them. Also returns the spans
+    (start, length) the linear sequences cover on the root's row."""
     ri = members.index(root)
     row = gapped[ri]
     first, last = _span(row)
@@ -351,8 +402,8 @@ def crossing_cut(root: Member, members: list[Member], gapped: dict[int, str]
             start = (start - len(before)) % length
         spans.append((start, len(member.sequence)))
     if not crossing:
-        return None, []
-    return _uncovered_middle(spans, length), crossing
+        return None, [], spans
+    return _uncovered_middle(spans, length), crossing, spans
 
 
 # ---- step 2: guide tree ----------------------------------------------------------------
@@ -687,19 +738,21 @@ def multiple_alignment(docs: list[Any], report: Callable[[float, str], None] | N
         raise AlignmentError("None of the chosen sequences has anything recognisably in "
                              "common with the others, so there is nothing to align. Check "
                              "that they are the sequences you meant.")
+    open_circles(root, members)
     joins, gapped = progressive()
     if root.circular:
-        cut, crossing = crossing_cut(root, members, gapped)
+        cut, crossing, spans = crossing_cut(root, members, gapped)
         if crossing and cut is None:
             warnings.append(f"{', '.join(crossing)} cross{'es' if len(crossing) == 1 else ''} "
-                            f"base 1 of “{root.name}”, and the linear sequences cover all of "
-                            "it between them, so the circle cannot be opened anywhere else: "
-                            "the part past base 1 is shown in columns of its own at the end "
-                            "of the circle.")
+                            f"where the circles are opened (“{root.name}” base "
+                            f"{root.rotation + 1}), and the linear sequences cover all of it "
+                            "between them, so the circles cannot be opened anywhere else: the "
+                            "part past that point is shown in columns of its own before the "
+                            "start of the circles.")
         elif crossing:
             # Open every circle elsewhere and align again, so the fragment is in one piece.
             steps["total"] += 1 + (len(members) - 1) * 3.2
-            orient(members, tick, (root.rotation + cut) % len(root.sequence))
+            open_circles(root, members, spans)
             joins, gapped = progressive()
     n = len(members)
     if report:
@@ -817,32 +870,68 @@ def homologous_segments(scores: list[float], offset: int = 0) -> list[tuple[int,
     return sorted(out)
 
 
+def _extend(scores: list[float], edge: int, step: int) -> int:
+    """How far a segment edge extends outwards (``step`` -1 to the left, 1 to the right)
+    before its running score falls END_X_DROP below the best it reached."""
+    total = best = 0.0
+    best_edge = edge
+    k = edge - 1 if step < 0 else edge
+    while 0 <= k < len(scores):
+        total += scores[k]
+        if total > best:
+            best, best_edge = total, (k if step < 0 else k + 1)
+        elif best - total > END_X_DROP:
+            break
+        k += step
+    return best_edge
+
+
+def _identical(column: tuple[str, str, int | None]) -> bool:
+    return column[0] == column[1] != "-" and column[0] != "N"
+
+
 def _realign_join(columns: list[tuple[str, str, int | None]], length: int
                   ) -> list[tuple[str, str, int | None]]:
     """Two circles' columns with the stretch around the rows' cut aligned again in one
     piece. The rows of a multiple alignment are linear: an insertion or deletion next to
     where the circles were opened is split over the two ends, half at each, which read
-    round would be two events instead of one."""
-    window = min(JOIN_WINDOW, len(columns) // 4)
-    if window < ANCHOR_WORD:
+    round would be two events instead of one. The stretch realigned runs from the last run
+    of ANCHOR_WORD identical columns before the cut to the first one after it, so that it
+    begins and ends in agreement and holds the whole event."""
+    k = ANCHOR_WORD
+    if len(columns) < 4 * k:
         return columns
-    join = columns[-window:] + columns[:window]
+    if all(map(_identical, columns[-k:] + columns[:k])):
+        return columns                       # the cut lies inside identical sequence
+    run, left = 0, None
+    for i in range(len(columns) - 1, -1, -1):
+        run = run + 1 if _identical(columns[i]) else 0
+        if run == k:
+            left = i
+            break
+    run, right = 0, None
+    for i in range(len(columns)):
+        run = run + 1 if _identical(columns[i]) else 0
+        if run == k:
+            right = i + 1
+            break
+    if left is None or right is None or right >= left:
+        return columns
+    join = columns[left:] + columns[:right]
     a = [(x, p) for x, _, p in join if x != "-"]
     b = "".join(y for _, y, _ in join if y != "-")
-    if not a or not b:
-        return columns
     aligner = Align.PairwiseAligner(scoring="blastn")
     pairs = _columns_of(aligner.align("".join(x for x, _ in a), b)[0].coordinates)
     redone = [(a[i][0] if i is not None else "-", b[j] if j is not None else "-",
                a[i][1] if i is not None else None) for i, j in pairs]
-    return redone + columns[window:-window]
+    return redone + columns[right:left]
 
 
 def _longest_identical_run(columns: list[tuple[str, str, int | None]]) -> int:
     """The middle column of the longest run of identical bases (0 when there is none)."""
     best, best_at, run = 0, 0, 0
     for k, (x, y, _) in enumerate(columns):
-        run = run + 1 if x == y != "-" and x != "N" else 0
+        run = run + 1 if _identical((x, y, None)) else 0
         if run > best:
             best, best_at = run, k - run // 2
     return best_at
@@ -904,25 +993,40 @@ def compare(a: dict[str, Any], b: dict[str, Any]) -> dict[str, Any]:
     segments = [list(seg) for seg in homologous_segments(scores)]
     if not segments:
         return {**empty, "unrelated": [_stretch(columns)]}
-    # Ends: a stretch before the first homologous segment or after the last one is still
-    # compared unless it costs more than X_DROP (a difference next to the cut of a circle,
-    # or at the first base, must not vanish).
-    if sum(scores[:segments[0][0]]) > -X_DROP:
-        segments[0][0] = 0
-    if sum(scores[segments[-1][1]:]) > -X_DROP:
-        segments[-1][1] = len(columns)
-    # Between two segments: an insertion or deletion (bases on one side only, give or take a
-    # few) is a difference however long; so is a stretch that costs less than X_DROP.
+    # Ends: a stretch before the first homologous segment or after the last one is compared
+    # as far as it goes on scoring (BLAST's extension with a small X-drop); beyond, it is
+    # named as not compared: an adapter or a homology arm is not a list of mutations.
+    segments[0][0] = _extend(scores, segments[0][0], -1)
+    segments[-1][1] = _extend(scores, segments[-1][1], 1)
+    # Between two segments: an insertion or deletion (bases on one side only, give or take
+    # INDEL_SLACK) is a difference however long; so is a stretch that costs less than
+    # X_DROP. Anything else is a replacement by unrelated sequence, named as such.
     merged = [segments[0]]
     for seg in segments[1:]:
         between = columns[merged[-1][1]:seg[0]]
         a_bases = sum(1 for x, _, _ in between if x != "-")
         b_bases = sum(1 for _, y, _ in between if y != "-")
-        if (min(a_bases, b_bases) <= max(INDEL_SLACK, INDEL_SHARE * max(a_bases, b_bases))
+        if (min(a_bases, b_bases) <= INDEL_SLACK
                 or sum(scores[merged[-1][1]:seg[0]]) > -X_DROP):
             merged[-1][1] = seg[1]
         else:
             merged.append(seg)
+    # Next to an unrelated stretch, a few chance matches would extend a segment into it and
+    # pass for mismatches: such an edge goes back to its last run of EDGE_RUN identical
+    # columns.
+    trimmed = []
+    for k, (i, j) in enumerate(merged):
+        if i > 0:
+            while i < j and not all(map(_identical, columns[i:i + EDGE_RUN])):
+                i += 1
+        if j < len(columns):
+            while j > i and not all(map(_identical, columns[j - EDGE_RUN:j])):
+                j -= 1
+        if j - i >= EDGE_RUN:
+            trimmed.append([i, j])
+    merged = trimmed
+    if not merged:
+        return {**empty, "unrelated": [_stretch(columns)]}
     diffs: list[dict[str, Any]] = []
     compared: list[tuple[str, str, int | None]] = []
     unrelated = []
