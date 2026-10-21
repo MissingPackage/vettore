@@ -109,12 +109,13 @@ function PrimerLibraryDialog(props: ToolProps) {
     try {
       // Only this window's changes, applied by the engine to the file as it is now: what a
       // colleague added, edited or deleted since it was loaded stays as they left it.
-      const changes = saveChanges(file.primers, primers);
+      const changes = saveChanges(file.primers, primers, file.rejected);
       const saved = await api.primerLibrary.save(changes);
       const mine = new Set([...primers, ...file.primers].map((p) => p.sequence));
       const after = new Set(saved.primers.map((p) => p.sequence));
       const theirs = saved.primers.filter((p) => !mine.has(p.sequence)).length;
-      const dropped = primers.filter((p) => !after.has(p.sequence)).length - saved.gone;
+      const touched = new Set([...changes.edited, ...changes.removed].map((c) => c.sequence));
+      const dropped = file.primers.filter((p) => !touched.has(p.sequence) && !after.has(p.sequence)).length;
       setFile(saved);
       setPrimers(saved.primers);
       setDirty(false);
@@ -270,7 +271,7 @@ function PrimerLibraryDialog(props: ToolProps) {
             </p>
           </div>
           <div className="vt-pl-head-actions">
-            <Button small data-testid="pl-choose-file"
+            <Button small data-testid="pl-choose-file" disabled={busy}
                     onClick={() => guard("choose another file", chooseFile)}>Change file…</Button>
             <Button small data-testid="pl-reload" onClick={() => guard("reload the file", load)} disabled={busy}
                     title="Re-read the shared file (e.g. after a colleague changed it)">Reload</Button>
@@ -431,7 +432,7 @@ function ImportPanel(props: {
                   value={props.text} onChange={(e) => props.onText(e.target.value)} />
       </Field>
       <div className="vt-pl-import-actions">
-        <Button small data-testid="pl-import-file" onClick={props.onFile}>Open a .csv/.tsv file…</Button>
+        <Button small data-testid="pl-import-file" disabled={props.busy} onClick={props.onFile}>Open a .csv/.tsv file…</Button>
         <span className="vt-pl-spacer" />
         <Button small data-testid="pl-import-cancel" onClick={props.onCancel}>Cancel</Button>
         <Button small intent="primary" data-testid="pl-import-run" disabled={props.busy || !props.text.trim()}

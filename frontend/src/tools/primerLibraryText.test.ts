@@ -133,13 +133,17 @@ describe("saveChanges", () => {
     const c = primer({ name: "C", sequence: "GGGGAAAATT" });
     const changes = saveChanges([a, b], [{ ...a, notes: "new" }, c]);
     expect(changes.added.map((p) => p.name)).toEqual(["C"]);
-    expect(changes.edited).toEqual([{ sequence: "AAAACCCCGG", was: { name: "A", notes: "n", location: "", added: "" }, notes: "new" }]);
-    expect(changes.removed).toEqual([{ sequence: "TTTTGGGGCC", was: { name: "B", notes: "", location: "", added: "" } }]);
+    expect(changes.edited).toEqual([{ sequence: "AAAACCCCGG", was: { name: "A", notes: "n", location: "", added: "" }, twins: 1, notes: "new" }]);
+    expect(changes.removed).toEqual([{ sequence: "TTTTGGGGCC", was: { name: "B", notes: "", location: "", added: "" }, twins: 1 }]);
   });
   it("marks a primer removed and added again, so it comes back", () => {
     const again = { ...b, name: "B2", fresh: true };
     const [e] = saveChanges([a, b], [a, again]).edited;
     expect(e).toMatchObject({ sequence: "TTTTGGGGCC", readd: true, name: "B2", was: { name: "B" } });
+  });
+  it("counts a second tube of the oligo in the file", () => {
+    const twin = { name: "B copy", sequence: "ttttggggcc", reason: "it is the same oligo as “B”." };
+    expect(saveChanges([a, b], [a], [twin]).removed[0].twins).toBe(2);
   });
   it("sends nothing when nothing changed", () => {
     expect(saveChanges([a, b], [a, b])).toEqual({ added: [], edited: [], removed: [] });

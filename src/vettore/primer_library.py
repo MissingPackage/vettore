@@ -168,10 +168,10 @@ def _column_of(cell: str) -> tuple[str, int] | None:
     return None
 
 
-def _header_index(cells: list[str]) -> tuple[dict[str, int], list[int]] | None:
-    """Columns of a header row and every column that could hold the sequence (best first), or
-    None when the row is not a header (it has no name and sequence columns, or its "sequence"
-    cell is itself DNA)."""
+def _header_index(cells: list[str]) -> tuple[dict[str, int], list[int], bool] | None:
+    """Columns of a header row, every column that could hold the sequence (best first), and
+    whether the row names both columns plainly ("Name", "Sequence"); None when the row is not a
+    header (it has no name and sequence columns, or it holds a primer's sequence)."""
     best: dict[str, tuple[int, int]] = {}
     sequences: list[tuple[int, int]] = []
     for pos, cell in enumerate(cells):
@@ -187,7 +187,8 @@ def _header_index(cells: list[str]) -> tuple[dict[str, int], list[int]] | None:
         return None
     if _is_dna(cells[index["sequence"]]) or any(_is_oligo(c) for c in cells):
         return None                      # a row holding a primer's sequence is data, not a header
-    return index, [pos for _, pos in sorted(sequences)]
+    plain = best["name"][0] == 0 and best["sequence"][0] == 0
+    return index, [pos for _, pos in sorted(sequences)], plain
 
 
 def _split(line: str, delimiter: str) -> list[str]:
@@ -324,10 +325,12 @@ def parse_text(text: str) -> LibraryText:
     for row in rows:
         # A quote opened and never closed makes the rows below one cell: refuse, rather than
         # rewrite that cell and lose them. A note written on several lines is fine.
+        multiline = len(_lines(row.raw)) > 1
+        unclosed = multiline and row is rows[-1] and row.raw.count('"') % 2 == 1
         for cell in row.cells:
             parts = re.split(r"\r\n|\r|\n", cell)
-            if len(parts) > 1 and any(any(_is_oligo(c) for c in _split(part, delimiter)[1:])
-                                      for part in parts[1:]):
+            if unclosed or len(parts) > 1 and any(any(_is_oligo(c) for c in _split(part, delimiter))
+                                                  for part in parts[1:]):
                 raise PrimerLibraryError(
                     f"a quote (\") opened on line {line} is never closed, so the rows below it "
                     "would be read as one cell. Close the quote, or remove it, in a text editor.")
@@ -340,16 +343,16 @@ def parse_text(text: str) -> LibraryText:
         if any(c.strip() for c in row.cells) and (found := _header_index(row.cells)):
             below = [r.cells for r in rows[pos + 1:] if any(c.strip() for c in r.cells)][:50]
             elsewhere = any(any(_is_oligo(x) for x in c) for c in below)
-            if elsewhere and not any(any(p < len(c) and _is_dna(c[p]) for c in below)
-                                     for p in found[1]):
-                found = None              # the oligos are in other columns: not this header
+            if not found[2] and elsewhere and not any(
+                    any(p < len(c) and _is_dna(c[p]) for c in below) for p in found[1]):
+                found = None              # "Seq1;…;primer": a data row, not a header
                 continue
             lib.header = row
             lib.preamble += [r.raw for r in rows[:pos]]
             lib.rows = rows[pos + 1:]
             break
     if found:
-        lib.index, sequence_columns = found
+        lib.index, sequence_columns, _ = found
         if len(sequence_columns) > 1:     # "Sequence (5'-3')" and "Sequence (RNA)": the DNA one
             lib.index["sequence"] = max(sequence_columns, key=lambda pos: sum(
                 pos < len(r.cells) and _is_dna(r.cells[pos]) for r in lib.rows))
@@ -412,12 +415,14 @@ class Change:
     """One change the dialog made to a primer it loaded: ``sequence`` (cleaned), ``was`` (its
     name, notes, location and date as loaded, which tell its row apart from another tube of the
     same oligo), and ``values``, the fields to set (none for a removal). ``readd``: the user
-    removed it and added it again, so it is added back if the row has gone meanwhile."""
+    removed it and added it again, so it is added back if the row has gone meanwhile.
+    ``twins``: how many rows the file had with this oligo when the dialog read it."""
 
     sequence: str
     was: dict[str, str] = field(default_factory=dict)
     values: dict[str, str] = field(default_factory=dict)
     readd: bool = False
+    twins: int = 1
 
 
 def _same_fields(row: _Row, was: dict[str, str]) -> bool:
@@ -425,18 +430,28 @@ def _same_fields(row: _Row, was: dict[str, str]) -> bool:
                              if k in EDITABLE)
 
 
-def _find_row(rows: list[_Row], change: Change, taken: set[int]) -> int | None:
-    """The row a change is about: among the rows with its oligo (a second tube included), the
-    one whose fields are still those the dialog loaded, else the only one with the name it had.
-    None when it cannot be told for sure (the row has gone, or was renamed meanwhile): nothing
-    is then written to, or removed from, another tube."""
+def _find_row(rows: list[_Row], change: Change, taken: set[int], removal: bool) -> int | None:
+    """The row a change is about, or None when it cannot be told for sure (the row has gone):
+    nothing is then written to, or removed from, another tube of the same oligo.
+
+    The row whose fields are still those the dialog loaded is it. When the file had only one
+    row with this oligo at load time, a colleague may have changed that row meanwhile: it is
+    still the row with the loaded name, and for an edit (not a removal) the only row with the
+    oligo even if renamed. With two tubes at load, only an exact match counts."""
     rows_with = [i for i, r in enumerate(rows) if r.seq == change.sequence and i not in taken]
     for i in rows_with:
         if _same_fields(rows[i], change.was):
             return i
+    if change.twins > 1:
+        return None
     name = (change.was.get("name") or "").strip()
     named = [i for i in rows_with if name and rows[i].fields.get("name") == name]
-    return named[0] if len(named) == 1 else None
+    if len(named) == 1:
+        return named[0]
+    every = [r for r in rows if r.seq == change.sequence]
+    if not removal and not named and len(rows_with) == 1 and len(every) == 1:
+        return rows_with[0]
+    return None
 
 
 def merged_text(current: LibraryText | None, added: list[Primer],
@@ -473,7 +488,7 @@ def merged_text(current: LibraryText | None, added: list[Primer],
     taken: set[int] = set()
     drop: set[int] = set()
     for change in removed:
-        if (i := _find_row(lib.rows, change, taken)) is None:
+        if (i := _find_row(lib.rows, change, taken, removal=True)) is None:
             counts["gone"] += 1
         else:
             taken.add(i)
@@ -481,8 +496,10 @@ def merged_text(current: LibraryText | None, added: list[Primer],
     edit_at: dict[int, dict[str, str]] = {}
     for change in edits:
         values = {k: (v or "").strip() for k, v in change.values.items() if k in EDITABLE}
-        if (i := _find_row(lib.rows, change, taken)) is not None:
+        if (i := _find_row(lib.rows, change, taken, removal=False)) is not None:
             taken.add(i)
+            if change.readd:              # still there: keep its date and what others wrote
+                values = {k: v for k, v in values.items() if v and k != "added"}
             edit_at[i] = values
         elif change.readd:
             added = [*added, Primer(sequence=change.sequence, **{
@@ -903,12 +920,14 @@ def product_over_region(primers: list[Primer], sequence: str, circular: bool,
     if n == 0:
         return None
     every = amplified_products(primers, sequence, circular)
-    pairs: dict[tuple[str, str], int] = {}
+
+    def bands(f: str, r: str) -> int:     # every product the two primers make in one tube
+        return sum({p["forward_sequence"], p["reverse_sequence"]} <= {f, r} for p in every)
+
     for product in every:
-        key = (product["forward_sequence"], product["reverse_sequence"])
-        pairs[key] = pairs.get(key, 0) + 1
-    for product in every:
-        if pairs[(product["forward_sequence"], product["reverse_sequence"])] > 1:
+        if product["forward_sequence"] == product["reverse_sequence"]:
+            continue                      # one primer priming both ways: not a pair to reuse
+        if bands(product["forward_sequence"], product["reverse_sequence"]) > 1:
             continue                      # the pair would give more than one band
         if not min_size <= product["size"] <= max_size:
             continue
@@ -1064,7 +1083,8 @@ def save_library(body: SaveLibrary) -> dict[str, Any]:
             raise HTTPException(422, f"“{row.get('name') or 'A primer'}”: {exc}") from exc
         was = row.get("was") if isinstance(row.get("was"), dict) else {}
         return Change(sequence, {k: str(was.get(k) or "") for k in EDITABLE if k in was},
-                      {k: str(row[k] or "") for k in EDITABLE if k in row}, bool(row.get("readd")))
+                      {k: str(row[k] or "") for k in EDITABLE if k in row}, bool(row.get("readd")),
+                      max(1, int(row.get("twins") or 1)))
 
     edits = [change(row) for row in body.edited]
     removed = [change(row) for row in body.removed]

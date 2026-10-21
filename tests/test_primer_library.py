@@ -664,3 +664,55 @@ def test_a_primer_with_a_second_site_nearby_is_not_offered_for_sequencing_or_a_p
     primers = [pl.Primer("F", fwd), pl.Primer("R", rev)]
     assert len(pl.amplified_products(primers, seq2, False)) == 2      # two bands...
     assert pl.product_over_region(primers, seq2, False, 300, 400) is None   # ...so not offered
+
+
+# ---- fifth review ------------------------------------------------------------------------
+
+SAME_NAME = "name;sequence;location\nM13F;GTAAAACGACGGCCAGT;box1\nM13F;GTAAAACGACGGCCAGT;box2\n"
+
+
+def test_with_two_tubes_of_one_name_a_change_never_falls_on_the_other(library_file):
+    # Loaded with two tubes; the colleague then deleted the box1 tube.
+    library_file.write_text("name;sequence;location\nM13F;GTAAAACGACGGCCAGT;box2\n", encoding="utf-8")
+    was = {"name": "M13F", "notes": "", "location": "box1", "added": ""}
+    r = pl.write_library([], [pl.Change("GTAAAACGACGGCCAGT", was, {"location": "box1 A4"}, twins=2)],
+                         [pl.Change("GTAAAACGACGGCCAGT", was, twins=2)])
+    assert r["gone"] == 2
+    assert library_file.read_text(encoding="utf-8-sig").endswith("M13F;GTAAAACGACGGCCAGT;box2\n")
+
+
+def test_an_edit_follows_a_single_tube_a_colleague_renamed(library_file):
+    library_file.write_text("name;sequence;notes\nM13F-new;GTAAAACGACGGCCAGT;\n", encoding="utf-8")
+    r = pl.write_library([], [pl.Change("GTAAAACGACGGCCAGT", {"name": "M13F"}, {"notes": "mine"})])
+    assert r["changed"] == 1 and r["primers"][0]["name"] == "M13F-new"
+
+
+def test_adding_back_a_primer_still_in_the_file_keeps_its_date_and_notes(library_file):
+    library_file.write_text("name;sequence;notes;added\nM13F;GTAAAACGACGGCCAGT;theirs;2020-01-01\n",
+                            encoding="utf-8")
+    pl.write_library([], [pl.Change("GTAAAACGACGGCCAGT", {"name": "M13F", "notes": ""},
+                                    {"name": "M13F", "notes": "", "added": "2026-10-21"}, readd=True)])
+    assert "M13F;GTAAAACGACGGCCAGT;theirs;2020-01-01" in library_file.read_text(encoding="utf-8-sig")
+
+
+@pytest.mark.parametrize("body", [
+    'Name;Sequence;Notes\nA;ACGTACGTACGTACGTAA;"odd\nB;ACGTACGTAC;x\nC;/5Phos/ACGTACGTACG;y\nD;to order;z\n',
+    'Sequence;Name\nACGTACGTACGTACGTAA;"P1\nGTAAAACGACGGCCAGT;P2\nCAGGAAACAGCTATGAC;P3\n',
+])
+def test_an_unclosed_quote_anywhere_is_refused(library_file, body):
+    library_file.write_text(body, encoding="utf-8")
+    with pytest.raises(pl.PrimerLibraryError, match="never closed"):
+        pl.read_library()
+
+
+def test_a_plain_header_is_kept_even_when_its_sequences_carry_modifications():
+    text = "Name;Target site;Sequence;Notes\nqF1;GGCCAATTGGCCAATTGG;/5Phos/ACGTACGTACGTACGTAA;x\n"
+    primers, rejected = pl.parse_csv(text)
+    assert primers == [] and len(rejected) == 1        # read under its header, not by position
+
+
+def test_a_pair_is_not_offered_when_one_primer_also_pairs_with_itself():
+    f, r = "ACGTTGCATTCGAATGACCTG", "GGTTACCGATTACGCATTGCA"
+    seq = ("T" * 200 + f + "C" * 680 + rc(r) + "A" * 1100 + rc(f) + "G" * 500).upper()
+    primers = [pl.Primer("F", f), pl.Primer("R", r)]
+    assert pl.product_over_region(primers, seq, False, 300, 600) is None   # F with F: 2nd band

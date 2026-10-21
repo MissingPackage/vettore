@@ -182,11 +182,15 @@ const fieldsOf = (p: LibraryPrimer): Fields => Object.fromEntries(EDITABLE.map((
  * primer as loaded (`was`), so the engine finds that very row (not another tube of the same
  * oligo) in the file as it is then; a colleague's own edits and deletions stay. A primer
  * removed and added again is an edit marked `readd`, so it comes back even if deleted meanwhile. */
-export function saveChanges(loaded: LibraryPrimer[], current: LibraryPrimer[]): {
+export function saveChanges(loaded: LibraryPrimer[], current: LibraryPrimer[],
+                            rejected: RejectedRow[] = []): {
   added: LibraryPrimer[];
-  edited: ({ sequence: string; was: Fields; readd?: boolean } & Fields)[];
-  removed: { sequence: string; was: Fields }[];
+  edited: ({ sequence: string; was: Fields; readd?: boolean; twins: number } & Fields)[];
+  removed: { sequence: string; was: Fields; twins: number }[];
 } {
+  // Rows of the file with the same oligo (a second tube): with one, the engine changes a row
+  // only when its fields are exactly those loaded.
+  const twins = (seq: string) => 1 + rejected.filter((r) => cleanSequence(r.sequence) === seq).length;
   const before = new Map(loaded.map((p) => [p.sequence, p]));
   const now = new Set(current.map((p) => p.sequence));
   const added = current.filter((p) => !before.has(p.sequence));
@@ -194,11 +198,12 @@ export function saveChanges(loaded: LibraryPrimer[], current: LibraryPrimer[]): 
     const was = before.get(p.sequence);
     if (!was) return [];
     const changed = Object.fromEntries(EDITABLE.filter((k) => p[k] !== was[k]).map((k) => [k, p[k]]));
-    if (p.fresh) return [{ sequence: p.sequence, was: fieldsOf(was), readd: true, ...fieldsOf(p) }];
-    return Object.keys(changed).length ? [{ sequence: p.sequence, was: fieldsOf(was), ...changed }] : [];
+    const twinsNow = twins(p.sequence);
+    if (p.fresh) return [{ sequence: p.sequence, was: fieldsOf(was), readd: true, twins: twinsNow, ...fieldsOf(p) }];
+    return Object.keys(changed).length ? [{ sequence: p.sequence, was: fieldsOf(was), twins: twinsNow, ...changed }] : [];
   });
   const removed = loaded.filter((p) => !now.has(p.sequence))
-    .map((p) => ({ sequence: p.sequence, was: fieldsOf(p) }));
+    .map((p) => ({ sequence: p.sequence, was: fieldsOf(p), twins: twins(p.sequence) }));
   return { added, edited, removed };
 }
 
