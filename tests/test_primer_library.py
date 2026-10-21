@@ -807,3 +807,40 @@ def test_a_pasted_note_on_two_lines_saves_and_reads_back(library_file):
     pl.write_library([p])
     lib = pl.read_library()
     assert [q["notes"] for q in lib["primers"]] == ["x", "univ fwd\nTa 55; 30x"]
+
+
+# ---- ninth review ------------------------------------------------------------------------
+
+@pytest.mark.parametrize("text", [
+    'Name;Sequence;Notes;Location\nM13F;GTAAAACGACGGCCAGT;univ fwd;box 1\nM13R;CAGGAAACAGCTATGAC;univ rev;"\n',
+    'M13F;GTAAAACGACGGCCAGT;";box1;2024\nM13R;CAGGAAACAGCTATGAC;"5"" tube";";2024\nT7;TAATACGACTCACTATAGGG;n;box3;2024\n',
+])
+def test_a_quote_open_at_the_end_is_refused_so_additions_cannot_vanish(library_file, text):
+    library_file.write_text(text, encoding="utf-8")
+    with pytest.raises(pl.PrimerLibraryError, match="never closed"):
+        pl.read_library()
+    with pytest.raises(pl.PrimerLibraryError):
+        pl.write_library([pl.Primer("SP6", "ATTTAGGTGACACTATAG")])
+    assert library_file.read_text(encoding="utf-8") == text
+
+
+@pytest.mark.parametrize("text,name", [
+    (('Name;Sequence;Notes\nT7;TAATACGACTCACTATAGGG;"approx Ta 55;box1\n5"UTR-F;CAGGAAACAGCTATGACATG\n'
+     'SP6;ATTTAGGTGACACTATAG;x\n'), "T7"),
+])
+def test_every_row_over_several_lines_is_held(library_file, text, name):
+    library_file.write_text(text, encoding="utf-8")
+    lib = pl.read_library()
+    row = next(p for p in lib["primers"] if p["name"] == name)
+    assert row["held"] is True
+    was = {k: row[k] for k in pl.EDITABLE}
+    r = pl.write_library([], removed=[pl.Change(row["sequence"], was)])
+    assert r["held"] == 1 and library_file.read_text(encoding="utf-8-sig") == text
+
+
+def test_a_one_letter_sequence_does_not_break_the_library(client):
+    r = client.post("/api/primer-library/save", headers=headers(),
+                    json={"added": [{"name": "typo", "sequence": "G"}]})
+    assert r.status_code == 200
+    got = client.get("/api/primer-library", headers=headers())
+    assert got.status_code == 200 and got.json()["primers"][0]["tm"] is None

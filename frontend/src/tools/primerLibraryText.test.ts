@@ -162,7 +162,7 @@ describe("heldText", () => {
   it("names the rows and says nothing in them is lost", () => {
     const text = heldText([{ name: "M13F", sequence: "GTAAAACGACGGCCAGT", line: 3 }]);
     expect(text).toContain("“M13F” (line 3)");
-    expect(text).toContain("nothing in them is lost");
+    expect(text).toContain("nothing is lost");
   });
 });
 

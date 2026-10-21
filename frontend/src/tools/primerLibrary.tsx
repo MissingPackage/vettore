@@ -34,7 +34,7 @@ import "./primerLibrary.css";
 const { Dialog, Callout } = Blueprint as unknown as Record<string, React.ComponentType<any>>;
 
 const EMPTY: LibraryFile = { path: "", exists: false, mtime: null, delimiter: ";", primers: [], rejected: [] };
-const HELD_TIP = "This row of the file runs over several lines and may hold other rows: change it in Excel.";
+const HELD_TIP = "This row of the file runs over several lines: change it in Excel.";
 type Notice = { intent: "success" | "warning" | "danger"; text: string } | null;
 
 function PrimerLibraryDialog(props: ToolProps) {
@@ -127,7 +127,7 @@ function PrimerLibraryDialog(props: ToolProps) {
       const extra = [
         saved.skipped && `${plural(saved.skipped, "primer you added was", "primers you added were")} already in the file (someone added the same oligo meanwhile): the file's entry is kept.`,
         saved.gone && `${plural(saved.gone, "change was", "changes were")} not saved: someone had changed or removed that row of the file meanwhile.`,
-        saved.held && `${plural(saved.held, "change was", "changes were")} not saved: that row runs over several lines and may hold other rows, so Vettore leaves it as it is.`,
+        saved.held && `${plural(saved.held, "change was", "changes were")} not saved: that row of the file runs over several lines, so Vettore leaves it as it is (change it in Excel).`,
         theirs && `${plural(theirs, "primer", "primers")} someone else added meanwhile ${theirs === 1 ? "is" : "are"} now listed.`,
         dropped > 0 && `${plural(dropped, "primer", "primers")} someone else removed meanwhile ${dropped === 1 ? "is" : "are"} no longer listed.`,
       ].filter(Boolean).join(" ");

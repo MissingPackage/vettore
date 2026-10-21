@@ -110,10 +110,20 @@ class Primer:
             "location": self.location,
             "added": self.added,
             "length": len(self.sequence),
-            "tm": round(tm.primer_tm(self.sequence), 1) if _is_plain_dna(self.sequence) else None,
+            "tm": _tm_or_none(self.sequence),
             "degenerate": not _is_plain_dna(self.sequence),
             "searched": len(self.sequence) >= MIN_LENGTH,
         }
+
+
+def _tm_or_none(sequence: str) -> float | None:
+    """The primer's Tm (°C), or None when it has ambiguity codes or is too short to have one."""
+    if not _is_plain_dna(sequence):
+        return None
+    try:
+        return round(tm.primer_tm(sequence), 1)
+    except ValueError:
+        return None
 
 
 def _is_plain_dna(sequence: str) -> bool:
@@ -327,7 +337,7 @@ def parse_text(text: str) -> LibraryText:
         raise PrimerLibraryError(
             f"the row starting on line {line + len(preamble)} could not be read as spreadsheet "
             f"columns ({exc}).") from exc
-    _mark_doubtful_rows(rows, delimiter, len(preamble) + 1)
+    _mark_doubtful_rows(rows, lines, delimiter, len(preamble) + 1)
 
     found = None
     for pos, row in enumerate(rows):
@@ -381,29 +391,36 @@ def parse_text(text: str) -> LibraryText:
     return lib
 
 
-def _mark_doubtful_rows(rows: list[_Row], delimiter: str, first_line: int) -> None:
+_SENTINEL = "vettore-end-of-file-check"
+
+
+def _mark_doubtful_rows(rows: list[_Row], lines: list[str], delimiter: str, first_line: int) -> None:
     """Mark the rows Vettore must not change because they may hold other rows. A quote typed by
     hand (one never closed, a ditto mark) makes the rows below it part of one cell, and a save
-    that rewrote or removed that cell would lose them. A cell running over several lines whose
-    later lines hold the separator or a quote, or a row longer than the others, may be such a
-    cell, or may be a note written on several lines in Excel: both are read, and neither is
-    changed (``held``). A quote left open to the end of the file is refused, since a primer
+    that rewrote or removed that cell would lose them. From the text alone that cannot be told
+    apart for sure from a note written on several lines in Excel, so every row running over
+    several lines, and every row longer than the others, is read but never changed (``held``):
+    it is edited in Excel. A quote still open at the end of the file is refused, since a primer
     added after it would vanish into it."""
+    tail = lines[-1] if lines else ""
+    probe = [*lines, *([] if tail.endswith(("\n", "\r")) else ["\n"]), _SENTINEL + "\n"]
+    try:
+        last = list(csv.reader(probe, delimiter=delimiter))[-1]
+    except csv.Error:
+        last = []
+    if last != [_SENTINEL]:
+        line = first_line + sum(len(_lines(r.raw)) for r in rows[:-1]) if rows else first_line
+        raise PrimerLibraryError(
+            f"a quote (\") on or after line {line} is never closed, so everything below it "
+            "reads as one cell. Open the file in a text editor and close or remove that quote.")
     widths = [len(r.cells) for r in rows if len(_lines(r.raw)) == 1 and any(c.strip() for c in r.cells)]
     usual = max(set(widths), key=widths.count) if widths else None
     line = first_line
     for row in rows:
         row.line = line
-        lines = len(_lines(row.raw))
-        if lines > 1:
-            if row is rows[-1] and row.raw.count('"') % 2 == 1:
-                raise PrimerLibraryError(
-                    f"a quote (\") on line {line} is never closed, so everything below it reads "
-                    "as one cell. Open the file in a text editor and close or remove that quote.")
-            later = [part for cell in row.cells for part in re.split(r"\r\n|\r|\n", cell)[1:]]
-            row.held = (any(delimiter in part or '"' in part for part in later)
-                        or (usual is not None and len(row.cells) > usual))
-        line += lines
+        lines_here = len(_lines(row.raw))
+        row.held = lines_here > 1 or (usual is not None and len(row.cells) > usual)
+        line += lines_here
 
 
 def _cell(cells: list[str], index: dict[str, int], key: str) -> str:
@@ -700,6 +717,7 @@ def write_library(added: list[Primer], edits: list[Change] | None = None,
             "Nothing was saved: afterwards the file would hold no primer Vettore can read and no "
             "header row naming its columns, so it could not be opened again. Add a header row "
             "(name;sequence;notes) at the top of the file in Excel, then save again.")
+    _check_saved_text(current, text, counts)
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         tmp = path.with_name(f".{path.name}.vettore-tmp")
@@ -711,6 +729,30 @@ def write_library(added: list[Primer], edits: list[Change] | None = None,
             f"The primer library file “{path.name}” could not be saved: {_os_reason(exc)}. "
             "Choose another location for the library in the Primer Library dialog.") from exc
     return {**read_library(), **counts}
+
+
+def _check_saved_text(current: LibraryText | None, text: str, counts: dict[str, int]) -> None:
+    """The last guard before a save is written: read the new text back and check that every
+    row of the file that was not changed or removed is still there, as it was, and that every
+    primer added reads back as its own row. Anything else (a quote typed by hand that takes in
+    the rows after it) and nothing is written."""
+    after = parse_text(text)
+    rows_after = [r.raw.rstrip("\r\n") for r in after.rows if any(c.strip() for c in r.cells)]
+    before = [r.raw.rstrip("\r\n") for r in (current.rows if current else [])
+              if any(c.strip() for c in r.cells)]
+    remaining = list(rows_after)
+    missing = 0
+    for raw in before:
+        if raw in remaining:
+            remaining.remove(raw)
+        else:
+            missing += 1
+    expected_rows = len(before) - counts["removed"] + counts["added"]
+    if missing > counts["changed"] + counts["removed"] or len(rows_after) != expected_rows:
+        raise PrimerLibraryError(
+            "Nothing was saved: read back, the file would not have the rows it should (a quote "
+            "typed by hand in the file can take in the rows after it). Check the quotes in the "
+            "file in Excel or a text editor, then save again.")
 
 
 def _os_reason(exc: OSError) -> str:

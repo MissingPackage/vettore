@@ -90,10 +90,10 @@ export function heldText(held: HeldRow[]): string {
   const shown = held.slice(0, 3).map((h) => `“${h.name || "a row"}” (line ${h.line})`).join(", ");
   const more = held.length > 3 ? ` and ${held.length - 3} more` : "";
   const n = held.length;
-  return `${n} row${n === 1 ? "" : "s"} of the file ${n === 1 ? "has a cell" : "have cells"} running over several `
-    + `lines that may hold other rows: ${shown}${more}. Vettore shows ${n === 1 ? "it" : "them"} but will not `
-    + "change or remove them, so nothing in them is lost. If one is a quote typed by hand, fix it in "
-    + "Excel or a text editor; a note written on several lines is fine as it is.";
+  return `${n} row${n === 1 ? "" : "s"} of the file run${n === 1 ? "s" : ""} over several lines: ${shown}${more}. `
+    + "That is a note with line breaks, or a quote typed by hand that takes in the rows after it, and "
+    + `Vettore cannot tell which; it shows ${n === 1 ? "it" : "them"} but does not change or remove `
+    + `${n === 1 ? "it" : "them"}, so nothing is lost. Change ${n === 1 ? "it" : "them"} in Excel.`;
 }
 
 /** Note key the engine marks map-only overlay primers with (src/vettore/fileio.py). */
