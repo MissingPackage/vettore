@@ -22,6 +22,9 @@ export interface Preferences {
   myEnzymes: string[];
   /** The buffer the lab digests each of "My enzymes" in, by enzyme name ("rCutSmart"). */
   enzymeBuffers: Record<string, string>;
+  /** File → Open from NCBI… is in the menu: the one thing in Vettore that uses the internet,
+   * and only when the user asks. On by default; turning it off hides the menu item. */
+  allowNcbi: boolean;
 }
 
 export type ChromeTheme = "light" | "dark" | "system";
@@ -42,6 +45,7 @@ const DEFAULTS: Preferences = {
   chrome: "light",
   myEnzymes: [],
   enzymeBuffers: {},
+  allowNcbi: true,
 };
 
 function clean(stored: Partial<Preferences>): Preferences {
@@ -55,6 +59,7 @@ function clean(stored: Partial<Preferences>): Preferences {
   if (!CHROME_THEMES.some((t) => t.id === prefs.chrome)) prefs.chrome = DEFAULTS.chrome;
   prefs.myEnzymes = knownEnzymes(prefs.myEnzymes);
   prefs.enzymeBuffers = cleanBuffers(prefs.enzymeBuffers);
+  if (typeof prefs.allowNcbi !== "boolean") prefs.allowNcbi = DEFAULTS.allowNcbi;
   return prefs;
 }
 

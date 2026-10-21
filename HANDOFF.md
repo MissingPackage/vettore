@@ -55,7 +55,10 @@ annotated tag and the GitHub release notes.
 4. Progressive multiple alignment (today: star alignment to a reference); related 15 kb
    sequences take ~3.5 s each.
 5. Printing in the Linux (Qt WebEngine) window; history graph.
-6. Open question for the user: online import by accession from NCBI (needs the network).
+6. S6.3 File → Open from NCBI… (`src/vettore/ncbi.py`, `frontend/src/files/NcbiDialog.tsx`) is
+   built: the only network call, NCBI E-utilities `efetch` with the accession alone; preference
+   "Allow Open from NCBI", on by default. Check by hand on Windows behind the lab's network
+   (proxy, certificate store) once: the tests replace NCBI with a stand-in.
 7. Run the opt-in Qt window tests (`VETTORE_QT_TESTS=1`, xvfb) in CI; trim the Linux bundle.
 
 ## Decisions (see spec "Architecture")
@@ -71,8 +74,7 @@ annotated tag and the GitHub release notes.
 
 ## Open questions (also in the spec)
 
-Which cloning methods are used most; whether online import from NCBI/Addgene is acceptable;
-whether Vettore-written `.dna` files open in colleagues' tools.
+Which cloning methods are used most; whether Vettore-written `.dna` files open in colleagues' tools.
 
 ## Gotchas
 

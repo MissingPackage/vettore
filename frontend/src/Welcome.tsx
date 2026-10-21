@@ -17,6 +17,8 @@ export default function Welcome(props: {
   onSample: (id: string) => void | Promise<void>;
   /** Open a sequence copied from an email or a web page. */
   onPaste?: () => void;
+  /** File → Open from NCBI…; absent when the preference turns it off. */
+  onNcbi?: () => void;
 }) {
   const { samples } = props;
   const [opening, setOpening] = useState<string | null>(null);
@@ -60,6 +62,15 @@ export default function Welcome(props: {
         You can also drop a file anywhere on this window: GenBank (.gb, .gbk, .ape), .dna, EMBL,
         FASTA, .xdna, .gck, Sanger .ab1 or plain sequence text.
       </p>
+      {props.onNcbi && (
+        <p className="vt-welcome-drop" data-testid="welcome-ncbi-hint">
+          A public GenBank record can be opened by its accession number:{" "}
+          <button className="vt-link" data-testid="welcome-ncbi" onClick={props.onNcbi}>
+            Open from NCBI…
+          </button>{" "}
+          (this uses the internet).
+        </p>
+      )}
 
       {samples.length > 0 && (
         <div className="vt-welcome-section vt-samples">
