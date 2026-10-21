@@ -1,6 +1,7 @@
 // Bridge to the local Python engine (HTTP on 127.0.0.1, guarded by a session token).
 import { engineErrorText } from "./files/engineErrors";
 import type { PlannerResponse } from "./tools/digestPlannerText";
+import type { BoundPrimer, LibraryFile, LibraryPrimer, RejectedRow } from "./tools/primerLibraryText";
 
 export interface OveAnnotation {
   id?: string;
@@ -197,4 +198,33 @@ export const api = {
   /** File content for a browser download: text for GenBank/FASTA, base64 for .dna. */
   exportFile: (sequenceData: SequenceData, format: "genbank" | "fasta" | "dna") =>
     call<{ content?: string; content_b64?: string }>("export", { sequenceData, format }),
+  primerLibrary: {
+    /** The library at the chosen path: its primers, the path, its modification time and any
+     * rows that could not be read. */
+    get: () => call<LibraryFile>("primer-library"),
+    /** Point the library at a .csv (kept in a shared folder) and read it. */
+    setPath: (path: string) => call<LibraryFile>("primer-library/path", { path }),
+    /** Apply the dialog's changes (see primerLibraryText.saveChanges) to the shared .csv as it is
+     * now. Returns the library as read back, with how many rows were added, changed and removed,
+     * additions skipped (the file had that oligo already) and changes whose row had gone. */
+    save: (changes: { added?: object[]; edited?: object[]; removed?: object[] }) =>
+      call<LibraryFile & { added: number; changed: number; removed: number; skipped: number; gone: number; held: number; kept: number }>(
+        "primer-library/save", changes),
+    /** Parse pasted or file text (name, sequence, notes…) without saving, so the dialog can show
+     * what will be kept and what will be left out. */
+    parse: (text: string) => call<{ primers: LibraryPrimer[]; rejected: RejectedRow[]; today: string }>("primer-library/parse", { text }),
+    /** Library primers that bind the given document, with their binding sites: those of
+     * `primers` when given (the dialog's unsaved list), otherwise those of the saved file. */
+    bindings: (sequenceData: SequenceData, primers?: object[]) =>
+      call<{ primers: BoundPrimer[] }>("primer-library/bindings", { sequenceData, primers }),
+    /** Library primers that read across a region (sequencing primers), in reading order. */
+    sequencing: (sequenceData: SequenceData, start: number, end: number) =>
+      call<{ primers: { name: string; sequence: string; strand: number; start: number; end: number; reads_from: number }[] }>(
+        "primer-library/sequencing", { sequenceData, start, end }),
+    /** The library primer pair that already amplifies a product over a region, or null. */
+    product: (sequenceData: SequenceData, start: number, end: number,
+              productMin: number | null = null, productMax: number | null = null) =>
+      call<{ product: { forward: string; reverse: string; size: number } | null }>(
+        "primer-library/product", { sequenceData, start, end, product_min: productMin, product_max: productMax }),
+  },
 };

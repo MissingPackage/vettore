@@ -48,8 +48,11 @@ annotated tag and the GitHub release notes.
    catalogue growth, construct lineage, progressive alignment, optional NCBI import): the user
    answered its questions on 2026-10-21 (private notes repo, `roadmap/S5-S6-roadmap-DRAFT.md`).
    Order: S5.1 → S5.3 → S5.2 → S5.4 → S6.1 → S6.2 → S6.3. S5.1, the diagnostic digest planner
-   (`src/vettore/digest_planner.py`, `frontend/src/tools/digestPlanner.tsx`), is built; S5.3
-   (lab primer library, a shared .csv) is next.
+   (`src/vettore/digest_planner.py`, `frontend/src/tools/digestPlanner.tsx`), and S5.3, the lab
+   primer library — a shared .csv, with the one binding rule in `src/vettore/primer_library.py`,
+   the dialog in `frontend/src/tools/primerLibrary.tsx` and the map overlay in
+   `frontend/src/tools/libraryOverlay.ts` (overlay primers tagged with
+   `fileio.OVERLAY_NOTE` and stripped on save) — are built. S5.2 (Sanger contig) is next.
    Catalogue 0.3.1 added PGK (human, mouse), UbC, H1, 7SK, SFFV and full-length CAG; mouse U6,
    H1, 7SK, UbC, Eef1a1 and Gfap and human CAMK2A have no public vector record annotating them.
 4. Progressive multiple alignment (S6.2) is built in Python (`src/vettore/msa.py`,

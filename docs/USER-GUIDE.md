@@ -17,6 +17,7 @@ when you ask for it and sends nothing but the accession number.
 - [Enzymes](#enzymes)
 - [Primers and Tm](#primers-and-tm)
 - [Designing PCR primers](#designing-pcr-primers-primers--design-pcr-primers)
+- [The lab primer library](#the-lab-primer-library-primers--primer-library)
 - [Cloning simulations](#cloning-simulations-actions-menu)
 - [Annotating a new sequence](#annotating-a-new-sequence-features--detect-common-features)
 - [Checking what an AAV capsid can carry](#checking-what-an-aav-capsid-can-carry-tools--aav-packaging-check)
@@ -227,7 +228,23 @@ For each pair you see the product size, and for each primer its position, length
 
 If no pair fits, the dialog says why (for example *Tm too low*) and what to widen.
 
-**Add to Sequence** adds the chosen pair to the plasmid's primers, named after the feature or the file (`KanR_F`, `KanR_R`), and records it in History. **Copy for Ordering** copies `name ⇥ sequence` lines, ready to paste into an order form.
+**Add to Sequence** adds the chosen pair to the plasmid's primers, named after the feature or the file (`KanR_F`, `KanR_R`), and records it in History. **Copy for Ordering** copies `name ⇥ sequence` lines, ready to paste into an order form. **Save to Library** keeps the pair in the lab primer library (below).
+
+If the lab library already has a pair that amplifies the region you chose, within the product sizes you asked for and with the whole region between the two primers, a note says so at the top of the results ("You may already have KanR_F and KanR_R: product 1,086 bp"), so you can reuse them instead of ordering new ones.
+
+## The lab primer library (Primers → Primer Library…)
+
+The primer library remembers the primers your lab already has, so you reuse them, find them on any new plasmid, and stop ordering duplicates.
+
+Choose **Primers → Primer Library…**. The table lists each primer with its name, sequence (5′→3′), length, Tm, notes, where it is kept (free text, e.g. "box 3 A4") and the date it was added. The search box filters by name or by sequence.
+
+- **Add a primer** with the row under the table (name, sequence, notes, location). A sequence already in the library is refused with the name it already has.
+- **Import…** reads several at once: paste two or more columns copied from a spreadsheet (name, sequence, and optionally notes and location), or open a .csv or .tsv file. Rows whose sequence is not DNA are listed and left out; a sequence already in the library is skipped. **Export .csv** writes the whole library to a file, with the same separator as the library file (semicolons for a new library) so Excel opens it in columns.
+- **Edit** the notes or location of any primer in place; **Copy** a primer for an order form; **Remove** one you no longer keep.
+
+The library is **one .csv file**. Keep it in a shared folder — OneDrive, Dropbox, a lab drive — so everyone in the lab shares the same list. Vettore reads it from the path you choose (**Change file…**) and writes your changes back there when you press **Save to File**. Files saved from Excel work as they are, also with semicolons (Excel set to Italian), a `sep=;` first line, columns in any order, columns of your own (Tm, who ordered it…) and accented notes. Saving changes only the rows you changed: your own columns, the header and the spelling of each sequence stay as they were, and a row Vettore cannot read stays in the file unchanged, so a colleague's line is never lost. Nothing is locked: when you save, Vettore reads the file again and adds your changes to it, so primers a colleague added while you had it open are kept (and then listed). Closing the window, **Reload** or **Change file…** with unsaved changes asks first. An Excel workbook (.xlsx) or a file that is not a primer list is refused and left as it is: in Excel use File → Save As → CSV. A row that runs over several lines in the file (a note with line breaks, or a quote typed by hand that takes in the rows after it) is shown but not changed from Vettore, so nothing in it can be lost; change it in Excel. A quote left open at the end of the file is refused until it is closed.
+
+**Primers → Show Library Primers** draws the library primers that bind the open document on its map. A primer binds where its last 15 bases match exactly and the rest of it matches with at most two mismatches; a 5′ tail is allowed, both strands are searched, and degenerate bases (N, R, Y…) match every base they stand for. Inside a repeat, overlapping sites of one primer count as one. Primers shorter than 15 bases are not looked for, and a primer that binds more than ten places is listed with its count instead of being drawn. The map shows the bases that anneal; for a primer with a tail, the whole primer is in the primer's note. These primers are a view, not part of the document: showing them does not count as a change, Undo leaves them alone, and they are never written when you save the file. The Primer Library dialog also lists, for the open document, which library primers bind it and where.
 
 ## Cloning simulations (Actions menu)
 

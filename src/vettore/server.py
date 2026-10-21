@@ -27,6 +27,7 @@ from . import (
     msa,
     ncbi,
     primer_design,
+    primer_library,
     sanger,
     settings,
     tm,
@@ -189,6 +190,7 @@ ACTIONS: tuple[tuple[str, str], ...] = (
     ("/api/tm", "Calculating the Tm"),
     ("/api/alignment/", "Aligning the sequences"),
     ("/api/primer-design/", "Designing primers"),
+    ("/api/primer-library", "The primer library"),
     ("/api/cloning/", "The simulation"),
     ("/api/app/samples", "Opening the sample"),
     ("/api/ncbi/", "Opening the record from NCBI"),
@@ -286,7 +288,7 @@ def create_app(token: str, static_dir: Path | None,
 
     app.include_router(cloning_router)
     # Feature modules own their routes; each exposes ``router``.
-    for module in (alignment, msa, primer_design, app_info, ncbi):
+    for module in (alignment, msa, primer_design, primer_library, app_info, ncbi):
         app.include_router(module.router)
 
     @app.exception_handler(fileio.UnsupportedFile)

@@ -91,6 +91,25 @@ def test_vettore_reopens_its_own_dna_files_unchanged(name):
     assert again["description"] == doc["description"]
 
 
+def test_overlay_library_primers_are_never_written_to_a_file():
+    # Primers Vettore only draws on the map (Show library primers) carry the overlay marker and
+    # must not leak into any saved format, even if they are in the document the UI passes.
+    doc = {
+        "name": "overlay", "sequence": "ACGT" * 20, "circular": True, "features": [],
+        "primers": [
+            {"name": "real", "start": 0, "end": 15, "strand": 1},
+            {"name": "KanR_F (library)", "start": 20, "end": 35, "strand": 1,
+             "notes": {fileio.OVERLAY_NOTE: ["library"]}},
+        ],
+    }
+    for fmt in ("genbank", fileio.DNA_FILE_FORMAT):
+        [reopened] = fileio.read_documents(f"overlay{'.gb' if fmt == 'genbank' else '.dna'}",
+                                           fileio.encode(doc, fmt))
+        names = [p["name"] for p in reopened["primers"]]
+        assert "real" in names and all("library" not in n for n in names)
+    assert fileio.save_warnings(doc, "genbank") == []  # the overlay primer is not "left out"
+
+
 def test_tailed_primers_keep_their_tails():
     doc = open_doc("sample-hybridization-params.dna")
     sg = SgffReader.from_bytes(fileio.write_dna(doc))

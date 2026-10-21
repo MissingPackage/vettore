@@ -631,6 +631,21 @@ def write_dna(data: dict) -> bytes:
 _NOT_SAVEABLE = re.compile("[^ACGTURYSWKMBDHVN]", re.IGNORECASE)
 
 
+#: Note key marking a primer that Vettore drew on the map only (a lab-library primer shown by
+#: "Show library primers"); it is never written to a saved file.
+OVERLAY_NOTE = "vettore_overlay"
+
+
+def strip_overlay_primers(data: dict) -> dict:
+    """``data`` without the primers Vettore only overlays on the map (library primers). The
+    overlay is a view, not part of the document, so it is removed before a file is written."""
+    primers = _as_list(data.get("primers"))
+    kept = [p for p in primers
+            if not (isinstance(p, dict) and isinstance(p.get("notes"), dict)
+                    and p["notes"].get(OVERLAY_NOTE))]
+    return data if len(kept) == len(primers) else {**data, "primers": kept}
+
+
 def _check_saveable(data: dict) -> None:
     """A document whose sequence Vettore could not open again is not written."""
     sequence = data.get("sequence", "")
@@ -650,6 +665,7 @@ def save_warnings(data: dict, fmt: str) -> list[str]:
     not on the sequence (FASTA keeps no features, so it leaves out nothing it could keep)."""
     if fmt == "fasta":
         return []
+    data = strip_overlay_primers(data)
     out = []
     for kind, items in unplaceable(data).items():
         noun = kind[:-1] if len(items) == 1 else kind
@@ -665,6 +681,7 @@ def save_warnings(data: dict, fmt: str) -> list[str]:
 def encode(data: dict, fmt: str) -> bytes:
     """The bytes of a saved document in ``fmt`` (genbank, fasta or the .dna format)."""
     _check_saveable(data)
+    data = strip_overlay_primers(data)
     if fmt == "genbank":
         return write_genbank(data).encode("utf-8")
     if fmt == "fasta":

@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSelector } from "react-redux";
-import { Editor } from "@teselagen/ove";
+import { actions, Editor } from "@teselagen/ove";
+import { store } from "./store";
+import { removeOverlay, withOverlay } from "./tools/libraryOverlay";
 import {
   api,
   EngineError,
@@ -15,6 +17,7 @@ import {
   canSaveInPlace,
   createDocument,
   editorState,
+  isDirty,
   markSaved,
   needsSave,
   now,
@@ -43,7 +46,7 @@ import { applyEnzymeSet, ENZYME_SETS, type EnzymeSetId } from "./enzymeSets";
 import { ENZYMES } from "./enzymeLogic";
 import { OVERLAY_VIEWS, showView, VIEWS, type ViewId } from "./views";
 import ViewTabs from "./ViewTabs";
-import { applyChrome, usePreferences } from "./preferences";
+import { applyChrome, savePreferences, usePreferences } from "./preferences";
 import { ACCEPT, dirName, SAVE_EXTENSION, safeFileName, type SaveKind } from "./files/formats";
 import { addNotice, dismissNotice, messageOf, type Notice, type NoticeKind } from "./files/notices";
 import NoticeStack from "./files/NoticeStack";
@@ -79,6 +82,16 @@ function useWindowHeight() {
     return () => window.removeEventListener("resize", onResize);
   }, []);
   return height;
+}
+
+/** A document as tools and cloning see it: its own content, without the library primers
+ * that Show Library Primers only draws on the map. */
+function ownData(editorName: string): SequenceData {
+  const data = editorState(editorName)?.sequenceData as SequenceData;
+  if (!data) return data;
+  const own = removeOverlay(data.primers);
+  // The same object when nothing is overlaid, so dialogs that compare it do not re-run.
+  return own.length === count(data.primers) ? data : { ...data, primers: own };
 }
 
 function download(filename: string, content: string | Blob, type = "text/plain") {
@@ -130,7 +143,11 @@ export default function App() {
   docsRef.current = docs;
 
   // Light or dark frame, as chosen in Preferences (theme/dark-chrome.css).
-  const { chrome, allowNcbi } = usePreferences();
+  const prefs = usePreferences();
+  const { chrome, allowNcbi } = prefs;
+  // Bumped when a tool dialog closes: the Primer Library may have changed the library, so the
+  // library primers shown on the map are looked up again.
+  const [libraryVersion, setLibraryVersion] = useState(0);
   useEffect(() => applyChrome(chrome), [chrome]);
 
   // Documents opened in the last two seconds: their tab glows once so the eye finds it (a new
@@ -429,7 +446,7 @@ export default function App() {
   const openDocs: OpenDoc[] = useMemo(() => docs.map((d) => ({
     editorName: d.editorName,
     name: d.name,
-    data: () => editorState(d.editorName)?.sequenceData as SequenceData,
+    data: () => ownData(d.editorName),
     selection: () => {
       const layer = editorState(d.editorName)?.selectionLayer;
       return layer && layer.start >= 0 && layer.end >= 0
@@ -447,7 +464,7 @@ export default function App() {
     // Snapshot the inputs as they are now, so History can reopen them after they change.
     const parents = docsRef.current
       .filter((d) => product.parents.includes(d.name))
-      .map((d) => ({ name: d.name, data: editorState(d.editorName)?.sequenceData as SequenceData }))
+      .map((d) => ({ name: d.name, data: ownData(d.editorName) }))
       .filter((p) => p.data);
     const sequenceData = distinctName(product.doc as SequenceData, docsRef.current.map((d) => d.name));
     const doc = createDocument(sequenceData, null, {
@@ -474,7 +491,7 @@ export default function App() {
   /** FASTA keeps only the sequence: say what the saved file does not contain. */
   const warnIfAnnotationsLost = useCallback((saved: SaveResult, data: SequenceData) => {
     const features = count(data.features);
-    const primers = count(data.primers);
+    const primers = removeOverlay(data.primers as any).length;   // library primers are a view
     if (saved.format !== "fasta" || !(features || primers)) return;
     const parts = [features && `${features} feature${features > 1 ? "s" : ""}`,
       primers && `${primers} primer${primers > 1 ? "s" : ""}`].filter(Boolean).join(" and ");
@@ -717,6 +734,36 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, circular]);
 
+  // Draw (or take off) the lab-library primers that bind the active document. The overlay is a
+  // view, not an edit: it stays out of Undo, a document that had no unsaved changes still has
+  // none, and the engine never writes the tagged overlay primers to a saved file.
+  useEffect(() => {
+    if (!active) return;
+    const put = (data: SequenceData, primers: unknown[]) => {
+      const wasClean = !isDirty(editorState(active));
+      store.dispatch(actions.updateSequenceData({ ...data, primers },
+        { editorName: active, disregardUndo: true }));
+      if (wasClean) markSaved(active);
+    };
+    const data = editorState(active)?.sequenceData as SequenceData | undefined;
+    if (!data) return;
+    if (!prefs.showLibraryPrimers) {
+      const own = removeOverlay(data.primers);
+      const list = Array.isArray(data.primers) ? data.primers : Object.values(data.primers ?? {});
+      if (own.length !== list.length) put(data, own);
+      return;
+    }
+    let live = true;
+    api.primerLibrary.bindings(data)
+      .then((r) => {
+        const now = editorState(active)?.sequenceData as SequenceData | undefined;
+        if (live && now) put(now, withOverlay(now.primers, r.primers));
+      })
+      .catch(() => undefined);
+    return () => { live = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active, prefs.showLibraryPrimers, activeSequence, circular, libraryVersion]);
+
   // ---- command search ----------------------------------------------------------------------
   // The search box lives at the top of the Help menu; the editor's own shortcut for it is Cmd+/
   // only, and works only once Help has been opened. Ctrl+/ and the view bar's button open Help
@@ -847,6 +894,8 @@ export default function App() {
     detectFeatures: () => setDetectOpen(true),
     tool: (id: string) => setToolId(id),
     openSample,
+    toggleLibraryPrimers: () => savePreferences({ showLibraryPrimers: !prefs.showLibraryPrimers }),
+    showLibraryPrimers: prefs.showLibraryPrimers,
     openFromNcbi: () => setNcbiOpen(true),
     allowNcbi,
     recent,
@@ -854,7 +903,7 @@ export default function App() {
     hasDocument: !!activeDoc,
   };
   // menuFilter must be stable (OVE memoizes on it); handlers are read through the ref.
-  const menuFilter = useMemo(() => buildMenu(handlers), [recent, samples, !!activeDoc, allowNcbi]); // eslint-disable-line react-hooks/exhaustive-deps
+  const menuFilter = useMemo(() => buildMenu(handlers), [recent, samples, !!activeDoc, prefs.showLibraryPrimers, allowNcbi]); // eslint-disable-line react-hooks/exhaustive-deps
   const contextMenus = useMemo(() => rightClickOverrides(() => handlers.current.copyAsFasta()), []);
 
   const onSave = useCallback(
@@ -1089,7 +1138,7 @@ export default function App() {
           <Component
             docs={openDocs}
             active={openDocs.find((d) => d.editorName === active) ?? null}
-            onClose={() => setToolId(null)}
+            onClose={() => { setToolId(null); setLibraryVersion((v) => v + 1); }}
             openDocument={openDocument}
             logHistory={logHistory}
           />

@@ -36,6 +36,10 @@ export interface MenuHandlers {
   tool: (id: string) => void;
   /** Open one of the sample constructs that come with Vettore, unsaved. */
   openSample: (id: string) => void;
+  /** Draw the lab-library primers that bind the open document on its map, or take them off. */
+  toggleLibraryPrimers: () => void;
+  /** Whether the library-primer overlay is on, for the menu's tick. */
+  showLibraryPrimers: boolean;
   /** File → Open from NCBI…: a GenBank record by its accession. */
   openFromNcbi: () => void;
   /** Preference "Allow Open from NCBI": the menu item is hidden when it is off. */
@@ -229,6 +233,13 @@ export function buildMenu(ref: MutableRefObject<MenuHandlers>) {
         { text: "Add Primer…", cmd: "newPrimer" },
         "--",
         { text: "Show Primers", cmd: "togglePrimers" },
+        {
+          text: "Show Library Primers",
+          icon: h().showLibraryPrimers ? "tick" : "blank",
+          disabled: !hasDocument,
+          "data-test": "toggle-library-primers",
+          onClick: () => h().toggleLibraryPrimers(),
+        },
         "--",
         { text: "Primers View", hotkey: "mod+5", onClick: () => h().view("primers") },
         ...toolItems("Primers"),
