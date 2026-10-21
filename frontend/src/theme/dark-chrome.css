@@ -11,12 +11,12 @@
   --vt-chrome-sunken: #151a20;    /* document tab strip */
   --vt-chrome-track: #181d24;     /* segmented control track */
   --vt-chrome-pill: #3a4552;      /* the open view's pill */
-  --vt-chrome-text: #d5dbe3;      /* 11.9:1 on chrome-bg */
+  --vt-chrome-text: #d5dbe3;      /* 11.3:1 on chrome-bg */
   --vt-chrome-strong: #f3f5f8;
-  --vt-chrome-muted: #a3adba;     /* 7.0:1 on chrome-bg, 6.3:1 on chrome-raised */
-  --vt-chrome-icon: #8cc4ec;      /* toolbar icons: 8.6:1 on chrome-bg */
+  --vt-chrome-muted: #a3adba;     /* 7.0:1 on chrome-bg, 6.1:1 on chrome-raised */
+  --vt-chrome-icon: #8cc4ec;      /* toolbar icons: 8.4:1 on chrome-bg */
   --vt-chrome-border: #3a434e;
-  --vt-chrome-control: #6b7685;   /* select and button outlines: 3.4:1 on chrome-raised */
+  --vt-chrome-control: #737e8d;   /* select and button outlines: 3.4:1 on chrome-raised */
   --vt-chrome-hover: rgba(255, 255, 255, 0.08);
 }
 

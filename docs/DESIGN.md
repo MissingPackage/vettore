@@ -11,6 +11,7 @@ Files:
 |---|---|
 | `frontend/src/theme/tokens.css` | Design tokens (CSS variables): colour, type, spacing, radius, elevation, focus, motion |
 | `frontend/src/theme/overrides.css` | Blueprint 3 and editor-component chrome brought in line with the tokens |
+| `frontend/src/theme/dark-chrome.css` | The optional dark frame (Preferences → Appearance) |
 | `frontend/src/app.css` | Vettore's own surfaces (shell, views, dialogs) and the shared classes below |
 | `frontend/e2e/design-screens.spec.ts` | Screenshot harness and layout, contrast and focus checks |
 | `frontend/public/favicon.svg`, `vettore.png`, `vettore.ico` | App icon |
@@ -47,9 +48,9 @@ Always use a token, never a literal colour. Ratios are WCAG contrast against the
 | `--vt-text-on-accent` | `#ffffff` | Text on accent or danger fills |
 | `--vt-text-on-accent-muted` | `rgba(255,255,255,0.9)` | Secondary text on accent fills (about 5:1 on `--vt-accent`) |
 | `--vt-surface` | `#ffffff` | Pages, inputs, cards, the active document tab |
-| `--vt-surface-subtle` | `#f7f8fa` | View bar, status bar, dialog bodies |
+| `--vt-surface-subtle` | `#f7f8fa` | Status bar, dialog bodies, sample cards |
 | `--vt-surface-sunken` | `#dfe3e8` | Document tab strip |
-| `--vt-surface-raised` | `#eceff2` | Inactive document tabs |
+| `--vt-surface-raised` | `#eceff2` | View-tab track, hovered document tabs |
 | `--vt-surface-hover` | `#e9edf2` | Hover on tabs and plain buttons |
 | `--vt-overlay-hover` | 8 % ink | Hover tint over any background (icon buttons) |
 | `--vt-border` | `#c3c8cf` | Container outlines and dividers (decorative) |
@@ -95,12 +96,38 @@ Line height: `--vt-line-height` (1.43, 20px at 14px) for paragraphs; `--vt-line-
 | Token | Value | Use |
 |---|---|---|
 | `--vt-space-0` … `--vt-space-7` | 2, 4, 8, 12, 16, 24, 32, 48 px | Gaps and padding; use the scale, not new values |
-| `--vt-radius-sm` / `--vt-radius` / `--vt-radius-lg` | 3 / 4 / 6 px | Controls / notices / cards, dialogs, tabs |
+| `--vt-radius-sm` / `--vt-radius` / `--vt-radius-lg` / `--vt-radius-xl` | 4 / 6 / 8 / 10 px | Controls, toolbar keys / notices, segmented controls / cards, tabs / dialogs |
 | `--vt-control-height` | 30px | Every input, select and button in Vettore's forms |
 | `--vt-control-height-sm` | 24px | The smallest clickable target (WCAG 2.5.8) |
 | `--vt-measure` | 72ch | Longest line for explanatory text |
 | `--vt-shadow-1` / `-2` / `-3` | | Raised controls / popovers / dialogs |
-| `--vt-duration` | 120ms (0 with reduced motion) | Colour transitions on hover |
+| `--vt-duration` | 120ms | Colour transitions on hover |
+| `--vt-duration-med` | 180ms | Chrome that moves: the view-tab pill, a new tab, a notice |
+| `--vt-duration-data` | 260ms | Data that changes shape: gel bands moving to a new size |
+| `--vt-ease-out` | `cubic-bezier(0.2, 0.7, 0.2, 1)` | Easing for everything that moves |
+
+All three durations are 0 when the system asks for reduced motion.
+
+### Motion
+
+Motion is for the frame and for feedback, never for reading. The budget:
+
+- **Chrome, at most 180 ms**: the view-tab pill slides, a new document's tab slides in and its
+  outline glows once (so a new product is easy to find), notices slide in from the right,
+  welcome actions lift 1 px on hover. Nothing waits for an animation before it can be clicked.
+- **Data, at most 260 ms, and only where the movement is the information**: gel bands slide to
+  their new size when a lane's enzymes change, so the eye sees which fragment split.
+- **Never**: the map, sequence, alignment and tables. Zoom, scroll, selection and view changes
+  stay instant. No entrance animations on pages, no parallax, no animated text.
+
+### Dark frame
+
+File → Preferences → Appearance offers Light (the default), Dark menus and tabs, and As the
+system is set. `theme/dark-chrome.css` styles the menu bar, toolbar, document tabs, view bar
+and status bar under `html[data-chrome="dark"]`, with its own `--vt-chrome-*` tokens (every
+text pair at least 6:1, control outlines 3.3:1). The map, sequence, tables, dialogs and menus
+stay light: the editor's feature and enzyme colours are drawn for white. A new chrome surface
+needs a rule there too.
 
 ## Shared classes
 
@@ -201,6 +228,12 @@ Rules that adapt the editor component and Blueprint to Vettore (in `theme/overri
   views, so their sliders cannot catch clicks meant for Vettore's tables.
 - `html[data-platform]` selects how menu shortcuts are written: `Ctrl+Shift+S` off a Mac, the
   key symbols on a Mac.
+- The editor's toolbar keys have no fill; a tool that is on is a white key with an accent
+  outline (`.veToolbar … .bp3-active`).
+- The menu search (top of Help) ranks with `menuSearch.tsx`: a name that starts with the typed
+  text, then a word that does, then the text anywhere, then the menu it sits in. Ctrl+/ and the
+  view bar's "Search commands" button open it with the box focused (the editor's own shortcut
+  was Cmd+/ only).
 - Messages from the engine appear in the message stack (`files/NoticeStack`, classes
   `vt-toast*`); the `vt-notice*` classes are for messages inside dialogs.
 
@@ -258,7 +291,9 @@ For every screen or dialog you add or change:
 - [ ] Busy and result messages use `role="status"`; blocking errors use `role="alert"`.
 - [ ] Colour is never the only signal.
 - [ ] Nothing overlaps or truncates at 1366×768 and 1920×1080; the dialog footer stays visible.
-- [ ] Motion respects `prefers-reduced-motion` (the tokens set `--vt-duration` to 0).
+- [ ] Motion respects `prefers-reduced-motion` (the tokens set every `--vt-duration*` to 0)
+      and stays within the budget under Motion.
+- [ ] A new chrome surface is readable in the dark frame too (`theme/dark-chrome.css`).
 
 ## Checking the design
 
