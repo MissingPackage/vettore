@@ -118,3 +118,42 @@ test("explains what to do when only one sequence is open", async ({ page }) => {
   await menu(page, "Tools", "Align Multiple Sequences…");
   await expect(page.getByTestId("msa-empty")).toContainText("Open at least two sequences");
 });
+
+test("all to each other: consensus, conservation and the differences between any two", async ({ page }) => {
+  await page.goto(`/?token=${TOKEN}`);
+  const reference = randomDna(400, 23);
+  const swap = (i: number) => reference.slice(0, i) + (reference[i] === "A" ? "C" : "A") + reference.slice(i + 1);
+  await newSequence(page, "pRef", reference);
+  await newSequence(page, "pOne", swap(50));
+  await newSequence(page, "pTwo", swap(200).slice(0, 300) + swap(200).slice(310));  // and 10 bp less
+  await page.getByTestId("doctab").first().click();
+
+  await menu(page, "Tools", "Align Multiple Sequences…");
+  const dialog = page.getByTestId("msa-dialog");
+  await dialog.getByTestId("msa-mode-all").check();
+  await expect(dialog.getByTestId("msa-all-choice")).toHaveCount(3);
+  // Only the active document is ticked; a prompt says what to do.
+  await expect(dialog.getByTestId("msa-all-prompt")).toContainText("Tick at least two");
+  await expect(dialog.getByTestId("msa-all-align")).toBeDisabled();
+  for (const box of await dialog.getByTestId("msa-all-choice").all()) await box.check();
+  await dialog.getByTestId("msa-all-align").click();
+
+  const rows = dialog.getByTestId("msa-all-summary").locator("tbody tr");
+  await expect(rows).toHaveCount(3, { timeout: 30_000 });
+  await expect(dialog.getByTestId("msa-all-summary")).toContainText("of 400");
+  await expect(dialog.getByTestId("msa-conservation").locator("rect").first()).toBeAttached();
+  await expect(page.locator(".vt-msa-panel .vt-msa-view svg").first()).toBeVisible({ timeout: 20_000 });
+
+  await dialog.getByTestId("msa-pair-a").selectOption({ label: "pRef" });
+  await dialog.getByTestId("msa-pair-b").selectOption({ label: "pTwo" });
+  const diffs = dialog.getByTestId("msa-pair-differences");
+  await expect(diffs).toContainText(`201: ${reference[200]} → `);
+  await expect(diffs).toContainText("10 bp missing");
+  await expect(dialog.getByTestId("msa-pair-summary")).toContainText("1 mismatch · 1 deletion (10 bp)");
+  await page.screenshot({ path: "test-results/alignment-all.png" });
+
+  // The other mode is still there, untouched.
+  await dialog.getByTestId("msa-mode-reference").check();
+  await expect(dialog.getByTestId("msa-reference")).toBeVisible();
+  await expect(dialog.getByTestId("msa-all-summary")).toBeHidden();
+});

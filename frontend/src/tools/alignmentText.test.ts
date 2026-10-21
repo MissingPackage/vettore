@@ -93,6 +93,18 @@ it("copies differences as tab-separated lines", () => {
   ]);
 });
 
+it("adds a note column only when some difference is uncertain", () => {
+  const text = differencesAsTsv("pX", [
+    { kind: "mismatch", start: 10, end: 10, reference: "A", sequence: "C" },
+    { kind: "deletion", start: 798, end: 799, reference: "TG", sequence: "", uncertain: true },
+  ]);
+  expect(text.split("\n")).toEqual([
+    "sequence\tkind\tstart\tend\treference bases\tsequence bases\tnote",
+    "pX\tmismatch\t10\t10\tA\tC\t",
+    "pX\tdeletion\t798\t799\tTG\t\tnear the end: uncertain",
+  ]);
+});
+
 it("tells apart open files that share a name by their tab number", () => {
   expect(distinctNames([
     { editorName: "a", name: "Pasted sequence" },

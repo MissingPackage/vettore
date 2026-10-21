@@ -24,6 +24,7 @@ from . import (
     digest_planner,
     fileio,
     gel,
+    msa,
     ncbi,
     primer_design,
     sanger,
@@ -285,7 +286,7 @@ def create_app(token: str, static_dir: Path | None,
 
     app.include_router(cloning_router)
     # Feature modules own their routes; each exposes ``router``.
-    for module in (alignment, primer_design, app_info, ncbi):
+    for module in (alignment, msa, primer_design, app_info, ncbi):
         app.include_router(module.router)
 
     @app.exception_handler(fileio.UnsupportedFile)

@@ -26,6 +26,12 @@ The download links in the README always point to the latest release.
 - File → Preferences → My enzymes keeps the enzymes in your freezer, each with the buffer you digest it in (empty until you fill it in; a list, or two columns enzyme and buffer, can be pasted from a spreadsheet); the digest planner tries them first.
 - Find Diagnostic Digest shows each enzyme's buffer next to it, ranks double digests in one buffer before those that need two, and says what to do when a pair needs two different buffers; the copied protocol carries the buffers too.
 
+## Unreleased — aligning several sequences to each other
+
+- Tools → Align Multiple Sequences… has a second mode, **All to each other**: a progressive alignment (guide tree from shared words, most similar sequences first) of up to 50 sequences, with no reference privileged. Strand and origin follow the first circular sequence; each sequence is turned by its closest relative, and a fragment across a plasmid's origin lines up in one piece. One that shares nothing with the others is left out with a note.
+- The result shows a consensus row on top of the stacked sequences, a conservation bar with the most variable stretches listed under it, each sequence's identity to the consensus, and the differences between any two sequences you pick, in the first one's numbering, ready to copy into a spreadsheet. Unrelated stretches (two inserts in one backbone) are named as not compared rather than listed as mutations, and N is never counted as a difference. The two are realigned to each other where needed, so gaps the other sequences required never show up as an insertion and a deletion between them.
+- The alignment runs in the background with a progress bar and can be stopped; 10 plasmids of 15 kb take a few seconds.
+
 ## 0.3.1 — more promoters, with their species
 
 - Detect Common Features knows the PGK (human and mouse), UbC, H1, 7SK and SFFV promoters and the full-length CAG promoter (CMV enhancer, chicken β-actin promoter and chimeric intron), each taken from a public GenBank record and cross-checked against a second, independent one.
