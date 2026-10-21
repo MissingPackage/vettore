@@ -553,3 +553,28 @@ def test_unrelated_inserts_leave_no_differences_at_the_junctions(seed):
     assert out["differences"] == []
     [swap] = out["unrelated"]
     assert swap["a_bases"] >= 590
+
+
+# ---- regressions found by the fifth adversarial review -----------------------------------
+
+
+@pytest.mark.parametrize("seed", range(12))
+def test_divergent_linear_pairs_are_compared_without_error(seed):
+    # Seed 0 is the reviewer's case: realigning the first stretch moved gaps to the front.
+    rng = random.Random(7)
+    a = "".join(rng.choice("ACGT") for _ in range(2100)) if seed == 0 else clean_dna(1500, 800 + seed)
+    b = _substitute(a, 0.15, 31) if seed == 0 else _substitute(a, 0.12 + 0.005 * seed, 900 + seed)
+    for x, y in ((a, b), (b, a)):
+        _, out = _two(x, y, circular=False)
+        assert out["start"] is not None and out["unrelated"] == []
+        assert out["counts"]["mismatches"] > 100
+
+
+@pytest.mark.parametrize("side", ["5'", "3'"])
+def test_a_short_barcode_tail_is_not_compared_rather_than_listed(side):
+    barcode = clean_dna(10, 95)
+    amplicon = barcode + BASE[1000:1800] if side == "5'" else BASE[1000:1800] + barcode
+    _, out = _two(amplicon, BASE, circular=False)
+    assert out["differences"] == []
+    [tail] = out["unrelated"]
+    assert tail["a_bases"] == 10

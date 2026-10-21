@@ -106,7 +106,7 @@ END_X_DROP = 15.0
 #: Identical columns a segment edge next to an unrelated stretch must end in.
 EDGE_RUN = 5
 #: An end is named unrelated only if at least this long and less than this identical.
-END_MIN, END_IDENTITY = 30, 0.5
+END_MIN, END_IDENTITY = 10, 0.5
 #: Largest stretch (cells of the dynamic programming matrix) realigned as a pair.
 PAIR_MAX_CELLS = 4_000_000
 PROFILE_MAX = 3_000          # columns; longer stretches between anchors use the summaries
@@ -899,14 +899,18 @@ def _unrelated_end(columns: list[tuple[str, str, int | None]]) -> bool:
     return sum(map(_identical, columns)) < END_IDENTITY * len(columns)
 
 
-def _realign_pairwise(columns: list[tuple[str, str, int | None]]
+def _realign_pairwise(columns: list[tuple[str, str, int | None]], free_ends: bool
                       ) -> list[tuple[str, str, int | None]]:
     """The two rows aligned to each other again between their runs of ANCHOR_WORD identical
     columns. Two rows of a multiple alignment carry the gaps the other members needed: two
     identical sequences can face each other as ``AGA-GAC`` / ``AGAG-AC`` around a third
     one's deletion, an insertion and a deletion that are not there. Each stretch between
-    identical runs is aligned anew as a pair (blastn scores), so the differences are those
-    of the two sequences alone. Stretches too large to realign (PAIR_MAX_CELLS), or that do
+    identical runs is aligned anew as a pair (blastn scores, as the rest of the comparison),
+    so the differences are those of the two sequences alone. Between divergent sequences
+    the list can therefore group differences unlike the stacked view, which was built for
+    all of them (a gap there may be a mismatch here).
+    End gaps are free at the ends of two linear sequences (``free_ends``), never across the
+    join of two circles. Stretches too large to realign (PAIR_MAX_CELLS), or that do
     do not come out as alike (unrelated inserts), are kept as they are."""
     k = ANCHOR_WORD
     anchored = [False] * len(columns)
@@ -933,9 +937,9 @@ def _realign_pairwise(columns: list[tuple[str, str, int | None]]
                 and len(a) * len(b) <= PAIR_MAX_CELLS):
             # Free end gaps only where the stretch is an end of the comparison.
             aligner = Align.PairwiseAligner(scoring="blastn")
-            if i == 0:
+            if free_ends and i == 0:
                 aligner.left_gap_score = 0.0
-            if j == len(columns):
+            if free_ends and j == len(columns):
                 aligner.right_gap_score = 0.0
             pairs = _columns_of(aligner.align("".join(x for x, _ in a), b)[0].coordinates)
             redone = [(a[p][0] if p is not None else "-", b[q] if q is not None else "-",
@@ -1068,7 +1072,12 @@ def compare(a: dict[str, Any], b: dict[str, Any]) -> dict[str, Any]:
         # Columns where only one of the two has begun or still goes on (a fragment's ends,
         # an overhang) are not compared, as in the star alignment.
         columns = columns[both[0]:both[-1] + 1]
-    columns = _realign_pairwise(columns)
+    columns = _realign_pairwise(columns, not (a.get("circular") and b.get("circular")))
+    # Free end gaps can leave a few bases of one sequence before the other begins: those
+    # are an overhang, not compared, as above.
+    both = [k for k, (x, y, _) in enumerate(columns) if x != "-" and y != "-"]
+    if both:
+        columns = columns[both[0]:both[-1] + 1]
     scores = _column_scores(columns)
     segments = [list(seg) for seg in homologous_segments(scores)]
     if not segments:
