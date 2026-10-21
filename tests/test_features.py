@@ -635,8 +635,15 @@ def test_a_label_naming_the_other_species_is_flagged(element, label, wrong):
 # S5.4 asks that detection stay under two seconds for a 15 kb plasmid with the grown
 # catalogue. The cost is not in the catalogue's size — a feature absent from the sequence is
 # ruled out by an exact seed search and costs almost nothing — but in the elements that *are*
-# there, each of which is aligned where its seeds land. The worst case is therefore a plasmid
-# packed with catalogue elements, which is what these tests build.
+# there, each of which is aligned where its seeds land.
+#
+# A plasmid packed with elements copied exactly from the catalogue is therefore NOT the worst
+# case, and measuring only that one flatters the engine: an exact copy is taken as it stands
+# and costs no alignment at all. Promoters and ITRs differ between vectors by a few bases (the
+# reason this module aligns rather than searching), so the real worst case is a plasmid packed
+# with elements that are *nearly* the catalogue's. One changed base per element is enough to
+# double the work, and that plasmid is still annotated with the same 15 elements at 99.2–100 %
+# identity — the user cannot tell the two apart, so the tests must not either.
 
 DETECTION_BUDGET = 2.0
 
@@ -660,13 +667,41 @@ def _packed_plasmid(budget: int = 15_000) -> str:
     return ("".join(pieces) + clean_dna(budget, 11))[:budget]
 
 
+def _near_miss_plasmid(budget: int = 15_000) -> str:
+    """``_packed_plasmid`` with one base changed per element, away from every seed.
+
+    This is the realistic worst case. The change is placed where no seed covers it, so all six
+    seeds of each element still hit and the element is still found — at 99.2–100 % identity,
+    annotated exactly as the verbatim plasmid is — but no element is exact any more, so every
+    one of them is aligned in full.
+    """
+    parts = {f.name: f.sequence for f in catalogue()}
+    pieces = []
+    for name in PACKED_ELEMENTS:
+        sequence = parts[name]
+        seeded = {index for start, _ in features_module._seeds(sequence)
+                  for index in range(start, start + features_module.SEED)}
+        free = [index for index in range(len(sequence)) if index not in seeded]
+        if free:                       # the short exact sites are seed all the way through
+            at = free[len(free) // 2]
+            other = "A" if sequence[at] != "A" else "C"
+            sequence = sequence[:at] + other + sequence[at + 1:]
+        pieces.append(sequence)
+    return ("".join(pieces) + clean_dna(budget, 11))[:budget]
+
+
 #: The budget in the work itself: cells of dynamic programming, summed over every alignment
-#: pass. The packed plasmid below needs 39.4 M in 38 passes; before the verbatim shortcut and
-#: the skip of the circular copy it needed 165.6 M in 102. Cells rather than passes because a
-#: pass is not a fixed cost — it is the window's length times the query's — so a count of
-#: passes can stay flat while the work behind it grows. The bound sits between the two, with
-#: room for the catalogue to grow before it needs revisiting.
-MAX_ALIGNMENT_CELLS = 80_000_000
+#: pass. Cells rather than passes because a pass is not a fixed cost — it is the window's
+#: length times the query's — so a count of passes can stay flat while the work behind it
+#: grows. Today's figures, for the two plasmids above:
+#:
+#:   verbatim    39.4 M in 38 passes   (165.6 M in 102 before this engine's shortcuts)
+#:   near-miss   81.3 M in 48 passes   (165.6 M in 102 — the shortcuts cannot help it)
+#:
+#: The bounds are tight on purpose: at 80 M the verbatim bound would still pass with the
+#: circular-copy skip taken out altogether, which makes it no guard at all.
+MAX_ALIGNMENT_CELLS = 50_000_000
+MAX_ALIGNMENT_CELLS_NEAR_MISS = 95_000_000
 
 
 def _alignment_work(sequence: str, circular: bool = True, features=None) -> tuple[int, int]:
@@ -694,9 +729,34 @@ def test_detection_of_a_15kb_plasmid_stays_inside_its_alignment_budget():
     assert cells <= MAX_ALIGNMENT_CELLS, f"{cells / 1e6:.1f} M cells of alignment"
 
 
+def test_a_plasmid_of_near_miss_elements_is_the_case_still_over_the_budget():
+    """The realistic worst case, recorded rather than left out.
+
+    One changed base per element doubles the alignment work, because no element can be taken
+    as it stands any more. S5.4's two seconds are **not** met here: this plasmid takes about
+    2.3 s where the verbatim one takes 1.2 s, against 4.7 s before this engine's shortcuts. So
+    the criterion is met for a construct assembled from catalogue parts and missed for one
+    carrying a vector's own variants, and closing that gap means changing how an element's
+    alignment is chosen, not tuning a constant.
+
+    The bound below is the work as it stands, so that the gap cannot widen unnoticed while it
+    is open, and so that whoever closes it sees this number move.
+    """
+    sequence = _near_miss_plasmid()
+    matches = detect(sequence, circular=True)
+    assert len(matches) == len(detect(_packed_plasmid(), circular=True)), (
+        "the near-miss plasmid must be annotated like the verbatim one, or it is measuring "
+        "something else"
+    )
+    assert all(match.identity >= 99.0 for match in matches)
+    _, cells = _alignment_work(sequence)
+    assert cells <= MAX_ALIGNMENT_CELLS_NEAR_MISS, f"{cells / 1e6:.1f} M cells of alignment"
+
+
 def test_detection_of_a_15kb_plasmid_stays_within_its_time_budget():
-    """S5.4's budget as it is written. The test above is what fails on a real regression; this
-    one states the criterion and catches a cost that is not alignment."""
+    """S5.4's budget as it is written, on a plasmid assembled from catalogue parts. The test
+    above records the case that is still over it. The cells tests are what fail on a
+    regression; this one catches a cost that is not alignment."""
     sequence = _packed_plasmid()
     detect(sequence, circular=True)          # warm the catalogue and the aligner
     start = time.perf_counter()
