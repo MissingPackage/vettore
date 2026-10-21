@@ -2,6 +2,13 @@
 
 The download links in the README always point to the latest release.
 
+## Unreleased — several Sanger reads, one verdict
+
+- In Tools → Align to Reference DNA Sequence…, two or more reads of a clone give one consensus over the expected plasmid: at each base the read with the best call wins, and every position where the reads disagree is listed with each read's call and quality.
+- A coverage strip and one sentence say which stretches are read on both strands, on one strand only, or not at all, in plasmid numbering.
+- The verdict is given on the consensus: a difference is confirmed when two reads show it, or one read at Q30 or better; otherwise it says to check the trace.
+- Save Consensus opens the consensus as a new document, with the plasmid's features, the covered stretch annotated "Sanger verified (n reads)" and the confirmed differences annotated.
+
 ## Unreleased — a lighter, clearer frame
 
 - The frame is lighter: toolbar tools that are on are white keys with a thin blue outline instead of solid squares, document tabs lose their folder borders, and the view tabs (Map, Sequence, Enzymes…) are one segmented control whose white marker slides to the open view. Nothing moved: menus, tabs, panes and shortcuts are where they were.

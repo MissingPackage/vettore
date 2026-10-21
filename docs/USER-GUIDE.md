@@ -468,6 +468,17 @@ A sentence above the table answers "is my clone right?". Either the reads match 
 
 Next to each difference is the read quality at that base. Hover it to see the chance that the base call is wrong. Differences on low-quality bases (under Q20) are flagged: check those peaks in the chromatogram before trusting them. Long lists show the first few differences, and **show all** opens the rest. Insertions and deletions are grouped into one event each. Reads that cross the origin of a circular plasmid are handled and marked. If no read can be aligned, the dialog explains why and what to try (gentler trimming, or the right plasmid tab).
 
+### Several reads of one clone: the contig
+
+With two or more reads, the verdict is given on their **consensus**, and a **Contig** section appears under the table:
+
+- **Coverage.** A sentence and a strip under it say which stretches of the plasmid are read on both strands, on one strand only, or by no read at all, in plasmid numbering ("223–861 covered on both strands; 862–903 on one strand only; no read over 1–222 and 904–1,125").
+- **The consensus.** At each position the base comes from the read with the highest-quality call there. An `N` is no call and never wins. Where the reads disagree, the position is listed with every read's call and quality, so you can open those peaks.
+- **Differences, with a verdict.** A difference from the plasmid is **confirmed** when two reads show it, or when one read shows it at Q30 or better (1 wrong call in 1,000). Otherwise it says **check the trace**.
+- **Save consensus** opens the consensus as a new document: the plasmid's features (moved over any insertion or deletion), the covered stretch annotated "Sanger verified (n reads)", and each confirmed difference annotated where it is. Where no read reaches, the consensus keeps the plasmid's own sequence.
+
+Reads that do not come from this plasmid are listed apart, above the table, and never enter the consensus. The contig needs the expected plasmid: reads are not assembled without a reference.
+
 ## Simulating a gel (Tools → Simulate Agarose Gel…)
 
 Add one lane per file, choose the enzymes for each lane (leave them empty to load the uncut

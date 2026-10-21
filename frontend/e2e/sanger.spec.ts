@@ -79,11 +79,41 @@ test("a mutation seen by two reads is counted once", async ({ page }) => {
     { name: "read_F.ab1", mimeType: "application/octet-stream", buffer: trace },
     { name: "read_R.ab1", mimeType: "application/octet-stream", buffer: trace },
   ]);
+  // The verdict comes from the consensus of both reads: one difference, confirmed by two reads.
   const verdict = page.getByTestId("sanger-verdict");
-  await expect(verdict).toContainText("1 difference across 2 reads", { timeout: 30_000 });
-  await expect(verdict).toContainText("Both reads covering it show it.");
+  await expect(verdict).toContainText("1 difference between the consensus of 2 reads and pMutant", { timeout: 30_000 });
+  await expect(verdict).toContainText("It is confirmed");
   // The per-read table still lists the difference under each read.
   const differences = page.getByTestId("sanger-differences");
   await expect(differences).toHaveCount(2);
   await expect(differences.nth(1)).toContainText(`${index + 1}: ${replacement} → ${reference[index]}`);
+});
+
+test("two reads give one consensus that opens as a new document", async ({ page }) => {
+  const reference = referenceAroundTheRead();
+  const index = 4 * 74 + 200;
+  const replacement = reference[index] === "A" ? "G" : "A";
+  await newSequence(page, "pMutant", reference.slice(0, index) + replacement + reference.slice(index + 1));
+
+  await menu(page, "Tools", "Align to Reference DNA Sequence…");
+  const trace = fs.readFileSync(path.join(DATA, "3730.ab1"));
+  await page.getByTestId("sanger-files").setInputFiles([
+    { name: "read_1.ab1", mimeType: "application/octet-stream", buffer: trace },
+    { name: "read_2.ab1", mimeType: "application/octet-stream", buffer: trace },
+  ]);
+  const contig = page.getByTestId("sanger-contig");
+  await expect(contig).toBeVisible({ timeout: 30_000 });
+  // Both reads are the same forward trace: the covered stretch is read on one strand only.
+  await expect(page.getByTestId("sanger-coverage")).toContainText("covered on one strand only");
+  await expect(page.getByTestId("sanger-coverage")).toContainText("no read over 1–");
+  await expect(page.getByTestId("sanger-coverage-strip")).toBeVisible();
+  const differences = page.getByTestId("sanger-contig-differences");
+  await expect(differences).toContainText(`${(index + 1).toLocaleString("en-US")}: ${replacement} → ${reference[index]}`);
+  await expect(differences).toContainText("seen in 2 reads");
+  await expect(differences).toContainText("confirmed");
+  await page.screenshot({ path: "test-results/sanger-contig.png" });
+
+  await page.getByTestId("sanger-save-consensus").click();
+  await page.getByRole("button", { name: "Close" }).last().click();
+  await expect(page.locator(".vt-doctab.active")).toContainText("pMutant consensus");
 });

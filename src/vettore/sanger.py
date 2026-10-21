@@ -21,6 +21,8 @@ from typing import Any
 from Bio import Align, SeqIO
 from Bio.Seq import Seq
 
+from . import contig
+
 #: Mott's algorithm: a base scores ``cutoff - 10**(-Q/10)``; the best-scoring run is kept.
 DEFAULT_CUTOFF = 0.05          # ≈ Q13, Biopython's own default
 MIN_SEGMENT = 20
@@ -369,8 +371,11 @@ def merge_gapped(reference: str,
 
 
 def alignment_payload(reference_name: str, reference: str, circular: bool,
-                      reads: list[tuple[str, bytes]], cutoff: float = DEFAULT_CUTOFF) -> dict:
-    """Everything the UI needs: one stacked alignment plus a per-read summary."""
+                      reads: list[tuple[str, bytes]], cutoff: float = DEFAULT_CUTOFF,
+                      document: dict[str, Any] | None = None) -> dict:
+    """Everything the UI needs: one stacked alignment, a per-read summary and the contig of
+    the reads that aligned (``contig.contig_payload``; ``document`` is the reference's
+    ``sequenceData``, from which the consensus document is made)."""
     aligned_reads: list[AlignedRead] = []
     summaries: list[dict[str, Any]] = []
     warnings: list[str] = []
@@ -436,4 +441,6 @@ def alignment_payload(reference_name: str, reference: str, circular: bool,
         "reference": {"name": reference_name, "length": length, "circular": circular},
         "coverage_percent": round(100.0 * len(covered) / max(1, length), 1),
         "first_covered": first_covered,
+        "contig": (contig.contig_payload(reference, circular, aligned_reads, document)
+                   if aligned_reads else None),
     }
