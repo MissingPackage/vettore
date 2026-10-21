@@ -25,6 +25,8 @@ interface Detected {
   catalogueLength?: number;
   catalogueFrom?: number;
   catalogueTo?: number;
+  /** A coding sequence whose indels break its reading frame. */
+  frameshift?: boolean;
   isNew: boolean;
   /** The existing feature that already covers this match, under whatever name. */
   annotatedAs?: string | null;
@@ -99,8 +101,9 @@ export default function DetectFeaturesDialog(props: { doc: OpenDoc; onClose: () 
       .detectFeatures<DetectResult>({ sequenceData: data, min_identity: minIdentity })
       .then((payload) => {
         setResult(payload);
-        // Everything not annotated yet is ticked: one click adds the useful result.
-        setChosen(new Set(payload.features.filter((f) => f.isNew).map(key)));
+        // Everything not annotated yet is ticked: one click adds the useful result. A coding
+        // sequence with a broken reading frame is shown but left for the user to decide.
+        setChosen(new Set(payload.features.filter((f) => f.isNew && !f.frameshift).map(key)));
       })
       .catch((e) => setError(String((e as Error).message)))
       .finally(() => setBusy(false));
@@ -136,7 +139,8 @@ export default function DetectFeaturesDialog(props: { doc: OpenDoc; onClose: () 
       notes: {
         note: [f.note || f.name],
         detected_from: [
-          `${f.source} (${f.identity.toFixed(1)}% identity${partText(f) ? ` over ${partText(f)}` : ""})`,
+          `${f.source} (${f.identity.toFixed(1)}% identity${partText(f) ? ` over ${partText(f)}` : ""})`
+            + (f.frameshift ? "; the reading frame is broken (frameshift)" : ""),
         ],
       },
     }));
@@ -232,7 +236,7 @@ export default function DetectFeaturesDialog(props: { doc: OpenDoc; onClose: () 
                 {result.features.map((f) => (
                   <tr
                     key={key(f)}
-                    className={f.labelWarning ? "vt-detect-doubt" : f.isNew ? "" : "vt-muted"}
+                    className={f.labelWarning || f.frameshift ? "vt-detect-doubt" : f.isNew ? "" : "vt-muted"}
                     data-testid="detect-row"
                   >
                     <td>
@@ -242,6 +246,12 @@ export default function DetectFeaturesDialog(props: { doc: OpenDoc; onClose: () 
                     <td>
                       <span className="vt-swatch" style={{ background: COLOR[f.type] ?? COLOR.misc_feature }} />
                       {f.name}
+                      {f.frameshift && (
+                        <span className="vt-warn vt-detect-doubt-text" data-testid="detect-frameshift">
+                          Frameshift: an insertion or deletion inside breaks the reading frame, so
+                          the protein differs after it. Check the sequence before adding it.
+                        </span>
+                      )}
                       {f.labelWarning ? (
                         <span className="vt-warn vt-detect-doubt-text" data-testid="detect-label-warning">
                           {f.labelWarning}

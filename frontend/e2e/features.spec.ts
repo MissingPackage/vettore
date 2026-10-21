@@ -164,8 +164,9 @@ test.describe("on a 1366 × 768 screen", () => {
 });
 
 test("a match that covers part of its catalogue entry says which bases", async ({ page }) => {
-  // mCherry in pT-PGK-mCherry differs from the catalogue at its first and last codons: the
-  // row shows the 705 bp that match, at 100 %, and that they are bases 4–708 of the entry.
+  // mCherry in pT-PGK-mCherry has GTC for the catalogue's ATG and stops with TAG, not TAA:
+  // the row shows the 708 bp from the second codon to the stop, and that they are bases
+  // 4–711 of the entry.
   const fasta = fs.readFileSync(data("features-MT891341.1.fasta"), "utf-8");
   const bases = fasta.split("\n").filter((line) => !line.startsWith(">")).join("").toUpperCase();
   await page.goto(`/?token=${TOKEN}`);
@@ -173,7 +174,27 @@ test("a match that covers part of its catalogue entry says which bases", async (
   await menu(page, "Features", "Detect Common Features…");
   const row = page.getByTestId("detect-row").filter({ hasText: "mCherry" });
   await expect(row).toBeVisible({ timeout: 30_000 });
-  await expect(row).toContainText("705 bp");
-  await expect(row.getByTestId("detect-part")).toHaveText("· bases 4–708 of 711");
-  await expect(row).toContainText("100.0 %");
+  await expect(row).toContainText("708 bp");
+  await expect(row.getByTestId("detect-part")).toHaveText("· bases 4–711 of 711");
+  await expect(row).toContainText("99.8 %");
+});
+
+test("a coding sequence with a broken reading frame is flagged and not ticked", async ({ page }) => {
+  const catalogue = JSON.parse(fs.readFileSync(
+    path.resolve(import.meta.dirname, "../../src/vettore/data/common_features.json"), "utf-8"));
+  const egfp: string = catalogue.features.find((f: { name: string }) => f.name === "EGFP").sequence;
+  // Filler that matches nothing in the catalogue, the same on every run.
+  let state = 7;
+  const filler = Array.from({ length: 400 }, () => {
+    state = (state * 1103515245 + 12345) % 2 ** 31;
+    return "ACGT"[state % 4];
+  }).join("");
+  // One base missing in the middle of EGFP: still a 99.9 % match, but not EGFP after it.
+  await page.goto(`/?token=${TOKEN}`);
+  await newPlasmid(page, "EGFP-frameshift", filler + egfp.slice(0, 360) + egfp.slice(361) + filler);
+  await menu(page, "Features", "Detect Common Features…");
+  const row = page.getByTestId("detect-row").filter({ hasText: "EGFP" });
+  await expect(row).toBeVisible({ timeout: 30_000 });
+  await expect(row.getByTestId("detect-frameshift")).toContainText("breaks the reading frame");
+  await expect(row.getByRole("checkbox")).not.toBeChecked();
 });

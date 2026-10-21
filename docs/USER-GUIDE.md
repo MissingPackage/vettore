@@ -411,10 +411,15 @@ Every entry in the catalogue is a real subsequence of a public GenBank record. T
 which record it came from and the percent identity of the match, so you can judge a hit
 yourself. The identity is over exactly the bases that are annotated, and no row is ever below
 the minimum identity you chose. Only the part of the element that is really there is
-annotated: the cloning sites around it are not counted as part of it, and a coding sequence is
-cut to whole codons of its own frame. When that is less than the whole catalogue entry, the
-Size column says which part, for example "705 bp · bases 4–708 of 711" for an mCherry whose
-first and last codons differ, and the feature's notes say the same.
+annotated: the cloning sites around it are not counted as part of it. A coding sequence is
+annotated in whole codons of its own frame, from the vector's own start codon to its own stop
+codon when they sit in frame next to the match: a TAG where the catalogue has TAA is still the
+stop, and an ATG followed by a codon put in for an NcoI site (ATG GGG ATT…) is still the start.
+When the match is less than the whole catalogue entry, the Size column says which part, for
+example "708 bp · bases 4–711 of 711" for an mCherry whose first codon is not ATG, and the
+feature's notes say the same. A coding sequence with an insertion or deletion that breaks its
+reading frame is marked "Frameshift" and left unticked: the match can be over 99 % while the
+protein is different after the break.
 
 Tick the ones you want and they are added to the map, coloured by type, with their provenance
 kept in the feature's notes.
