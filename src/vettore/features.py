@@ -90,25 +90,6 @@ def _candidate_offsets(target: str, feature: str) -> set[int]:
     return offsets
 
 
-def _loci(offsets: set[int], margin: int) -> list[tuple[int, int]]:
-    """``offsets`` grouped into the (first, last) of each locus to align.
-
-    Several seeds of one feature usually land on one copy of it, each giving a slightly
-    different guess at where it starts. Aligning every guess separately costs a full dynamic
-    programming pass each and ends in the same match, which ``_dedupe`` then drops. Guesses
-    less than a margin apart cannot be two copies of the feature — two copies are at least a
-    feature length apart — so they are one locus, aligned once in a window wide enough to hold
-    whichever guess is right.
-    """
-    loci: list[tuple[int, int]] = []
-    for offset in sorted(offsets):
-        if loci and offset - loci[-1][1] < margin:
-            loci[-1] = (loci[-1][0], offset)
-        else:
-            loci.append((offset, offset))
-    return loci
-
-
 @dataclass
 class Match:
     name: str
@@ -137,23 +118,23 @@ def _match_long(target: str, query: str, length: int,
     results: list[tuple[int, int, float]] = []
     aligner = _aligner()
     margin = max(30, len(query) // 10)
-    for first, last in _loci(_candidate_offsets(target, query), margin):
-        window_start = max(0, first - margin)
-        # A window that opens at or after the end of the sequence itself only ever matches in
-        # the copy a circular search appends, where every hit is a duplicate of one in the
-        # sequence and is dropped below. Aligning it would be wasted work.
-        if window_start >= length:
+    for offset in sorted(_candidate_offsets(target, query)):
+        # A guess at or past the end of the sequence itself can only be the copy a circular
+        # search appends, and the same seed hit also appears in the sequence a length earlier,
+        # so that copy is found there instead. Aligning this one would be wasted work.
+        if offset >= length:
             continue
-        window = target[window_start : last + len(query) + margin]
+        # An element present verbatim is the best local alignment of itself under this
+        # scoring, in full and at no offset, so it needs no alignment: most catalogue elements
+        # sit in a vector unchanged, and this is what keeps detection quick on a plasmid full
+        # of them. Every guess is tested, because a repeated element (a 6×HA tag is two 3×HA
+        # in a row) gives one guess per copy and per register.
+        if 100.0 >= min_identity and target[offset : offset + len(query)] == query:
+            results.append((offset, offset + len(query) - 1, 100.0))
+            continue
+        window_start = max(0, offset - margin)
+        window = target[window_start : offset + len(query) + margin]
         if len(window) < SEED:
-            continue
-        # An element that is present verbatim is the best local alignment of itself, so it
-        # needs no alignment: most catalogue elements sit in a vector unchanged, and this is
-        # what keeps detection quick on a plasmid full of them.
-        exact = {offset for offset in (first, last)
-                 if target[offset : offset + len(query)] == query}
-        if exact:
-            results.extend((offset, offset + len(query) - 1, 100.0) for offset in exact)
             continue
         alignments = aligner.align(window, query)
         if not len(alignments):
