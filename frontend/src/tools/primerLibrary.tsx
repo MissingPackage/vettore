@@ -22,6 +22,7 @@ import {
   type BoundPrimer,
   type LibraryFile,
   type LibraryPrimer,
+  heldText,
   rejectedText,
   saveChanges,
   today as todayDate,
@@ -33,6 +34,7 @@ import "./primerLibrary.css";
 const { Dialog, Callout } = Blueprint as unknown as Record<string, React.ComponentType<any>>;
 
 const EMPTY: LibraryFile = { path: "", exists: false, mtime: null, delimiter: ";", primers: [], rejected: [] };
+const HELD_TIP = "This row of the file runs over several lines and may hold other rows: change it in Excel.";
 type Notice = { intent: "success" | "warning" | "danger"; text: string } | null;
 
 function PrimerLibraryDialog(props: ToolProps) {
@@ -60,9 +62,11 @@ function PrimerLibraryDialog(props: ToolProps) {
       setFile(got);
       setPrimers(got.primers);
       setDirty(false);
-      if (got.rejected.length) {
-        setNotice({ intent: "warning", text: rejectedText(got.rejected, "file") });
-      }
+      const warnings = [
+        got.rejected.length ? rejectedText(got.rejected, "file") : "",
+        got.held?.length ? heldText(got.held) : "",
+      ].filter(Boolean);
+      if (warnings.length) setNotice({ intent: "warning", text: warnings.join(" ") });
     } catch (e) {
       setError(messageOf(e));
     } finally {
@@ -123,6 +127,7 @@ function PrimerLibraryDialog(props: ToolProps) {
       const extra = [
         saved.skipped && `${plural(saved.skipped, "primer you added was", "primers you added were")} already in the file (someone added the same oligo meanwhile): the file's entry is kept.`,
         saved.gone && `${plural(saved.gone, "change was", "changes were")} not saved: someone had changed or removed that row of the file meanwhile.`,
+        saved.held && `${plural(saved.held, "change was", "changes were")} not saved: that row runs over several lines and may hold other rows, so Vettore leaves it as it is.`,
         theirs && `${plural(theirs, "primer", "primers")} someone else added meanwhile ${theirs === 1 ? "is" : "are"} now listed.`,
         dropped > 0 && `${plural(dropped, "primer", "primers")} someone else removed meanwhile ${dropped === 1 ? "is" : "are"} no longer listed.`,
       ].filter(Boolean).join(" ");
@@ -341,12 +346,13 @@ function PrimerLibraryDialog(props: ToolProps) {
                         its line breaks when it is edited here. */}
                     <textarea className="bp3-input bp3-small vt-pl-edit" aria-label={`Notes for ${p.name}`}
                               rows={Math.min(3, p.notes.split("\n").length)}
-                              value={p.notes} disabled={busy} onChange={(e) => editField(p, "notes", e.target.value)} />
+                              value={p.notes} disabled={busy || p.held} title={p.held ? HELD_TIP : undefined} onChange={(e) => editField(p, "notes", e.target.value)} />
                   </td>
                   <td>
                     <textarea className="bp3-input bp3-small vt-pl-edit" aria-label={`Location of ${p.name}`}
                               rows={Math.min(3, p.location.split("\n").length)}
-                              placeholder="box 3 A4" value={p.location} disabled={busy}
+                              placeholder="box 3 A4" value={p.location} disabled={busy || p.held}
+                              title={p.held ? HELD_TIP : undefined}
                               onChange={(e) => editField(p, "location", e.target.value)} />
                   </td>
                   <td className="vt-muted">{p.added || "—"}</td>
@@ -354,7 +360,7 @@ function PrimerLibraryDialog(props: ToolProps) {
                     <Button small minimal icon="duplicate" aria-label={`Copy ${p.name}`}
                             data-testid="pl-copy" onClick={() => copyOne(p)} />
                     <Button small minimal icon="trash" aria-label={`Remove ${p.name}`}
-                            data-testid="pl-remove" disabled={busy} onClick={() => remove(p)} />
+                            data-testid="pl-remove" disabled={busy || p.held} onClick={() => remove(p)} />
                   </td>
                 </tr>
               ))}

@@ -254,6 +254,10 @@ class _Row:
     seq: str | None = None
     #: The row's name, notes, location and date, as read.
     fields: dict[str, str] = field(default_factory=dict)
+    #: Its first line in the file.
+    line: int = 0
+    #: It may hold other rows (see ``_mark_doubtful_rows``): read, never changed by a save.
+    held: bool = False
 
 
 @dataclass
@@ -269,6 +273,8 @@ class LibraryText:
     rows: list[_Row] = field(default_factory=list)
     primers: list[Primer] = field(default_factory=list)
     rejected: list[dict[str, Any]] = field(default_factory=list)
+    #: Rows that may hold other rows, so a save leaves them as they are: name, sequence, line.
+    held: list[dict[str, Any]] = field(default_factory=list)
 
 
 def _lines(text: str) -> list[str]:
@@ -321,7 +327,7 @@ def parse_text(text: str) -> LibraryText:
         raise PrimerLibraryError(
             f"the row starting on line {line + len(preamble)} could not be read as spreadsheet "
             f"columns ({exc}).") from exc
-    _refuse_swallowed_rows(rows, delimiter, len(preamble) + 1)
+    _mark_doubtful_rows(rows, delimiter, len(preamble) + 1)
 
     found = None
     for pos, row in enumerate(rows):
@@ -353,6 +359,8 @@ def parse_text(text: str) -> LibraryText:
             continue
         name = _cell(row.cells, lib.index, "name")
         raw_seq = _cell(row.cells, lib.index, "sequence")
+        if row.held:
+            lib.held.append({"name": name, "sequence": raw_seq, "line": row.line})
         row.fields = {k: _cell(row.cells, lib.index, k) for k in EDITABLE}
         row.fields["name"] = row.fields["name"] or "(unnamed)"
         try:
@@ -373,29 +381,28 @@ def parse_text(text: str) -> LibraryText:
     return lib
 
 
-def _refuse_swallowed_rows(rows: list[_Row], delimiter: str, first_line: int) -> None:
-    """Refuse text where a quote typed by hand makes the rows below it part of one cell (a save
-    would then rewrite that cell and lose them). A note written on several lines in Excel
-    (Alt+Enter) is fine, commas and semicolons in it included: what gives a swallowed row away
-    is a later line of the cell that is a whole row by itself (as many cells as the file's
-    rows), a row with more cells than the others, or a quote left open to the end."""
+def _mark_doubtful_rows(rows: list[_Row], delimiter: str, first_line: int) -> None:
+    """Mark the rows Vettore must not change because they may hold other rows. A quote typed by
+    hand (one never closed, a ditto mark) makes the rows below it part of one cell, and a save
+    that rewrote or removed that cell would lose them. A cell running over several lines whose
+    later lines hold the separator or a quote, or a row longer than the others, may be such a
+    cell, or may be a note written on several lines in Excel: both are read, and neither is
+    changed (``held``). A quote left open to the end of the file is refused, since a primer
+    added after it would vanish into it."""
     widths = [len(r.cells) for r in rows if len(_lines(r.raw)) == 1 and any(c.strip() for c in r.cells)]
     usual = max(set(widths), key=widths.count) if widths else None
     line = first_line
     for row in rows:
+        row.line = line
         lines = len(_lines(row.raw))
         if lines > 1:
-            width = max(2, usual or len(row.cells))   # a paste of one row: its own width
-            unclosed = row is rows[-1] and row.raw.count('"') % 2 == 1
-            looks_like_rows = any(len(_split(part, delimiter)) >= width
-                                  for cell in row.cells
-                                  for part in re.split(r"\r\n|\r|\n", cell)[1:])
-            if unclosed or looks_like_rows or len(row.cells) > width:
+            if row is rows[-1] and row.raw.count('"') % 2 == 1:
                 raise PrimerLibraryError(
-                    f"around line {line} a cell runs over several lines and takes in what look "
-                    "like whole rows of the library. This is usually a quote (\") typed by hand "
-                    "that is never closed, or closed on a later row. Open the file in a text "
-                    f"editor and check the quotes from line {line} on.")
+                    f"a quote (\") on line {line} is never closed, so everything below it reads "
+                    "as one cell. Open the file in a text editor and close or remove that quote.")
+            later = [part for cell in row.cells for part in re.split(r"\r\n|\r|\n", cell)[1:]]
+            row.held = (any(delimiter in part or '"' in part for part in later)
+                        or (usual is not None and len(row.cells) > usual))
         line += lines
 
 
@@ -484,8 +491,9 @@ def merged_text(current: LibraryText | None, added: list[Primer],
 
     Returns the text and counts: ``added``, ``changed`` and ``removed`` rows; ``skipped``,
     added primers whose oligo the file already had; ``gone``, edits and removals not applied
-    because their row was no longer in the file (or could not be told apart); ``kept``,
-    unreadable rows kept as they are.
+    because their row was no longer in the file (or could not be told apart); ``held``, changes
+    not applied because their row may hold other rows; ``kept``, unreadable rows kept as they
+    are.
     """
     edits, removed = edits or [], removed or []
     lib = current or LibraryText(delimiter=";")
@@ -495,7 +503,7 @@ def merged_text(current: LibraryText | None, added: list[Primer],
     if current is None or (header is None and not any(r.cells for r in lib.rows)):
         header = list(COLUMNS)
         index = {name: pos for pos, name in enumerate(COLUMNS)}
-    counts = {"added": 0, "changed": 0, "removed": 0, "skipped": 0, "gone": 0,
+    counts = {"added": 0, "changed": 0, "removed": 0, "skipped": 0, "gone": 0, "held": 0,
               "kept": len(lib.rejected)}
 
     taken: set[int] = set()
@@ -503,13 +511,17 @@ def merged_text(current: LibraryText | None, added: list[Primer],
     for change in removed:
         if (i := _find_row(lib.rows, change, taken, removal=True)) is None:
             counts["gone"] += 1
+        elif lib.rows[i].held:
+            counts["held"] += 1
         else:
             taken.add(i)
             drop.add(i)
     edit_at: dict[int, dict[str, str]] = {}
     for change in edits:
         values = {k: (v or "").strip() for k, v in change.values.items() if k in EDITABLE}
-        if (i := _find_row(lib.rows, change, taken, removal=False)) is not None:
+        if (i := _find_row(lib.rows, change, taken, removal=False)) is not None and lib.rows[i].held:
+            counts["held"] += 1
+        elif i is not None:
             taken.add(i)
             if change.readd:              # still there: keep its date and what others wrote
                 values = {k: v for k, v in values.items() if v and k != "added"}
@@ -627,12 +639,17 @@ def _read_file() -> tuple[LibraryText | None, float | None, str]:
         raise PrimerLibraryError(
             f"“{path.name}” cannot be used as the primer library: {exc} It is left as it is."
         ) from exc
-    if lib.header is None and not lib.primers and any(r.cells for r in lib.rows):
+    if not _is_library(lib):
         raise PrimerLibraryError(
             f"“{path.name}” is not a primer library: no row has a name and a DNA sequence, and "
             "there is no header naming those columns. Choose another file; this one is left "
             "as it is.")
     return lib, mtime, encoding
+
+
+def _is_library(lib: LibraryText) -> bool:
+    """A primer list: a header naming its columns, a primer Vettore can read, or nothing yet."""
+    return lib.header is not None or bool(lib.primers) or not any(r.cells for r in lib.rows)
 
 
 def check_library_path(raw: str) -> None:
@@ -650,9 +667,18 @@ def read_library() -> dict[str, Any]:
     lib, mtime, _ = _read_file()
     if lib is None:
         return {"path": str(path), "exists": False, "mtime": None, "delimiter": ";",
-                "primers": [], "rejected": []}
+                "primers": [], "rejected": [], "held": []}
+    held = {cleaned for r in lib.held if (cleaned := _clean_or_none(r["sequence"]))}
     return {"path": str(path), "exists": True, "mtime": mtime, "delimiter": lib.delimiter,
-            "primers": [p.as_dict() for p in lib.primers], "rejected": lib.rejected}
+            "primers": [{**p.as_dict(), "held": p.sequence in held} for p in lib.primers],
+            "rejected": lib.rejected, "held": lib.held}
+
+
+def _clean_or_none(raw: str) -> str | None:
+    try:
+        return clean_sequence(raw)
+    except PrimerLibraryError:
+        return None
 
 
 def write_library(added: list[Primer], edits: list[Change] | None = None,
@@ -664,12 +690,16 @@ def write_library(added: list[Primer], edits: list[Change] | None = None,
     check_library_path(str(path))
     current, _, encoding = _read_file()
     text, counts = merged_text(current, added, edits, removed)
-    try:
-        parse_text(text)                  # what is written must read back, or nothing is written
+    try:                                  # what is written must read back, or nothing is written
+        readable = _is_library(parse_text(text))
     except PrimerLibraryError as exc:
+        raise PrimerLibraryError(f"Nothing was saved: the library would not read back "
+                                 f"afterwards ({exc})") from exc
+    if not readable:
         raise PrimerLibraryError(
-            f"Nothing was saved: the library would not read back afterwards ({exc}) "
-            "Change the note that holds a line break, then save again.") from exc
+            "Nothing was saved: afterwards the file would hold no primer Vettore can read and no "
+            "header row naming its columns, so it could not be opened again. Add a header row "
+            "(name;sequence;notes) at the top of the file in Excel, then save again.")
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         tmp = path.with_name(f".{path.name}.vettore-tmp")

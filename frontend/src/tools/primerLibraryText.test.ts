@@ -7,6 +7,7 @@ import {
   newEntry,
   orderingText,
   range,
+  heldText,
   rejectedText,
   saveChanges,
   sequenceAlreadyIn,
@@ -154,6 +155,14 @@ describe("bindingText in a repeat", () => {
   it("says the primer primes at several positions", () => {
     expect(bindingText({ start: 0, end: 19, strand: 1, footprint: 20, tail: 0, mismatches: 0, positions: 6 }))
       .toContain("primes at 6 overlapping positions");
+  });
+});
+
+describe("heldText", () => {
+  it("names the rows and says nothing in them is lost", () => {
+    const text = heldText([{ name: "M13F", sequence: "GTAAAACGACGGCCAGT", line: 3 }]);
+    expect(text).toContain("“M13F” (line 3)");
+    expect(text).toContain("nothing in them is lost");
   });
 });
 

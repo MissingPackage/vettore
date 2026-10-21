@@ -18,6 +18,8 @@ export interface LibraryPrimer {
   searched?: boolean;
   /** Added in this window (typed or imported), not read from the file. */
   fresh?: boolean;
+  /** Its row in the file may hold other rows: shown, but not changed or removed here. */
+  held?: boolean;
 }
 
 export interface RejectedRow {
@@ -72,6 +74,26 @@ export interface LibraryFile {
   delimiter: string;
   primers: LibraryPrimer[];
   rejected: RejectedRow[];
+  /** Rows that run over several lines and may hold other rows: read, never changed by a save. */
+  held?: HeldRow[];
+}
+
+export interface HeldRow {
+  name: string;
+  sequence: string;
+  line: number;
+}
+
+/** One sentence for rows Vettore reads but will not change, because a cell of theirs runs over
+ * several lines and may have taken in other rows (a quote typed by hand). */
+export function heldText(held: HeldRow[]): string {
+  const shown = held.slice(0, 3).map((h) => `“${h.name || "a row"}” (line ${h.line})`).join(", ");
+  const more = held.length > 3 ? ` and ${held.length - 3} more` : "";
+  const n = held.length;
+  return `${n} row${n === 1 ? "" : "s"} of the file ${n === 1 ? "has a cell" : "have cells"} running over several `
+    + `lines that may hold other rows: ${shown}${more}. Vettore shows ${n === 1 ? "it" : "them"} but will not `
+    + "change or remove them, so nothing in them is lost. If one is a quote typed by hand, fix it in "
+    + "Excel or a text editor; a note written on several lines is fine as it is.";
 }
 
 /** Note key the engine marks map-only overlay primers with (src/vettore/fileio.py). */

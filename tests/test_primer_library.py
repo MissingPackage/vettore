@@ -720,11 +720,51 @@ def test_a_pair_is_not_offered_when_one_primer_also_pairs_with_itself():
 
 # ---- sixth review ------------------------------------------------------------------------
 
-def test_a_stray_quote_over_modified_or_placeholder_rows_is_refused():
-    t = ('Name;Sequence;Notes\nA;ACGTACGTACGTACGTAA;"oops\nB;/5Phos/GGCCAATTGGCCAATTGG;box2\n'
-         'D;to order;3.5"\nE;TTGCATTCGAATGACCTGAT;x\n')
-    with pytest.raises(pl.PrimerLibraryError, match="quote"):
-        pl.parse_text(t)
+def _held_file_survives(library_file, text: str, name: str, seq: str):
+    """A row that may hold other rows is listed as held, and neither an edit nor a removal of
+    it changes a byte of the file."""
+    library_file.write_text(text, encoding="utf-8")
+    lib = pl.read_library()
+    assert [h["name"] for h in lib["held"]] == [name]
+    assert next(p for p in lib["primers"] if p["name"] == name)["held"] is True
+    was = {k: next(p for p in lib["primers"] if p["name"] == name)[k] for k in pl.EDITABLE}
+    r = pl.write_library([], [pl.Change(seq, was, {"notes": "NEW"})])
+    assert r["held"] == 1 and library_file.read_text(encoding="utf-8-sig") == text
+    r = pl.write_library([], removed=[pl.Change(seq, was)])
+    assert r["held"] == 1 and library_file.read_text(encoding="utf-8-sig") == text
+
+
+def test_a_stray_quote_over_modified_or_placeholder_rows_loses_nothing(library_file):
+    _held_file_survives(library_file, 'Name;Sequence;Notes\nA;ACGTACGTACGTACGTAA;"oops\n'
+                        'B;/5Phos/GGCCAATTGGCCAATTGG;box2\nD;to order;3.5"\nE;TTGCATTCGAATGACCTGAT;x\n',
+                        "A", "ACGTACGTACGTACGTAA")
+
+
+def test_a_swallowed_row_starting_with_a_quoted_name_loses_nothing(library_file):
+    _held_file_survives(library_file, 'name;sequence;notes\nA;ACGTACGTACGTACGTAA;"oops\n"M13F; old";'
+                        'GTAAAACGACGGCCAGT;box2\nC;CAGGAAACAGCTATGAC;y\n', "A", "ACGTACGTACGTACGTAA")
+
+
+def test_a_quote_closed_inside_the_next_row_loses_nothing(library_file):
+    _held_file_survives(library_file, 'Name;Sequence;Notes;Location;Added\n'
+                        'M13F;GTAAAACGACGGCCAGT;"univ fwd;box1;2024-01-10\n'
+                        'M13R;CAGGAAACAGCTATGAC;Ta 55;"rack 3; box 2";2024-01-10\n'
+                        'T7;TAATACGACTCACTATAGGG;n;box3;2024-01-10\n', "M13F", "GTAAAACGACGGCCAGT")
+
+
+def test_ditto_marks_lose_nothing(library_file):
+    text = ('Name;Sequence;Notes;Location;Added\nP0;GTAAAACGACGGCCAGT;n;box1;2024\n'
+            'P1;CAGGAAACAGCTATGAC;n;";2024\nP2;TAATACGACTCACTATAGGG;n;";2024\n'
+            'P3;ATTTAGGTGACACTATAG;n;box2;2024\n')
+    _held_file_survives(library_file, text, "P1", "CAGGAAACAGCTATGAC")
+
+
+def test_a_save_never_leaves_a_headerless_library_unreadable(library_file):
+    text = "M13F;GTAAAACGACGGCCAGT;univ\nNEW1;to order;ask Marco\n"
+    library_file.write_text(text, encoding="utf-8")
+    with pytest.raises(pl.PrimerLibraryError, match="Nothing was saved"):
+        pl.write_library([], removed=[pl.Change("GTAAAACGACGGCCAGT", {"name": "M13F"})])
+    assert library_file.read_text(encoding="utf-8") == text
 
 
 def test_a_note_on_two_lines_is_still_fine():
@@ -759,11 +799,6 @@ def test_excel_notes_on_several_lines_are_read(text):
     [p], rejected = pl.parse_csv(text)
     assert rejected == [] and p.name == "M13F"
 
-
-def test_a_swallowed_row_starting_with_a_quoted_name_is_refused():
-    t = 'name;sequence;notes\nA;ACGTACGTACGTACGTAA;"oops\n"M13F; old";GTAAAACGACGGCCAGT;box2\nC;CAGGAAACAGCTATGAC;y\n'
-    with pytest.raises(pl.PrimerLibraryError, match="quote"):
-        pl.parse_text(t)
 
 
 def test_a_pasted_note_on_two_lines_saves_and_reads_back(library_file):

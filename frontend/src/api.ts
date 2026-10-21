@@ -205,7 +205,7 @@ export const api = {
      * now. Returns the library as read back, with how many rows were added, changed and removed,
      * additions skipped (the file had that oligo already) and changes whose row had gone. */
     save: (changes: { added?: object[]; edited?: object[]; removed?: object[] }) =>
-      call<LibraryFile & { added: number; changed: number; removed: number; skipped: number; gone: number; kept: number }>(
+      call<LibraryFile & { added: number; changed: number; removed: number; skipped: number; gone: number; held: number; kept: number }>(
         "primer-library/save", changes),
     /** Parse pasted or file text (name, sequence, notes…) without saving, so the dialog can show
      * what will be kept and what will be left out. */
