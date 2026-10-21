@@ -131,7 +131,8 @@ test.describe("with clipboard access", () => {
         await menu(page, "File", "New File from Clipboard");
       }
       await expect(page.getByTestId("doctab")).toHaveCount(3);
-      const names = await page.getByTestId("doctab").locator("span").allTextContents();
+      // The name is the tab's own span; the unsaved bullet is a span inside it.
+      const names = await page.getByTestId("doctab").locator(":scope > span").allTextContents();
       expect(names).toEqual(["pFA-KanMX4", "• Pasted sequence", "• Pasted sequence 2"]);
       await expect.poll(() => reported.at(-1)).toBe(2);
     });
