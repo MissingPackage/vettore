@@ -68,7 +68,8 @@ def test_only_the_accession_is_sent(monkeypatch):
     assert parsed.scheme == "https"
     assert parsed.netloc == "eutils.ncbi.nlm.nih.gov"
     assert urllib.parse.parse_qs(parsed.query) == {
-        "db": ["nuccore"], "id": ["MT612431.1"], "rettype": ["gbwithparts"], "retmode": ["text"]}
+        "db": ["nuccore"], "id": ["MT612431.1"], "rettype": ["gbwithparts"], "retmode": ["text"],
+        "tool": ["vettore"]}
 
 
 @pytest.mark.parametrize("accession", [
@@ -142,6 +143,8 @@ def test_an_accession_copied_with_words_around_it_is_picked_out():
     assert ncbi.clean_accession("MT612431.1 (circular)") == "MT612431.1"
     # Only the accession is ever sent, whatever surrounds it.
     assert ncbi.clean_accession("MT612431.1; rm -rf") == "MT612431.1"
+    assert ncbi.clean_accession("NC_045512.2 NC_045512.2") == "NC_045512.2"
+    assert ncbi.clean_accession("https://www.ncbi.nlm.nih.gov/nuccore/MT612431.1") == "MT612431.1"
 
 
 @pytest.mark.parametrize("accession", ["NP_000509.1", "XP_011544321", "WP_000123456.1",
@@ -217,3 +220,56 @@ def test_a_record_that_cannot_be_read_does_not_talk_about_a_file(monkeypatch):
     detail = res.json()["detail"]
     assert "could not read the record NCBI sent" in detail
     assert "colleague" not in detail
+
+
+@pytest.mark.parametrize("typed", ["NC_045512.2:21563-25384", "NC_000011.10:c27722058-27654893",
+                                   "NC_045512.2: 21,563..25,384"])
+def test_a_region_is_refused_rather_than_opening_the_whole_record(monkeypatch, typed):
+    answer = Answer(monkeypatch, b"LOCUS")
+    res = fetch(typed)
+    assert res.status_code == 422
+    assert "opens whole records only" in res.json()["detail"]
+    assert answer.urls == []
+
+
+@pytest.mark.parametrize("typed", ["SRR1234567", "ERR1234567", "PMC1234567", "PRJNA123456",
+                                   "SAMN12345678"])
+def test_identifiers_of_other_databases_are_not_called_proteins(monkeypatch, typed):
+    answer = Answer(monkeypatch, b"LOCUS")
+    detail = fetch(typed).json()["detail"]
+    assert "is not a GenBank record" in detail
+    assert "protein" not in detail
+    assert answer.urls == []
+
+
+def test_a_version_too_long_is_not_cut_short():
+    with pytest.raises(Exception, match="is not a GenBank accession"):
+        ncbi.clean_accession("MT612431.1234")
+
+
+@pytest.mark.parametrize("code", [401, 403, 407])
+def test_a_network_filter_that_refuses_is_not_an_ncbi_outage(monkeypatch, code):
+    Answer(monkeypatch, error=urllib.error.HTTPError(
+        "https://eutils.ncbi.nlm.nih.gov", code, "Forbidden", None, io.BytesIO(b"")))
+    res = fetch("MT612431.1")
+    assert res.status_code == 503
+    assert "does not let Vettore through" in res.json()["detail"]
+
+
+def test_a_record_sent_as_its_parts_without_sequence_says_how_to_get_it(monkeypatch):
+    Answer(monkeypatch, b"LOCUS       NW_000001     5000 bp    DNA     linear   CON\n"
+                        b"VERSION     NW_000001.1\nCONTIG      join(AC000001.1:1..5000)\n//\n")
+    res = fetch("NW_000001.1")
+    assert res.status_code == 422
+    assert "without the sequence" in res.json()["detail"]
+    assert "Try again" not in res.json()["detail"]
+
+
+def test_a_genome_whose_locus_line_gives_no_length_is_refused_after_reading(monkeypatch):
+    monkeypatch.setattr(ncbi, "MAX_BP", 1000)
+    record = (DATA / "MT612431.1.gb").read_bytes()
+    _, rest = record.split(b"\n", 1)
+    Answer(monkeypatch, b"LOCUS       MT612431\n" + rest)
+    res = fetch("MT612431.1")
+    assert res.status_code == 422
+    assert "7,204 bp" in res.json()["detail"]

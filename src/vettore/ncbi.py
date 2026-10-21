@@ -38,7 +38,14 @@ MAX_BYTES = 16_000_000    # the download stops here whatever the LOCUS line says
 #: MT612431.1, M77789, NC_001422.1, NZ_CP009072.1, and WGS contigs such as AAAA02000001.
 ACCESSION = re.compile(r"^(?:[A-Z]{2}_[A-Z]{0,6}|[A-Z]{1,6})\d{5,12}(?:\.\d{1,3})?$")
 #: The accession inside pasted text such as "GenBank: MT612431.1" or "MT612431.1 (circular)".
-ACCESSION_IN_TEXT = re.compile(r"\b(?:[A-Z]{2}_[A-Z]{0,6}|[A-Z]{1,6})\d{5,12}(?:\.\d{1,3})?\b")
+ACCESSION_IN_TEXT = re.compile(
+    r"\b(?:[A-Z]{2}_[A-Z]{0,6}|[A-Z]{1,6})\d{5,12}(?:\.\d{1,3})?(?![.\d])")
+#: A region written after the accession, as NCBI and BLAST print it: "NC_045512.2:21563-25384",
+#: "NC_000011.10:c27722058-27654893".
+REGION = re.compile(r":\s*C?\d[\d,]*\s*(?:-|\.\.)\s*\d")
+#: Identifiers of other NCBI and EBI databases that look like accessions: SRA runs,
+#: experiments, studies and samples, BioProjects, BioSamples, PubMed Central.
+OTHER_DATABASE = re.compile(r"^(?:[SED]R[RXPSA]|PRJ[A-Z]{1,2}|SAM[NED]|PMC)\d")
 #: Protein accessions: RefSeq NP_/XP_/WP_/YP_/AP_, and INSDC three letters and five or seven
 #: digits (nucleotide accessions have one, two, four, five or six letters).
 PROTEIN = re.compile(r"^(?:[NXWYA]P_\d+|[A-Z]{3}(?:\d{5}|\d{7}))(?:\.\d+)?$")
@@ -67,13 +74,26 @@ def clean_accession(raw: str) -> str:
     typed = raw.strip().upper()
     if not typed:
         raise HTTPException(422, "Type an accession number, for example MT612431.1.")
+    if REGION.search(typed):
+        # Opening the whole record instead would hand over a different sequence than the one
+        # asked for, without a word.
+        raise HTTPException(422, f"“{raw.strip()}” asks for a region of a record; Vettore "
+                                 "opens whole records only. Type the accession alone and "
+                                 "select the region in Vettore, or, for a region of a "
+                                 "chromosome, download that region from the NCBI website as a "
+                                 "GenBank file and open it.")
     if not ACCESSION.match(typed):
-        found = ACCESSION_IN_TEXT.findall(typed)
+        found = sorted(set(ACCESSION_IN_TEXT.findall(typed)))
         if len(found) != 1:
             raise HTTPException(422, f"“{raw.strip()}” is not a GenBank accession number. It "
                                      "looks like letters followed by digits, for example "
                                      "MT612431.1 or NC_001422.1.")
         typed = found[0]
+    if OTHER_DATABASE.match(typed):
+        raise HTTPException(422, f"{typed} is not a GenBank record: it looks like an identifier "
+                                 "of another database (sequencing reads, a project, a sample or "
+                                 "an article). Use the accession of a nucleotide record, for "
+                                 "example MT612431.1.")
     if PROTEIN.match(typed):
         raise HTTPException(422, f"{typed} is a protein accession: Vettore opens DNA. Use the "
                                  "accession of the nucleotide record (on the protein's NCBI "
@@ -108,8 +128,9 @@ def download(accession: str) -> bytes:
     """The GenBank flat file of ``accession`` (``gbwithparts``: a record assembled from parts
     comes with its sequence). Raises :class:`Offline` when NCBI cannot be reached and
     ``HTTPException`` when it answers that there is no such record."""
-    query = urllib.parse.urlencode({"db": "nuccore", "id": accession,
-                                    "rettype": "gbwithparts", "retmode": "text"})
+    # "tool" names the program, as NCBI's usage policy asks; nothing about the user is sent.
+    query = urllib.parse.urlencode({"db": "nuccore", "id": accession, "rettype": "gbwithparts",
+                                    "retmode": "text", "tool": "vettore"})
     try:
         with urllib.request.urlopen(f"{EFETCH_URL}?{query}", timeout=TIMEOUT,
                                     context=_ssl_context()) as response:
@@ -123,6 +144,8 @@ def download(accession: str) -> bytes:
         log.warning("NCBI answered %s for %s", exc.code, accession)
         if exc.code in (400, 404):
             raise HTTPException(404, not_found(accession)) from exc
+        if exc.code in (401, 403, 407):   # a proxy or filter of the local network said no
+            raise Offline(f"HTTP {exc.code}") from exc
         raise _busy(accession, f"it answered with error {exc.code}") from exc
     except urllib.error.URLError as exc:
         log.warning("NCBI could not be reached for %s: %r", accession, exc)
@@ -175,6 +198,11 @@ def fetch(accession: str) -> dict[str, Any]:
         raise HTTPException(422, f"{version} is the master record of a sequencing project: it "
                                  "lists contigs but holds no sequence. Open one of its contig "
                                  "accessions instead (on its NCBI page, under “WGS”).")
+    if not re.search(rb"^ORIGIN", content, re.MULTILINE) and re.search(
+            rb"^CONTIG\s", content, re.MULTILINE):
+        raise HTTPException(422, f"NCBI sent {version} as a list of its parts, without the "
+                                 "sequence. Download it from the NCBI website as a GenBank file "
+                                 "(“Show sequence”) and open that file.")
     try:
         result = fileio.read_file(f"{version}.gb", content).as_dict()
     except fileio.UnsupportedFile as exc:
@@ -182,6 +210,10 @@ def fetch(accession: str) -> dict[str, Any]:
         raise HTTPException(422, f"Vettore could not read the record NCBI sent for {version}. "
                                  "Try again; if it happens again, download it from the NCBI "
                                  "website as a GenBank file and open that file.") from exc
+    # The LOCUS line was checked before the download; the sequence itself is the last word.
+    longest = max((len(d.get("sequence", "")) for d in result["documents"]), default=0)
+    if longest > MAX_BP:
+        raise _too_large(version, f"{longest:,} bp")
     return {"path": None, "accession": version, **result}
 
 

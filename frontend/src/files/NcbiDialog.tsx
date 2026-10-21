@@ -20,7 +20,10 @@ export default function NcbiDialog(props: {
   const [error, setError] = useState<string | null>(null);
   // Cancel while downloading: the record that arrives afterwards is dropped, not opened.
   const closed = useRef(false);
-  useEffect(() => () => { closed.current = true; }, []);
+  useEffect(() => {
+    closed.current = false;   // React's development mode mounts twice
+    return () => { closed.current = true; };
+  }, []);
   const close = () => {
     closed.current = true;
     props.onClose();
@@ -66,7 +69,7 @@ export default function NcbiDialog(props: {
           This is the only thing in Vettore that uses the internet. Only the accession number is
           sent to NCBI: no sequence and no file leaves this computer. No account is needed.
         </p>
-        {busy && <p role="status" data-testid="ncbi-busy">Downloading {accession.trim().toUpperCase()} from NCBI…</p>}
+        {busy && <p role="status" data-testid="ncbi-busy">Downloading from NCBI…</p>}
         {error && <p className="vt-field-error" role="alert" data-testid="ncbi-error">{error}</p>}
       </div>
       <div className={Classes.DIALOG_FOOTER}>

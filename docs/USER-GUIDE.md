@@ -125,6 +125,10 @@ saved (save it with Ctrl+S to keep it). The welcome screen has the same link.
 - Records over 2,000,000 bp (a bacterial genome or a chromosome) are refused before they are
   downloaded: download the region you need from the NCBI website and open that file. The
   master record of a sequencing project holds no sequence; open one of its contigs.
+- Vettore opens whole records. A region written after the accession
+  (`NC_045512.2:21563-25384`) is refused rather than silently opening the whole record: open
+  the record and select the region, or download a chromosome region from the NCBI website.
+  SRA, BioProject, BioSample and PubMed Central identifiers are pointed out as such.
 - Typed without a version (`M77789`), the record opens under the version NCBI sends
   (`M77789.2`), so you know which one you have.
 - The tab's History starts with "Opened from NCBI" and the accession.
