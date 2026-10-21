@@ -55,6 +55,7 @@ import { fastaRecord, rangeLength, selectionRange } from "./files/fasta";
 import { resolveDrop } from "./files/drop";
 import { EDITOR_TOOLS, rightClickOverrides } from "./files/editorFiles";
 import PasteDialog from "./files/PasteDialog";
+import NcbiDialog from "./files/NcbiDialog";
 import CopyTextDialog from "./files/CopyTextDialog";
 import SaveCopyDialog from "./files/SaveCopyDialog";
 import UnsavedDialog, { type UnsavedChoice } from "./files/UnsavedDialog";
@@ -125,6 +126,7 @@ export default function App() {
   const [notices, setNotices] = useState<Notice[]>([]);
   const [newOpen, setNewOpen] = useState(false);
   const [paste, setPaste] = useState<{ text: string; reason?: string } | null>(null);
+  const [ncbiOpen, setNcbiOpen] = useState(false);
   const [copyText, setCopyText] = useState<{ title: string; text: string } | null>(null);
   const [saveCopy, setSaveCopy] = useState<{ doc: Doc; resolve: (ok: boolean) => void } | null>(null);
   const [unsaved, setUnsaved] = useState<{ doc: Doc; resolve: (choice: UnsavedChoice) => void } | null>(null);
@@ -142,7 +144,7 @@ export default function App() {
 
   // Light or dark frame, as chosen in Preferences (theme/dark-chrome.css).
   const prefs = usePreferences();
-  const { chrome } = prefs;
+  const { chrome, allowNcbi } = prefs;
   // Bumped when a tool dialog closes: the Primer Library may have changed the library, so the
   // library primers shown on the map are looked up again.
   const [libraryVersion, setLibraryVersion] = useState(0);
@@ -255,8 +257,11 @@ export default function App() {
     return name === data.name ? data : { ...data, name };
   }, []);
 
-  /** Open the documents of a file (or of pasted text, when `origin` is null) in new tabs. */
-  const addResult = useCallback((result: OpenResult, origin: string | null) => {
+  /**
+   * Open the documents of a file (or of pasted text, when `origin` is null) in new tabs.
+   * `accession` marks a record downloaded from NCBI: it exists nowhere on this computer.
+   */
+  const addResult = useCallback((result: OpenResult, origin: string | null, accession?: string) => {
     const label = result.format_label;
     const fileName = result.path ? baseName(result.path) : origin ? baseName(origin) : "";
     const records = result.documents.length;
@@ -271,11 +276,13 @@ export default function App() {
         result.path,
         origin === null
           ? { time: now(), action: "Created from clipboard", detail: `${label ?? "Text"}, ${sequenceData.sequence.length} bp` }
-          : { time: now(), action: "Opened", detail: `${result.path ?? origin}${label ? ` (${label})` : ""}` },
+          : accession
+            ? { time: now(), action: "Opened from NCBI", detail: `${accession}, ${sequenceData.sequence.length} bp` }
+            : { time: now(), action: "Opened", detail: `${result.path ?? origin}${label ? ` (${label})` : ""}` },
         {
           ...(source ? { saveInPlace: !!result.path && !!result.writable, source } : {}),
-          // Pasted text exists nowhere else; a file or an untouched sample does.
-          neverSaved: origin === null,
+          // Pasted text and a download exist nowhere else; a file or an untouched sample does.
+          neverSaved: origin === null || !!accession,
         },
       );
     });
@@ -889,12 +896,14 @@ export default function App() {
     openSample,
     toggleLibraryPrimers: () => savePreferences({ showLibraryPrimers: !prefs.showLibraryPrimers }),
     showLibraryPrimers: prefs.showLibraryPrimers,
+    openFromNcbi: () => setNcbiOpen(true),
+    allowNcbi,
     recent,
     samples,
     hasDocument: !!activeDoc,
   };
   // menuFilter must be stable (OVE memoizes on it); handlers are read through the ref.
-  const menuFilter = useMemo(() => buildMenu(handlers), [recent, samples, !!activeDoc, prefs.showLibraryPrimers]); // eslint-disable-line react-hooks/exhaustive-deps
+  const menuFilter = useMemo(() => buildMenu(handlers), [recent, samples, !!activeDoc, prefs.showLibraryPrimers, allowNcbi]); // eslint-disable-line react-hooks/exhaustive-deps
   const contextMenus = useMemo(() => rightClickOverrides(() => handlers.current.copyAsFasta()), []);
 
   const onSave = useCallback(
@@ -1031,7 +1040,8 @@ export default function App() {
           <>
           {docTabs}
           <Welcome recent={recent} samples={samples} onOpen={openFiles} onNew={() => setNewOpen(true)}
-                   onRecent={openPath} onPaste={newFromClipboard} onSample={openSample} />
+                   onRecent={openPath} onPaste={newFromClipboard} onSample={openSample}
+                   onNcbi={allowNcbi ? () => setNcbiOpen(true) : undefined} />
           </>
         )}
       </div>
@@ -1054,6 +1064,15 @@ export default function App() {
           onOpen={(result) => {
             setPaste(null);
             addResult(result, null);
+          }}
+        />
+      )}
+      {ncbiOpen && (
+        <NcbiDialog
+          onClose={() => setNcbiOpen(false)}
+          onOpen={(result, accession) => {
+            setNcbiOpen(false);
+            addResult(result, `${accession}.gb`, accession);
           }}
         />
       )}

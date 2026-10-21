@@ -169,6 +169,9 @@ export const api = {
   recent: () => call<{ paths: string[] }>("recent"),
   samples: () => call<{ samples: Sample[] }>("app/samples"),
   openSample: (id: string) => call<OpenResult>(`app/samples/${encodeURIComponent(id)}`),
+  /** A public GenBank record downloaded from NCBI (the only request that leaves the computer). */
+  openFromNcbi: (accession: string) =>
+    call<OpenResult & { accession: string }>("ncbi/fetch", { accession }),
   unsaved: (count: number) => call<{ count: number }>("unsaved", { count }),
   fileAssociations: () => call<FileAssociations>("desktop/file-associations"),
   /** Make sequence files open with Vettore on double-click (`true`), or undo it. */

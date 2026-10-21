@@ -116,3 +116,35 @@ test("an open file can be added and removed as a wrong clone", async ({ page }) 
   await dialog.getByTestId("digest-wrong-remove").click();
   await expect(dialog.getByTestId("digest-nothing-to-compare")).toBeVisible();
 });
+
+test("each enzyme shows the buffer the lab gave it, and a pair in two buffers says so", async ({ page }) => {
+  await cloneInsert(page);
+  await menu(page, "File", "Preferences…");
+  const prefs = page.getByTestId("preferences-dialog");
+  // Two columns copied from a spreadsheet: enzyme, Tab, buffer.
+  await prefs.getByTestId("pref-my-enzymes-list").fill("SalI\tNEBuffer r3.1\nSphI\trCutSmart\nNdeI\trCutSmart");
+  await prefs.getByTestId("pref-my-enzymes-add").click();
+  await expect(prefs.getByTestId("pref-buffer-SalI")).toHaveValue("NEBuffer r3.1");
+  await expect(prefs.getByTestId("pref-buffer-SphI")).toHaveValue("rCutSmart");
+  // A buffer can be typed by hand too, spaces included.
+  await prefs.getByTestId("pref-buffer-NdeI").fill("NEBuffer r2.1");
+  await expect(prefs.getByTestId("pref-buffer-NdeI")).toHaveValue("NEBuffer r2.1");
+  await prefs.getByTestId("pref-buffer-NdeI").fill("rCutSmart");
+  await page.getByTestId("pref-close").click();
+
+  await menu(page, "Tools", "Find Diagnostic Digest…");
+  const dialog = page.getByTestId("digest-dialog");
+  await expect(dialog.getByTestId("digest-set-mine")).toBeChecked();
+  const results = dialog.getByTestId("digest-results");
+  await expect(results).toContainText("SphI (rCutSmart)");
+  await expect(results).toContainText("SalI (NEBuffer r3.1)");
+  // Pairs in one buffer come before the pair that needs two.
+  const labels = await dialog.getByTestId("digest-result-enzymes").allTextContents();
+  const mixed = labels.findIndex((l) => l.includes("SalI (NEBuffer r3.1) + SphI") || l.includes("SphI (rCutSmart) + SalI"));
+  const sameBuffer = labels.findIndex((l) => l.includes("NdeI (rCutSmart) + SphI (rCutSmart)"));
+  expect(sameBuffer).toBeGreaterThanOrEqual(0);
+  expect(mixed).toBeGreaterThan(sameBuffer);
+  await dialog.getByTestId("digest-result").nth(mixed).check();
+  await expect(dialog.getByTestId("digest-buffer-note")).toContainText("go in different buffers");
+  await page.screenshot({ path: "test-results/digest-planner-buffers.png" });
+});

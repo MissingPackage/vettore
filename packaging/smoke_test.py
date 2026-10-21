@@ -11,6 +11,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -148,6 +149,16 @@ def main() -> int:
         aligned = call("alignment/align", {"reference": doc, "sequences": [fragment]})
         [placed] = aligned["sequences"]
         assert (placed["start"], placed["identity"]) == (1001, 100.0), placed
+        # The progressive alignment runs in a background thread and scores profiles with numpy.
+        job = call("alignment/multiple/start", {"sequences": [doc, fragment]})["job"]
+        for _ in range(100):
+            state = call(f"alignment/multiple/job/{job}")
+            if state["state"] != "running":
+                break
+            time.sleep(0.2)
+        assert state["state"] == "done", state
+        rows = {s["name"]: s for s in state["result"]["sequences"]}
+        assert rows["frag"]["first_column"] == 1001, rows["frag"]
         # Sanger reads are aligned with Biopython's BLASTN scoring matrix, a data file.
         reference = (FIXTURES.parents[1] / "frontend" / "e2e" / "fixtures"
                      / "sanger-reference.txt").read_text(encoding="utf-8")
@@ -171,12 +182,19 @@ def main() -> int:
         assert any(Path(exe).name in line for line in planned), planned
         assert all(any(ext in line for line in planned) for ext in assoc["extensions"]), planned
         assert call("desktop/file-associations") == assoc
+        # Open from NCBI is in the bundle; a name that is not an accession is refused before
+        # anything is sent, so this runs offline too.
+        try:
+            call("ncbi/fetch", {"accession": "not an accession"})
+            raise AssertionError("Open from NCBI accepted a name that is not an accession")
+        except urllib.error.HTTPError as exc:
+            assert exc.code == 422, exc.code
         hand_over(exe, env)
         saved_files = work / "saved"
         saved_files.mkdir()
         checked = round_trips(saved_files)
         print("smoke test passed: server up, .dna parsed (3941 bp, 9 features), UI served, "
-              f"restriction cloning, Tm, primer design, alignment, Sanger reads, samples and feature "
+              f"restriction cloning, Tm, primer design, alignment (to a reference and progressive), Sanger reads, samples and feature "
               "detection work, file associations reachable (dry run), a second start hands its "
               f"file to the running copy, {checked} open-and-save "
               "round trips "

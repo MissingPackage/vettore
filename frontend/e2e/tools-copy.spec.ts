@@ -107,8 +107,11 @@ test.describe("when the system refuses the clipboard", () => {
     await page.getByTestId("pd-copy").click();
     await expect(page.getByTestId("copy-text")).toHaveValue(/^KanR_F\t[ACGT]{18,24}\nKanR_R\t[ACGT]{18,24}$/);
     await expect(page.getByTestId("pd-notice")).toHaveCount(0);
-    await page.keyboard.press("Escape");
-    await expect(copyBox(page)).toBeHidden();
+    // A dialog still opening can miss the key: press again until the box has closed.
+    await expect(async () => {
+      await page.keyboard.press("Escape");
+      await expect(copyBox(page)).toBeHidden({ timeout: 1000 });
+    }).toPass({ timeout: 10_000 });
 
     await page.getByTestId("pd-add").click();
     await page.getByTestId("pd-close").click();

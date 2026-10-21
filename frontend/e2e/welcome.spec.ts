@@ -43,7 +43,11 @@ test("help is reachable before any document is open", async ({ page }) => {
   await page.goto(`/?token=${TOKEN}`);
   await page.getByTestId("welcome-getting-started").click();
   await expect(page.getByTestId("getting-started-dialog")).toContainText("Open a construct");
-  await page.keyboard.press("Escape");
+  // A dialog still opening can miss the key: press again until it has closed.
+  await expect(async () => {
+    await page.keyboard.press("Escape");
+    await expect(page.getByTestId("getting-started-dialog")).toBeHidden({ timeout: 1000 });
+  }).toPass({ timeout: 10_000 });
   await page.getByTestId("welcome-shortcuts").click();
   await expect(page.getByTestId("shortcuts-dialog")).toContainText("Ctrl+O");
 });

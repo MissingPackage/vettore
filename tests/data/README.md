@@ -2,7 +2,10 @@
 
 The `*.dna` files and `3730.ab1` (ABI Sanger trace) are copied unchanged from the Biopython
 test suite (`Tests/`, https://github.com/biopython/biopython),
-distributed under the Biopython License Agreement / BSD 3-Clause License.
+distributed under the Biopython License Agreement / BSD 3-Clause License. So is
+`msa-opuntia.aln` (Biopython `Tests/Clustalw/opuntia.aln`, unchanged): seven *Opuntia*
+chloroplast sequences (GenBank AF191658-AF191665) and their ClustalW 1.81 alignment, the
+reference alignment of `tests/test_msa.py`.
 
 ## File-exchange fixtures (`exchange-*`)
 

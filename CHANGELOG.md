@@ -2,6 +2,12 @@
 
 The download links in the README always point to the latest release.
 
+## Unreleased — opening a record from NCBI
+
+- File → Open from NCBI… opens a public GenBank record by its accession number (for example MT612431.1) as a new, unsaved document; the welcome screen has the same link. It is the only thing in Vettore that uses the internet, only when you press Open, and it sends nothing but the accession number; no account is needed.
+- Offline, the dialog says so plainly and stays open; nothing else in Vettore changes. A mistyped, unknown or protein accession, a genome too large to open (over 2 Mb, refused before downloading) and a network that blocks secure connections each get one sentence saying what to do. An accession typed without its version opens under the version NCBI sends.
+- File → Preferences → Allow Open from NCBI (on by default) hides the menu item when unticked.
+
 ## Unreleased — a lighter, clearer frame
 
 - The frame is lighter: toolbar tools that are on are white keys with a thin blue outline instead of solid squares, document tabs lose their folder borders, and the view tabs (Map, Sequence, Enzymes…) are one segmented control whose white marker slides to the open view. Nothing moved: menus, tabs, panes and shortcuts are where they were.
@@ -24,7 +30,14 @@ The download links in the README always point to the latest release.
 - Tools → Find Diagnostic Digest… finds the single or double digest that tells the expected clone apart from the wrong ones on one gel, and lists the best ten with one sentence each ("Expected clone: 4.2 kb + 1.1 kb; parent vector: 4.4 kb"). Choosing one draws its gel next to your ladder; Send to Gel Simulation opens it with one lane per outcome, and Copy as Protocol copies enzymes, gel and expected sizes.
 - A product of restriction cloning remembers its wrong clones (insert in the other orientation, vector closed without insert, parent vector, and the simulation's other products), and the digest planner starts from them.
 - Enzymes that Dam or Dcm methylation blocks on the plasmids are left out and named, unless the DNA comes from a dam−/dcm− strain.
-- File → Preferences → My enzymes keeps the enzymes in your freezer (empty until you fill it in; a list can be pasted from a spreadsheet); the digest planner tries them first.
+- File → Preferences → My enzymes keeps the enzymes in your freezer, each with the buffer you digest it in (empty until you fill it in; a list, or two columns enzyme and buffer, can be pasted from a spreadsheet); the digest planner tries them first.
+- Find Diagnostic Digest shows each enzyme's buffer next to it, ranks double digests in one buffer before those that need two, and says what to do when a pair needs two different buffers; the copied protocol carries the buffers too.
+
+## Unreleased — aligning several sequences to each other
+
+- Tools → Align Multiple Sequences… has a second mode, **All to each other**: a progressive alignment (guide tree from shared words, most similar sequences first) of up to 50 sequences, with no reference privileged. Strand and origin follow the first circular sequence; each sequence is turned by its closest relative, and a fragment across a plasmid's origin lines up in one piece. One that shares nothing with the others is left out with a note.
+- The result shows a consensus row on top of the stacked sequences, a conservation bar with the most variable stretches listed under it, each sequence's identity to the consensus, and the differences between any two sequences you pick, in the first one's numbering, ready to copy into a spreadsheet. Unrelated stretches (two inserts in one backbone) are named as not compared rather than listed as mutations, and N is never counted as a difference. The two are realigned to each other where needed, so gaps the other sequences required never show up as an insertion and a deletion between them.
+- The alignment runs in the background with a progress bar and can be stopped; 10 plasmids of 15 kb take a few seconds.
 
 ## 0.3.1 — more promoters, with their species
 

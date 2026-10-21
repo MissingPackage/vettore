@@ -55,10 +55,17 @@ annotated tag and the GitHub release notes.
    `fileio.OVERLAY_NOTE` and stripped on save) — are built. S5.2 (Sanger contig) is next.
    Catalogue 0.3.1 added PGK (human, mouse), UbC, H1, 7SK, SFFV and full-length CAG; mouse U6,
    H1, 7SK, UbC, Eef1a1 and Gfap and human CAMK2A have no public vector record annotating them.
-4. Progressive multiple alignment (today: star alignment to a reference); related 15 kb
-   sequences take ~3.5 s each.
+4. Progressive multiple alignment (S6.2) is built in Python (`src/vettore/msa.py`,
+   `frontend/src/tools/alignmentMultiple.tsx`), not a bundled aligner: nothing to package.
+   On simulated families it recovers 92 % of the true residue pairs against FAMSA's 94 %
+   (measured locally, not a dependency). Still to do: check against a published alignment
+   of AAV serotype capsid genes once their records can be fetched (NCBI was not reachable
+   from the build machine); today the AAV check uses the AAV2 and AAV9 VP1 fixtures.
 5. Printing in the Linux (Qt WebEngine) window; history graph.
-6. Open question for the user: online import by accession from NCBI (needs the network).
+6. S6.3 File → Open from NCBI… (`src/vettore/ncbi.py`, `frontend/src/files/NcbiDialog.tsx`) is
+   built: the only network call, NCBI E-utilities `efetch` with the accession alone; preference
+   "Allow Open from NCBI", on by default. Check by hand on Windows behind the lab's network
+   (proxy, certificate store) once: the tests replace NCBI with a stand-in.
 7. Run the opt-in Qt window tests (`VETTORE_QT_TESTS=1`, xvfb) in CI; trim the Linux bundle.
 
 ## Decisions (see spec "Architecture")
@@ -74,8 +81,7 @@ annotated tag and the GitHub release notes.
 
 ## Open questions (also in the spec)
 
-Which cloning methods are used most; whether online import from NCBI/Addgene is acceptable;
-whether Vettore-written `.dna` files open in colleagues' tools.
+Which cloning methods are used most; whether Vettore-written `.dna` files open in colleagues' tools.
 
 ## Gotchas
 

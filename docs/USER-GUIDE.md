@@ -3,7 +3,8 @@
 Vettore is an offline plasmid editor and cloning simulator. It follows the way bench work
 flows — open a construct, read its map and sites, plan the cloning, order the primers, verify
 the clone — and runs entirely on your own computer: no account, no internet, no data leaves
-the machine.
+the machine. The one exception is **File → Open from NCBI…**, which downloads a public record
+when you ask for it and sends nothing but the accession number.
 
 ## Contents
 
@@ -108,6 +109,32 @@ open the same help you find in the Help menu once a file is open.
   [Preferences](#preferences-file--preferences).
 
 Your `.dna` files open with their features, colours, primers (including 5′ tails) and topology.
+
+### Opening a record from NCBI (File → Open from NCBI…)
+
+Type a GenBank accession number, such as `MT612431.1`, `M77789.2` or `NC_001422.1`, and press
+**Open** (or Enter). Vettore downloads the record from NCBI and opens it as a new tab, not yet
+saved (save it with Ctrl+S to keep it). The welcome screen has the same link.
+
+- This is the only thing in Vettore that uses the internet, and only when you press Open. Only
+  the accession number is sent: no sequence and no file leaves your computer, and no account is
+  needed.
+- Without a connection the dialog says so and stays open, so you can try again; everything
+  else in Vettore works offline as always.
+- A wrong or unknown accession is named in the message, and a protein accession is pointed
+  out as such. An accession copied with words around it ("GenBank: MT612431.1") works too.
+- Records over 2,000,000 bp (a bacterial genome or a chromosome) are refused before they are
+  downloaded: download the region you need from the NCBI website and open that file. The
+  master record of a sequencing project holds no sequence; open one of its contigs.
+- Vettore opens whole records. A region written after the accession
+  (`NC_045512.2:21563-25384`) is refused rather than silently opening the whole record: open
+  the record and select the region, or download a chromosome region from the NCBI website.
+  SRA, BioProject, BioSample and PubMed Central identifiers are pointed out as such.
+- Typed without a version (`M77789`), the record opens under the version NCBI sends
+  (`M77789.2`), so you know which one you have.
+- The tab's History starts with "Opened from NCBI" and the accession.
+- To hide the menu item, untick **Allow Open from NCBI** in
+  [Preferences](#preferences-file--preferences).
 
 ## Copy and paste sequences
 
@@ -471,6 +498,19 @@ If a sequence resembles the reference only in part (two plasmids that share a ba
 
 Limits: up to 10 sequences at a time (reference included), each up to 15,000 bp. A large comparison takes a few seconds per sequence. To compare part of a bigger sequence, make a new file from that region first (**Actions → New File from Selection**).
 
+### All to each other
+
+**Each to the reference** answers "where do these differ from this one?". To see several sequences side by side with none of them privileged (variants of a construct, capsid genes of several serotypes), choose **All to each other** at the top of the dialog, tick at least two sequences and press **Align**.
+
+The sequences are turned to the strand of the first circular sequence ticked (the first one ticked, when none is circular); each sequence is turned by the one it resembles most, so two constructs that share only an inverted element (a FLEx cassette, a loxP site) do not flip each other. Circular sequences are all opened at the same place, inside sequence they share (normally their base 1, unless they differ there, for example when one file starts inside a cassette the others lack), and away from any linear sequence (an amplicon, a read), so that nothing is cut in two; the table then says where each plasmid's origin moved. The most similar ones are lined up first, then the groups with each other (a progressive alignment, as ClustalW does), so similar sequences end up next to each other in the view. A bar shows how far the alignment has got; **Stop** abandons it.
+
+- The table gives each sequence's length, strand, the alignment columns it covers and how identical it is to the consensus.
+- **Conservation** draws, for every stretch of columns, the share of the sequences that carry the column's most common base: tall blue bars are conserved, short orange ones variable. A gap never counts as agreement, so a 10 bp insertion in one sequence out of ten shows as 10 %. Columns covered by a single sequence (the overhanging end of a longer one), or holding only N, compare nothing and are drawn as short grey stubs. Hover a bar for its columns; the most variable stretches are listed under it.
+- The view stacks the sequences under a **Consensus** row (the most common base of each column; an ambiguity code such as R where two are equally common; a gap where most sequences have one). Coloured marks are differences from the consensus.
+- **Differences between two sequences**: pick any two to list every difference of the first from the second, in the second's own numbering and strand, as in the reference mode. **Copy list** copies it for a spreadsheet. Only stretches the two have in common are compared: where both carry unrelated sequence (two inserts in one backbone, say), the stretch is named as *not compared* instead of being listed as hundreds of mutations. Insertions and deletions are always listed as differences, however long. A divergent but related stretch, such as the variable regions of two AAV serotypes, is still compared; unrelated sequence on both sides is recognised from about 150 bp, so a shorter one may be listed as a cluster of differences. Two circular sequences are compared all the way round, so a difference next to base 1 is reported like any other. At the ends of linear sequences, comparison stops where the two stop matching: an adapter, a barcode or a homology arm (from 10 bp, less than half of it identical) is named as not compared rather than listed as mutations; a shorter or still similar end, such as a SNP at the last base of an amplicon, is compared. The edge of a not-compared stretch is set by where the two start matching again, so a difference within about 6 bp of it may fall inside the stretch: check those few bases by eye in the alignment. Near the ends of two linear sequences, before the first or after the last stretch of 12 identical bases (between very divergent sequences, such as a codon-optimised gene and the native one, 8 identical bases, or failing that the last 30 bp), nothing beyond holds the alignment: several differences packed there can be read as substitutions or as an insertion or deletion, so they are listed marked *uncertain* (and noted in the copied list); check them against the trace. The list is worked out for the two sequences alone, so between divergent sequences it can group differences unlike the stacked view, which was built for all of them: a gap there may be listed as a mismatch here. An N facing a base is not a difference; such positions are counted apart.
+
+A sequence that shares nothing with the others is left out with a note. Limits: up to 50 sequences, each up to 15,000 bp and 150,000 bp in all (10 plasmids of 15 kb, or 50 genes of 3 kb); the largest take a few seconds.
+
 ## Verifying a clone by sequencing (Tools → Align to Reference DNA Sequence…)
 
 Open the plasmid you expect, then choose the `.ab1` files your sequencing provider sent. Several at once is fine. Each read is quality-trimmed (Mott's algorithm; the stringency is adjustable), aligned to the plasmid on either strand, and stacked under the reference with its chromatogram, starting at the region the reads cover.
@@ -512,8 +552,10 @@ you chose (the same migration model as Simulate Agarose Gel). Bands under 150 bp
 for the agarose percentage, are too faint or too compressed to count. The best ten are listed,
 each with one sentence such as "Expected clone: 4.2 kb + 1.1 kb; insert in the other
 orientation: 5.1 kb + 249 bp; parent vector: 4.4 kb". Digests whose bands are well apart come
-first, then single digests before double ones, then digests that give the expected clone two to
-five bands. A digest marked **close bands** works on paper but its bands run near each other:
+first, then single digests before double ones, then double digests whose two enzymes go in
+the same buffer, then digests that give the expected clone two to five bands. Next to each
+enzyme is the buffer you gave it in **My enzymes**; a pair that needs two different buffers is
+marked **different buffers**, with what to do about it. A digest marked **close bands** works on paper but its bands run near each other:
 check them on the gel. Digests that give exactly the same bands are listed once, with the other
 enzymes named underneath.
 
@@ -570,11 +612,15 @@ What Vettore starts from, kept between sessions:
   every file you open next. Documents already open keep what you chose for them.
 - **Gel ladder** and **agarose percentage** — what **Tools → Simulate Agarose Gel…** opens on,
   so your usual gel is one click away.
-- **My enzymes** — the enzymes your lab has. Add them one by one, or paste a list copied from
-  a spreadsheet (names separated by commas, spaces or new lines); names Vettore does not know
-  are pointed out. **Tools → Find Diagnostic Digest…** tries these first. Empty by default.
+- **My enzymes** — the enzymes your lab has, each with the buffer you digest it in (type it
+  next to the enzyme). Add them one by one, or paste a list (names separated by commas, spaces
+  or new lines) or two columns copied from a spreadsheet, enzyme and buffer; names Vettore
+  does not know are pointed out. **Tools → Find Diagnostic Digest…** tries these first and
+  shows their buffers. Empty by default.
 - **Minimum identity when detecting common features** — 95 % by default. Lower it to catch
   variants (a promoter a few bases off), raise it to 100 % to accept exact matches only.
+- **Allow Open from NCBI** — on by default. Untick it and **File → Open from NCBI…** (and its
+  link on the welcome screen) is hidden, so nothing in Vettore can use the internet.
 
 - **Open sequence files with Vettore when you double-click them** — only in the Vettore you
   downloaded. Tick it and `.dna`, `.gb`, `.gbk`, `.gbff`, `.ape`, `.embl`, `.fa`, `.fasta`,

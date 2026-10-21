@@ -87,47 +87,109 @@ function OpenWithVettore() {
   );
 }
 
-/** The enzymes in the lab's freezer, picked one by one or pasted as a list. */
-function MyEnzymes(props: { value: string[]; onChange: (names: string[], what: string) => void }) {
+/** Buffer names offered while typing, after the ones the lab already uses. */
+const COMMON_BUFFERS = [
+  "rCutSmart", "NEBuffer r1.1", "NEBuffer r2.1", "NEBuffer r3.1",
+  "FastDigest", "Tango", "Buffer B", "Buffer G", "Buffer O", "Buffer R",
+];
+
+/**
+ * The enzymes in the lab's freezer, each with the buffer the lab digests it in: picked one by
+ * one or pasted as a list (two columns copied from a spreadsheet bring the buffers too).
+ */
+function MyEnzymes(props: {
+  value: string[];
+  buffers: Record<string, string>;
+  onChange: (patch: Partial<Preferences>, what: string) => void;
+}) {
   const [text, setText] = useState("");
   const [unknown, setUnknown] = useState<string[]>([]);
   const addList = () => {
-    const { known, unknown: notFound } = parseEnzymeList(text);
+    const { known, unknown: notFound, buffers } = parseEnzymeList(text);
     const added = known.filter((n) => !props.value.includes(n));
     setUnknown(notFound);
-    if (added.length) props.onChange([...props.value, ...added], `${added.length} enzyme${added.length === 1 ? "" : "s"} added`);
+    if (added.length || Object.keys(buffers).length) {
+      const parts = [added.length && `${added.length} enzyme${added.length === 1 ? "" : "s"} added`,
+        Object.keys(buffers).length && `buffers set for ${Object.keys(buffers).length}`].filter(Boolean);
+      props.onChange({ myEnzymes: [...props.value, ...added], enzymeBuffers: { ...props.buffers, ...buffers } },
+        parts.join(", "));
+    }
     if (!notFound.length) setText("");
   };
+  const setBuffer = (name: string, buffer: string) => {
+    const next = { ...props.buffers };
+    if (buffer.trim()) next[name] = buffer;
+    else delete next[name];
+    props.onChange({ enzymeBuffers: next }, `Buffer of ${name} saved`);
+  };
+  const remove = (name: string) => {
+    const next = { ...props.buffers };
+    delete next[name];
+    props.onChange({ myEnzymes: props.value.filter((n) => n !== name), enzymeBuffers: next }, `${name} removed`);
+  };
+  const suggestions = [...new Set([...Object.values(props.buffers), ...COMMON_BUFFERS])];
   return (
     <div className={`vt-field${unknown.length ? " vt-field-invalid" : ""}`} data-testid="pref-my-enzymes-field">
       <span className="vt-field-label">My enzymes</span>
+      {props.value.length > 0 && (
+        <table className="bp3-html-table bp3-html-table-condensed vt-table vt-my-enzymes" data-testid="pref-my-enzymes-table">
+          <thead><tr><th>Enzyme</th><th>Buffer you digest it in</th><th><span className="vt-sr-only">Remove</span></th></tr></thead>
+          <tbody>
+            {props.value.map((name) => (
+              <tr key={name}>
+                <td>{name}</td>
+                <td>
+                  <input
+                    className="bp3-input bp3-fill"
+                    list="pref-buffer-names"
+                    aria-label={`Buffer for ${name}`}
+                    data-testid={`pref-buffer-${name}`}
+                    placeholder="e.g. rCutSmart"
+                    value={props.buffers[name] ?? ""}
+                    onChange={(e) => setBuffer(name, e.target.value)}
+                  />
+                </td>
+                <td>
+                  <Button small minimal aria-label={`Remove ${name}`} onClick={() => remove(name)}>Remove</Button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      <datalist id="pref-buffer-names">
+        {suggestions.map((b) => <option key={b} value={b} />)}
+      </datalist>
       <EnzymePicker
-        value={props.value}
-        onChange={(names) => props.onChange(names, "My enzymes saved")}
-        max={400}
+        value={[]}
+        onChange={(names) => props.onChange({ myEnzymes: [...props.value, ...names.filter((n) => !props.value.includes(n))] },
+          "My enzymes saved")}
+        max={1}
         testId="pref-my-enzymes"
       />
-      <div className="vt-row">
-        <input
+      <div className="vt-row vt-my-enzymes-paste">
+        <textarea
           className="bp3-input bp3-fill"
+          rows={2}
           data-testid="pref-my-enzymes-list"
           aria-label="Paste a list of enzymes"
           aria-describedby="pref-my-enzymes-hint"
-          placeholder="Or paste a list: EcoRI, BamHI, HindIII…"
+          placeholder="Or paste a list: EcoRI, BamHI, HindIII… or two columns from a spreadsheet: enzyme and buffer"
           value={text}
           onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && addList()}
         />
         <Button data-testid="pref-my-enzymes-add" disabled={!text.trim()} onClick={addList}>Add</Button>
         {props.value.length > 0 && (
-          <Button minimal data-testid="pref-my-enzymes-clear" onClick={() => props.onChange([], "My enzymes cleared")}>
+          <Button minimal data-testid="pref-my-enzymes-clear"
+                  onClick={() => props.onChange({ myEnzymes: [], enzymeBuffers: {} }, "My enzymes cleared")}>
             Clear
           </Button>
         )}
       </div>
       <span className="vt-field-hint" id="pref-my-enzymes-hint">
-        The enzymes in your freezer. Find Diagnostic Digest tries these first; while the list is
-        empty it tries every commercial enzyme.
+        The enzymes in your freezer, with the buffer you digest each one in. Find Diagnostic Digest
+        tries these first, shows each enzyme's buffer and says when two enzymes need different
+        buffers; while the list is empty it tries every commercial enzyme.
       </span>
       {unknown.length > 0 && (
         <span className="vt-field-error" role="alert" data-testid="pref-my-enzymes-unknown">
@@ -251,9 +313,31 @@ function PreferencesDialog(props: ToolProps) {
           </div>
         </Field>
 
-        <MyEnzymes value={prefs.myEnzymes} onChange={(myEnzymes, what) => change({ myEnzymes }, what)} />
+        <MyEnzymes value={prefs.myEnzymes} buffers={prefs.enzymeBuffers} onChange={change} />
 
         <OpenWithVettore />
+
+        <div className="vt-field" data-testid="pref-ncbi-field">
+          <span className="vt-field-label">Internet</span>
+          <label className="bp3-control bp3-checkbox vt-pref-check">
+            <input
+              type="checkbox"
+              data-testid="pref-ncbi"
+              checked={prefs.allowNcbi}
+              aria-describedby="pref-ncbi-hint"
+              onChange={(e) => change({ allowNcbi: e.target.checked },
+                                      e.target.checked ? "Open from NCBI is in the File menu"
+                                                       : "Open from NCBI is hidden")}
+            />
+            <span className="bp3-control-indicator" />
+            Allow Open from NCBI
+          </label>
+          <span className="vt-field-hint" id="pref-ncbi-hint">
+            File → Open from NCBI… downloads a public GenBank record by its accession number. It is
+            the only thing in Vettore that uses the internet, and only when you ask; it sends the
+            accession number and nothing else. Turned off, the menu item is hidden.
+          </span>
+        </div>
 
         {saved && (
           <Callout intent="success" data-testid="pref-saved">{saved}.</Callout>

@@ -1,5 +1,5 @@
 version = 1
-revision = 5
+revision = 3
 requires-python = ">=3.12, <3.14"
 
 [[package]]
@@ -883,6 +883,7 @@ version = "0.3.1"
 source = { editable = "." }
 dependencies = [
     { name = "biopython" },
+    { name = "certifi" },
     { name = "fastapi" },
     { name = "primer3-py" },
     { name = "pydna" },
@@ -905,6 +906,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "biopython", specifier = ">=1.88" },
+    { name = "certifi", specifier = ">=2024.2.2" },
     { name = "fastapi", specifier = ">=0.115" },
     { name = "httpx", marker = "extra == 'dev'", specifier = ">=0.27" },
     { name = "primer3-py", specifier = ">=2.3.1" },

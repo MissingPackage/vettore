@@ -24,6 +24,8 @@ from . import (
     digest_planner,
     fileio,
     gel,
+    msa,
+    ncbi,
     primer_design,
     primer_library,
     sanger,
@@ -113,6 +115,7 @@ class DiagnosticDigestRequest(BaseModel):
     excluded: list[str] = []
     ladder: str = gel.DEFAULT_LADDER
     percent: float = gel.DEFAULT_PERCENT
+    buffers: dict[str, str] = {}      # the lab's buffer per enzyme ("My enzymes")
 
 
 class Unsaved(BaseModel):
@@ -190,6 +193,7 @@ ACTIONS: tuple[tuple[str, str], ...] = (
     ("/api/primer-library", "The primer library"),
     ("/api/cloning/", "The simulation"),
     ("/api/app/samples", "Opening the sample"),
+    ("/api/ncbi/", "Opening the record from NCBI"),
     ("/api/unsaved", "Counting the documents with unsaved changes"),
     ("/api/hand-over", "Opening the file"),
     ("/api/desktop/file-associations", "Changing which program opens sequence files"),
@@ -284,7 +288,7 @@ def create_app(token: str, static_dir: Path | None,
 
     app.include_router(cloning_router)
     # Feature modules own their routes; each exposes ``router``.
-    for module in (alignment, primer_design, primer_library, app_info):
+    for module in (alignment, msa, primer_design, primer_library, app_info, ncbi):
         app.include_router(module.router)
 
     @app.exception_handler(fileio.UnsupportedFile)
@@ -453,7 +457,7 @@ def create_app(token: str, static_dir: Path | None,
         return digest_planner.plan(
             (body.expected.name, body.expected.sequenceData),
             [(alt.name, alt.sequenceData) for alt in body.alternatives],
-            body.enzymes, body.excluded, body.percent, body.ladder)
+            body.enzymes, body.excluded, body.percent, body.ladder, body.buffers)
 
     @app.get("/api/recent")
     def recent() -> dict[str, list[str]]:
