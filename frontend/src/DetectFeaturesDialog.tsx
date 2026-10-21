@@ -46,12 +46,17 @@ function annotatedText(f: Detected): string {
 
 /**
  * "bases 4–708 of 711" when the match covers only part of the catalogue entry, so a 100 %
- * over a shorter stretch is not read as the whole element; null when it covers all of it.
+ * over a shorter stretch is not read as the whole element, and "3 bp inserted" (or missing)
+ * when the vector's copy is longer or shorter than that part; null when neither.
  */
 function partText(f: Detected): string | null {
   const { catalogueFrom: from, catalogueTo: to, catalogueLength: total } = f;
-  if (from == null || to == null || total == null || (from === 1 && to === total)) return null;
-  return `bases ${from}–${to} of ${total}`;
+  if (from == null || to == null || total == null) return null;
+  const pieces: string[] = [];
+  if (from !== 1 || to !== total) pieces.push(`bases ${from}–${to} of ${total}`);
+  const extra = f.length - (to - from + 1);
+  if (extra) pieces.push(`${Math.abs(extra)} bp ${extra > 0 ? "inserted" : "missing"}`);
+  return pieces.length ? pieces.join(", ") : null;
 }
 
 /** A message as a sentence, so another sentence can follow it. */
@@ -268,7 +273,7 @@ export default function DetectFeaturesDialog(props: { doc: OpenDoc; onClose: () 
                       {f.length} bp
                       {partText(f) && (
                         <span className="vt-muted" data-testid="detect-part"
-                              title={`The catalogue entry is ${f.catalogueLength} bp; only these bases of it match here`}>
+                              title={`The catalogue entry is ${f.catalogueLength} bp; this says which of its bases match here, and how much longer or shorter the copy in this sequence is`}>
                           {" "}· {partText(f)}
                         </span>
                       )}

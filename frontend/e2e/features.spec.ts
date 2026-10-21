@@ -198,3 +198,15 @@ test("a coding sequence with a broken reading frame is flagged and not ticked", 
   await expect(row.getByTestId("detect-frameshift")).toContainText("breaks the reading frame");
   await expect(row.getByRole("checkbox")).not.toBeChecked();
 });
+
+test("a coding sequence with a codon put in after its ATG says so", async ({ page }) => {
+  // NeoR in this destination vector starts ATG GGG ATT (an NcoI site): the row annotates the
+  // ORF from that ATG and says the copy has 3 bp the catalogue entry does not.
+  await page.goto(`/?token=${TOKEN}`);
+  await newPlasmid(page, "pDEST-R4-R2", genbankSequence("cloning-multisite-destination-r4r2.gb"));
+  await menu(page, "Features", "Detect Common Features…");
+  const row = page.getByTestId("detect-row").filter({ hasText: "NeoR/KanR" });
+  await expect(row).toBeVisible({ timeout: 30_000 });
+  await expect(row).toContainText("798 bp");
+  await expect(row.getByTestId("detect-part")).toHaveText("· 3 bp inserted");
+});

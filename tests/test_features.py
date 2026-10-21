@@ -154,6 +154,21 @@ def test_a_different_stop_codon_of_the_vector_is_part_of_the_cds(strand):
     assert match.part == (1, 720) and match.identity == pytest.approx(100.0 * 719 / 720)
 
 
+@pytest.mark.parametrize(("linker", "start"), [("ATGGGC", 1), ("ATGCCC", 4), ("ATGTAA", 4),
+                                               ("ATG", 1)])
+def test_an_atg_before_the_match_is_the_start_only_in_an_ncoi_context(linker, start):
+    """EGFP without its ATG, after a linker. ATG GGC is the NcoI start (CCATGG) with a codon
+    put in; ATG CCC is a Met in a linker, and ATG TAA would put a stop in the protein: neither
+    is EGFP's start."""
+    [egfp] = [f for f in catalogue() if f.name == "EGFP"]
+    filler = clean_dna(400, 313)
+    for strand in (1, -1):
+        insert = linker + egfp.sequence[3:]
+        construct = filler + (insert if strand == 1 else rc(insert)) + filler
+        [match] = [m for m in detect(construct, False) if m.name == "EGFP"]
+        assert match.part[0] == start, (linker, strand)
+
+
 @pytest.mark.parametrize(("edit", "frameshift"), [(1, True), (2, True), (3, False)])
 def test_an_indel_that_breaks_the_reading_frame_is_flagged(edit, frameshift):
     """One or two bases missing in the middle of EGFP leave a 99 % match whose protein is
@@ -164,6 +179,17 @@ def test_an_indel_that_breaks_the_reading_frame_is_flagged(edit, frameshift):
     [match] = [m for m in detect(construct, False, min_identity=95.0) if m.name == "EGFP"]
     assert match.frameshift is frameshift
     assert match.as_dict(len(construct))["frameshift"] is frameshift
+
+
+def test_an_insertion_and_a_deletion_that_make_up_for_each_other_are_flagged():
+    """One base in at 300, one out at 330: the frame is right again after, but the ten codons
+    between are another protein."""
+    [egfp] = [f for f in catalogue() if f.name == "EGFP"]
+    seq = egfp.sequence
+    filler = clean_dna(400, 314)
+    edited = seq[:300] + ("A" if seq[300] != "A" else "C") + seq[300:330] + seq[331:]
+    [match] = [m for m in detect(filler + edited + filler, False) if m.name == "EGFP"]
+    assert len(edited) == len(seq) and match.frameshift
 
 
 def test_one_mismatch_in_a_long_element_is_not_shown_as_100_percent():

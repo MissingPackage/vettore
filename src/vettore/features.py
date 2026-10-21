@@ -159,8 +159,10 @@ def _codon_ends(columns: list[Column], target: str, query: str, strand: int) -> 
     """A coding sequence cut to whole codons, with its own start and stop codons put back when
     the vector has them in frame next to the match: a TAG where the catalogue has TAA is still
     the stop, and an ATG one codon before the match is the start, after a codon put in to make
-    an NcoI site (ATG GGG ATT) too. The codon put in is counted as an insertion. On the minus
-    strand the query is the entry's reverse complement, so the stop codon is at its head."""
+    an NcoI site (ATG GGG ATT) too. The codon put in is counted as an insertion, and is only
+    accepted in that context (it starts with G, as CCATGG requires, and is not a stop), so a
+    Met in the linker of a fusion is not taken for the start. On the minus strand the query is
+    the entry's reverse complement, so the stop codon is at its head."""
     starts, stops = {"ATG"}, STOP_CODONS
     if strand == -1:
         starts, stops = {_reverse_complement(c) for c in stops}, {_reverse_complement("ATG")}
@@ -172,7 +174,8 @@ def _codon_ends(columns: list[Column], target: str, query: str, strand: int) -> 
     if first_q == 3:
         for k in range(1, head_reach + 1):
             begin = first_t - 3 * k
-            if begin >= 0 and target[begin : begin + 3] in starts:
+            put_in = target[begin + 3 : first_t]
+            if begin >= 0 and target[begin : begin + 3] in starts and _ncoi_codon(put_in, strand):
                 columns = ([(begin + i, i, target[begin + i] == query[i]) for i in range(3)]
                            + [(begin + 3 + i, None, False) for i in range(3 * (k - 1))]
                            + columns)
@@ -183,7 +186,8 @@ def _codon_ends(columns: list[Column], target: str, query: str, strand: int) -> 
     if last_q == length - 4:
         for k in range(1, tail_reach + 1):
             begin = last_t + 1 + 3 * (k - 1)
-            if target[begin : begin + 3] in stops:
+            put_in = target[last_t + 1 : begin]
+            if target[begin : begin + 3] in stops and _ncoi_codon(put_in, strand):
                 columns = (columns
                            + [(last_t + 1 + i, None, False) for i in range(3 * (k - 1))]
                            + [(begin + i, length - 3 + i,
@@ -192,11 +196,30 @@ def _codon_ends(columns: list[Column], target: str, query: str, strand: int) -> 
     return columns
 
 
+def _ncoi_codon(codon: str, strand: int) -> bool:
+    """Whether a codon put in after the ATG (none at all is fine too) is the one an NcoI site
+    makes, read on the coding strand: it starts with G and is not a stop."""
+    if not codon:
+        return True
+    if strand == -1:
+        codon = _reverse_complement(codon)
+    return codon[0] == "G" and codon not in STOP_CODONS
+
+
 def _frameshift(columns: list[Column]) -> bool:
-    """Whether the gaps inside an alignment change its reading frame."""
-    inserted = sum(1 for _, q, _ in columns if q is None)
-    deleted = sum(1 for t, _, _ in columns if t is None)
-    return (inserted - deleted) % 3 != 0
+    """Whether the gaps inside an alignment break its reading frame: overall, or over a codon
+    or more between an insertion and a deletion that make up for each other."""
+    shift = 0
+    out_of_frame = 0
+    for t, q, _ in columns:
+        shift += (q is None) - (t is None)
+        if shift % 3 and q is not None:
+            out_of_frame += 1
+            if out_of_frame >= 3:
+                return True
+        elif shift % 3 == 0:
+            out_of_frame = 0
+    return shift % 3 != 0
 
 
 def _match_long(target: str, feature: CatalogueFeature, query: str, strand: int,

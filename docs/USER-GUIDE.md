@@ -417,7 +417,8 @@ codon when they sit in frame next to the match: a TAG where the catalogue has TA
 stop, and an ATG followed by a codon put in for an NcoI site (ATG GGG ATT…) is still the start.
 When the match is less than the whole catalogue entry, the Size column says which part, for
 example "708 bp · bases 4–711 of 711" for an mCherry whose first codon is not ATG, and the
-feature's notes say the same. A coding sequence with an insertion or deletion that breaks its
+feature's notes say the same; "798 bp · 3 bp inserted" says the copy here has bases the
+catalogue entry does not. A coding sequence with an insertion or deletion that breaks its
 reading frame is marked "Frameshift" and left unticked: the match can be over 99 % while the
 protein is different after the break.
 
