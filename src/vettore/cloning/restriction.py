@@ -259,15 +259,34 @@ def insert_fragment(vector_doc: SequenceDoc, vector_enzymes: list[str], insert_d
             f"{_end_text(piece.seq.five_prime_end())} / {_end_text(piece.seq.three_prime_end())}."
             + hint) from None
 
+    parents = [vector_doc.name, insert_doc.name]
+    screen: list[Product] = []
+
+    def wrong_clone(molecule: Dseqrecord, label: str, details: str) -> None:
+        screen.append(Product(doc=from_dseqrecord(molecule, f"{vector_doc.name} ({label})"),
+                              operation="Restriction cloning", parents=parents,
+                              details=details, label=label))
+
     if can_join(backbone.record, other):
         warnings.append("Non-directional cloning: the insert can ligate in both orientations; "
                         "screen colonies for the orientation you want")
+        wrong_clone(_rotate_to_origin(_join(backbone.record, other), vector),
+                    "insert in the other orientation",
+                    "The same insert, ligated the other way round")
+    empty = None
     try:
-        circularise(backbone.record)
+        empty = circularise(backbone.record)
         warnings.append("The vector ends are compatible with each other: the backbone can "
                         "re-ligate without insert (dephosphorylate the vector)")
     except IncompatibleEnds:
         pass
+    # Vector that escaped the digest is the background of every restriction cloning; with a
+    # single site, the re-ligated vector is that same molecule.
+    if empty is not None and empty.seguid() != vector.seguid():
+        wrong_clone(_rotate_to_origin(empty, vector), "empty vector, re-ligated",
+                    "The cut vector closed on itself without insert")
+    wrong_clone(vector, "parent vector",
+                "The vector itself: not cut, or cut and closed again without insert")
     if "blunt" in (backbone.left_end[0], backbone.right_end[0]):
         warnings.append("Blunt-end ligation is less efficient than sticky-end ligation")
 
@@ -279,8 +298,9 @@ def insert_fragment(vector_doc: SequenceDoc, vector_enzymes: list[str], insert_d
                f"{backbone.left_enzyme} sites of {vector_doc.name}")
     return CloningResult(
         products=[Product(doc=from_dseqrecord(product, name), operation="Restriction cloning",
-                          parents=[vector_doc.name, insert_doc.name], details=details)],
+                          parents=parents, details=details)],
         warnings=warnings,
+        screen_against=screen,
     )
 
 

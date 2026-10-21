@@ -11,11 +11,12 @@ import {
   CHROME_THEMES,
   defaultPreferences,
   IDENTITY_CHOICES,
+  parseEnzymeList,
   savePreferences,
   usePreferences,
   type Preferences,
 } from "../preferences";
-import { Field } from "../cloning/inputs";
+import { EnzymePicker, Field } from "../cloning/inputs";
 import type { Tool, ToolProps } from "./types";
 import "./preferences.css";
 
@@ -82,6 +83,58 @@ function OpenWithVettore() {
       )}
       {error && <span className="vt-field-error" role="alert" data-testid="pref-open-with-error">{error}</span>}
       {done && !busy && <span className="vt-pref-done" role="status" data-testid="pref-open-with-done">{done}</span>}
+    </div>
+  );
+}
+
+/** The enzymes in the lab's freezer, picked one by one or pasted as a list. */
+function MyEnzymes(props: { value: string[]; onChange: (names: string[], what: string) => void }) {
+  const [text, setText] = useState("");
+  const [unknown, setUnknown] = useState<string[]>([]);
+  const addList = () => {
+    const { known, unknown: notFound } = parseEnzymeList(text);
+    const added = known.filter((n) => !props.value.includes(n));
+    setUnknown(notFound);
+    if (added.length) props.onChange([...props.value, ...added], `${added.length} enzyme${added.length === 1 ? "" : "s"} added`);
+    if (!notFound.length) setText("");
+  };
+  return (
+    <div className={`vt-field${unknown.length ? " vt-field-invalid" : ""}`} data-testid="pref-my-enzymes-field">
+      <span className="vt-field-label">My enzymes</span>
+      <EnzymePicker
+        value={props.value}
+        onChange={(names) => props.onChange(names, "My enzymes saved")}
+        max={400}
+        testId="pref-my-enzymes"
+      />
+      <div className="vt-row">
+        <input
+          className="bp3-input bp3-fill"
+          data-testid="pref-my-enzymes-list"
+          aria-label="Paste a list of enzymes"
+          aria-describedby="pref-my-enzymes-hint"
+          placeholder="Or paste a list: EcoRI, BamHI, HindIII…"
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && addList()}
+        />
+        <Button data-testid="pref-my-enzymes-add" disabled={!text.trim()} onClick={addList}>Add</Button>
+        {props.value.length > 0 && (
+          <Button minimal data-testid="pref-my-enzymes-clear" onClick={() => props.onChange([], "My enzymes cleared")}>
+            Clear
+          </Button>
+        )}
+      </div>
+      <span className="vt-field-hint" id="pref-my-enzymes-hint">
+        The enzymes in your freezer. Find Diagnostic Digest tries these first; while the list is
+        empty it tries every commercial enzyme.
+      </span>
+      {unknown.length > 0 && (
+        <span className="vt-field-error" role="alert" data-testid="pref-my-enzymes-unknown">
+          Vettore does not know {unknown.map((u) => `“${u}”`).join(", ")}. Check the spelling
+          (for example HindIII, not Hind3), then add {unknown.length === 1 ? "it" : "them"} again.
+        </span>
+      )}
     </div>
   );
 }
@@ -197,6 +250,8 @@ function PreferencesDialog(props: ToolProps) {
             </select>
           </div>
         </Field>
+
+        <MyEnzymes value={prefs.myEnzymes} onChange={(myEnzymes, what) => change({ myEnzymes }, what)} />
 
         <OpenWithVettore />
 

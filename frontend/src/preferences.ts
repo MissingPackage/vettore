@@ -2,7 +2,7 @@
 // Changes apply immediately: components read them through `usePreferences`, which re-renders
 // every subscriber when something is saved.
 import { useEffect, useState } from "react";
-import { DEFAULT_ENZYME_SET, ENZYME_SETS, type EnzymeSetId } from "./enzymeLogic";
+import { DEFAULT_ENZYME_SET, ENZYMES, ENZYME_SETS, type EnzymeSetId } from "./enzymeLogic";
 
 const KEY = "vettore-preferences";
 
@@ -17,6 +17,9 @@ export interface Preferences {
   detectMinIdentity: number;
   /** The frame around the work (menus, tabs, status bar): light, dark, or as the system is set. */
   chrome: ChromeTheme;
+  /** The enzymes in the lab's freezer: Find Diagnostic Digest tries these first. Empty until
+   * the user fills it in, and then the commercial set is used. */
+  myEnzymes: string[];
 }
 
 export type ChromeTheme = "light" | "dark" | "system";
@@ -35,6 +38,7 @@ const DEFAULTS: Preferences = {
   gelPercent: 1.0,
   detectMinIdentity: 95,
   chrome: "light",
+  myEnzymes: [],
 };
 
 function clean(stored: Partial<Preferences>): Preferences {
@@ -46,18 +50,41 @@ function clean(stored: Partial<Preferences>): Preferences {
     prefs.detectMinIdentity = DEFAULTS.detectMinIdentity;
   }
   if (!CHROME_THEMES.some((t) => t.id === prefs.chrome)) prefs.chrome = DEFAULTS.chrome;
+  prefs.myEnzymes = knownEnzymes(prefs.myEnzymes);
   return prefs;
 }
 
 export function defaultPreferences(): Preferences {
-  return { ...DEFAULTS };
+  return { ...DEFAULTS, myEnzymes: [] };
+}
+
+/** Enzyme names as the database writes them, each once; anything else is dropped. */
+export function knownEnzymes(names: unknown): string[] {
+  if (!Array.isArray(names)) return [];
+  const out: string[] = [];
+  for (const raw of names) {
+    const name = typeof raw === "string" ? ENZYMES[raw.trim().toLowerCase()]?.name : undefined;
+    if (name && !out.includes(name)) out.push(name);
+  }
+  return out;
+}
+
+/**
+ * Enzyme names typed or pasted as a list (commas, spaces, semicolons or new lines between
+ * them, as copied from a spreadsheet): the names Vettore knows, and the words it does not.
+ */
+export function parseEnzymeList(text: string): { known: string[]; unknown: string[] } {
+  const words = text.split(/[\s,;]+/).map((w) => w.trim()).filter(Boolean);
+  const known = knownEnzymes(words);
+  const unknown = words.filter((w) => !ENZYMES[w.toLowerCase()]);
+  return { known, unknown: [...new Set(unknown)] };
 }
 
 export function loadPreferences(): Preferences {
   try {
     return clean(JSON.parse(localStorage.getItem(KEY) ?? "{}") as Partial<Preferences>);
   } catch {
-    return { ...DEFAULTS };
+    return defaultPreferences();
   }
 }
 

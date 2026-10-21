@@ -1,0 +1,72 @@
+/* Tools → Find Diagnostic Digest. Colours and spacing come from theme/tokens.css. */
+.vt-digest-wrong {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--vt-space-1);
+}
+
+.vt-digest-wrong > li.vt-card {
+  flex-direction: row;
+  align-items: center;
+  padding: var(--vt-space-1) var(--vt-space-2);
+  justify-content: space-between;
+  gap: var(--vt-space-2);
+}
+
+.vt-digest-gel-setup > .vt-field {
+  flex: 1;
+}
+
+/* The list scrolls on its own, so the gel of the chosen digest stays in view below it. */
+.vt-digest-results {
+  max-height: 240px;
+  overflow-y: auto;
+  margin: 0 0 var(--vt-space-3);
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--vt-space-1);
+}
+
+.vt-digest-result {
+  display: flex;
+  gap: var(--vt-space-2);
+  align-items: flex-start;
+  padding: var(--vt-space-1) var(--vt-space-2);
+  border: 1px solid var(--vt-border-subtle);
+  border-radius: var(--vt-radius);
+  background: var(--vt-surface);
+  cursor: pointer;
+  line-height: var(--vt-line-height-tight);
+}
+
+.vt-digest-result > input {
+  margin-top: 3px;
+}
+
+.vt-digest-result:hover {
+  background: var(--vt-surface-hover);
+}
+
+.vt-digest-result-chosen,
+.vt-digest-result-chosen:hover {
+  background: var(--vt-selection);
+  border-color: var(--vt-accent-border);
+}
+
+.vt-digest-sentence {
+  color: var(--vt-text);
+  font-size: var(--vt-font-size-sm);
+}
+
+.vt-digest-same {
+  font-size: var(--vt-font-size-xs);
+}
+
+.vt-digest-gel {
+  overflow-x: auto;
+}

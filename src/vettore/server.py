@@ -18,7 +18,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import alignment, app_info, fileio, gel, primer_design, sanger, settings, tm
+from . import alignment, app_info, digest_planner, fileio, gel, primer_design, sanger, settings, tm
 from . import features as common_features
 from .cloning.api import router as cloning_router
 from .cloning.base import CloningError, dna_sequence
@@ -82,6 +82,24 @@ class GelLane(BaseModel):
 
 class GelRequest(BaseModel):
     lanes: list[GelLane]
+    ladder: str = gel.DEFAULT_LADDER
+    percent: float = gel.DEFAULT_PERCENT
+
+
+class DigestMolecule(BaseModel):
+    name: str
+    sequenceData: dict[str, Any]
+
+
+class DiagnosticDigestRequest(BaseModel):
+    """The expected clone and the wrong clones to tell apart from it. ``enzymes`` None tries
+    the whole commercial set; ``excluded`` are enzymes methylation would block (the interface
+    holds REBASE's methylation table)."""
+
+    expected: DigestMolecule
+    alternatives: list[DigestMolecule]
+    enzymes: list[str] | None = None
+    excluded: list[str] = []
     ladder: str = gel.DEFAULT_LADDER
     percent: float = gel.DEFAULT_PERCENT
 
@@ -154,6 +172,7 @@ ACTIONS: tuple[tuple[str, str], ...] = (
     ("/api/features/", "Detecting common features"),
     ("/api/sanger/", "Aligning the reads"),
     ("/api/gel", "Simulating the gel"),
+    ("/api/diagnostic-digest", "Finding a diagnostic digest"),
     ("/api/tm", "Calculating the Tm"),
     ("/api/alignment/", "Aligning the sequences"),
     ("/api/primer-design/", "Designing primers"),
@@ -414,6 +433,15 @@ def create_app(token: str, static_dir: Path | None,
             raise HTTPException(422, gel.unknown_ladder(body.ladder))
         return gel.simulate([(lane.name, lane.sequenceData, lane.enzymes) for lane in body.lanes],
                             body.ladder, body.percent)
+
+    @app.post("/api/diagnostic-digest")
+    def diagnostic_digest(body: DiagnosticDigestRequest) -> dict[str, Any]:
+        if body.ladder not in gel.LADDERS:
+            raise HTTPException(422, gel.unknown_ladder(body.ladder))
+        return digest_planner.plan(
+            (body.expected.name, body.expected.sequenceData),
+            [(alt.name, alt.sequenceData) for alt in body.alternatives],
+            body.enzymes, body.excluded, body.percent, body.ladder)
 
     @app.get("/api/recent")
     def recent() -> dict[str, list[str]]:

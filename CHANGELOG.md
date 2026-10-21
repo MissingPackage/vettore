@@ -12,6 +12,13 @@ The download links in the README always point to the latest release.
 - File → Preferences → Appearance can make the menus, tabs and status bar dark, or follow the system; the map, sequence and dialogs stay light.
 - Movement is short (under a quarter of a second), never touches the map, sequence or tables, and is switched off when the system asks for reduced motion.
 
+## Unreleased — choosing a diagnostic digest
+
+- Tools → Find Diagnostic Digest… finds the single or double digest that tells the expected clone apart from the wrong ones on one gel, and lists the best ten with one sentence each ("Expected clone: 4.2 kb + 1.1 kb; parent vector: 4.4 kb"). Choosing one draws its gel next to your ladder; Send to Gel Simulation opens it with one lane per outcome, and Copy as Protocol copies enzymes, gel and expected sizes.
+- A product of restriction cloning remembers its wrong clones (insert in the other orientation, vector closed without insert, parent vector, and the simulation's other products), and the digest planner starts from them.
+- Enzymes that Dam or Dcm methylation blocks on the plasmids are left out and named, unless the DNA comes from a dam−/dcm− strain.
+- File → Preferences → My enzymes keeps the enzymes in your freezer (empty until you fill it in; a list can be pasted from a spreadsheet); the digest planner tries them first.
+
 ## 0.3.1 — more promoters, with their species
 
 - Detect Common Features knows the PGK (human and mouse), UbC, H1, 7SK and SFFV promoters and the full-length CAG promoter (CMV enhancer, chicken β-actin promoter and chimeric intron), each taken from a public GenBank record and cross-checked against a second, independent one.
