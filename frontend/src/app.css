@@ -81,6 +81,18 @@ body { overflow: hidden; }
 .vt-viewtab:hover:not(:disabled):not(.active) { background: var(--vt-overlay-hover); color: var(--vt-text-strong); }
 .vt-viewtab.active { color: var(--vt-text-strong); font-weight: var(--vt-weight-strong); }
 .vt-viewtab:disabled { color: var(--vt-text-faint); cursor: default; }
+.vt-viewbar-end { display: flex; align-items: center; gap: var(--vt-space-3); min-width: 0; }
+/* Looks like a search field so it reads as "type to find", but opens the menu search. */
+.vt-command-search {
+  display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 4px 0 8px;
+  border: 1px solid var(--vt-border); border-radius: var(--vt-radius);
+  background: var(--vt-surface-subtle); color: var(--vt-text-muted); font: inherit; font-size: var(--vt-font-size-sm);
+  cursor: pointer; white-space: nowrap;
+  transition: border-color var(--vt-duration), color var(--vt-duration), background-color var(--vt-duration);
+}
+.vt-command-search:hover { border-color: var(--vt-accent-border); color: var(--vt-text-strong); background: var(--vt-surface); }
+.vt-command-search:focus-visible { outline: 2px solid var(--vt-focus); outline-offset: 2px; }
+.vt-command-search .vt-kbd { line-height: 16px; }
 .vt-enzyme-set { display: flex; align-items: center; color: var(--vt-text-muted); white-space: nowrap; }
 .vt-enzyme-set select {
   font: inherit; height: 24px; padding: 0 var(--vt-space-1);

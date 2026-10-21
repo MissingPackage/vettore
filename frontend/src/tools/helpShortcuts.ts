@@ -49,7 +49,7 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { keys: "Ctrl+G", what: "Go to a position" },
       { keys: "Ctrl+A", what: "Select the whole sequence" },
       { keys: "Ctrl+I", what: "Select everything except the current selection" },
-      { keys: "Ctrl+/", what: "Search the menus by name" },
+      { keys: "Ctrl+/", what: "Search the menu commands by name" },
     ],
   },
   {

@@ -80,6 +80,30 @@
   border-radius: var(--vt-radius-sm);
 }
 
+/* ---- the menu search (Help, Ctrl+/) ------------------------------------------------------------ */
+/* A wide list like a command palette; the menu each command sits in is written at the 12px
+   minimum (the editor sets it inline at 8px). */
+:root .tg-menu-search-suggestions .bp3-menu {
+  min-width: 420px;
+  max-height: min(420px, calc(100vh - 160px));
+  overflow-y: auto;
+  padding: var(--vt-space-1);
+}
+:root .tg-menu-search-suggestions .bp3-menu-item {
+  border-radius: var(--vt-radius-sm);
+  align-items: center;
+}
+:root .tg-menu-search-suggestions .bp3-menu-item-label > span {
+  font-size: var(--vt-font-size-xs) !important;
+  color: var(--vt-text-muted);
+}
+:root .tg-menu-search-suggestions .bp3-menu-item.bp3-active .bp3-menu-item-label > span {
+  color: var(--vt-text-on-accent-muted);
+}
+:root .tg-menu-bar-help-search .bp3-input {
+  min-width: 280px;
+}
+
 /* ---- links out of the app ---------------------------------------------------------------- */
 /* The digest tool links to the editor component's online documentation. Vettore runs offline,
    and in the desktop window the link would open a page that cannot load. */

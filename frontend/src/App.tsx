@@ -702,6 +702,32 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, circular]);
 
+  // ---- command search ----------------------------------------------------------------------
+  // The search box lives at the top of the Help menu; the editor's own shortcut for it is Cmd+/
+  // only, and works only once Help has been opened. Ctrl+/ and the view bar's button open Help
+  // with the box focused.
+  const openCommandSearch = useCallback(() => {
+    if (!activeDoc) return;
+    const help = [...document.querySelectorAll<HTMLElement>(`.veEditor.${activeDoc.editorName} .tg-menu-bar-item`)]
+      .find((b) => b.textContent === "Help");
+    if (!help) return;
+    const input = () => document.querySelector<HTMLInputElement>(".tg-menu-bar-help-search input");
+    if (!input()) help.click();
+    requestAnimationFrame(() => input()?.focus());
+  }, [activeDoc]);
+  useEffect(() => {
+    // Capture phase, before the editor's own hotkey handler can toggle the box shut again.
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key === "/") {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        openCommandSearch();
+      }
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [openCommandSearch]);
+
   // ---- keyboard shortcuts not handled by OVE --------------------------------------------
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -860,6 +886,16 @@ export default function App() {
   const viewBar = (
       <div className="vt-viewbar" style={{ height: VIEWBAR_HEIGHT }}>
         <ViewTabs view={activeDoc?.view ?? null} onSelect={selectView} />
+        <span className="vt-viewbar-end">
+        {activeDoc && (
+          <button className="vt-command-search" data-testid="command-search" onClick={openCommandSearch}
+                  title="Find any menu command by name">
+            <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor"
+                 strokeWidth={2.2} strokeLinecap="round"><circle cx="11" cy="11" r="6" /><path d="m20 20-4.5-4.5" /></svg>
+            Search commands
+            <span className="vt-kbd">Ctrl+/</span>
+          </button>
+        )}
         {activeDoc && (
           <label className="vt-enzyme-set">
             Enzymes:&nbsp;
@@ -874,6 +910,7 @@ export default function App() {
             </select>
           </label>
         )}
+        </span>
       </div>
   );
 

@@ -8,6 +8,7 @@ import { ENZYME_SETS, type EnzymeSetId } from "./enzymeSets";
 import { TOOLS } from "./tools";
 import type { MenuName } from "./tools/types";
 import type { ViewId } from "./views";
+import { rankMenuItems } from "./menuSearch";
 
 export interface MenuHandlers {
   newFile: () => void;
@@ -272,9 +273,13 @@ export function buildMenu(ref: MutableRefObject<MenuHandlers>) {
       ],
     };
 
-    // Help keeps the editor's menu search; its About, version and hotkey list described the
-    // embedded editor, not Vettore, and doubled Vettore's own About and Keyboard Shortcuts.
-    const search = ((help?.submenu as MenuItem[]) ?? []).filter((m) => typeof m === "object" && m.isMenuSearch);
+    // Help keeps the editor's menu search, ranked by Vettore (menuSearch.tsx); its About, version
+    // and hotkey list described the embedded editor, not Vettore, and doubled Vettore's own
+    // About and Keyboard Shortcuts.
+    const search = ((help?.submenu as MenuItem[]) ?? [])
+      .filter((m) => typeof m === "object" && m.isMenuSearch)
+      .map((m) => ({ ...(m as object), itemListPredicate: rankMenuItems,
+                     inputProps: { placeholder: "Search commands (Ctrl+/)" } }));
     const helpMenu = { ...help, text: "Help", submenu: tidy([...search, ...toolItems("Help")]) };
 
     // Menu order: File, Edit, View, Enzymes, Features, Primers, Actions, Tools, Help.
