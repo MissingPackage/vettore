@@ -36,6 +36,10 @@ export interface MenuHandlers {
   tool: (id: string) => void;
   /** Open one of the sample constructs that come with Vettore, unsaved. */
   openSample: (id: string) => void;
+  /** File → Open from NCBI…: a GenBank record by its accession. */
+  openFromNcbi: () => void;
+  /** Preference "Allow Open from NCBI": the menu item is hidden when it is off. */
+  allowNcbi: boolean;
   recent: string[];
   samples: Sample[];
   hasDocument: boolean;
@@ -138,6 +142,9 @@ export function buildMenu(ref: MutableRefObject<MenuHandlers>) {
             onClick: () => h().openSample(s.id),
           })),
         },
+        ...(h().allowNcbi
+          ? [{ text: "Open from NCBI…", "data-test": "open-from-ncbi", onClick: () => h().openFromNcbi() }]
+          : []),
         "--",
         { text: "Close", hotkey: "mod+w", onClick: () => h().close() },
         { cmd: "saveSequence", text: "Save" },

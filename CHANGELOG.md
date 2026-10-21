@@ -2,6 +2,12 @@
 
 The download links in the README always point to the latest release.
 
+## Unreleased — opening a record from NCBI
+
+- File → Open from NCBI… opens a public GenBank record by its accession number (for example MT612431.1) as a new, unsaved document; the welcome screen has the same link. It is the only thing in Vettore that uses the internet, only when you press Open, and it sends nothing but the accession number; no account is needed.
+- Offline, the dialog says so plainly and stays open; nothing else in Vettore changes. A mistyped or unknown accession, and a genome too large to open, each get one sentence saying what to do.
+- File → Preferences → Allow Open from NCBI (on by default) hides the menu item when unticked.
+
 ## Unreleased — a lighter, clearer frame
 
 - The frame is lighter: toolbar tools that are on are white keys with a thin blue outline instead of solid squares, document tabs lose their folder borders, and the view tabs (Map, Sequence, Enzymes…) are one segmented control whose white marker slides to the open view. Nothing moved: menus, tabs, panes and shortcuts are where they were.

@@ -11,6 +11,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -171,6 +172,13 @@ def main() -> int:
         assert any(Path(exe).name in line for line in planned), planned
         assert all(any(ext in line for line in planned) for ext in assoc["extensions"]), planned
         assert call("desktop/file-associations") == assoc
+        # Open from NCBI is in the bundle; a name that is not an accession is refused before
+        # anything is sent, so this runs offline too.
+        try:
+            call("ncbi/fetch", {"accession": "not an accession"})
+            raise AssertionError("Open from NCBI accepted a name that is not an accession")
+        except urllib.error.HTTPError as exc:
+            assert exc.code == 422, exc.code
         hand_over(exe, env)
         saved_files = work / "saved"
         saved_files.mkdir()
