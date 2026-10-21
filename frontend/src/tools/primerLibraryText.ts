@@ -16,6 +16,8 @@ export interface LibraryPrimer {
   degenerate?: boolean;
   /** Long enough to be looked for on sequences (at least 15 nt). */
   searched?: boolean;
+  /** Added in this window (typed or imported), not read from the file. */
+  fresh?: boolean;
 }
 
 export interface RejectedRow {
@@ -39,8 +41,10 @@ export interface Binding {
 export interface BoundPrimer extends LibraryPrimer {
   /** Where it binds; empty when it binds too many places to draw (see `sites`). */
   bindings: Binding[];
-  /** How many places it binds. */
+  /** How many places it binds (every 3′ position inside a repeat counts). */
   sites: number;
+  /** Some of those places are a repeat (overlapping positions). */
+  repeat?: boolean;
 }
 
 /** Today as YYYY-MM-DD in the user's own time zone, for "date added". */
@@ -170,13 +174,18 @@ export function mergeImport(existing: LibraryPrimer[], incoming: LibraryPrimer[]
 
 const EDITABLE = ["name", "notes", "location", "added"] as const;
 
+type Fields = Partial<Record<(typeof EDITABLE)[number], string>>;
+const fieldsOf = (p: LibraryPrimer): Fields => Object.fromEntries(EDITABLE.map((k) => [k, p[k]]));
+
 /** What the dialog changed since it read the file, as the engine's save takes it: primers
- * added, only the changed fields of primers it had, and sequences removed. Applied to the file
- * as it is then, so a colleague's own edits and deletions in the meantime stay. */
+ * added, the changed fields of primers it had, and the primers removed. Each change carries the
+ * primer as loaded (`was`), so the engine finds that very row (not another tube of the same
+ * oligo) in the file as it is then; a colleague's own edits and deletions stay. A primer
+ * removed and added again is an edit marked `readd`, so it comes back even if deleted meanwhile. */
 export function saveChanges(loaded: LibraryPrimer[], current: LibraryPrimer[]): {
   added: LibraryPrimer[];
-  edited: ({ sequence: string } & Partial<Record<(typeof EDITABLE)[number], string>>)[];
-  removed: string[];
+  edited: ({ sequence: string; was: Fields; readd?: boolean } & Fields)[];
+  removed: { sequence: string; was: Fields }[];
 } {
   const before = new Map(loaded.map((p) => [p.sequence, p]));
   const now = new Set(current.map((p) => p.sequence));
@@ -185,9 +194,11 @@ export function saveChanges(loaded: LibraryPrimer[], current: LibraryPrimer[]): 
     const was = before.get(p.sequence);
     if (!was) return [];
     const changed = Object.fromEntries(EDITABLE.filter((k) => p[k] !== was[k]).map((k) => [k, p[k]]));
-    return Object.keys(changed).length ? [{ sequence: p.sequence, ...changed }] : [];
+    if (p.fresh) return [{ sequence: p.sequence, was: fieldsOf(was), readd: true, ...fieldsOf(p) }];
+    return Object.keys(changed).length ? [{ sequence: p.sequence, was: fieldsOf(was), ...changed }] : [];
   });
-  const removed = loaded.filter((p) => !now.has(p.sequence)).map((p) => p.sequence);
+  const removed = loaded.filter((p) => !now.has(p.sequence))
+    .map((p) => ({ sequence: p.sequence, was: fieldsOf(p) }));
   return { added, edited, removed };
 }
 
@@ -196,5 +207,5 @@ export function newEntry(name: string, sequence: string, today: string,
                          notes = "", location = ""): LibraryPrimer {
   const seq = cleanSequence(sequence);
   return { name: name.trim() || "(unnamed)", sequence: seq, notes, location, added: today,
-           length: seq.length, tm: null };
+           length: seq.length, tm: null, fresh: true };
 }

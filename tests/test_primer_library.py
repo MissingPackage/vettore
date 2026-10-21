@@ -193,7 +193,7 @@ def headers():
 def test_save_then_get_round_trips_through_the_file(client):
     rows = [{"name": "M13F", "sequence": "GTAAAACGACGGCCAGT", "notes": "", "location": "box 1", "added": "2024-01-02"}]
     saved = client.post("/api/primer-library/save", json={"added": rows}, headers=headers())
-    assert saved.status_code == 200 and saved.json()["count"] == 1
+    assert saved.status_code == 200 and saved.json()["added"] == 1
     got = client.get("/api/primer-library", headers=headers())
     assert got.status_code == 200
     body = got.json()
@@ -282,7 +282,7 @@ def test_saving_keeps_unreadable_rows_and_the_files_separator(library_file):
     lib = pl.read_library()
     assert [p["name"] for p in lib["primers"]] == ["M13F"] and len(lib["rejected"]) == 2
     new = pl.Primer("KanR_F", "ATGATTGAACAAGATGGATTGCAC")
-    result = pl.write_library([new], {"GTAAAACGACGGCCAGT": {"notes": "box 3"}})
+    result = pl.write_library([new], [pl.Change("GTAAAACGACGGCCAGT", {"name": "M13F"}, {"notes": "box 3"})])
     assert result["kept"] == 2
     raw = library_file.read_bytes()
     assert raw.startswith(b"\xef\xbb\xbf")             # a BOM, so Excel shows µ and accents
@@ -347,13 +347,13 @@ def test_extra_columns_and_the_header_survive_a_save(library_file):
                 "M13F;GTAAAACGACGGCCAGT;53;17;Anna;box 3\r\n")
     library_file.write_bytes(original.encode("utf-8"))
     result = pl.write_library([pl.Primer("KanR_F", "ATGATTGAACAAGATGGATTGCAC")],
-                              {"GTAAAACGACGGCCAGT": {"notes": "box 4"}})
+                              [pl.Change("GTAAAACGACGGCCAGT", {"name": "M13F"}, {"notes": "box 4"})])
     text = library_file.read_bytes().decode("utf-8-sig")
     lines = text.split("\r\n")
     assert lines[0] == "Nome;Sequenza;Tm;Lunghezza;Chi;Note"            # header as written
     assert lines[1] == "M13F;GTAAAACGACGGCCAGT;53;17;Anna;box 4"        # Tm, length, who stay
     assert lines[2] == "KanR_F;ATGATTGAACAAGATGGATTGCAC"
-    assert result["count"] == 2
+    assert (result["added"], result["changed"]) == (1, 1)
 
 
 def test_a_name_column_wins_over_an_id_column():
@@ -365,8 +365,8 @@ def test_rows_stay_in_their_columns_whatever_the_column_order(library_file):
     library_file.write_text("sequence,name,notes\nGTAAAACGACGGCCAGT,M13F,u\nnot-dna,Broken,fix me\n",
                             encoding="utf-8")
     before = pl.read_library()
-    pl.write_library([], {"GTAAAACGACGGCCAGT": {"notes": "v"}})
-    pl.write_library([], {"GTAAAACGACGGCCAGT": {"notes": "u"}})
+    pl.write_library([], [pl.Change("GTAAAACGACGGCCAGT", {"name": "M13F"}, {"notes": "v"})])
+    pl.write_library([], [pl.Change("GTAAAACGACGGCCAGT", {"name": "M13F"}, {"notes": "u"})])
     after = pl.read_library()
     assert [p["name"] for p in after["primers"]] == ["M13F"]   # the name never becomes a sequence
     assert after["rejected"] == before["rejected"]
@@ -378,7 +378,8 @@ def test_an_unchanged_file_is_written_back_byte_for_byte(library_file):
             "Inosine;ACGTIACGT;keep\r\n")
     library_file.write_bytes(b"\xef\xbb\xbf" + body.encode("utf-8"))
     # The dialog sends every field of every primer as it has them: nothing differs, nothing moves.
-    edits = {p["sequence"]: {k: p[k] for k in pl.EDITABLE} for p in pl.read_library()["primers"]}
+    edits = [pl.Change(p["sequence"], {k: p[k] for k in pl.EDITABLE}, {k: p[k] for k in pl.EDITABLE})
+             for p in pl.read_library()["primers"]]
     pl.write_library([], edits)
     assert library_file.read_bytes() == b"\xef\xbb\xbf" + body.encode("utf-8")   # lowercase kept
 
@@ -387,7 +388,7 @@ def test_excels_sep_line_names_the_separator_and_stays(library_file):
     library_file.write_text("sep=;\nname;sequence;notes\nM13F;GTAAAACGACGGCCAGT;a, b\n", encoding="utf-8")
     lib = pl.read_library()
     assert lib["delimiter"] == ";" and lib["primers"][0]["notes"] == "a, b"
-    pl.write_library([], {"GTAAAACGACGGCCAGT": {"notes": "a, b; c"}})
+    pl.write_library([], [pl.Change("GTAAAACGACGGCCAGT", {"name": "M13F"}, {"notes": "a, b; c"})])
     assert library_file.read_text(encoding="utf-8-sig").startswith("sep=;")
 
 
@@ -407,7 +408,7 @@ def test_files_that_are_not_a_primer_list_are_refused_and_left_alone(library_fil
     library_file.write_bytes(data)
     if words is None:                      # Excel's "Unicode text" (UTF-16) is read and kept so
         assert pl.read_library()["primers"][0]["name"] == "M13F"
-        pl.write_library([], {"GTAAAACGACGGCCAGT": {"notes": "x"}})
+        pl.write_library([], [pl.Change("GTAAAACGACGGCCAGT", {"name": "M13F"}, {"notes": "x"})])
         assert library_file.read_bytes().startswith((b"\xff\xfe", b"\xfe\xff"))
         return
     with pytest.raises(pl.PrimerLibraryError, match=words):
@@ -444,8 +445,8 @@ def test_saving_applies_only_this_windows_changes(client):
                             "M13R;CAGGAAACAGCTATGAC;\nT7;TAATACGACTCACTATAGGG;\n", encoding="utf-8")
     # B edits M13F's notes and removes T7; A, who loaded the same file, only adds SP6.
     b = client.post("/api/primer-library/save", headers=headers(), json={
-        "edited": [{"sequence": "GTAAAACGACGGCCAGT", "notes": "B's note"}],
-        "removed": ["TAATACGACTCACTATAGGG"]})
+        "edited": [{"sequence": "GTAAAACGACGGCCAGT", "was": {"name": "M13F"}, "notes": "B's note"}],
+        "removed": [{"sequence": "TAATACGACTCACTATAGGG", "was": {"name": "T7"}}]})
     assert b.status_code == 200
     a = client.post("/api/primer-library/save", headers=headers(), json={
         "added": [{"name": "SP6", "sequence": "ATTTAGGTGACACTATAG"}]})
@@ -454,7 +455,7 @@ def test_saving_applies_only_this_windows_changes(client):
     assert body["primers"][0]["notes"] == "B's note"                          # B's edit stays
     # An edit to a primer someone deleted meanwhile is not saved, and is counted.
     c = client.post("/api/primer-library/save", headers=headers(), json={
-        "edited": [{"sequence": "TAATACGACTCACTATAGGG", "notes": "too late"}]})
+        "edited": [{"sequence": "TAATACGACTCACTATAGGG", "was": {"name": "T7"}, "notes": "too late"}]})
     assert c.json()["gone"] == 1 and "T7" not in [p["name"] for p in c.json()["primers"]]
 
 
@@ -519,7 +520,7 @@ def test_a_reversed_region_on_a_linear_sequence_is_refused(client):
 def test_a_new_column_goes_past_cells_the_header_does_not_name(library_file):
     library_file.write_text("Name;Sequence\nM13F;GTAAAACGACGGCCAGT;box 3\nM13R;CAGGAAACAGCTATGAC;box 4\n",
                             encoding="utf-8")
-    pl.write_library([], {"GTAAAACGACGGCCAGT": {"notes": "NEW"}})
+    pl.write_library([], [pl.Change("GTAAAACGACGGCCAGT", {"name": "M13F"}, {"notes": "NEW"})])
     text = library_file.read_text(encoding="utf-8-sig")
     assert "M13F;GTAAAACGACGGCCAGT;box 3;NEW" in text and "M13R;CAGGAAACAGCTATGAC;box 4\n" in text
     assert text.startswith("Name;Sequence;;notes")
@@ -531,7 +532,7 @@ def test_a_quote_never_closed_is_refused_not_swallowing_the_rows_below(library_f
     with pytest.raises(pl.PrimerLibraryError, match="quote"):
         pl.read_library()
     with pytest.raises(pl.PrimerLibraryError):
-        pl.write_library([], {"GTAAAACGACGGCCAGT": {"notes": "NEW"}})
+        pl.write_library([], [pl.Change("GTAAAACGACGGCCAGT", {"name": "M13F"}, {"notes": "NEW"})])
     assert library_file.read_bytes() == data
 
 
@@ -540,7 +541,7 @@ def test_title_rows_above_the_header_are_kept(library_file):
     library_file.write_text(body, encoding="utf-8")
     [p] = pl.read_library()["primers"]
     assert (p["name"], p["notes"]) == ("M13F", "box 3")
-    pl.write_library([], {"GTAAAACGACGGCCAGT": {"notes": "box 4"}})
+    pl.write_library([], [pl.Change("GTAAAACGACGGCCAGT", {"name": "M13F"}, {"notes": "box 4"})])
     assert library_file.read_text(encoding="utf-8-sig") == body.replace("box 3", "box 4")
 
 
@@ -558,7 +559,8 @@ def test_a_no_op_save_leaves_odd_rows_exactly_as_written(library_file):
     body = ('name;sequence;notes\r\n;GTAAAACGACGGCCAGT;nameless\r\n M13R ;CAGGAAACAGCTATGAC\r\n'
             'T7;TAATACGACTCACTATAGGG;"line1\nline2"\r\n')
     library_file.write_bytes(body.encode("utf-8"))
-    edits = {p["sequence"]: {k: p[k] for k in pl.EDITABLE} for p in pl.read_library()["primers"]}
+    edits = [pl.Change(p["sequence"], {k: p[k] for k in pl.EDITABLE}, {k: p[k] for k in pl.EDITABLE})
+             for p in pl.read_library()["primers"]]
     pl.write_library([], edits)
     assert library_file.read_bytes().decode("utf-8-sig") == body
 
@@ -602,3 +604,63 @@ def test_a_primer_in_a_short_repeat_is_not_offered_as_a_product():
     [site] = [b for b in pl.find_bindings(rev, seq, False) if b.strand == -1]
     assert site.positions > 1
     assert pl.amplified_products([pl.Primer("F", fwd), pl.Primer("R", rev)], seq, False) == []
+
+
+# ---- fourth review: two tubes of one oligo, look-alike headers, nearby sites -------------
+
+TUBES = "name;sequence;location\nM13F-tube2;GTAAAACGACGGCCAGT;box7\nM13F;GTAAAACGACGGCCAGT;box1\n"
+LOADED_M13F = {"name": "M13F", "notes": "", "location": "box1", "added": ""}
+
+
+def test_an_edit_lands_on_the_tube_it_was_made_on(library_file):
+    # The dialog loaded the file with M13F first; a colleague then put tube 2 above it.
+    library_file.write_text(TUBES, encoding="utf-8")
+    pl.write_library([], [pl.Change("GTAAAACGACGGCCAGT", LOADED_M13F, {"location": "box1 A4"})])
+    text = library_file.read_text(encoding="utf-8-sig")
+    assert "M13F-tube2;GTAAAACGACGGCCAGT;box7" in text and "M13F;GTAAAACGACGGCCAGT;box1 A4" in text
+
+
+def test_removing_a_tube_removes_that_tube_only(library_file):
+    library_file.write_text(TUBES, encoding="utf-8")
+    pl.write_library([], removed=[pl.Change("GTAAAACGACGGCCAGT", LOADED_M13F)])
+    assert library_file.read_text(encoding="utf-8-sig") == (
+        "name;sequence;location\nM13F-tube2;GTAAAACGACGGCCAGT;box7\n")
+    # The colleague had already removed that tube: the other tube is left alone.
+    result = pl.write_library([], removed=[pl.Change("GTAAAACGACGGCCAGT", LOADED_M13F)])
+    assert result["gone"] == 1 and [p["name"] for p in result["primers"]] == ["M13F-tube2"]
+
+
+def test_a_primer_removed_and_added_again_comes_back_even_if_deleted_meanwhile(library_file):
+    library_file.write_text("name;sequence\nM13R;CAGGAAACAGCTATGAC\n", encoding="utf-8")
+    result = pl.write_library([], [pl.Change("GTAAAACGACGGCCAGT", {"name": "M13F"},
+                                             {"name": "M13F", "notes": "again"}, readd=True)])
+    assert [p["name"] for p in result["primers"]] == ["M13R", "M13F"] and result["gone"] == 0
+
+
+def test_a_data_row_starting_with_seq_is_not_a_header():
+    text = "M13F;GTAAAACGACGGCCAGT\nSeq1;CAGGAAACAGCTATGAC;primer\nT7;TAATACGACTCACTATAGGG\n"
+    primers, rejected = pl.parse_csv(text)
+    assert rejected == [] and [p.name for p in primers] == ["M13F", "Seq1", "T7"]
+
+
+def test_gene_names_are_not_taken_for_sequences():
+    primers, _ = pl.parse_csv("ACTB;CATGTACGTTGCTATCCAGGC;box1\nMYC;to order;\nHBB;?;\n")
+    assert [(p.name, p.sequence) for p in primers] == [("ACTB", "CATGTACGTTGCTATCCAGGC")]
+
+
+@pytest.mark.parametrize("row", ['A;GTAAAACGACGGCCAGT;"GFP" fusion', '"A" old;GTAAAACGACGGCCAGT;x',
+                                 'A;GTAAAACGACGGCCAGT;"Box 3", shelf'])
+def test_hand_typed_quotes_are_read_as_excel_reads_them(row):
+    primers, rejected = pl.parse_csv(f"name;sequence;notes\n{row}\nB;CAGGAAACAGCTATGAC;y\n")
+    assert rejected == [] and len(primers) == 2
+
+
+def test_a_primer_with_a_second_site_nearby_is_not_offered_for_sequencing_or_a_product():
+    fwd = "TTGCATTCGAATGACCTGAT"
+    seq = linear("G" * 200 + fwd + "CCCCC" + fwd, "A" * 300, "T" * 200)
+    assert pl.sequencing_primers([pl.Primer("S", fwd)], seq, False, 330, 360) == []
+    rev = "GGTTACCGATTACGCATTGC"
+    seq2 = seq + rc(rev) + "G" * 50
+    primers = [pl.Primer("F", fwd), pl.Primer("R", rev)]
+    assert len(pl.amplified_products(primers, seq2, False)) == 2      # two bands...
+    assert pl.product_over_region(primers, seq2, False, 300, 400) is None   # ...so not offered

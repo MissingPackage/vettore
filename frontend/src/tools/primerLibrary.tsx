@@ -112,16 +112,21 @@ function PrimerLibraryDialog(props: ToolProps) {
       const changes = saveChanges(file.primers, primers);
       const saved = await api.primerLibrary.save(changes);
       const mine = new Set([...primers, ...file.primers].map((p) => p.sequence));
+      const after = new Set(saved.primers.map((p) => p.sequence));
       const theirs = saved.primers.filter((p) => !mine.has(p.sequence)).length;
+      const dropped = primers.filter((p) => !after.has(p.sequence)).length - saved.gone;
       setFile(saved);
       setPrimers(saved.primers);
       setDirty(false);
+      const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
       const extra = [
-        theirs && `${theirs} primer${theirs === 1 ? "" : "s"} someone else added since you opened the file ${theirs === 1 ? "is" : "are"} kept and now listed.`,
-        saved.gone && `${saved.gone} of your edits ${saved.gone === 1 ? "was" : "were"} not saved: someone had removed ${saved.gone === 1 ? "that primer" : "those primers"} from the file meanwhile.`,
+        saved.skipped && `${plural(saved.skipped, "primer you added was", "primers you added were")} already in the file (someone added the same oligo meanwhile): the file's entry is kept.`,
+        saved.gone && `${plural(saved.gone, "change was", "changes were")} not saved: someone had removed that primer, renamed it or changed its sequence meanwhile.`,
+        theirs && `${plural(theirs, "primer", "primers")} someone else added meanwhile ${theirs === 1 ? "is" : "are"} now listed.`,
+        dropped > 0 && `${plural(dropped, "primer", "primers")} someone else removed meanwhile ${dropped === 1 ? "is" : "are"} no longer listed.`,
       ].filter(Boolean).join(" ");
-      setNotice({ intent: saved.gone ? "warning" : "success",
-                  text: `Saved to ${baseName(saved.path)}: ${changes.added.length} added, ${changes.edited.length} changed, ${changes.removed.length} removed.${extra ? " " + extra : ""}` });
+      setNotice({ intent: saved.gone || saved.skipped ? "warning" : "success",
+                  text: `Saved to ${baseName(saved.path)}: ${saved.added} added, ${saved.changed} changed, ${saved.removed} removed.${extra ? " " + extra : ""}` });
       return true;
     } catch (e) {
       setError(messageOf(e));
@@ -194,7 +199,7 @@ function PrimerLibraryDialog(props: ToolProps) {
     setBusy(true);
     try {
       const parsed = await api.primerLibrary.parse(text);
-      const incoming = parsed.primers.map((p) => ({ ...p, added: p.added || today }));
+      const incoming = parsed.primers.map((p) => ({ ...p, added: p.added || today, fresh: true }));
       const { merged, added, duplicates } = mergeImport(primers, incoming);
       change(merged);
       setImportText(null);
@@ -331,11 +336,11 @@ function PrimerLibraryDialog(props: ToolProps) {
                   <td>{p.tm === null ? "—" : `${p.tm.toFixed(1)} °C`}</td>
                   <td>
                     <input className="bp3-input bp3-small vt-pl-edit" aria-label={`Notes for ${p.name}`}
-                           value={p.notes} onChange={(e) => editField(p, "notes", e.target.value)} />
+                           value={p.notes} disabled={busy} onChange={(e) => editField(p, "notes", e.target.value)} />
                   </td>
                   <td>
                     <input className="bp3-input bp3-small vt-pl-edit" aria-label={`Location of ${p.name}`}
-                           placeholder="box 3 A4" value={p.location}
+                           placeholder="box 3 A4" value={p.location} disabled={busy}
                            onChange={(e) => editField(p, "location", e.target.value)} />
                   </td>
                   <td className="vt-muted">{p.added || "—"}</td>
@@ -343,7 +348,7 @@ function PrimerLibraryDialog(props: ToolProps) {
                     <Button small minimal icon="duplicate" aria-label={`Copy ${p.name}`}
                             data-testid="pl-copy" onClick={() => copyOne(p)} />
                     <Button small minimal icon="trash" aria-label={`Remove ${p.name}`}
-                            data-testid="pl-remove" onClick={() => remove(p)} />
+                            data-testid="pl-remove" disabled={busy} onClick={() => remove(p)} />
                   </td>
                 </tr>
               ))}
@@ -362,7 +367,7 @@ function PrimerLibraryDialog(props: ToolProps) {
                    value={adding.notes} onChange={(e) => setAdding({ ...adding, notes: e.target.value })} />
             <input className="bp3-input bp3-small" data-testid="pl-add-location" placeholder="box 3 A4"
                    value={adding.location} onChange={(e) => setAdding({ ...adding, location: e.target.value })} />
-            <Button small intent="primary" data-testid="pl-add-button" onClick={addPrimer}>Add</Button>
+            <Button small intent="primary" data-testid="pl-add-button" disabled={busy} onClick={addPrimer}>Add</Button>
           </div>
         </div>
 
@@ -380,7 +385,7 @@ function PrimerLibraryDialog(props: ToolProps) {
                     <b>{p.name}</b>{" "}
                     {p.bindings.length === 0 && (
                       <span className="vt-muted" data-testid="pl-bound-many">
-                        binds {p.sites} places (a repeat): not drawn on the map
+                        binds {p.sites} places{p.repeat ? " (a repeat)" : ""}: not drawn on the map
                       </span>
                     )}
                     {p.bindings.map((b, i) => (

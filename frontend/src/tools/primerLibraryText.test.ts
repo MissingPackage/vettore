@@ -122,7 +122,7 @@ describe("orderingText and newEntry", () => {
   });
   it("stamps a new entry with today's date and cleans the sequence", () => {
     const e = newEntry("  KanR_F ", "acg t", "2026-10-21", "note", "box 1");
-    expect(e).toMatchObject({ name: "KanR_F", sequence: "ACGT", added: "2026-10-21", location: "box 1", length: 4 });
+    expect(e).toMatchObject({ name: "KanR_F", sequence: "ACGT", added: "2026-10-21", location: "box 1", length: 4, fresh: true });
   });
 });
 
@@ -133,8 +133,13 @@ describe("saveChanges", () => {
     const c = primer({ name: "C", sequence: "GGGGAAAATT" });
     const changes = saveChanges([a, b], [{ ...a, notes: "new" }, c]);
     expect(changes.added.map((p) => p.name)).toEqual(["C"]);
-    expect(changes.edited).toEqual([{ sequence: "AAAACCCCGG", notes: "new" }]);
-    expect(changes.removed).toEqual(["TTTTGGGGCC"]);
+    expect(changes.edited).toEqual([{ sequence: "AAAACCCCGG", was: { name: "A", notes: "n", location: "", added: "" }, notes: "new" }]);
+    expect(changes.removed).toEqual([{ sequence: "TTTTGGGGCC", was: { name: "B", notes: "", location: "", added: "" } }]);
+  });
+  it("marks a primer removed and added again, so it comes back", () => {
+    const again = { ...b, name: "B2", fresh: true };
+    const [e] = saveChanges([a, b], [a, again]).edited;
+    expect(e).toMatchObject({ sequence: "TTTTGGGGCC", readd: true, name: "B2", was: { name: "B" } });
   });
   it("sends nothing when nothing changed", () => {
     expect(saveChanges([a, b], [a, b])).toEqual({ added: [], edited: [], removed: [] });

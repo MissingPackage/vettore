@@ -202,10 +202,10 @@ export const api = {
     /** Point the library at a .csv (kept in a shared folder) and read it. */
     setPath: (path: string) => call<LibraryFile>("primer-library/path", { path }),
     /** Apply the dialog's changes (see primerLibraryText.saveChanges) to the shared .csv as it is
-     * now. Returns the library as read back, with how many primers were written and how many
-     * edits were lost because someone had deleted that primer. */
-    save: (changes: { added?: object[]; edited?: object[]; removed?: string[] }) =>
-      call<LibraryFile & { count: number; kept: number; gone: number }>(
+     * now. Returns the library as read back, with how many rows were added, changed and removed,
+     * additions skipped (the file had that oligo already) and changes whose row had gone. */
+    save: (changes: { added?: object[]; edited?: object[]; removed?: object[] }) =>
+      call<LibraryFile & { added: number; changed: number; removed: number; skipped: number; gone: number; kept: number }>(
         "primer-library/save", changes),
     /** Parse pasted or file text (name, sequence, notes…) without saving, so the dialog can show
      * what will be kept and what will be left out. */

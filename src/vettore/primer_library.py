@@ -185,8 +185,8 @@ def _header_index(cells: list[str]) -> tuple[dict[str, int], list[int]] | None:
     index = {column: pos for column, (_, pos) in best.items()}
     if "name" not in index or "sequence" not in index:
         return None
-    if _is_dna(cells[index["sequence"]]):
-        return None                      # "ACGT..." under the name column: data, not a header
+    if _is_dna(cells[index["sequence"]]) or any(_is_oligo(c) for c in cells):
+        return None                      # a row holding a primer's sequence is data, not a header
     return index, [pos for _, pos in sorted(sequences)]
 
 
@@ -201,6 +201,14 @@ def _is_dna(cell: str) -> bool:
     try:
         clean_sequence(cell)
         return True
+    except PrimerLibraryError:
+        return False
+
+
+def _is_oligo(cell: str, shortest: int = MIN_LENGTH) -> bool:
+    """A cell that is DNA as long as a primer: "ACTB" or "MYC" are gene names, not oligos."""
+    try:
+        return len(clean_sequence(cell)) >= shortest
     except PrimerLibraryError:
         return False
 
@@ -241,6 +249,10 @@ class _Row:
     cells: list[str]
     raw: str
     key: str | None = None
+    #: The row's cleaned oligo when it has one (a second tube of a primer included).
+    seq: str | None = None
+    #: The row's name, notes, location and date, as read.
+    fields: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -268,9 +280,9 @@ def _positional(body: list[_Row]) -> dict[str, int]:
     """Columns of a file or paste without a header: name, sequence, notes, location, added;
     or sequence first (then name) when it is the first column that holds DNA."""
     rows = [r.cells for r in body if any(c.strip() for c in r.cells)][:50]
-    first = sum(bool(c) and _is_dna(c[0]) for c in rows)
-    second = sum(len(c) > 1 and _is_dna(c[1]) for c in rows)
-    if rows and first > second:
+    first = sum(bool(c) and _is_oligo(c[0], 10) for c in rows)
+    second = sum(len(c) > 1 and _is_oligo(c[1], 10) for c in rows)
+    if rows and first > 2 * second:
         return {"sequence": 0, "name": 1, "notes": 2, "location": 3, "added": 4}
     return {name: pos for pos, name in enumerate(COLUMNS)}
 
@@ -300,20 +312,38 @@ def parse_text(text: str) -> LibraryText:
             yield line
 
     try:
-        for cells in csv.reader(feed(), delimiter=delimiter, strict=True):
+        for cells in csv.reader(feed(), delimiter=delimiter):
             rows.append(_Row(cells, "".join(consumed)))
             consumed.clear()
     except csv.Error as exc:
         line = sum(len(_lines(r.raw)) for r in rows) + 1
         raise PrimerLibraryError(
             f"the row starting on line {line + len(preamble)} could not be read as spreadsheet "
-            f"columns ({exc}); a quote (\") that is opened and never closed does this.") from exc
+            f"columns ({exc}).") from exc
+    line = len(preamble) + 1
+    for row in rows:
+        # A quote opened and never closed makes the rows below one cell: refuse, rather than
+        # rewrite that cell and lose them. A note written on several lines is fine.
+        for cell in row.cells:
+            parts = re.split(r"\r\n|\r|\n", cell)
+            if len(parts) > 1 and any(any(_is_oligo(c) for c in _split(part, delimiter)[1:])
+                                      for part in parts[1:]):
+                raise PrimerLibraryError(
+                    f"a quote (\") opened on line {line} is never closed, so the rows below it "
+                    "would be read as one cell. Close the quote, or remove it, in a text editor.")
+        line += len(_lines(row.raw))
 
     found = None
     for pos, row in enumerate(rows):
         if sum(any(c.strip() for c in r.cells) for r in rows[:pos]) >= _HEADER_SEARCH:
             break
         if any(c.strip() for c in row.cells) and (found := _header_index(row.cells)):
+            below = [r.cells for r in rows[pos + 1:] if any(c.strip() for c in r.cells)][:50]
+            elsewhere = any(any(_is_oligo(x) for x in c) for c in below)
+            if elsewhere and not any(any(p < len(c) and _is_dna(c[p]) for c in below)
+                                     for p in found[1]):
+                found = None              # the oligos are in other columns: not this header
+                continue
             lib.header = row
             lib.preamble += [r.raw for r in rows[:pos]]
             lib.rows = rows[pos + 1:]
@@ -333,8 +363,11 @@ def parse_text(text: str) -> LibraryText:
             continue
         name = _cell(row.cells, lib.index, "name")
         raw_seq = _cell(row.cells, lib.index, "sequence")
+        row.fields = {k: _cell(row.cells, lib.index, k) for k in EDITABLE}
+        row.fields["name"] = row.fields["name"] or "(unnamed)"
         try:
             sequence = clean_sequence(raw_seq)
+            row.seq = sequence
         except PrimerLibraryError as exc:
             lib.rejected.append({"name": name, "sequence": raw_seq, "reason": str(exc)})
             continue
@@ -374,25 +407,59 @@ def _write_row(cells: list[str], delimiter: str, newline: str) -> str:
 EDITABLE = ("name", "notes", "location", "added")
 
 
+@dataclass
+class Change:
+    """One change the dialog made to a primer it loaded: ``sequence`` (cleaned), ``was`` (its
+    name, notes, location and date as loaded, which tell its row apart from another tube of the
+    same oligo), and ``values``, the fields to set (none for a removal). ``readd``: the user
+    removed it and added it again, so it is added back if the row has gone meanwhile."""
+
+    sequence: str
+    was: dict[str, str] = field(default_factory=dict)
+    values: dict[str, str] = field(default_factory=dict)
+    readd: bool = False
+
+
+def _same_fields(row: _Row, was: dict[str, str]) -> bool:
+    return bool(was) and all(row.fields.get(k, "") == (v or "").strip() for k, v in was.items()
+                             if k in EDITABLE)
+
+
+def _find_row(rows: list[_Row], change: Change, taken: set[int]) -> int | None:
+    """The row a change is about: among the rows with its oligo (a second tube included), the
+    one whose fields are still those the dialog loaded, else the only one with the name it had.
+    None when it cannot be told for sure (the row has gone, or was renamed meanwhile): nothing
+    is then written to, or removed from, another tube."""
+    rows_with = [i for i, r in enumerate(rows) if r.seq == change.sequence and i not in taken]
+    for i in rows_with:
+        if _same_fields(rows[i], change.was):
+            return i
+    name = (change.was.get("name") or "").strip()
+    named = [i for i in rows_with if name and rows[i].fields.get("name") == name]
+    return named[0] if len(named) == 1 else None
+
+
 def merged_text(current: LibraryText | None, added: list[Primer],
-                edits: dict[str, dict[str, str]] | None = None,
-                removed: set[str] = frozenset()) -> tuple[str, dict[str, int]]:
+                edits: list[Change] | None = None,
+                removed: list[Change] | None = None) -> tuple[str, dict[str, int]]:
     """The file's new text after a save from the dialog. The file is read again at save time
     and only the dialog's own changes are applied to it, so two people editing it never undo
     each other's work:
 
-    - ``edits`` (sequence → the fields changed in the dialog) change only those cells of that
-      primer's row; its other cells, any extra columns and the sequence as written stay;
-    - a row whose sequence is in ``removed`` (deleted in the dialog) goes;
-    - ``added`` primers not in the file are added at the end (one already there is left as is);
+    - each edit changes only the fields it names, on the row it is about (found by
+      ``_find_row``: a second tube of the same oligo is never touched by mistake); its other
+      cells, any extra columns and the sequence as written stay;
+    - each removal deletes the row it is about;
+    - ``added`` primers whose oligo is not in the file are added at the end;
     - every other row stays exactly as it is, byte for byte: primers a colleague added, edited
       or kept, and rows Vettore could not read. A primer a colleague deleted stays deleted.
 
-    Returns the text and counts: ``count`` primers written (added or changed), ``kept``
-    unreadable rows kept, and ``gone`` edits not saved because someone had deleted that primer
-    meanwhile.
+    Returns the text and counts: ``added``, ``changed`` and ``removed`` rows; ``skipped``,
+    added primers whose oligo the file already had; ``gone``, edits and removals not applied
+    because their row was no longer in the file (or could not be told apart); ``kept``,
+    unreadable rows kept as they are.
     """
-    edits = edits or {}
+    edits, removed = edits or [], removed or []
     lib = current or LibraryText(delimiter=";")
     nl = lib.newline
     index = dict(lib.index)
@@ -400,13 +467,42 @@ def merged_text(current: LibraryText | None, added: list[Primer],
     if current is None or (header is None and not any(r.cells for r in lib.rows)):
         header = list(COLUMNS)
         index = {name: pos for pos, name in enumerate(COLUMNS)}
-    in_file = {row.key for row in lib.rows if row.key is not None}
-    fresh = [p for p in added if p.sequence not in in_file]
+    counts = {"added": 0, "changed": 0, "removed": 0, "skipped": 0, "gone": 0,
+              "kept": len(lib.rejected)}
+
+    taken: set[int] = set()
+    drop: set[int] = set()
+    for change in removed:
+        if (i := _find_row(lib.rows, change, taken)) is None:
+            counts["gone"] += 1
+        else:
+            taken.add(i)
+            drop.add(i)
+    edit_at: dict[int, dict[str, str]] = {}
+    for change in edits:
+        values = {k: (v or "").strip() for k, v in change.values.items() if k in EDITABLE}
+        if (i := _find_row(lib.rows, change, taken)) is not None:
+            taken.add(i)
+            edit_at[i] = values
+        elif change.readd:
+            added = [*added, Primer(sequence=change.sequence, **{
+                k: values.get(k, change.was.get(k, "")) for k in EDITABLE})]
+        else:
+            counts["gone"] += 1
+    in_file = {row.seq for row in lib.rows if row.seq is not None}
+    fresh, seen = [], set()
+    for p in added:
+        if p.sequence in in_file or p.sequence in seen:
+            counts["skipped"] += p.sequence in in_file
+            continue
+        seen.add(p.sequence)
+        fresh.append(p)
+
     if header is not None:                # a column the file lacks, but the dialog now fills
         width = max([len(header)] + [len(r.cells) for r in lib.rows])
         for column in COLUMNS:
             needed = any(getattr(p, column) for p in fresh) or any(
-                e.get(column) for e in edits.values())
+                v.get(column) for v in edit_at.values())
             if column not in index and needed:
                 index[column] = width     # past every cell of every row: nothing is overwritten
                 header += [""] * (width - len(header)) + [column]
@@ -429,24 +525,19 @@ def merged_text(current: LibraryText | None, added: list[Primer],
     if header is not None:
         same = lib.header is not None and header == lib.header.cells
         out.append(lib.header.raw if same else _write_row(header, lib.delimiter, nl))
-    counts = {"count": 0, "kept": len(lib.rejected), "gone": 0}
-    seen_edits = set()
-    for row in lib.rows:
-        if row.key is not None and row.key in removed:
+    for i, row in enumerate(lib.rows):
+        if i in drop:
+            counts["removed"] += 1
             continue
-        if row.key is not None and row.key in edits:
-            seen_edits.add(row.key)
-            cells = apply(row.cells, {k: v for k, v in edits[row.key].items() if k in EDITABLE})
-            if cells != row.cells:
-                out.append(_write_row(cells, lib.delimiter, nl))
-                counts["count"] += 1
-                continue
+        if i in edit_at and (cells := apply(row.cells, edit_at[i])) != row.cells:
+            out.append(_write_row(cells, lib.delimiter, nl))
+            counts["changed"] += 1
+            continue
         out.append(row.raw)
-    counts["gone"] = len(set(edits) - seen_edits - removed)
     for p in fresh:
         values = {column: getattr(p, column) for column in COLUMNS}
         out.append(_write_row(apply([], values), lib.delimiter, nl))
-        counts["count"] += 1
+        counts["added"] += 1
     for i, line in enumerate(out[:-1]):    # a last line without a newline, now followed by more
         if not line.endswith(("\n", "\r")):
             out[i] = line + nl
@@ -534,21 +625,15 @@ def read_library() -> dict[str, Any]:
             "primers": [p.as_dict() for p in lib.primers], "rejected": lib.rejected}
 
 
-def write_library(added: list[Primer], edits: dict[str, dict[str, str]] | None = None,
-                  removed: list[str] | tuple[str, ...] = ()) -> dict[str, Any]:
+def write_library(added: list[Primer], edits: list[Change] | None = None,
+                  removed: list[Change] | None = None) -> dict[str, Any]:
     """Apply the dialog's changes to the shared file as it is now (see ``merged_text``): a
     colleague's work and the rows Vettore could not read stay, and the file keeps its
     separator, header and extra columns. Returns the library as read back, with the counts."""
     path = settings.primer_library_path()
     check_library_path(str(path))
     current, _, encoding = _read_file()
-    gone = set()
-    for raw in removed:
-        try:
-            gone.add(clean_sequence(raw))
-        except PrimerLibraryError:
-            continue
-    text, counts = merged_text(current, added, edits, gone)
+    text, counts = merged_text(current, added, edits, removed)
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         tmp = path.with_name(f".{path.name}.vettore-tmp")
@@ -747,7 +832,7 @@ def library_on_sequence(primers: list[Primer], sequence: str, circular: bool) ->
         if not bindings:
             continue
         sites = sum(b.positions for b in bindings)
-        entry = {**p.as_dict(), "sites": sites}
+        entry = {**p.as_dict(), "sites": sites, "repeat": any(b.positions > 1 for b in bindings)}
         entry["bindings"] = [] if sites > MAX_SITES else [b.as_dict() for b in bindings]
         found.append(entry)
     return found
@@ -812,11 +897,19 @@ def product_over_region(primers: list[Primer], sequence: str, circular: bool,
     whose template between the two primers holds the whole region [start, end] (0-based
     inclusive; on a circular sequence ``start > end`` crosses the origin), or None. Bases under
     a primer come from the primer, not the template, so the region must lie between the 3′
-    ends. Used to tell the user "you already have F and R"."""
+    ends. A pair that would make more than one product (a primer with a second site near the
+    other) is not offered. Used to tell the user "you already have F and R"."""
     n = len(sequence)
     if n == 0:
         return None
-    for product in amplified_products(primers, sequence, circular, max_product=max_size):
+    every = amplified_products(primers, sequence, circular)
+    pairs: dict[tuple[str, str], int] = {}
+    for product in every:
+        key = (product["forward_sequence"], product["reverse_sequence"])
+        pairs[key] = pairs.get(key, 0) + 1
+    for product in every:
+        if pairs[(product["forward_sequence"], product["reverse_sequence"])] > 1:
+            continue                      # the pair would give more than one band
         if not min_size <= product["size"] <= max_size:
             continue
         f3, r3 = product["forward_three_prime"], product["reverse_three_prime"]
@@ -834,15 +927,21 @@ def sequencing_primers(primers: list[Primer], sequence: str, circular: bool,
     """Library primers that read across the region [start, end]: a forward primer whose 3′ end
     is at least SEQ_PRIMER_MIN bases before the region, a reverse primer the same after it, and
     the whole region within SEQ_READ_LENGTH of the 3′ end. ``reads_from`` is the distance from
-    the 3′ end to the region's nearer edge. Forward primers first, nearest first."""
+    the 3′ end to the region's nearer edge. Only primers with one site on the template: a second
+    site would lay a second trace over the read. Forward primers first, nearest first."""
     seq = sequence.upper()
     n = len(seq)
     if n == 0:
         return []
     region = _span(start, end, n) if circular else end - start + 1
     forwards, reverses = _bindings_by_strand(primers, seq, circular)
+    sites: dict[str, int] = {}
+    for p, _ in forwards + reverses:
+        sites[p.sequence] = sites.get(p.sequence, 0) + 1
     out = []
     for p, b in forwards + reverses:
+        if sites[p.sequence] > 1:
+            continue                      # a second site would superimpose a second trace
         if b.strand == 1:
             distance = _span(b.end, start, n) - 1 if circular else start - b.end
         else:
@@ -868,7 +967,7 @@ class SaveLibrary(BaseModel):
 
     added: list[dict[str, Any]] = []
     edited: list[dict[str, Any]] = []
-    removed: list[str] = []
+    removed: list[dict[str, Any] | str] = []
 
 
 class ImportText(BaseModel):
@@ -956,15 +1055,21 @@ def set_path(body: SetPath) -> dict[str, Any]:
 @router.post("/save")
 def save_library(body: SaveLibrary) -> dict[str, Any]:
     added = _primers_from_payload(body.added)
-    edits: dict[str, dict[str, str]] = {}
-    for row in body.edited:
+
+    def change(row: dict[str, Any] | str) -> Change:
+        row = {"sequence": row} if isinstance(row, str) else row
         try:
             sequence = clean_sequence(str(row.get("sequence", "")))
         except PrimerLibraryError as exc:
             raise HTTPException(422, f"“{row.get('name') or 'A primer'}”: {exc}") from exc
-        edits[sequence] = {k: str(row[k] or "").strip() for k in EDITABLE if k in row}
+        was = row.get("was") if isinstance(row.get("was"), dict) else {}
+        return Change(sequence, {k: str(was.get(k) or "") for k in EDITABLE if k in was},
+                      {k: str(row[k] or "") for k in EDITABLE if k in row}, bool(row.get("readd")))
+
+    edits = [change(row) for row in body.edited]
+    removed = [change(row) for row in body.removed]
     try:
-        return write_library(added, edits, body.removed)
+        return write_library(added, edits, removed)
     except PrimerLibraryError as exc:
         raise HTTPException(422, str(exc)) from exc
 
