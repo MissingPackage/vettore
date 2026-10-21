@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { Sample } from "./api";
 import { baseName } from "./documents";
 import { HelpDialogById } from "./tools/help";
+import MiniMap from "./MiniMap";
 import "./Welcome.css";
 
 /** Shown while no document is open: what Vettore is, and the three ways in. */
@@ -38,15 +39,18 @@ export default function Welcome(props: {
 
       <div className="vt-welcome-actions">
         <button className="vt-primary" data-testid="open" onClick={props.onOpen}>
+          <ActionIcon d="M3 7h6l2 2h10v10H3z" />
           Open a file…
           <span>Ctrl+O</span>
         </button>
         <button data-testid="new" onClick={props.onNew}>
+          <ActionIcon d="M6 3h9l4 4v14H6z M12 10v7 M8.5 13.5h7" />
           New DNA file…
           <span>Ctrl+N</span>
         </button>
         {props.onPaste && (
           <button data-testid="paste" onClick={props.onPaste}>
+            <ActionIcon d="M8 4h8v4H8z M8 6H5v15h14V6h-3" />
             Paste a sequence…
             <span>Ctrl+Shift+V</span>
           </button>
@@ -64,22 +68,27 @@ export default function Welcome(props: {
             Public GenBank records that come with Vettore. They open unsaved, so you can edit
             and cut them without touching anything of yours.
           </p>
-          <ul>
+          <ul className="vt-sample-cards">
             {samples.map((s) => (
               <li key={s.id}>
                 <button
-                  className="vt-link"
+                  className="vt-sample-card"
                   data-testid={`sample-${s.id}`}
                   disabled={opening !== null}
                   onClick={() => openSample(s.id)}
                 >
-                  {s.label}
+                  {s.length && s.features ? <MiniMap length={s.length} features={s.features} /> : null}
+                  <span className="vt-sample-text">
+                    <span className="vt-sample-name">{s.label}</span>
+                    <span className="vt-welcome-note">{s.description}</span>
+                    <span className="vt-sample-meta vt-num">
+                      {s.length ? `${s.length.toLocaleString("en-US")} bp` : ""}
+                      {s.length && s.accession ? " · " : ""}
+                      {s.accession ?? ""}
+                      {opening === s.id ? " · opening…" : ""}
+                    </span>
+                  </span>
                 </button>
-                <span className="vt-welcome-note">
-                  {s.description}
-                  {s.accession ? ` · ${s.accession}` : ""}
-                  {opening === s.id ? " · opening…" : ""}
-                </span>
               </li>
             ))}
           </ul>
@@ -118,5 +127,15 @@ export default function Welcome(props: {
       </div>
       {help && <HelpDialogById id={help} onClose={() => setHelp(null)} />}
     </div>
+  );
+}
+
+/** A line icon before each welcome action, drawn in the button's text colour. */
+function ActionIcon(props: { d: string }) {
+  return (
+    <svg className="vt-welcome-icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"
+         fill="none" stroke="currentColor" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round">
+      <path d={props.d} />
+    </svg>
   );
 }

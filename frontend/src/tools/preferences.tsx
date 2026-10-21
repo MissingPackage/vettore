@@ -8,6 +8,7 @@ import { associationHint, movedNote, overriddenNote } from "../files/association
 import { messageOf } from "../files/notices";
 import { ENZYME_SETS } from "../enzymeLogic";
 import {
+  CHROME_THEMES,
   defaultPreferences,
   IDENTITY_CHOICES,
   savePreferences,
@@ -115,6 +116,21 @@ function PreferencesDialog(props: ToolProps) {
           The defaults Vettore starts from. Changes apply straight away and are kept for the
           next time you open the app; documents already open keep what you chose for them.
         </p>
+
+        <Field
+          label="Appearance"
+          hint="Dark keeps the map, the sequence and dialogs light: only menus, tabs and the status bar change."
+        >
+          <div className="bp3-html-select bp3-fill">
+            <select
+              data-testid="pref-chrome"
+              value={prefs.chrome}
+              onChange={(e) => change({ chrome: e.target.value as Preferences["chrome"] }, "Appearance saved")}
+            >
+              {CHROME_THEMES.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
+            </select>
+          </div>
+        </Field>
 
         <Field
           label="Enzyme set for documents you open"

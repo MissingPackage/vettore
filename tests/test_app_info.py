@@ -41,6 +41,15 @@ def test_samples_are_listed_with_a_label_and_one_line_of_description():
         assert len(sample["description"]) < 160
 
 
+def test_samples_carry_an_outline_for_their_mini_map():
+    samples = {s["id"]: s for s in get("/api/app/samples").json()["samples"]}
+    puc = samples["puc19"]
+    assert puc["length"] == 2686 and puc["circular"] is True
+    assert 0 < len(puc["features"]) <= 12
+    assert all(f["type"] != "source" for f in puc["features"])
+    assert all(0 <= f["start"] < puc["length"] and 0 <= f["end"] < puc["length"] for f in puc["features"])
+
+
 def test_opening_a_sample_gives_an_unsaved_document_named_after_the_construct():
     result = get("/api/app/samples/puc19").json()
     assert result["path"] is None          # unsaved: Save must ask where to write

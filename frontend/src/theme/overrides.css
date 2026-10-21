@@ -58,6 +58,52 @@
   content: "Alt+";
 }
 
+/* ---- the editor's toolbar ------------------------------------------------------------------- */
+/* Icons without a fill; a tool that is switched on (enzymes, features, primers shown) is a white
+   key with a thin accent outline instead of a solid blue square, and hover is a light tint.
+   Positions, order and tooltips stay the editor's. */
+:root .veToolbar .veToolbarItemOuter .bp3-button.bp3-minimal {
+  border-radius: var(--vt-radius);
+  transition: background-color var(--vt-duration), box-shadow var(--vt-duration);
+}
+:root .veToolbar .veToolbarItemOuter .bp3-button.bp3-minimal:hover:not(.bp3-disabled) {
+  background: var(--vt-overlay-hover);
+}
+:root .veToolbar .veToolbarItemOuter .bp3-button.bp3-minimal.bp3-active {
+  background: var(--vt-surface);
+  box-shadow: inset 0 0 0 1px var(--vt-accent-border), var(--vt-shadow-1);
+}
+:root .veToolbar .veToolbarItemOuter .bp3-button.bp3-minimal.bp3-active:hover {
+  background: var(--vt-accent-bg);
+}
+:root .veToolbar .tg-menu-bar-item.bp3-button.bp3-minimal {
+  border-radius: var(--vt-radius-sm);
+}
+
+/* ---- the menu search (Help, Ctrl+/) ------------------------------------------------------------ */
+/* A wide list like a command palette; the menu each command sits in is written at the 12px
+   minimum (the editor sets it inline at 8px). */
+:root .tg-menu-search-suggestions .bp3-menu {
+  min-width: 420px;
+  max-height: min(420px, calc(100vh - 160px));
+  overflow-y: auto;
+  padding: var(--vt-space-1);
+}
+:root .tg-menu-search-suggestions .bp3-menu-item {
+  border-radius: var(--vt-radius-sm);
+  align-items: center;
+}
+:root .tg-menu-search-suggestions .bp3-menu-item-label > span {
+  font-size: var(--vt-font-size-xs) !important;
+  color: var(--vt-text-muted);
+}
+:root .tg-menu-search-suggestions .bp3-menu-item.bp3-active .bp3-menu-item-label > span {
+  color: var(--vt-text-on-accent-muted);
+}
+:root .tg-menu-bar-help-search .bp3-input {
+  min-width: 280px;
+}
+
 /* ---- links out of the app ---------------------------------------------------------------- */
 /* The digest tool links to the editor component's online documentation. Vettore runs offline,
    and in the desktop window the link would open a page that cannot load. */
@@ -68,7 +114,7 @@
 /* ---- dialogs --------------------------------------------------------------------------- */
 :root .bp3-dialog {
   background: var(--vt-surface-subtle);
-  border-radius: var(--vt-radius-lg);
+  border-radius: var(--vt-radius-xl);
   box-shadow: var(--vt-shadow-3);
   /* Every dialog fits the window: the body scrolls, the title and the buttons stay on screen
      (Blueprint's container adds a 30px margin above and below). */
@@ -79,7 +125,7 @@
   overflow: auto;
 }
 :root .bp3-dialog-header {
-  border-radius: var(--vt-radius-lg) var(--vt-radius-lg) 0 0;
+  border-radius: var(--vt-radius-xl) var(--vt-radius-xl) 0 0;
   box-shadow: 0 1px 0 var(--vt-border-subtle);
   min-height: 44px;
 }

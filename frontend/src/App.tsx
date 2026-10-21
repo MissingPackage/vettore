@@ -41,6 +41,8 @@ import { exportMap } from "./mapExport";
 import { applyEnzymeSet, ENZYME_SETS, type EnzymeSetId } from "./enzymeSets";
 import { ENZYMES } from "./enzymeLogic";
 import { OVERLAY_VIEWS, showView, VIEWS, type ViewId } from "./views";
+import ViewTabs from "./ViewTabs";
+import { applyChrome, usePreferences } from "./preferences";
 import { ACCEPT, dirName, SAVE_EXTENSION, safeFileName, type SaveKind } from "./files/formats";
 import { addNotice, dismissNotice, messageOf, type Notice, type NoticeKind } from "./files/notices";
 import NoticeStack from "./files/NoticeStack";
@@ -123,6 +125,24 @@ export default function App() {
   const height = useWindowHeight();
   const docsRef = useRef(docs);
   docsRef.current = docs;
+
+  // Light or dark frame, as chosen in Preferences (theme/dark-chrome.css).
+  const { chrome } = usePreferences();
+  useEffect(() => applyChrome(chrome), [chrome]);
+
+  // Documents opened in the last two seconds: their tab glows once so the eye finds it (a new
+  // cloning product among several tabs).
+  const [fresh, setFresh] = useState<string[]>([]);
+  const seen = useRef(new Set<string>());
+  useEffect(() => {
+    const names = docs.map((d) => d.editorName);
+    const added = names.filter((n) => !seen.current.has(n));
+    seen.current = new Set(names);
+    if (!added.length) return;
+    setFresh((f) => [...f, ...added]);
+    // Not cleared when docs change again: every edit updates docs, and the glow must still end.
+    setTimeout(() => setFresh((f) => f.filter((n) => !added.includes(n))), 2000);
+  }, [docs]);
 
   const activeDoc = docs.find((d) => d.editorName === active) ?? null;
   // Edited since opened or saved, or never saved at all: the tab shows a dot, closing asks.
@@ -429,7 +449,10 @@ export default function App() {
       parents,
     }, { neverSaved: true });
     addDocs([doc]);
-  }, [addDocs, distinctName]);
+    const bp = sequenceData.sequence.length.toLocaleString("en-US");
+    notify("info", `Created “${sequenceData.name}” (${bp} bp, ${sequenceData.circular ? "circular" : "linear"}) `
+      + "in a new tab. It is not saved to a file yet.");
+  }, [addDocs, distinctName, notify]);
 
   // ---- save ------------------------------------------------------------------------------
   /** Ask once whether to save a GenBank copy of a file that cannot be overwritten safely. */
@@ -684,6 +707,32 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, circular]);
 
+  // ---- command search ----------------------------------------------------------------------
+  // The search box lives at the top of the Help menu; the editor's own shortcut for it is Cmd+/
+  // only, and works only once Help has been opened. Ctrl+/ and the view bar's button open Help
+  // with the box focused.
+  const openCommandSearch = useCallback(() => {
+    if (!activeDoc) return;
+    const help = [...document.querySelectorAll<HTMLElement>(`.veEditor.${activeDoc.editorName} .tg-menu-bar-item`)]
+      .find((b) => b.textContent === "Help");
+    if (!help) return;
+    const input = () => document.querySelector<HTMLInputElement>(".tg-menu-bar-help-search input");
+    if (!input()) help.click();
+    requestAnimationFrame(() => input()?.focus());
+  }, [activeDoc]);
+  useEffect(() => {
+    // Capture phase, before the editor's own hotkey handler can toggle the box shut again.
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key === "/") {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        openCommandSearch();
+      }
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [openCommandSearch]);
+
   // ---- keyboard shortcuts not handled by OVE --------------------------------------------
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -821,14 +870,17 @@ export default function App() {
           <div
             key={d.editorName}
             ref={d.editorName === active ? revealActiveTab : undefined}
-            className={`vt-doctab${d.editorName === active ? " active" : ""}`}
+            className={`vt-doctab${d.editorName === active ? " active" : ""}${fresh.includes(d.editorName) ? " vt-doctab-new" : ""}`}
             onClick={() => setActive(d.editorName)}
             onAuxClick={(e) => e.button === 1 && closeDoc(d)}
             title={d.path ?? (d.neverSaved ? `${d.name} (not saved to a file yet)` : d.name)}
             data-testid="doctab"
             data-unsaved={unsavedByEditor[d.editorName] ? "true" : undefined}
           >
-            <span>{unsavedByEditor[d.editorName] ? "• " : ""}{d.name}</span>
+            <span>
+              {unsavedByEditor[d.editorName] && <><span className="vt-doctab-unsaved" title="Unsaved changes">•</span>{" "}</>}
+              {d.name}
+            </span>
             <button className="vt-doctab-close" title="Close (Ctrl+W)" onClick={(e) => { e.stopPropagation(); closeDoc(d); }}>×</button>
           </div>
         ))}
@@ -838,22 +890,17 @@ export default function App() {
 
   const viewBar = (
       <div className="vt-viewbar" style={{ height: VIEWBAR_HEIGHT }}>
-        <div className="vt-viewtabs" role="tablist">
-          {VIEWS.map((v) => (
-            <button
-              key={v.id}
-              role="tab"
-              data-testid={`view-${v.id}`}
-              aria-selected={activeDoc?.view === v.id}
-              className={`vt-viewtab${activeDoc?.view === v.id ? " active" : ""}`}
-              disabled={!activeDoc}
-              title={`${v.label} (Ctrl+${v.hotkey})`}
-              onClick={() => selectView(v.id)}
-            >
-              {v.label}
-            </button>
-          ))}
-        </div>
+        <ViewTabs view={activeDoc?.view ?? null} onSelect={selectView} />
+        <span className="vt-viewbar-end">
+        {activeDoc && (
+          <button className="vt-command-search" data-testid="command-search" onClick={openCommandSearch}
+                  title="Find any menu command by name">
+            <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor"
+                 strokeWidth={2.2} strokeLinecap="round"><circle cx="11" cy="11" r="6" /><path d="m20 20-4.5-4.5" /></svg>
+            Search commands
+            <span className="vt-kbd">Ctrl+/</span>
+          </button>
+        )}
         {activeDoc && (
           <label className="vt-enzyme-set">
             Enzymes:&nbsp;
@@ -868,6 +915,7 @@ export default function App() {
             </select>
           </label>
         )}
+        </span>
       </div>
   );
 

@@ -294,7 +294,8 @@ function AlignMultipleSequences(props: ToolProps) {
                     aligned. Bases are given on the reference strand.
                   </span>
                   {row.differences.length > 0 && (
-                    <Button small minimal icon="duplicate" data-testid="msa-copy" onClick={copy}>
+                    <Button small minimal icon={copied ? undefined : "duplicate"} className={copied ? "vt-done" : undefined}
+                            data-testid="msa-copy" onClick={copy}>
                       {copied ? "Copied: paste it into a spreadsheet" : "Copy list (for a spreadsheet)"}
                     </Button>
                   )}

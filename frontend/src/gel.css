@@ -1,0 +1,8 @@
+/* Simulated gel (GelDialog). A band moves to its new position when a lane's enzymes change, and
+   a band that has just appeared fades in. This is the one place where Vettore animates data:
+   the movement shows which fragment changed. --vt-duration-data is 0 with reduced motion. */
+.vt-gel-band {
+  transition: transform var(--vt-duration-data) var(--vt-ease-out), opacity var(--vt-duration-data);
+  animation: vt-band-in var(--vt-duration-data) ease-out both;
+}
+@keyframes vt-band-in { from { opacity: 0; } }

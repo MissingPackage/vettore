@@ -1,0 +1,88 @@
+/* Dark chrome (File → Preferences → Appearance). Only the frame around the work goes dark: menu
+   bar, toolbar, document tabs, view bar and status bar. The map, sequence, tables, dialogs and
+   menus stay on their light surfaces, because the editor's feature and enzyme colours are
+   chosen for white and would need redrawing to read on dark.
+
+   main.tsx and App set data-chrome on <html>; "system" follows the operating system. Every
+   text pair below is at least 4.5:1, control outlines 3:1 (docs/DESIGN.md lists them). */
+:root[data-chrome="dark"] {
+  --vt-chrome-bg: #1d232b;        /* menu bar, toolbar, status bar */
+  --vt-chrome-raised: #262d36;    /* view bar and the open document's tab */
+  --vt-chrome-sunken: #151a20;    /* document tab strip */
+  --vt-chrome-track: #181d24;     /* segmented control track */
+  --vt-chrome-pill: #3a4552;      /* the open view's pill */
+  --vt-chrome-text: #d5dbe3;      /* 11.3:1 on chrome-bg */
+  --vt-chrome-strong: #f3f5f8;
+  --vt-chrome-muted: #a3adba;     /* 7.0:1 on chrome-bg, 6.1:1 on chrome-raised */
+  --vt-chrome-icon: #8cc4ec;      /* toolbar icons: 8.4:1 on chrome-bg */
+  --vt-chrome-border: #3a434e;
+  --vt-chrome-control: #737e8d;   /* select and button outlines: 3.4:1 on chrome-raised */
+  --vt-chrome-hover: rgba(255, 255, 255, 0.08);
+}
+
+/* ---- menu bar and toolbar ------------------------------------------------------------------- */
+:root[data-chrome="dark"] .veToolbar-outer { background: var(--vt-chrome-bg); }
+:root[data-chrome="dark"] .veToolbar .tg-menu-bar-item.bp3-button.bp3-minimal { color: var(--vt-chrome-text); }
+:root[data-chrome="dark"] .veToolbar .tg-menu-bar-item.bp3-button.bp3-minimal:hover,
+:root[data-chrome="dark"] .veToolbar .bp3-popover-open > .tg-menu-bar-item.bp3-button.bp3-minimal {
+  background: var(--vt-chrome-hover); color: var(--vt-chrome-strong);
+}
+:root[data-chrome="dark"] .veToolbar .veToolbarItemOuter .bp3-button.bp3-minimal,
+:root[data-chrome="dark"] .veToolbar .veToolbarItemOuter .bp3-button.bp3-minimal .bp3-icon {
+  color: var(--vt-chrome-icon);
+}
+:root[data-chrome="dark"] .veToolbar .veToolbarItemOuter .bp3-button.bp3-minimal:hover:not(.bp3-disabled) {
+  background: var(--vt-chrome-hover);
+}
+:root[data-chrome="dark"] .veToolbar .veToolbarItemOuter .bp3-button.bp3-minimal.bp3-active {
+  background: var(--vt-chrome-raised);
+  box-shadow: inset 0 0 0 1px #2f5878;
+}
+:root[data-chrome="dark"] .veToolbar .veToolbarItemOuter .bp3-button.bp3-disabled,
+:root[data-chrome="dark"] .veToolbar .veToolbarItemOuter .bp3-button.bp3-disabled .bp3-icon {
+  color: rgba(140, 196, 236, 0.4);
+}
+:root[data-chrome="dark"] .veToolbar .veToolbarDropdown,
+:root[data-chrome="dark"] .veToolbar .veToolbarDropdown .bp3-icon { color: var(--vt-chrome-icon); }
+
+/* ---- document tabs -------------------------------------------------------------------------- */
+:root[data-chrome="dark"] .vt-doctabs { background: var(--vt-chrome-sunken); border-bottom-color: var(--vt-chrome-border); }
+:root[data-chrome="dark"] .vt-doctab { color: var(--vt-chrome-muted); }
+:root[data-chrome="dark"] .vt-doctab:hover { background: var(--vt-chrome-bg); color: var(--vt-chrome-strong); }
+:root[data-chrome="dark"] .vt-doctab.active {
+  background: var(--vt-chrome-raised); color: var(--vt-chrome-strong);
+  box-shadow: 0 -1px 0 var(--vt-chrome-border), 1px 0 0 var(--vt-chrome-border), -1px 0 0 var(--vt-chrome-border);
+}
+:root[data-chrome="dark"] .vt-doctab .vt-doctab-unsaved { color: var(--vt-chrome-icon); }
+:root[data-chrome="dark"] .vt-doctab-new::after { box-shadow: inset 0 0 0 2px var(--vt-chrome-icon); }
+:root[data-chrome="dark"] .vt-doctab-close { color: var(--vt-chrome-muted); }
+:root[data-chrome="dark"] .vt-doctab-close:hover { background: var(--vt-chrome-hover); color: var(--vt-chrome-strong); }
+:root[data-chrome="dark"] .vt-brand { color: var(--vt-chrome-text); }
+
+/* ---- view bar ----------------------------------------------------------------------------- */
+:root[data-chrome="dark"] .vt-viewbar { background: var(--vt-chrome-raised); border-bottom-color: var(--vt-chrome-border); }
+:root[data-chrome="dark"] .vt-viewtabs { background: var(--vt-chrome-track); }
+:root[data-chrome="dark"] .vt-viewtabs-pill { background: var(--vt-chrome-pill); box-shadow: none; }
+:root[data-chrome="dark"] .vt-viewtab { color: var(--vt-chrome-muted); }
+:root[data-chrome="dark"] .vt-viewtab:hover:not(:disabled):not(.active) { background: var(--vt-chrome-hover); color: var(--vt-chrome-strong); }
+:root[data-chrome="dark"] .vt-viewtab.active { color: var(--vt-chrome-strong); }
+:root[data-chrome="dark"] .vt-command-search {
+  background: var(--vt-chrome-track); border-color: var(--vt-chrome-control); color: var(--vt-chrome-muted);
+}
+:root[data-chrome="dark"] .vt-command-search:hover { background: var(--vt-chrome-bg); color: var(--vt-chrome-strong); }
+:root[data-chrome="dark"] .vt-command-search .vt-kbd {
+  background: var(--vt-chrome-raised); border-color: var(--vt-chrome-control); color: var(--vt-chrome-text);
+}
+:root[data-chrome="dark"] .vt-enzyme-set { color: var(--vt-chrome-muted); }
+:root[data-chrome="dark"] .vt-enzyme-set select {
+  background: var(--vt-chrome-track); border-color: var(--vt-chrome-control); color: var(--vt-chrome-strong);
+  color-scheme: dark;
+}
+
+/* ---- status bar ------------------------------------------------------------------------------ */
+:root[data-chrome="dark"] .vt-status-bar {
+  background: var(--vt-chrome-bg); border-top-color: var(--vt-chrome-border); color: var(--vt-chrome-text);
+}
+:root[data-chrome="dark"] .vt-status-bar .vt-muted,
+:root[data-chrome="dark"] .vt-status-set { color: var(--vt-chrome-muted); }
+:root[data-chrome="dark"] .vt-status-bar .vt-tm { text-decoration-color: var(--vt-chrome-muted); }

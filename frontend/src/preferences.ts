@@ -15,7 +15,16 @@ export interface Preferences {
   gelPercent: number;
   /** Minimum identity (%) for Detect Common Features. */
   detectMinIdentity: number;
+  /** The frame around the work (menus, tabs, status bar): light, dark, or as the system is set. */
+  chrome: ChromeTheme;
 }
+
+export type ChromeTheme = "light" | "dark" | "system";
+export const CHROME_THEMES: { id: ChromeTheme; label: string }[] = [
+  { id: "light", label: "Light" },
+  { id: "dark", label: "Dark menus and tabs" },
+  { id: "system", label: "As the system is set" },
+];
 
 /** Identity thresholds offered for feature detection; the engine's own default is 95. */
 export const IDENTITY_CHOICES = [90, 95, 98, 100];
@@ -25,6 +34,7 @@ const DEFAULTS: Preferences = {
   gelLadder: "neb-1kb-plus",
   gelPercent: 1.0,
   detectMinIdentity: 95,
+  chrome: "light",
 };
 
 function clean(stored: Partial<Preferences>): Preferences {
@@ -35,6 +45,7 @@ function clean(stored: Partial<Preferences>): Preferences {
   if (!IDENTITY_CHOICES.includes(prefs.detectMinIdentity)) {
     prefs.detectMinIdentity = DEFAULTS.detectMinIdentity;
   }
+  if (!CHROME_THEMES.some((t) => t.id === prefs.chrome)) prefs.chrome = DEFAULTS.chrome;
   return prefs;
 }
 
@@ -75,4 +86,19 @@ export function usePreferences(): Preferences {
     };
   }, []);
   return prefs;
+}
+
+/** Puts data-chrome="light" or "dark" on <html> (theme/dark-chrome.css); "system" follows the
+ * operating system, also when it changes while Vettore is open. Returns the undo. */
+export function applyChrome(theme: ChromeTheme): () => void {
+  const root = document.documentElement;
+  if (theme !== "system") {
+    root.dataset.chrome = theme;
+    return () => {};
+  }
+  const query = window.matchMedia?.("(prefers-color-scheme: dark)");
+  const set = () => { root.dataset.chrome = query?.matches ? "dark" : "light"; };
+  set();
+  query?.addEventListener?.("change", set);
+  return () => query?.removeEventListener?.("change", set);
 }

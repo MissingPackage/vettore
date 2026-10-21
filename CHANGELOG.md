@@ -2,6 +2,16 @@
 
 The download links in the README always point to the latest release.
 
+## Unreleased — a lighter, clearer frame
+
+- The frame is lighter: toolbar tools that are on are white keys with a thin blue outline instead of solid squares, document tabs lose their folder borders, and the view tabs (Map, Sequence, Enzymes…) are one segmented control whose white marker slides to the open view. Nothing moved: menus, tabs, panes and shortcuts are where they were.
+- The welcome screen shows each sample construct as a card with a small map of its features, its length and its GenBank accession; Open, New and Paste have icons.
+- A document that has just opened — a cloning product, a pasted sequence — slides into the tab strip and its outline glows once, and creating a product says so in a notice. Copy buttons turn green with a check when the copy worked.
+- Ctrl+/ (or "Search commands" in the view bar) finds any menu command by name: typing "gel" lists Simulate Agarose Gel… first, with the menu it lives in.
+- In Simulate Agarose Gel the bands slide to their new size when you change a lane's enzymes, so you see which fragment split.
+- File → Preferences → Appearance can make the menus, tabs and status bar dark, or follow the system; the map, sequence and dialogs stay light.
+- Movement is short (under a quarter of a second), never touches the map, sequence or tables, and is switched off when the system asks for reduced motion.
+
 ## 0.3.1 — more promoters, with their species
 
 - Detect Common Features knows the PGK (human and mouse), UbC, H1, 7SK and SFFV promoters and the full-length CAG promoter (CMV enhancer, chicken β-actin promoter and chimeric intron), each taken from a public GenBank record and cross-checked against a second, independent one.

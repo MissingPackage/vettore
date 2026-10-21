@@ -8,10 +8,24 @@
   margin: 0 0 var(--vt-space-5);
 }
 
+/* The three ways in are keys with an icon, the label and the shortcut; hovering lifts them 1px. */
 .vt-welcome-actions button {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: var(--vt-space-2);
+  border-radius: var(--vt-radius-lg);
+  transition: background-color var(--vt-duration), border-color var(--vt-duration), transform var(--vt-duration);
+}
+.vt-welcome-actions button:hover {
+  border-color: var(--vt-accent);
+  transform: translateY(-1px);
+}
+.vt-welcome-icon {
+  flex: none;
+  color: var(--vt-accent);
+}
+.vt-welcome-actions button.vt-primary .vt-welcome-icon {
+  color: var(--vt-text-on-accent);
 }
 
 /* The shortcut after each label is read, so it uses a text colour, not a decorative one. */
@@ -71,16 +85,61 @@
   padding: var(--vt-space-1) 0;
 }
 
-/* A sample's one-line description wraps instead of being cut off. */
-.vt-samples li {
-  flex-direction: column;
-  gap: 0;
-  padding-bottom: var(--vt-space-2);
+/* Sample constructs are cards: a thumbnail map, the name, the description and the record. */
+.vt-welcome-section ul.vt-sample-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--vt-space-3);
+  margin-top: var(--vt-space-3);
 }
-
-.vt-samples .vt-welcome-note {
+.vt-sample-cards li {
+  display: block;
+  padding: 0;
+}
+.vt-sample-card {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr);
+  gap: var(--vt-space-3);
+  align-items: start;
+  width: 100%;
+  height: 100%;
+  padding: var(--vt-space-3);
+  border: 1px solid var(--vt-border-subtle);
+  border-radius: var(--vt-radius-lg);
+  background: var(--vt-surface-subtle);
+  color: var(--vt-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--vt-duration), box-shadow var(--vt-duration), background-color var(--vt-duration);
+}
+.vt-sample-card:hover:not(:disabled) {
+  border-color: var(--vt-accent-border);
+  background: var(--vt-surface);
+  box-shadow: var(--vt-shadow-2);
+}
+.vt-sample-card:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+.vt-sample-text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vt-space-1);
+  min-width: 0;
+}
+.vt-sample-name {
+  color: var(--vt-accent);
+  font-weight: var(--vt-weight-strong);
+  overflow-wrap: anywhere;
+}
+.vt-sample-card .vt-welcome-note {
   white-space: normal;
-  max-width: 68ch;
+  line-height: var(--vt-line-height-tight);
+}
+.vt-sample-meta {
+  color: var(--vt-text-muted);
+  font-size: var(--vt-font-size-xs);
 }
 
 /* A link that is really a button: keyboard-reachable, no navigation. */

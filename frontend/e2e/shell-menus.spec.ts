@@ -41,6 +41,24 @@ test("Help holds the menu search and Vettore's own help, not the embedded editor
   await page.screenshot({ path: "test-results/shell-menu-help.png" });
 });
 
+test("Ctrl+/ finds a command by a word in its name and runs it with Enter", async ({ page }) => {
+  await page.locator(".veCircularView").click();
+  await page.keyboard.press("Control+/");
+  const box = page.locator(".tg-menu-bar-help-search input");
+  await expect(box).toBeFocused();
+  await box.fill("gel");
+  const first = page.locator(".tg-menu-search-suggestions .bp3-menu-item").first();
+  await expect(first).toContainText("Simulate Agarose Gel…");
+  await expect(first).toContainText("Tools");   // the menu it lives in
+  await page.keyboard.press("Enter");
+  await expect(page.locator(".bp3-dialog")).toContainText("Simulate Agarose Gel");
+});
+
+test("the view bar's search button opens the same search", async ({ page }) => {
+  await page.getByTestId("command-search").click();
+  await expect(page.locator(".tg-menu-bar-help-search input")).toBeFocused();
+});
+
 test("every menu uses one ellipsis character and lists each command once", async ({ page }) => {
   const all: Record<string, string[]> = {};
   for (const name of MENUS) {
