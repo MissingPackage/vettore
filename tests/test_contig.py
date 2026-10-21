@@ -147,10 +147,18 @@ def test_verified_stretches_leave_out_the_positions_no_read_called():
     assert result["unclear"] == 2 and len(unclear) == 2
     [covered] = result["covered"]
     assert verified[0][0] == covered["start"] - 1 and verified[-1][1] == covered["end"] - 1
-    assert len(verified) == 3
-    assert verified[0][2] == "Sanger verified (1 read)"  # the left end is read by one read
-    for position in unclear:
+    assert verified[0][2] == "Sanger verified (1 read)"  # one stretch is read by one read
+    # Bases backed only by a call under Q20 are not verified either.
+    weak = [p for p, c in forward_calls().items() if p >= both_end(result)
+            and c.base != "N" and c.quality < 20]
+    assert weak and result["doubtful"] == len(weak)
+    for position in unclear + weak:
         assert not any(start <= position <= end for start, end, _ in verified)
+
+
+def both_end(result: dict) -> int:
+    [(_, end)] = strand_runs(result, 2)
+    return end
 
 
 def test_a_difference_to_check_is_annotated_as_such_and_not_verified():
@@ -345,3 +353,72 @@ def test_e2e_contig_fixture_is_up_to_date():
         "Regenerate: python -I scripts/make_contig_fixture.py > "
         "frontend/e2e/fixtures/contig-reference.txt")
     assert out.strip() == clone()
+
+
+# ---- contrary evidence that does not get a full vote (second review) -----------------------
+
+def verified_at(result: dict, position: int) -> bool:
+    """Whether reference position (0-based) lies in a verified stretch of the consensus."""
+    return any(r["start"] - 1 <= position <= r["end"] - 1 for r in result["verified"])
+
+
+def test_a_read_ending_inside_a_deletion_still_speaks_against_it():
+    insert = REFERENCE[200:500]
+    deleted = insert[:150] + insert[154:]                 # A lacks reference 350–353
+    partial = insert[:152]                                # B ends at 351, showing 350 and 351
+    result = made_contig(made_read("A", deleted, 40), made_read("B", partial, 40, -1))
+    [difference] = result["differences"]
+    assert difference["kind"] == "deletion" and difference["confirmed"] is False
+    assert [d["kind"] for d in result["disagreements"]] == ["base"]
+    assert not verified_at(result, 350)
+
+
+def test_a_read_with_an_n_inside_a_deletion_still_speaks_against_it():
+    insert = REFERENCE[200:500]
+    deleted = insert[:150] + insert[152:]                 # A lacks reference 350–351
+    with_n = with_base(insert, 151, "N")                  # B shows 350, and N at 351
+    result = made_contig(made_read("A", deleted, 40), made_read("B", with_n, 40, -1))
+    [difference] = result["differences"]
+    assert difference["confirmed"] is False
+    assert result["disagreements"]
+
+
+def test_a_tie_between_good_reads_is_not_verified():
+    insert = REFERENCE[200:500]
+    other = "A" if insert[150] != "A" else "C"
+    result = made_contig(made_read("ref", insert, 30),
+                         made_read("alt", with_base(insert, 150, other), 30, -1))
+    assert result["differences"] == []                    # the plasmid's base is shown
+    assert result["doubtful"] >= 1
+    assert not verified_at(result, 350)
+
+
+def test_the_reference_base_is_not_verified_against_a_good_contrary_read():
+    insert = REFERENCE[200:500]
+    other = "A" if insert[150] != "A" else "C"
+    result = made_contig(made_read("ref1", insert, 25), made_read("ref2", insert[:280], 25),
+                         made_read("alt", with_base(insert, 150, other), 40, -1))
+    assert result["differences"] == []                    # 25 + 25 outweighs 40
+    assert not verified_at(result, 350)
+    features = result["document"]["features"]
+    assert any(f["name"] == "Sanger: check the trace" and f["start"] <= 350 <= f["end"]
+               for f in features)
+
+
+def test_a_tied_insertion_slot_is_not_verified():
+    insert = REFERENCE[200:500]
+    extra = insert[:150] + "G" + insert[150:]
+    result = made_contig(made_read("plain", insert, 40), made_read("extra", extra, 40, -1))
+    assert not verified_at(result, 350)
+    assert all(not d["confirmed"] for d in result["differences"])
+
+
+def test_verified_counts_the_reads_that_agree_and_skips_weak_bases():
+    insert = REFERENCE[200:500]
+    result = made_contig(made_read("a", with_base(insert, 150, "N"), 40),
+                         made_read("b", insert, [40] * 160 + [12] + [40] * 139, -1))
+    names = {(r["start"], r["end"]): r["reads"] for r in result["verified"]}
+    assert any(start <= 351 <= end and n == 1 for (start, end), n in names.items())
+    assert verified_at(result, 360)                      # Q12 in b, but a has Q40 there
+    weak = made_contig(made_read("only", insert, [40] * 160 + [12] + [40] * 139))
+    assert not verified_at(weak, 360)

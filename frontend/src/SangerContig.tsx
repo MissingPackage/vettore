@@ -68,7 +68,7 @@ export default function SangerContig(props: {
         <h4 className="vt-contig-title">Contig: {n(contig.reads)} reads, one consensus</h4>
         {props.onSave && contig.document && (
           <Button small icon="floppy-disk" data-testid="sanger-save-consensus"
-                  title="Open the consensus as a new document: the covered stretch is annotated “Sanger verified”, and every confirmed difference is annotated where it is"
+                  title="Open the consensus as a new document: every difference is annotated where it is, the clearly called and checked stretches are annotated “Sanger verified”, and the places to check are marked"
                   onClick={() => props.onSave!(contig.document!)}>
             Save consensus
           </Button>

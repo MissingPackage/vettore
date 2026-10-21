@@ -78,13 +78,17 @@ def _read_calls(read: AlignedRead,
     return bases, inserts
 
 
-def _vote(calls: list[Call], reference_value: str) -> str:
-    """The call with the largest summed quality; more reads, then the reference, break a tie."""
-    groups: dict[str, list[Call]] = {}
+def _vote(calls: list[Call], reference_value: str) -> tuple[str, bool]:
+    """The call with the largest summed quality, and whether another call has as much (a tie:
+    more reads, then the reference, pick the call shown, which is then not trusted)."""
+    groups: dict[str, int] = {}
     for call in calls:
-        groups.setdefault(call.value, []).append(call)
-    return max(groups, key=lambda value: (sum(c.quality for c in groups[value]),
-                                          len(groups[value]), value == reference_value))
+        groups[call.value] = groups.get(call.value, 0) + call.quality
+    counts = {value: sum(1 for c in calls if c.value == value) for value in groups}
+    winner = max(groups, key=lambda value: (groups[value], counts[value],
+                                            value == reference_value))
+    tied = any(value != winner and score == groups[winner] for value, score in groups.items())
+    return winner, tied
 
 
 def _confirmed(support: list[Call], against: list[Call]) -> bool:
@@ -161,6 +165,9 @@ def contig_payload(reference: str, circular: bool, reads: list[AlignedRead],
     differences: list[dict[str, Any]] = []
     disagreements: list[dict[str, Any]] = []
     unclear: set[int] = set()        # covered positions without a clear call (reference kept)
+    doubtful: set[int] = set()       # positions where good reads conflict, or the vote is tied
+    support = [0] * length           # reads whose clear call agrees with the consensus
+    strong = [False] * length        # ... one of them at Q20 or better
 
     def listed(calls: list[Call]) -> list[dict[str, Any]]:
         return [{"read": names[c.read], "strand": strands[c.read], "call": c.value,
@@ -172,14 +179,14 @@ def contig_payload(reference: str, circular: bool, reads: list[AlignedRead],
         return {"reads": len(support), "quality": max(c.quality for c in support),
                 "confirmed": _confirmed(support, against)}
 
-    def slot_vote(position: int, covering: list[int]) -> None:
+    def slot_vote(position: int, touching: list[int]) -> None:
         """The slot before ``position``: a read votes on it when it covers both of its sides.
         No insertion weighs the weaker of the two bases around the slot."""
         previous = (position - 1) % length
         slot = []
-        for i in covering:
+        for i in touching:
             bases, inserts = per_read[i]
-            if previous not in bases:
+            if previous not in bases or position not in bases:
                 continue
             text, quality = inserts.get(position, ("", min(bases[previous].quality,
                                                            bases[position].quality)))
@@ -187,45 +194,57 @@ def contig_payload(reference: str, circular: bool, reads: list[AlignedRead],
         votes = [c for c in slot if _clear(c.value)]
         if not votes:
             return
-        inserted = _vote(votes, "")
+        inserted, tied = _vote(votes, "")
         if len({c.value for c in votes}) > 1:
             disagreements.append({"kind": "insertion", "position": position + 1,
                                   "reference": "", "consensus": inserted,
                                   "calls": listed(slot)})
+        conflict = tied or any(c.value != inserted and c.quality >= SUPPORTING_QUALITY
+                               for c in votes)
+        if conflict:
+            doubtful.add(position)
         if inserted:
             consensus_insert[position] = inserted
+            found = evidence(inserted, votes)
+            found["confirmed"] = found["confirmed"] and not conflict
             differences.append({"kind": "insertion", "position": position + 1,
-                                "reference": "", "consensus": inserted,
-                                **evidence(inserted, votes), "_start": position,
-                                "_end": position})
+                                "reference": "", "consensus": inserted, **found,
+                                "_start": position, "_end": position})
+
+    def column(i: int, unit: list[int], index: int) -> tuple[str, int, bool, bool]:
+        """Read i at one position of a unit: its call (with what it inserts before it, when it
+        also covers the previous position of the unit), the quality, whether the call is
+        clear, and whether the inserted bases are part of the call."""
+        bases, inserts = per_read[i]
+        position = unit[index]
+        here = bases[position]
+        joined = index > 0 and unit[index - 1] in bases
+        inserted, low = inserts.get(position, ("", 100)) if joined else ("", 100)
+        clear = _clear(inserted) and (here.base == "-" or here.base in BASES)
+        return inserted + here.base, min(here.quality, low), clear, joined
 
     for unit in _units(per_read, length, circular):
         first = unit[0]
-        covering = [i for i, (bases, _) in enumerate(per_read)
-                    if all(p in bases for p in unit)]
-        if not covering:
+        touching = [i for i, (bases, _) in enumerate(per_read) if any(p in bases for p in unit)]
+        if not touching:
             continue
         if first > 0 or circular:
-            slot_vote(first, covering)
-        # What each read shows over the unit: its base at every position, and what it
-        # inserts between them, as one string per position ("" or the inserted bases, then
-        # the base or "-").
-        calls: list[Call] = []
-        clear: list[bool] = []
+            slot_vote(first, touching)
+        # The reads covering the whole unit vote for what they show across it, one string per
+        # position ("" or the inserted bases, then the base or "-").
+        covering = [i for i in touching if all(p in per_read[i][0] for p in unit)]
+        votes: list[Call] = []
         for i in covering:
-            bases, inserts = per_read[i]
-            parts, quality, ok = [], 100, True
-            for index, p in enumerate(unit):
-                inserted, low = inserts.get(p, ("", 100)) if index else ("", 100)
-                column = bases[p]
-                parts.append(inserted + column.base)
-                quality = min(quality, column.quality, low)
-                ok = ok and _clear(inserted) and (column.base == "-" or column.base in BASES)
-            calls.append(Call(i, "|".join(parts), quality))
-            clear.append(ok)
-        votes = [c for c, ok in zip(calls, clear) if ok]
+            columns = [column(i, unit, index) for index in range(len(unit))]
+            if all(clear for _, _, clear, _ in columns):
+                votes.append(Call(i, "|".join(call for call, _, _, _ in columns),
+                                  min(quality for _, quality, _, _ in columns)))
+        shown = [Call(i, "".join(column(i, unit, index)[0] for index, p in enumerate(unit)
+                                 if p in per_read[i][0]),
+                      min(column(i, unit, index)[1] for index, p in enumerate(unit)
+                          if p in per_read[i][0]))
+                 for i in touching]
         ref_value = "|".join(reference[p] for p in unit)
-        shown = [Call(c.read, c.value.replace("|", ""), c.quality) for c in calls]
         if not votes:
             unclear.update(unit)
             disagreements.append({"kind": "no call", "position": first + 1,
@@ -233,14 +252,36 @@ def contig_payload(reference: str, circular: bool, reads: list[AlignedRead],
                                   "consensus": ref_value.replace("|", ""),
                                   "calls": listed(shown)})
             continue
-        winner = _vote(votes, ref_value)
-        if len({c.value for c in votes}) > 1:
+        winner, tied = _vote(votes, ref_value)
+        parts = winner.split("|")
+        # Every clear call of every read touching the unit, position by position, counts: a
+        # read that covers only part of it, or makes no clear call somewhere in it, still
+        # speaks for or against the consensus where it does call.
+        conflict = tied
+        disputed = len({c.value for c in votes}) > 1
+        for i in touching:
+            for index, p in enumerate(unit):
+                if p not in per_read[i][0]:
+                    continue
+                call, quality, clear, joined = column(i, unit, index)
+                if not clear:
+                    continue
+                if call == (parts[index] if joined else parts[index][-1]):
+                    support[p] += 1
+                    strong[p] = strong[p] or quality >= SUPPORTING_QUALITY
+                else:
+                    disputed = True
+                    conflict = conflict or quality >= SUPPORTING_QUALITY
+        if disputed:
             disagreements.append({"kind": "base", "position": first + 1,
                                   "reference": ref_value.replace("|", ""),
                                   "consensus": winner.replace("|", ""),
                                   "calls": listed(shown)})
+        if conflict:
+            doubtful.update(unit)
         found = evidence(winner, votes)
-        for index, (p, part) in enumerate(zip(unit, winner.split("|"))):
+        found["confirmed"] = found["confirmed"] and not conflict
+        for p, part in zip(unit, parts):
             inserted, base = part[:-1], part[-1]
             consensus_base[p] = base
             if inserted:
@@ -272,14 +313,19 @@ def contig_payload(reference: str, circular: bool, reads: list[AlignedRead],
             cursor += 1
     consensus = "".join(pieces)
 
-    # Verified: covered, with a clear call and no difference left to check. The count is the
-    # fewest reads over any base of the stretch.
-    doubtful = set(unclear)
+    # Verified: covered, a clear call that no good read contradicts, backed by a read at Q20 or
+    # better, and no difference left to check. The count is the fewest reads agreeing with the
+    # consensus over any base of the stretch.
+    for p in range(length):
+        if depth[p] and p not in unclear and not strong[p]:
+            doubtful.add(p)          # only weak calls (under Q20) back this base
     for d in differences:
         if not d["confirmed"]:
             doubtful.update(_positions(d["_start"], d["_end"], length))
-    state = [0 if not depth[p] else 1 if p in doubtful else 2 for p in range(length)]
-    verified = [(start, end, min(depth[p] for p in _positions(start, end, length)))
+    doubtful -= unclear
+    state = [0 if not depth[p] else 1 if p in doubtful or p in unclear else 2
+             for p in range(length)]
+    verified = [(start, end, min(support[p] for p in _positions(start, end, length)))
                 for start, end, value in _runs(state, circular) if value == 2]
     covered = [(start, end) for start, end, value in _runs([min(1, d) for d in depth], circular)
                if value]
@@ -292,16 +338,19 @@ def contig_payload(reference: str, circular: bool, reads: list[AlignedRead],
         "verified": [{"start": start + 1, "end": end + 1, "reads": n}
                      for start, end, n in verified],
         "unclear": len(unclear),
+        "doubtful": len(doubtful),
         "differences": [{k: v for k, v in d.items() if not k.startswith("_")}
                         for d in differences],
         "disagreements": disagreements,
     }
     if document is not None:
-        unclear_runs = [(start, end) for start, end, value
-                        in _runs([p in unclear for p in range(length)], circular) if value]
+        def runs_of(positions: set[int]) -> list[tuple[int, int]]:
+            return [(start, end) for start, end, value
+                    in _runs([p in positions for p in range(length)], circular) if value]
+
         out["document"] = _consensus_document(document, reference, circular, consensus,
-                                              start_of, kept, verified, unclear_runs,
-                                              differences)
+                                              start_of, kept, verified, runs_of(unclear),
+                                              runs_of(doubtful), differences)
     return out
 
 
@@ -350,6 +399,7 @@ def _consensus_document(document: dict[str, Any], reference: str, circular: bool
                         consensus: str, start_of: list[int], kept: list[bool],
                         verified: list[tuple[int, int, int]],
                         unclear: list[tuple[int, int]],
+                        doubtful: list[tuple[int, int]],
                         differences: list[dict[str, Any]]) -> dict[str, Any]:
     """The consensus as a new document: the reference's features moved over any insertion or
     deletion, the verified stretches annotated, every difference annotated where it is (those
@@ -375,6 +425,11 @@ def _consensus_document(document: dict[str, Any], reference: str, circular: bool
             _new_range(start, end, start_of, kept, new_length, circular),
             f"No read makes a clear call over reference bases {start + 1:,}–{end + 1:,}: the "
             "reference is kept; check the traces")
+    for start, end in doubtful:
+        add("Sanger: check the trace", "misc_feature",
+            _new_range(start, end, start_of, kept, new_length, circular),
+            f"Reference bases {start + 1:,}–{end + 1:,}: the reads conflict here, or only "
+            "calls under Q20 back the consensus; check the traces")
     for d in differences:
         evidence = (f"{d['reads']} reads" if d["reads"] > 1
                     else f"1 read at Q{d['quality']}")

@@ -44,6 +44,8 @@ export interface Contig {
   verified: { start: number; end: number; reads: number }[];
   /** Covered positions where no read makes a clear call: the reference is kept there. */
   unclear: number;
+  /** Covered positions where good reads conflict, the vote is tied, or only calls under Q20 back the consensus. */
+  doubtful: number;
   differences: ContigDifference[];
   disagreements: Disagreement[];
   document?: SequenceData;
@@ -97,16 +99,21 @@ export function contigVerdict(contig: Contig, referenceName: string, coveragePer
   const total = contig.differences.length;
   const disputed = contig.disagreements.filter((d) => d.kind !== "no call").length;
   const settled = (disputed
-    ? ` The reads disagree at ${n(disputed)} place${disputed === 1 ? "" : "s"}; the consensus takes the call`
-      + " with the most quality behind it (listed under Contig)."
+    ? ` The reads disagree at ${n(disputed)} place${disputed === 1 ? "" : "s"} (listed under Contig); the consensus`
+      + " takes the call with the most quality behind it, and the plasmid's base where the reads are even."
     : "")
+    + (contig.doubtful
+      ? ` ${n(contig.doubtful)} covered position${contig.doubtful === 1 ? " is" : "s are"} not verified: good reads`
+        + ` conflict there, or only calls under Q${SUPPORTING_QUALITY} back it. Check ${contig.doubtful === 1 ? "it" : "them"}`
+        + " in the traces."
+      : "")
     + (contig.unclear
       ? ` ${n(contig.unclear)} covered position${contig.unclear === 1 ? " has" : "s have"} no clear call in any read:`
         + " the plasmid's base is kept there, unverified."
       : "");
   if (!total) {
     return {
-      ok: !contig.unclear,
+      ok: !contig.unclear && !contig.doubtful,
       text: `No differences: the consensus of ${n(contig.reads)} reads matches ${referenceName} wherever they cover it`
         + ` (${where}).${settled}`,
     };

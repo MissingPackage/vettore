@@ -14,6 +14,7 @@ function contig(over: Partial<Contig> = {}): Contig {
     covered: [{ start: 223, end: 903 }],
     verified: [{ start: 223, end: 903, reads: 1 }],
     unclear: 0,
+    doubtful: 0,
     differences: [],
     disagreements: [],
     ...over,
@@ -65,7 +66,13 @@ describe("contigVerdict", () => {
         { kind: "no call", position: 895, reference: "N", consensus: "N", calls: [call] },
       ],
     }), "pCOI", 61.4);
-    expect(v.text).toContain("The reads disagree at 1 place;");
+    expect(v.text).toContain("The reads disagree at 1 place (listed under Contig)");
+  });
+
+  it("does not pass a clone where good reads conflict or only weak calls back a base", () => {
+    const v = contigVerdict(contig({ doubtful: 3 }), "pCOI", 61.4);
+    expect(v.ok).toBe(false);
+    expect(v.text).toContain("3 covered positions are not verified: good reads conflict there, or only calls under Q20");
   });
 
   it("does not pass a clone where some covered bases have no clear call", () => {
