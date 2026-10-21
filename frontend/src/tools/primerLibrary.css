@@ -71,6 +71,9 @@
 .vt-pl-edit {
   width: 100%;
   min-width: 90px;
+  resize: vertical;
+  height: auto;
+  line-height: 18px;
 }
 
 .vt-pl-rowactions {

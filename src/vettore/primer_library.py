@@ -321,22 +321,7 @@ def parse_text(text: str) -> LibraryText:
         raise PrimerLibraryError(
             f"the row starting on line {line + len(preamble)} could not be read as spreadsheet "
             f"columns ({exc}).") from exc
-    line = len(preamble) + 1
-    for row in rows:
-        # A quote opened and never closed makes the rows below one cell: refuse, rather than
-        # rewrite that cell and lose them. A note written on several lines is fine.
-        multiline = len(_lines(row.raw)) > 1
-        unclosed = multiline and row is rows[-1] and row.raw.count('"') % 2 == 1
-        for cell in row.cells:
-            parts = re.split(r"\r\n|\r|\n", cell)
-            # A later line of the cell that splits into cells like a row is a swallowed row,
-            # whatever it holds (a modified oligo, "to order", a short primer).
-            if unclosed or len(parts) > 1 and any(len(_split(part, delimiter)) > 1
-                                                  for part in parts[1:]):
-                raise PrimerLibraryError(
-                    f"a quote (\") opened on line {line} is never closed, so the rows below it "
-                    "would be read as one cell. Close the quote, or remove it, in a text editor.")
-        line += len(_lines(row.raw))
+    _refuse_swallowed_rows(rows, delimiter, len(preamble) + 1)
 
     found = None
     for pos, row in enumerate(rows):
@@ -386,6 +371,32 @@ def parse_text(text: str) -> LibraryText:
             name=name or "(unnamed)", sequence=sequence, notes=_cell(row.cells, lib.index, "notes"),
             location=_cell(row.cells, lib.index, "location"), added=_cell(row.cells, lib.index, "added")))
     return lib
+
+
+def _refuse_swallowed_rows(rows: list[_Row], delimiter: str, first_line: int) -> None:
+    """Refuse text where a quote typed by hand makes the rows below it part of one cell (a save
+    would then rewrite that cell and lose them). A note written on several lines in Excel
+    (Alt+Enter) is fine, commas and semicolons in it included: what gives a swallowed row away
+    is a later line of the cell that is a whole row by itself (as many cells as the file's
+    rows), a row with more cells than the others, or a quote left open to the end."""
+    widths = [len(r.cells) for r in rows if len(_lines(r.raw)) == 1 and any(c.strip() for c in r.cells)]
+    usual = max(set(widths), key=widths.count) if widths else None
+    line = first_line
+    for row in rows:
+        lines = len(_lines(row.raw))
+        if lines > 1:
+            width = max(2, usual or len(row.cells))   # a paste of one row: its own width
+            unclosed = row is rows[-1] and row.raw.count('"') % 2 == 1
+            looks_like_rows = any(len(_split(part, delimiter)) >= width
+                                  for cell in row.cells
+                                  for part in re.split(r"\r\n|\r|\n", cell)[1:])
+            if unclosed or looks_like_rows or len(row.cells) > width:
+                raise PrimerLibraryError(
+                    f"around line {line} a cell runs over several lines and takes in what look "
+                    "like whole rows of the library. This is usually a quote (\") typed by hand "
+                    "that is never closed, or closed on a later row. Open the file in a text "
+                    f"editor and check the quotes from line {line} on.")
+        line += lines
 
 
 def _cell(cells: list[str], index: dict[str, int], key: str) -> str:
@@ -653,6 +664,12 @@ def write_library(added: list[Primer], edits: list[Change] | None = None,
     check_library_path(str(path))
     current, _, encoding = _read_file()
     text, counts = merged_text(current, added, edits, removed)
+    try:
+        parse_text(text)                  # what is written must read back, or nothing is written
+    except PrimerLibraryError as exc:
+        raise PrimerLibraryError(
+            f"Nothing was saved: the library would not read back afterwards ({exc}) "
+            "Change the note that holds a line break, then save again.") from exc
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         tmp = path.with_name(f".{path.name}.vettore-tmp")

@@ -701,7 +701,7 @@ def test_adding_back_a_primer_still_in_the_file_keeps_its_date_and_notes(library
 ])
 def test_an_unclosed_quote_anywhere_is_refused(library_file, body):
     library_file.write_text(body, encoding="utf-8")
-    with pytest.raises(pl.PrimerLibraryError, match="never closed"):
+    with pytest.raises(pl.PrimerLibraryError, match="quote"):
         pl.read_library()
 
 
@@ -723,7 +723,7 @@ def test_a_pair_is_not_offered_when_one_primer_also_pairs_with_itself():
 def test_a_stray_quote_over_modified_or_placeholder_rows_is_refused():
     t = ('Name;Sequence;Notes\nA;ACGTACGTACGTACGTAA;"oops\nB;/5Phos/GGCCAATTGGCCAATTGG;box2\n'
          'D;to order;3.5"\nE;TTGCATTCGAATGACCTGAT;x\n')
-    with pytest.raises(pl.PrimerLibraryError, match="never closed"):
+    with pytest.raises(pl.PrimerLibraryError, match="quote"):
         pl.parse_text(t)
 
 
@@ -746,3 +746,29 @@ def test_a_malformed_twins_count_is_not_a_crash(client):
     r = client.post("/api/primer-library/save", headers=headers(), json={
         "removed": [{"sequence": "GTAAAACGACGGCCAGT", "was": {"name": "M13F"}, "twins": "two"}]})
     assert r.status_code == 200
+
+
+# ---- seventh review ----------------------------------------------------------------------
+
+@pytest.mark.parametrize("text", [
+    'name,sequence,notes,location\nM13F,GTAAAACGACGGCCAGT,"univ fwd\nordered IDT, 25 nmol",box1\n',
+    'name,sequence,notes,location\nM13F,GTAAAACGACGGCCAGT,x,"-20 freezer\nrack 3, box 2"\n',
+    'name;sequence;notes;location\nM13F;GTAAAACGACGGCCAGT;"univ fwd\nTa 55 C; 30 cycles";box1\n',
+])
+def test_excel_notes_on_several_lines_are_read(text):
+    [p], rejected = pl.parse_csv(text)
+    assert rejected == [] and p.name == "M13F"
+
+
+def test_a_swallowed_row_starting_with_a_quoted_name_is_refused():
+    t = 'name;sequence;notes\nA;ACGTACGTACGTACGTAA;"oops\n"M13F; old";GTAAAACGACGGCCAGT;box2\nC;CAGGAAACAGCTATGAC;y\n'
+    with pytest.raises(pl.PrimerLibraryError, match="quote"):
+        pl.parse_text(t)
+
+
+def test_a_pasted_note_on_two_lines_saves_and_reads_back(library_file):
+    library_file.write_text("name;sequence;notes\nM13R;CAGGAAACAGCTATGAC;x\n", encoding="utf-8")
+    [p], _ = pl.parse_csv("M13F\tGTAAAACGACGGCCAGT\t\"univ fwd\nTa 55; 30x\"\n")
+    pl.write_library([p])
+    lib = pl.read_library()
+    assert [q["notes"] for q in lib["primers"]] == ["x", "univ fwd\nTa 55; 30x"]

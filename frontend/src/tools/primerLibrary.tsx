@@ -337,13 +337,17 @@ function PrimerLibraryDialog(props: ToolProps) {
                   </td>
                   <td>{p.tm === null ? "—" : `${p.tm.toFixed(1)} °C`}</td>
                   <td>
-                    <input className="bp3-input bp3-small vt-pl-edit" aria-label={`Notes for ${p.name}`}
-                           value={p.notes} disabled={busy} onChange={(e) => editField(p, "notes", e.target.value)} />
+                    {/* A text area, not an input: a note written on several lines in Excel keeps
+                        its line breaks when it is edited here. */}
+                    <textarea className="bp3-input bp3-small vt-pl-edit" aria-label={`Notes for ${p.name}`}
+                              rows={Math.min(3, p.notes.split("\n").length)}
+                              value={p.notes} disabled={busy} onChange={(e) => editField(p, "notes", e.target.value)} />
                   </td>
                   <td>
-                    <input className="bp3-input bp3-small vt-pl-edit" aria-label={`Location of ${p.name}`}
-                           placeholder="box 3 A4" value={p.location} disabled={busy}
-                           onChange={(e) => editField(p, "location", e.target.value)} />
+                    <textarea className="bp3-input bp3-small vt-pl-edit" aria-label={`Location of ${p.name}`}
+                              rows={Math.min(3, p.location.split("\n").length)}
+                              placeholder="box 3 A4" value={p.location} disabled={busy}
+                              onChange={(e) => editField(p, "location", e.target.value)} />
                   </td>
                   <td className="vt-muted">{p.added || "—"}</td>
                   <td className="vt-pl-rowactions">
