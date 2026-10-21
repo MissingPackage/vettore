@@ -1,10 +1,13 @@
 import json
+import time
 from pathlib import Path
+from unittest import mock
 
 import pytest
 from Bio import SeqIO
 from cloning_helpers import clean_dna, rc
 
+from vettore import features as features_module
 from vettore.features import (
     DEFAULT_MIN_IDENTITY,
     SHORT_FEATURE,
@@ -626,3 +629,69 @@ def test_a_label_naming_the_other_species_is_flagged(element, label, wrong):
     assert out["label_warnings"] == (1 if wrong else 0)
     if wrong:
         assert row["labelWarning"].startswith(f"Annotated as “{label}”, but the sequence is the {element}")
+
+
+# ---- detection speed --------------------------------------------------------------------
+# S5.4 asks that detection stay under two seconds for a 15 kb plasmid with the grown
+# catalogue. The cost is not in the catalogue's size — a feature absent from the sequence is
+# ruled out by an exact seed search and costs almost nothing — but in the elements that *are*
+# there, each of which is aligned where its seeds land. The worst case is therefore a plasmid
+# packed with catalogue elements, which is what these tests build.
+
+DETECTION_BUDGET = 2.0
+
+
+def _packed_plasmid(budget: int = 15_000) -> str:
+    """A ``budget`` bp circular sequence carrying as many catalogue elements, longest first,
+    as fit, padded with random DNA. Longest first is the expensive end: an alignment costs the
+    element's length times the window it is sought in."""
+    pieces: list[str] = []
+    total = 0
+    for feature in sorted(catalogue(), key=lambda f: -f.length):
+        if total + feature.length <= budget - 1_000:
+            pieces.append(feature.sequence)
+            total += feature.length
+    return (("".join(pieces)) + clean_dna(budget, 11))[:budget]
+
+
+def test_detection_of_a_15kb_plasmid_stays_within_its_time_budget():
+    sequence = _packed_plasmid()
+    detect(sequence, circular=True)          # warm the catalogue and the aligner
+    start = time.perf_counter()
+    matches = detect(sequence, circular=True)
+    elapsed = time.perf_counter() - start
+    assert matches, "the packed plasmid should carry recognisable elements"
+    assert elapsed < DETECTION_BUDGET, f"detection took {elapsed:.2f} s"
+
+
+def test_a_plasmid_with_nothing_in_the_catalogue_is_ruled_out_quickly():
+    """The guard for the catalogue's growth: a sequence holding none of its elements is
+    dismissed on the seed search alone, so entries can be added without slowing every
+    document down."""
+    sequence = clean_dna(15_000, 12)
+    detect(sequence, circular=True)
+    start = time.perf_counter()
+    assert detect(sequence, circular=True) == []
+    assert time.perf_counter() - start < DETECTION_BUDGET / 4
+
+
+def test_an_element_present_verbatim_is_found_without_aligning_it():
+    """An exact copy is its own best local alignment, so it is reported without a dynamic
+    programming pass. The test pins the shortcut by failing if the aligner is used at all."""
+    feature = max(catalogue(), key=lambda f: f.length)
+    sequence = clean_dna(400, 13) + feature.sequence + clean_dna(400, 14)
+    aligner = features_module._aligner()
+    calls = []
+    original = aligner.align
+
+    def counted(*args, **kwargs):
+        calls.append(args)
+        return original(*args, **kwargs)
+
+    with mock.patch.object(aligner, "align", counted):
+        found = detect(sequence, circular=False, features=(feature,))
+    assert len(found) == 1
+    assert found[0].identity == 100.0
+    assert found[0].start == 400
+    assert found[0].end == 400 + feature.length - 1
+    assert calls == []
