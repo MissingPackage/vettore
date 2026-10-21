@@ -83,6 +83,16 @@ function useWindowHeight() {
   return height;
 }
 
+/** A document as tools and cloning see it: its own content, without the library primers
+ * that Show Library Primers only draws on the map. */
+function ownData(editorName: string): SequenceData {
+  const data = editorState(editorName)?.sequenceData as SequenceData;
+  if (!data) return data;
+  const own = removeOverlay(data.primers);
+  // The same object when nothing is overlaid, so dialogs that compare it do not re-run.
+  return own.length === count(data.primers) ? data : { ...data, primers: own };
+}
+
 function download(filename: string, content: string | Blob, type = "text/plain") {
   const blob = content instanceof Blob ? content : new Blob([content], { type });
   const url = URL.createObjectURL(blob);
@@ -133,6 +143,9 @@ export default function App() {
   // Light or dark frame, as chosen in Preferences (theme/dark-chrome.css).
   const prefs = usePreferences();
   const { chrome } = prefs;
+  // Bumped when a tool dialog closes: the Primer Library may have changed the library, so the
+  // library primers shown on the map are looked up again.
+  const [libraryVersion, setLibraryVersion] = useState(0);
   useEffect(() => applyChrome(chrome), [chrome]);
 
   // Documents opened in the last two seconds: their tab glows once so the eye finds it (a new
@@ -426,7 +439,7 @@ export default function App() {
   const openDocs: OpenDoc[] = useMemo(() => docs.map((d) => ({
     editorName: d.editorName,
     name: d.name,
-    data: () => editorState(d.editorName)?.sequenceData as SequenceData,
+    data: () => ownData(d.editorName),
     selection: () => {
       const layer = editorState(d.editorName)?.selectionLayer;
       return layer && layer.start >= 0 && layer.end >= 0
@@ -444,7 +457,7 @@ export default function App() {
     // Snapshot the inputs as they are now, so History can reopen them after they change.
     const parents = docsRef.current
       .filter((d) => product.parents.includes(d.name))
-      .map((d) => ({ name: d.name, data: editorState(d.editorName)?.sequenceData as SequenceData }))
+      .map((d) => ({ name: d.name, data: ownData(d.editorName) }))
       .filter((p) => p.data);
     const sequenceData = distinctName(product.doc as SequenceData, docsRef.current.map((d) => d.name));
     const doc = createDocument(sequenceData, null, {
@@ -742,7 +755,7 @@ export default function App() {
       .catch(() => undefined);
     return () => { live = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active, prefs.showLibraryPrimers, activeSequence]);
+  }, [active, prefs.showLibraryPrimers, activeSequence, circular, libraryVersion]);
 
   // ---- command search ----------------------------------------------------------------------
   // The search box lives at the top of the Help menu; the editor's own shortcut for it is Cmd+/
@@ -1106,7 +1119,7 @@ export default function App() {
           <Component
             docs={openDocs}
             active={openDocs.find((d) => d.editorName === active) ?? null}
-            onClose={() => setToolId(null)}
+            onClose={() => { setToolId(null); setLibraryVersion((v) => v + 1); }}
             openDocument={openDocument}
             logHistory={logHistory}
           />

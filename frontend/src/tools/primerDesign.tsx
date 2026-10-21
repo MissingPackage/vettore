@@ -9,6 +9,7 @@ import { api, call, type OveAnnotation, type SequenceData } from "../api";
 import { store } from "../store";
 import type { OpenDoc } from "../cloning/types";
 import { Field } from "../cloning/inputs";
+import { today } from "./primerLibraryText";
 import { useCopyText } from "../cloning/useCopyText";
 import type { Tool, ToolProps } from "./types";
 import {
@@ -242,7 +243,6 @@ function Designer(props: ToolProps & { doc: OpenDoc }) {
     setNotice(null);
     try {
       const library = await api.primerLibrary.get();
-      const parsed = await api.primerLibrary.parse("");
       const have = new Map(library.primers.map((p) => [p.sequence, p.name] as const));
       const toAdd = [
         { name: forwardName, sequence: pair.forward.sequence },
@@ -254,7 +254,7 @@ function Designer(props: ToolProps & { doc: OpenDoc }) {
         return;
       }
       const entries = toAdd.map((p) => ({
-        name: p.name, sequence: p.sequence, notes: `designed on ${doc.name}`, location: "", added: parsed.today,
+        name: p.name, sequence: p.sequence, notes: `designed on ${doc.name}`, location: "", added: today(),
       }));
       await api.primerLibrary.save([...library.primers, ...entries]);
       setNotice({ kind: "saved", text: `Saved ${forwardName} and ${reverseName} to the lab primer library.` });

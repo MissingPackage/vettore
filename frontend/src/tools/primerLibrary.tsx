@@ -22,7 +22,8 @@ import {
   type BoundPrimer,
   type LibraryFile,
   type LibraryPrimer,
-  type RejectedRow,
+  rejectedText,
+  today as todayDate,
 } from "./primerLibraryText";
 import type { Tool, ToolProps } from "./types";
 import "./primerLibrary.css";
@@ -45,7 +46,7 @@ function PrimerLibraryDialog(props: ToolProps) {
   const [adding, setAdding] = useState({ name: "", sequence: "", notes: "", location: "" });
   const [importText, setImportText] = useState<string | null>(null);
   const [bound, setBound] = useState<BoundPrimer[] | null>(null);
-  const [today, setToday] = useState("");
+  const today = todayDate();
   const fileInput = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
@@ -57,7 +58,7 @@ function PrimerLibraryDialog(props: ToolProps) {
       setPrimers(got.primers);
       setDirty(false);
       if (got.rejected.length) {
-        setNotice({ intent: "warning", text: rejectedText(got.rejected, "in the library file") });
+        setNotice({ intent: "warning", text: rejectedText(got.rejected, "file") });
       }
     } catch (e) {
       setError(messageOf(e));
@@ -68,7 +69,6 @@ function PrimerLibraryDialog(props: ToolProps) {
 
   useEffect(() => {
     load();
-    api.primerLibrary.parse("").then((r) => setToday(r.today)).catch(() => undefined);
   }, [load]);
 
   // Which library primers bind the active document (the "on this sequence" panel and the map
@@ -178,8 +178,9 @@ function PrimerLibraryDialog(props: ToolProps) {
       setImportText(null);
       const parts = [`Imported ${added} primer${added === 1 ? "" : "s"}`];
       if (duplicates) parts.push(`${duplicates} already in the library`);
-      if (parsed.rejected.length) parts.push(rejectedText(parsed.rejected, "skipped"));
-      setNotice({ intent: added ? "success" : "warning", text: parts.join("; ") + ". Save to write them to the shared file." });
+      setNotice({ intent: added && !parsed.rejected.length ? "success" : "warning",
+                  text: parts.join("; ") + ". Save to write them to the shared file."
+                    + (parsed.rejected.length ? " " + rejectedText(parsed.rejected, "paste") : "") });
     } catch (e) {
       setError(messageOf(e));
     } finally {
@@ -281,7 +282,10 @@ function PrimerLibraryDialog(props: ToolProps) {
                 <tr key={`${p.sequence}-${i}`} data-testid="pl-row">
                   <td>{p.name}</td>
                   <td className="vt-pl-seq">{p.sequence}</td>
-                  <td>{p.length}</td>
+                  <td title={p.searched === false ? "Shorter than 15 nt: not looked for on sequences" : undefined}>
+                    {p.length}{p.searched === false && <span className="vt-muted"> · too short to search</span>}
+                    {p.degenerate && <span className="vt-muted"> · degenerate</span>}
+                  </td>
                   <td>{p.tm === null ? "—" : `${p.tm.toFixed(1)} °C`}</td>
                   <td>
                     <input className="bp3-input bp3-small vt-pl-edit" aria-label={`Notes for ${p.name}`}
@@ -332,6 +336,11 @@ function PrimerLibraryDialog(props: ToolProps) {
                 {bound.map((p) => (
                   <li key={p.sequence}>
                     <b>{p.name}</b>{" "}
+                    {p.bindings.length === 0 && (
+                      <span className="vt-muted" data-testid="pl-bound-many">
+                        binds {p.sites} places (a repeat): not drawn on the map
+                      </span>
+                    )}
                     {p.bindings.map((b, i) => (
                       <span key={i} className="vt-muted">{i > 0 ? "; " : ""}{bindingText(b)}</span>
                     ))}
@@ -385,11 +394,6 @@ function ImportPanel(props: {
   );
 }
 
-function rejectedText(rejected: RejectedRow[], where: string): string {
-  const names = rejected.slice(0, 3).map((r) => `“${r.name || r.sequence}”`).join(", ");
-  const more = rejected.length > 3 ? ` and ${rejected.length - 3} more` : "";
-  return `${rejected.length} row${rejected.length === 1 ? "" : "s"} ${where} (not DNA): ${names}${more}`;
-}
 
 export const tools: Tool[] = [
   { id: "primer-library", menu: "Primers", label: "Primer Library", Component: PrimerLibraryDialog },

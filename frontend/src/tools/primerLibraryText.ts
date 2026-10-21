@@ -12,6 +12,10 @@ export interface LibraryPrimer {
   length: number;
   /** Tm (°C) of a plain-DNA primer; null for one with ambiguity codes. */
   tm: number | null;
+  /** The sequence has IUPAC codes (a degenerate primer). */
+  degenerate?: boolean;
+  /** Long enough to be looked for on sequences (at least 15 nt). */
+  searched?: boolean;
 }
 
 export interface RejectedRow {
@@ -31,7 +35,27 @@ export interface Binding {
 
 /** A library primer together with where it binds the open document. */
 export interface BoundPrimer extends LibraryPrimer {
+  /** Where it binds; empty when it binds too many places to draw (see `sites`). */
   bindings: Binding[];
+  /** How many places it binds. */
+  sites: number;
+}
+
+/** Today as YYYY-MM-DD in the user's own time zone, for "date added". */
+export function today(now = new Date()): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+}
+
+/** One sentence for the rows of a file or a paste that were left out, with why. */
+export function rejectedText(rejected: RejectedRow[], where: "file" | "paste"): string {
+  const shown = rejected.slice(0, 3).map((r) => `“${r.name || r.sequence || "a row"}”: ${r.reason}`);
+  const more = rejected.length > 3 ? ` (and ${rejected.length - 3} more)` : "";
+  const n = rejected.length;
+  const rows = `${n} row${n === 1 ? "" : "s"}`;
+  return where === "file"
+    ? `${rows} of the library file could not be read and stay in the file as they are, so a colleague can correct them. ${shown.join(" ")}${more}`
+    : `${rows} left out: ${shown.join(" ")}${more}`;
 }
 
 export interface LibraryFile {

@@ -5,13 +5,15 @@ import { isOverlay, overlayAnnotations, removeOverlay, withOverlay } from "./lib
 const bound: BoundPrimer[] = [
   {
     name: "M13F", sequence: "GTAAAACGACGGCCAGT", notes: "", location: "box 1", added: "", length: 17, tm: 55,
+    sites: 1,
     bindings: [{ start: 10, end: 26, strand: 1, footprint: 17, tail: 0, mismatches: 0 }],
   },
   {
     name: "Rep", sequence: "ACGTACGTACGTACGTAC", notes: "", location: "", added: "", length: 18, tm: null,
+    sites: 2,
     bindings: [
       { start: 30, end: 47, strand: 1, footprint: 18, tail: 0, mismatches: 0 },
-      { start: 90, end: 73, strand: -1, footprint: 18, tail: 0, mismatches: 1 },
+      { start: 73, end: 90, strand: -1, footprint: 18, tail: 0, mismatches: 1 },
     ],
   },
 ];
@@ -26,6 +28,8 @@ describe("overlayAnnotations", () => {
     expect(anns.map((a) => a.name)).toContain("Rep (2)");
     const rev = anns.find((a) => a.strand === -1)!;
     expect(rev.forward).toBe(false);
+    // Drawn where it anneals: the lower coordinate first, as every primer in the editor.
+    expect([rev.start, rev.end]).toEqual([73, 90]);
     expect((rev.notes as Record<string, string[]>)[OVERLAY_NOTE]).toEqual(["library"]);
   });
   it("carries the primer sequence and location in the note", () => {

@@ -66,7 +66,7 @@ test("add a primer, import pasted rows, and keep it in the shared file", async (
   await page.getByTestId("pl-import-text").fill(`Imported1\t${IMPORTED}\nBadRow\tACGXYZ`);
   await page.getByTestId("pl-import-run").click();
   await expect(dialog.getByTestId("pl-notice")).toContainText("Imported 1");
-  await expect(dialog.getByTestId("pl-notice")).toContainText("skipped");
+  await expect(dialog.getByTestId("pl-notice")).toContainText("left out");
 
   // Save writes both to the shared file; a reload reads them back.
   await page.getByTestId("pl-save").click();
@@ -83,7 +83,8 @@ test("add a primer, import pasted rows, and keep it in the shared file", async (
 
   // Show Library Primers draws it on the map as a primer.
   await menu(page, "Primers", "Show Library Primers");
-  await menu(page, "Primers", "Primers View");
+  // The view tab, not the menu: the toggle has just rebuilt the menu bar (its tick).
+  await page.getByRole("tab", { name: "Primers", exact: true }).click();
   await expect(page.locator(".veEditor").getByText("TestSeqP", { exact: false }).first()).toBeVisible();
 });
 
@@ -110,7 +111,8 @@ test("showing library primers on an opened file leaves it unchanged and out of U
   await page.getByTestId("pl-close").click();
 
   await menu(page, "Primers", "Show Library Primers");
-  await menu(page, "Primers", "Primers View");
+  // The view tab, not the menu: the toggle has just rebuilt the menu bar (its tick).
+  await page.getByRole("tab", { name: "Primers", exact: true }).click();
   await expect(page.locator(".veEditor").getByText("pBR_1201F", { exact: false }).first()).toBeVisible();
   // A view, not an edit: the file still has no unsaved changes, and Undo has nothing to undo.
   await expect(tab).not.toHaveAttribute("data-unsaved", "true");

@@ -7,7 +7,9 @@ import {
   newEntry,
   orderingText,
   range,
+  rejectedText,
   sequenceAlreadyIn,
+  today,
   toCsv,
   type LibraryPrimer,
 } from "./primerLibraryText";
@@ -110,5 +112,18 @@ describe("orderingText and newEntry", () => {
   it("stamps a new entry with today's date and cleans the sequence", () => {
     const e = newEntry("  KanR_F ", "acg t", "2026-10-21", "note", "box 1");
     expect(e).toMatchObject({ name: "KanR_F", sequence: "ACGT", added: "2026-10-21", location: "box 1", length: 4 });
+  });
+});
+
+describe("today and rejectedText", () => {
+  it("writes the local date as YYYY-MM-DD", () => {
+    expect(today(new Date(2026, 0, 5, 23, 30))).toBe("2026-01-05");
+  });
+  it("says why rows were left out, and that file rows are kept", () => {
+    const rows = [{ name: "Ino", sequence: "ACGI", reason: "its sequence has characters that are not DNA ('I')." }];
+    expect(rejectedText(rows, "paste")).toContain("not DNA");
+    expect(rejectedText(rows, "file")).toContain("stay in the file");
+    const dup = [{ name: "M13F copy", sequence: "GTAAAACG", reason: "it is the same oligo as “M13F”." }];
+    expect(rejectedText(dup, "paste")).not.toContain("not DNA");
   });
 });
