@@ -323,11 +323,12 @@ def test_a_deletion_across_the_origin_is_one_event():
 
 def test_an_n_is_no_call_and_never_enters_the_consensus():
     insert = REFERENCE[200:500]
-    result = made_contig(made_read("a", with_base(insert, 150, "N"), 40),
+    # Base callers give an N a very low quality; a good-quality N is doubt (tested below).
+    result = made_contig(made_read("a", with_base(insert, 150, "N"), [40] * 150 + [4] + [40] * 149),
                          made_read("b", insert, 20, -1))
     assert result["differences"] == []
     assert result["disagreements"] == []
-    alone = made_contig(made_read("a", with_base(insert, 150, "N"), 40))
+    alone = made_contig(made_read("a", with_base(insert, 150, "N"), [40] * 150 + [4] + [40] * 149))
     assert alone["differences"] == []
     assert [d["kind"] for d in alone["disagreements"]] == ["no call"]
     assert alone["document"]["sequence"] == REFERENCE
@@ -415,10 +416,48 @@ def test_a_tied_insertion_slot_is_not_verified():
 
 def test_verified_counts_the_reads_that_agree_and_skips_weak_bases():
     insert = REFERENCE[200:500]
-    result = made_contig(made_read("a", with_base(insert, 150, "N"), 40),
+    result = made_contig(made_read("a", with_base(insert, 150, "N"), [40] * 150 + [4] + [40] * 149),
                          made_read("b", insert, [40] * 160 + [12] + [40] * 139, -1))
     names = {(r["start"], r["end"]): r["reads"] for r in result["verified"]}
     assert any(start <= 351 <= end and n == 1 for (start, end), n in names.items())
     assert verified_at(result, 360)                      # Q12 in b, but a has Q40 there
     weak = made_contig(made_read("only", insert, [40] * 160 + [12] + [40] * 139))
     assert not verified_at(weak, 360)
+
+
+# ---- third review ----------------------------------------------------------------------------
+
+def test_extra_bases_called_n_are_never_verified():
+    insert = REFERENCE[200:500]
+    extra = insert[:150] + "N" + insert[150:]
+    both = made_contig(made_read("a", extra, 40), made_read("b", extra, 40, -1))
+    assert not verified_at(both, 350)
+    assert both["doubtful"] >= 1 and both["disagreements"]
+    against = made_contig(made_read("n", extra, 40), made_read("plain", insert, 40, -1))
+    assert not verified_at(against, 350)
+
+
+def test_a_good_mixed_call_on_a_reference_base_is_doubt():
+    insert = REFERENCE[200:500]
+    result = made_contig(made_read("plain", insert, 40),
+                         made_read("mixed", with_base(insert, 150, "R"), 40, -1))
+    assert result["differences"] == []
+    assert not verified_at(result, 350)
+
+
+def test_verified_counts_only_good_calls():
+    insert = REFERENCE[200:500]
+    result = made_contig(made_read("good", insert, 40),
+                         made_read("poor", insert, [40] * 140 + [8] * 20 + [40] * 140, -1))
+    assert any(r["start"] <= 351 <= r["end"] and r["reads"] == 1 for r in result["verified"])
+
+
+def test_a_flag_on_deleted_bases_stays_in_the_document():
+    insert = REFERENCE[200:500]
+    deleted = insert[:150] + insert[152:]
+    result = made_contig(made_read("a", deleted, 40), made_read("b", deleted, 40, -1),
+                         made_read("c", insert, [40] * 150 + [25, 25] + [40] * 148))
+    [difference] = result["differences"]
+    assert difference["kind"] == "deletion" and difference["confirmed"] is False
+    checks = [f for f in result["document"]["features"] if f["name"] == "Sanger: check the trace"]
+    assert checks and checks[0]["end"] - checks[0]["start"] == 1

@@ -166,8 +166,7 @@ def contig_payload(reference: str, circular: bool, reads: list[AlignedRead],
     disagreements: list[dict[str, Any]] = []
     unclear: set[int] = set()        # covered positions without a clear call (reference kept)
     doubtful: set[int] = set()       # positions where good reads conflict, or the vote is tied
-    support = [0] * length           # reads whose clear call agrees with the consensus
-    strong = [False] * length        # ... one of them at Q20 or better
+    support = [0] * length           # reads whose clear call at Q20+ agrees with the consensus
 
     def listed(calls: list[Call]) -> list[dict[str, Any]]:
         return [{"read": names[c.read], "strand": strands[c.read], "call": c.value,
@@ -192,15 +191,23 @@ def contig_payload(reference: str, circular: bool, reads: list[AlignedRead],
                                                            bases[position].quality)))
             slot.append(Call(i, text, quality))
         votes = [c for c in slot if _clear(c.value)]
+        unclear_calls = [c for c in slot if not _clear(c.value)]
         if not votes:
+            if unclear_calls:        # extra bases no read calls clearly: not verified
+                doubtful.add(position)
+                disagreements.append({"kind": "no call", "position": position + 1,
+                                      "reference": "", "consensus": "",
+                                      "calls": listed(slot)})
             return
         inserted, tied = _vote(votes, "")
-        if len({c.value for c in votes}) > 1:
+        if len({c.value for c in votes}) > 1 or unclear_calls:
             disagreements.append({"kind": "insertion", "position": position + 1,
                                   "reference": "", "consensus": inserted,
                                   "calls": listed(slot)})
+        # A good read showing something else, even extra bases it calls N or as a mixed
+        # call, is contrary evidence.
         conflict = tied or any(c.value != inserted and c.quality >= SUPPORTING_QUALITY
-                               for c in votes)
+                               for c in slot)
         if conflict:
             doubtful.add(position)
         if inserted:
@@ -265,10 +272,13 @@ def contig_payload(reference: str, circular: bool, reads: list[AlignedRead],
                     continue
                 call, quality, clear, joined = column(i, unit, index)
                 if not clear:
+                    # A good-quality N or mixed call (a mixed peak: two clones?) is doubt.
+                    if quality >= SUPPORTING_QUALITY:
+                        disputed = conflict = True
                     continue
                 if call == (parts[index] if joined else parts[index][-1]):
-                    support[p] += 1
-                    strong[p] = strong[p] or quality >= SUPPORTING_QUALITY
+                    if quality >= SUPPORTING_QUALITY:
+                        support[p] += 1      # the reads that back the consensus at Q20+
                 else:
                     disputed = True
                     conflict = conflict or quality >= SUPPORTING_QUALITY
@@ -317,7 +327,7 @@ def contig_payload(reference: str, circular: bool, reads: list[AlignedRead],
     # better, and no difference left to check. The count is the fewest reads agreeing with the
     # consensus over any base of the stretch.
     for p in range(length):
-        if depth[p] and p not in unclear and not strong[p]:
+        if depth[p] and p not in unclear and not support[p]:
             doubtful.add(p)          # only weak calls (under Q20) back this base
     for d in differences:
         if not d["confirmed"]:
@@ -425,11 +435,17 @@ def _consensus_document(document: dict[str, Any], reference: str, circular: bool
             _new_range(start, end, start_of, kept, new_length, circular),
             f"No read makes a clear call over reference bases {start + 1:,}–{end + 1:,}: the "
             "reference is kept; check the traces")
+    def flanks(position: int) -> tuple[int, int]:
+        """The two consensus bases around the place where reference ``position`` was."""
+        after = start_of[position]
+        return (((after - 1) % new_length, after % new_length) if circular
+                else (max(0, after - 1), min(after, new_length - 1)))
+
     for start, end in doubtful:
         add("Sanger: check the trace", "misc_feature",
-            _new_range(start, end, start_of, kept, new_length, circular),
-            f"Reference bases {start + 1:,}–{end + 1:,}: the reads conflict here, or only "
-            "calls under Q20 back the consensus; check the traces")
+            _new_range(start, end, start_of, kept, new_length, circular) or flanks(start),
+            f"Reference bases {start + 1:,}–{end + 1:,}: the reads conflict here, a difference "
+            "is not confirmed, or only calls under Q20 back the consensus; check the traces")
     for d in differences:
         evidence = (f"{d['reads']} reads" if d["reads"] > 1
                     else f"1 read at Q{d['quality']}")
@@ -450,10 +466,7 @@ def _consensus_document(document: dict[str, Any], reference: str, circular: bool
                 f"{d['position']:,} ({evidence})")
         else:
             # A deleted stretch has no bases left: the two bases around the gap carry it.
-            after = start_of[position]
-            span = (((after - 1) % new_length, after % new_length) if circular
-                    else (max(0, after - 1), min(after, new_length - 1)))
-            add(f"Δ{d['reference']} ({tag})", "variation", span,
+            add(f"Δ{d['reference']} ({tag})", "variation", flanks(position),
                 f"Reference bases {d['position']:,}–{d['_end'] + 1:,} ({d['reference']}) are "
                 f"missing between these two bases ({evidence})")
 

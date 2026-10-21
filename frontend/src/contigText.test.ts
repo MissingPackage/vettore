@@ -72,7 +72,7 @@ describe("contigVerdict", () => {
   it("does not pass a clone where good reads conflict or only weak calls back a base", () => {
     const v = contigVerdict(contig({ doubtful: 3 }), "pCOI", 61.4);
     expect(v.ok).toBe(false);
-    expect(v.text).toContain("3 covered positions are not verified: good reads conflict there, or only calls under Q20");
+    expect(v.text).toContain("3 covered positions are not verified: good reads conflict there, a difference is not confirmed, or only calls under Q20");
   });
 
   it("does not pass a clone where some covered bases have no clear call", () => {
