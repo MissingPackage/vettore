@@ -18,7 +18,18 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import alignment, app_info, digest_planner, fileio, gel, primer_design, sanger, settings, tm
+from . import (
+    alignment,
+    app_info,
+    digest_planner,
+    fileio,
+    gel,
+    msa,
+    primer_design,
+    sanger,
+    settings,
+    tm,
+)
 from . import features as common_features
 from .cloning.api import router as cloning_router
 from .cloning.base import CloningError, dna_sequence
@@ -273,7 +284,7 @@ def create_app(token: str, static_dir: Path | None,
 
     app.include_router(cloning_router)
     # Feature modules own their routes; each exposes ``router``.
-    for module in (alignment, primer_design, app_info):
+    for module in (alignment, msa, primer_design, app_info):
         app.include_router(module.router)
 
     @app.exception_handler(fileio.UnsupportedFile)

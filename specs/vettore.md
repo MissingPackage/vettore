@@ -196,7 +196,7 @@ digest that tells my correct clone apart from the usual wrong ones, so that one 
 | S0 Spike | done | — |
 | S1 Daily driver | done (S1.1–S1.6), plus more formats (EMBL, `.xdna`, `.gck`, plain text), content-based format detection, `.dna` writing, clipboard exchange, vendor conventions (colour notes, non-standard and `regulatory` feature types) | — |
 | S2 Cloning | done: S2.1–S2.8 — restriction (one or several inserts), linear and circular ligation, Gibson/HiFi/In-Fusion, PCR, mutagenesis, Golden Gate, Gateway BP/LR including MultiSite LR with up to four entry clones (checked against published MultiSite vectors and a published three-fragment clone), TA/GC/TOPO, annealed oligos; History reopens every input; Create All | — |
-| S3 Verification | done: S3.1–S3.5 — gel, Sanger alignment with verdict and read quality, star alignment of several sequences, common features with label checks, primer3 pair design | progressive multiple alignment (sequences are aligned to the reference, not to each other) |
+| S3 Verification | done: S3.1–S3.5 — gel, Sanger alignment with verdict and read quality, star alignment of several sequences, common features with label checks, primer3 pair design | progressive multiple alignment added in S6.2 (Align Multiple Sequences → All to each other) |
 | S4 Polish | mostly: preferences, shortcut list, sample constructs, help, AAV packaging check, consistent look, in-app quit dialog, one window for double-clicked files, per-user file associations (Windows and Linux) | history graph; printing in the Linux window; online import by accession (open question 6) |
 
 Tests: 609 pytest (plus 4 opt-in Qt window tests), 110 vitest, 130 Playwright end-to-end, plus a packaging smoke test that runs the packaged binary on both

@@ -454,6 +454,19 @@ If a sequence resembles the reference only in part (two plasmids that share a ba
 
 Limits: up to 10 sequences at a time (reference included), each up to 15,000 bp. A large comparison takes a few seconds per sequence. To compare part of a bigger sequence, make a new file from that region first (**Actions → New File from Selection**).
 
+### All to each other
+
+**Each to the reference** answers "where do these differ from this one?". To see several sequences side by side with none of them privileged (variants of a construct, capsid genes of several serotypes), choose **All to each other** at the top of the dialog, tick at least two sequences and press **Align**.
+
+The sequences are turned to the strand and origin of the first one ticked. The most similar ones are lined up first, then the groups with each other (a progressive alignment, as ClustalW does), so similar sequences end up next to each other in the view. A bar shows how far the alignment has got; **Stop** abandons it.
+
+- The table gives each sequence's length, strand, the alignment columns it covers and how identical it is to the consensus.
+- **Conservation** draws, for every stretch of columns, how many of the sequences share the most common base: tall blue bars are conserved, short orange ones variable. Hover a bar for its columns; the most variable stretches are listed under it.
+- The view stacks the sequences under a **Consensus** row (the most common base of each column; an ambiguity code such as R where two are equally common; a gap where most sequences have one). Coloured marks are differences from the consensus.
+- **Differences between two sequences**: pick any two to list every difference of the first from the second, in the second's own numbering and strand, as in the reference mode. **Copy list** copies it for a spreadsheet.
+
+A sequence that shares nothing with the others is left out with a note. Limits: up to 50 sequences, each up to 15,000 bp and 150,000 bp in all (10 plasmids of 15 kb, or 50 genes of 3 kb); the largest take a few seconds.
+
 ## Verifying a clone by sequencing (Tools → Align to Reference DNA Sequence…)
 
 Open the plasmid you expect, then choose the `.ab1` files your sequencing provider sent. Several at once is fine. Each read is quality-trimmed (Mott's algorithm; the stringency is adjustable), aligned to the plasmid on either strand, and stacked under the reference with its chromatogram, starting at the region the reads cover.
