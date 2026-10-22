@@ -1138,8 +1138,9 @@ def test_enough_deleted_sites_stop_an_element_being_found_at_all(label, element_
     What ends an element is **seed exhaustion**, not the identity floor. The engine aligns an
     element only where one of its six seeds occurs in the plasmid, and at each of these three
     boundaries nothing is left to align: the AmpR promoter has no candidate offset at all,
-    and 3×HA still has five, but every one of them is inside the copy nested in SaCas9, 6 kb
-    from the standalone copy and far outside the alignment window around an offset. Dropping
+    and 3×HA still has five, but every one of them comes from a seed hit inside the copy
+    nested in SaCas9, 6 kb from the standalone copy and far outside the alignment window
+    around an offset. Dropping
     `min_identity` to 0 brings neither of them back, so the floor is never reached and is not
     the reason. (Were they anchored they would fail it: 94.29 % for the promoter, 93.83 % for
     the tag. That is arithmetic about the deletions, not the engine's cause.)
