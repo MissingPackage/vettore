@@ -14,6 +14,7 @@ a single wrong base in a loxP site changes its behaviour.
 from __future__ import annotations
 
 import json
+import math
 import re
 from dataclasses import dataclass
 from functools import lru_cache
@@ -31,11 +32,6 @@ DEFAULT_MIN_COVERAGE = 90.0  # how much of the catalogue feature must be found
 #: ITRs are routinely shortened in vectors (the common "130 bp" ITR is a 14 nt truncation of
 #: the 145 nt wild type, and shorter variants exist), so they are matched permissively.
 COVERAGE_BY_TYPE = {"repeat_region": 70.0}
-
-#: A local alignment stops at the first mismatched base, which can leave a start codon out of
-#: the match. A few bases are added back; a longer trim is a genuinely shorter feature (a
-#: truncated ITR, say) and is left alone.
-MAX_EXTENSION = 6
 
 
 @dataclass(frozen=True)
@@ -90,6 +86,16 @@ def _candidate_offsets(target: str, feature: str) -> set[int]:
     return offsets
 
 
+#: (start, end, identity, first, last, frameshift) of a hit: start and end on the target,
+#: inclusive; first and last the bases of the query it covers, as a 0-based half-open range;
+#: frameshift whether the indels inside a coding sequence break its reading frame.
+Hit = tuple[int, int, float, int, int, bool]
+
+Column = tuple[int | None, int | None, bool]
+
+STOP_CODONS = frozenset({"TAA", "TAG", "TGA"})
+
+
 @dataclass
 class Match:
     name: str
@@ -100,6 +106,9 @@ class Match:
     identity: float
     note: str
     source: str
+    entry_length: int    # length of the catalogue entry
+    part: tuple[int, int]  # the bases of the entry the match covers, 1-based inclusive
+    frameshift: bool = False  # a coding sequence whose indels break its reading frame
 
     def span(self, length: int) -> set[int]:
         if self.start <= self.end:
@@ -109,13 +118,117 @@ class Match:
     def as_dict(self, length: int) -> dict[str, Any]:
         return {"name": self.name, "type": self.type, "start": self.start, "end": self.end,
                 "strand": self.strand, "forward": self.strand == 1,
-                "identity": round(self.identity, 1), "note": self.note, "source": self.source,
-                "length": len(self.span(length))}
+                "identity": shown_identity(self.identity), "note": self.note,
+                "source": self.source, "length": len(self.span(length)),
+                "catalogueLength": self.entry_length, "catalogueFrom": self.part[0],
+                "catalogueTo": self.part[1], "frameshift": self.frameshift}
 
 
-def _match_long(target: str, query: str, length: int,
-                min_identity: float, min_coverage: float) -> list[tuple[int, int, float]]:
-    results: list[tuple[int, int, float]] = []
+def shown_identity(identity: float) -> float:
+    """The identity to one decimal, rounded down: one mismatch in SaCas9 is 99.97 %, and it
+    must not read as 100.0 %."""
+    return math.floor(identity * 10 + 1e-9) / 10
+
+
+def _columns(alignment: Any, offset: int = 0) -> list[Column]:
+    """(target index, query index, identical) for each column of a pairwise alignment, with
+    None for the sequence that has a gap there; target indices are shifted by ``offset``."""
+    columns: list[Column] = []
+    t, q = offset + int(alignment.coordinates[0][0]), int(alignment.coordinates[1][0])
+    for a, b in zip(alignment[0], alignment[1]):
+        columns.append((t if a != "-" else None, q if b != "-" else None, a == b and a != "-"))
+        t += a != "-"
+        q += b != "-"
+    return columns
+
+
+def _whole_codons(columns: list[Column]) -> list[Column]:
+    """The columns from the first base of a codon of the catalogue entry to the last base of
+    one, both present in the target, so a coding sequence is annotated in its own frame."""
+    first = next((i for i, (t, q, _) in enumerate(columns)
+                  if t is not None and q is not None and q % 3 == 0), None)
+    last = next((i for i in range(len(columns) - 1, -1, -1)
+                 if columns[i][0] is not None and columns[i][1] is not None
+                 and columns[i][1] % 3 == 2), None)
+    if first is None or last is None or first > last:
+        return []
+    return columns[first : last + 1]
+
+
+def _codon_ends(columns: list[Column], target: str, query: str, strand: int) -> list[Column]:
+    """A coding sequence cut to whole codons, with its own start and stop codons put back when
+    the vector has them in frame next to the match: a TAG where the catalogue has TAA is still
+    the stop, and an ATG one codon before the match is the start, after a codon put in to make
+    an NcoI site (ATG GGG ATT) too. The codon put in is counted as an insertion, and is only
+    accepted in that context (it starts with G, as CCATGG requires, and is not a stop), so a
+    Met in the linker of a fusion is not taken for the start. On the minus strand the query is
+    the entry's reverse complement, so the stop codon is at its head."""
+    starts, stops = {"ATG"}, STOP_CODONS
+    if strand == -1:
+        starts, stops = {_reverse_complement(c) for c in stops}, {_reverse_complement("ATG")}
+    head_reach, tail_reach = (2, 1) if strand == 1 else (1, 2)
+    length = len(query)
+
+    first_t = next(t for t, _, _ in columns if t is not None)
+    first_q = next(q for _, q, _ in columns if q is not None)
+    if first_q == 3:
+        for k in range(1, head_reach + 1):
+            begin = first_t - 3 * k
+            put_in = target[begin + 3 : first_t]
+            if begin >= 0 and target[begin : begin + 3] in starts and _ncoi_codon(put_in, strand):
+                columns = ([(begin + i, i, target[begin + i] == query[i]) for i in range(3)]
+                           + [(begin + 3 + i, None, False) for i in range(3 * (k - 1))]
+                           + columns)
+                break
+
+    last_t = next(t for t, _, _ in reversed(columns) if t is not None)
+    last_q = next(q for _, q, _ in reversed(columns) if q is not None)
+    if last_q == length - 4:
+        for k in range(1, tail_reach + 1):
+            begin = last_t + 1 + 3 * (k - 1)
+            put_in = target[last_t + 1 : begin]
+            if target[begin : begin + 3] in stops and _ncoi_codon(put_in, strand):
+                columns = (columns
+                           + [(last_t + 1 + i, None, False) for i in range(3 * (k - 1))]
+                           + [(begin + i, length - 3 + i,
+                               target[begin + i] == query[length - 3 + i]) for i in range(3)])
+                break
+    return columns
+
+
+def _ncoi_codon(codon: str, strand: int) -> bool:
+    """Whether a codon put in after the ATG (none at all is fine too) is the one an NcoI site
+    makes, read on the coding strand: it starts with G and is not a stop."""
+    if not codon:
+        return True
+    if strand == -1:
+        codon = _reverse_complement(codon)
+    return codon[0] == "G" and codon not in STOP_CODONS
+
+
+def _frameshift(columns: list[Column]) -> bool:
+    """Whether the gaps inside an alignment break its reading frame: overall, or over a codon
+    or more between an insertion and a deletion that make up for each other."""
+    shift = 0
+    out_of_frame = 0
+    for t, q, _ in columns:
+        shift += (q is None) - (t is None)
+        if shift % 3 and q is not None:
+            out_of_frame += 1
+            if out_of_frame >= 3:
+                return True
+        elif shift % 3 == 0:
+            out_of_frame = 0
+    return shift % 3 != 0
+
+
+def _match_long(target: str, query: str, length: int, min_identity: float,
+                min_coverage: float, strand: int = 1, coding: bool = False) -> list[Hit]:
+    """Matches of ``query`` (the catalogue entry, or its reverse complement on the minus
+    ``strand``) in ``target``. With ``coding``, each is annotated in whole codons of its own
+    frame, from its start to its stop codon when the vector has them (the catalogue's CDS
+    entries run from ATG to stop, so the frame is the same on both strands)."""
+    results: list[Hit] = []
     aligner = _aligner()
     margin = max(30, len(query) // 10)
     for offset in sorted(_candidate_offsets(target, query)):
@@ -130,7 +243,7 @@ def _match_long(target: str, query: str, length: int,
         # of them. Every guess is tested, because a repeated element (a 6×HA tag is two 3×HA
         # in a row) gives one guess per copy and per register.
         if 100.0 >= min_identity and target[offset : offset + len(query)] == query:
-            results.append((offset, offset + len(query) - 1, 100.0))
+            results.append((offset, offset + len(query) - 1, 100.0, 0, len(query), False))
             continue
         window_start = max(0, offset - margin)
         window = target[window_start : offset + len(query) + margin]
@@ -139,33 +252,36 @@ def _match_long(target: str, query: str, length: int,
         alignments = aligner.align(window, query)
         if not len(alignments):
             continue
-        best = alignments[0]
-        aligned_ref, aligned_query = best[0], best[1]
-        matches = sum(1 for a, b in zip(aligned_ref, aligned_query) if a == b and a != "-")
-        coverage = 100.0 * sum(1 for b in aligned_query if b != "-") / len(query)
-        identity = 100.0 * matches / max(1, len(aligned_ref))
-        if identity >= min_identity and coverage >= min_coverage:
-            start = window_start + int(best.coordinates[0][0])
-            end = window_start + int(best.coordinates[0][-1]) - 1
-            head = int(best.coordinates[1][0])
-            tail = len(query) - int(best.coordinates[1][-1])
-            if head <= MAX_EXTENSION and tail <= MAX_EXTENSION:
-                extended_start = max(0, start - head)
-                extended_end = min(len(target) - 1, end + tail)
-                if extended_end - extended_start + 1 == len(query):
-                    start, end = extended_start, extended_end
-                    # Report identity over everything that is annotated, flanks included.
-                    span = target[start : end + 1]
-                    identity = 100.0 * sum(1 for a, b in zip(span, query) if a == b) / len(query)
-            results.append((start, end, identity))
+        # The annotation is the aligned region and nothing else, so the identity tested here is
+        # the identity the user reads. Ends of the catalogue entry that the local alignment
+        # left out are not added back: under this scoring a dropped end is at least 40 %
+        # mismatches, and in real vectors it is the junction the element was cloned into (a
+        # BamHI site before an SV40 polyA, the linker of a GFP fusion), not the element. The
+        # match says which bases of the entry it covers, so a shorter match is never silent.
+        columns = _columns(alignments[0], window_start)
+        choices = [columns]
+        if coding:
+            cut = _whole_codons(columns)
+            # The start and stop codons count towards the identity; if they would take it
+            # under the threshold, the match is shown without them rather than not at all.
+            choices = [_codon_ends(cut, target, query, strand), cut] if cut else []
+        for chosen in choices:
+            in_target = [t for t, _, _ in chosen if t is not None]
+            in_query = [q for _, q, _ in chosen if q is not None]
+            coverage = 100.0 * len(in_query) / len(query)
+            identity = 100.0 * sum(same for _, _, same in chosen) / len(chosen)
+            if identity >= min_identity and coverage >= min_coverage:
+                results.append((in_target[0], in_target[-1], identity, in_query[0],
+                                in_query[-1] + 1, coding and _frameshift(chosen)))
+                break
     return results
 
 
-def _match_short(target: str, query: str) -> list[tuple[int, int, float]]:
+def _match_short(target: str, query: str) -> list[Hit]:
     results = []
     start = target.find(query)
     while start != -1:
-        results.append((start, start + len(query) - 1, 100.0))
+        results.append((start, start + len(query) - 1, 100.0, 0, len(query), False))
         start = target.find(query, start + 1)
     return results
 
@@ -189,14 +305,20 @@ def detect(sequence: str, circular: bool = False, min_identity: float = DEFAULT_
             query = feature.sequence if strand == 1 else _reverse_complement(feature.sequence)
             coverage = COVERAGE_BY_TYPE.get(feature.type, min_coverage)
             hits = (_match_short(target, query) if feature.length <= SHORT_FEATURE
-                    else _match_long(target, query, length, min_identity, coverage))
-            for start, end, identity in hits:
+                    else _match_long(target, query, length, min_identity, coverage,
+                                     strand=strand,
+                                     coding=feature.type == "CDS" and feature.length % 3 == 0))
+            for start, end, identity, first, last, frameshift in hits:
                 if start >= length:
                     continue  # the same hit also appears in the first copy
+                # The query is the entry's reverse complement on the minus strand.
+                part = ((first + 1, last) if strand == 1
+                        else (feature.length - last + 1, feature.length - first))
                 found.append(Match(name=feature.name, type=feature.type, start=start % length,
                                    end=end % length if circular else min(end, length - 1),
                                    strand=strand, identity=identity, note=feature.note,
-                                   source=feature.source))
+                                   source=feature.source, entry_length=feature.length,
+                                   part=part, frameshift=frameshift))
     return _dedupe(found, length)
 
 
@@ -380,7 +502,8 @@ def _species_conflict(label: str, element: str) -> bool:
 
 
 def _identity_text(identity: float) -> str:
-    return "100 %" if round(identity, 1) >= 100 else f"{identity:.1f} %"
+    shown = shown_identity(identity)
+    return "100 %" if shown >= 100 else f"{shown:.1f} %"
 
 
 def _int(value: Any) -> int | None:

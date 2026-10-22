@@ -21,6 +21,12 @@ interface Detected {
   note: string;
   source: string;
   length: number;
+  /** The catalogue entry's length, and the bases of it (1-based) that the match covers. */
+  catalogueLength?: number;
+  catalogueFrom?: number;
+  catalogueTo?: number;
+  /** A coding sequence whose indels break its reading frame. */
+  frameshift?: boolean;
   isNew: boolean;
   /** The existing feature that already covers this match, under whatever name. */
   annotatedAs?: string | null;
@@ -36,6 +42,21 @@ function annotatedText(f: Detected): string {
   return f.annotatedAs && f.annotatedAs.toLowerCase() !== f.name.toLowerCase()
     ? `annotated as “${f.annotatedAs}”`
     : "already annotated";
+}
+
+/**
+ * "bases 4–708 of 711" when the match covers only part of the catalogue entry, so a 100 %
+ * over a shorter stretch is not read as the whole element, and "3 bp inserted" (or missing)
+ * when the vector's copy is longer or shorter than that part; null when neither.
+ */
+function partText(f: Detected): string | null {
+  const { catalogueFrom: from, catalogueTo: to, catalogueLength: total } = f;
+  if (from == null || to == null || total == null) return null;
+  const pieces: string[] = [];
+  if (from !== 1 || to !== total) pieces.push(`bases ${from}–${to} of ${total}`);
+  const extra = f.length - (to - from + 1);
+  if (extra) pieces.push(`${Math.abs(extra)} bp ${extra > 0 ? "inserted" : "missing"}`);
+  return pieces.length ? pieces.join(", ") : null;
 }
 
 /** A message as a sentence, so another sentence can follow it. */
@@ -85,8 +106,9 @@ export default function DetectFeaturesDialog(props: { doc: OpenDoc; onClose: () 
       .detectFeatures<DetectResult>({ sequenceData: data, min_identity: minIdentity })
       .then((payload) => {
         setResult(payload);
-        // Everything not annotated yet is ticked: one click adds the useful result.
-        setChosen(new Set(payload.features.filter((f) => f.isNew).map(key)));
+        // Everything not annotated yet is ticked: one click adds the useful result. A coding
+        // sequence with a broken reading frame is shown but left for the user to decide.
+        setChosen(new Set(payload.features.filter((f) => f.isNew && !f.frameshift).map(key)));
       })
       .catch((e) => setError(String((e as Error).message)))
       .finally(() => setBusy(false));
@@ -121,7 +143,10 @@ export default function DetectFeaturesDialog(props: { doc: OpenDoc; onClose: () 
       color: COLOR[f.type] ?? COLOR.misc_feature,
       notes: {
         note: [f.note || f.name],
-        detected_from: [`${f.source} (${f.identity.toFixed(1)}% identity)`],
+        detected_from: [
+          `${f.source} (${f.identity.toFixed(1)}% identity${partText(f) ? ` over ${partText(f)}` : ""})`
+            + (f.frameshift ? "; the reading frame is broken (frameshift)" : ""),
+        ],
       },
     }));
     store.dispatch(
@@ -216,7 +241,7 @@ export default function DetectFeaturesDialog(props: { doc: OpenDoc; onClose: () 
                 {result.features.map((f) => (
                   <tr
                     key={key(f)}
-                    className={f.labelWarning ? "vt-detect-doubt" : f.isNew ? "" : "vt-muted"}
+                    className={f.labelWarning || f.frameshift ? "vt-detect-doubt" : f.isNew ? "" : "vt-muted"}
                     data-testid="detect-row"
                   >
                     <td>
@@ -226,6 +251,12 @@ export default function DetectFeaturesDialog(props: { doc: OpenDoc; onClose: () 
                     <td>
                       <span className="vt-swatch" style={{ background: COLOR[f.type] ?? COLOR.misc_feature }} />
                       {f.name}
+                      {f.frameshift && (
+                        <span className="vt-warn vt-detect-doubt-text" data-testid="detect-frameshift">
+                          Frameshift: an insertion or deletion inside breaks the reading frame, so
+                          the protein differs after it. Check the sequence before adding it.
+                        </span>
+                      )}
                       {f.labelWarning ? (
                         <span className="vt-warn vt-detect-doubt-text" data-testid="detect-label-warning">
                           {f.labelWarning}
@@ -238,7 +269,15 @@ export default function DetectFeaturesDialog(props: { doc: OpenDoc; onClose: () 
                     <td className="vt-num">
                       {f.start + 1}…{f.end + 1} {f.forward ? "→" : "←"}
                     </td>
-                    <td className="vt-num">{f.length} bp</td>
+                    <td className="vt-num">
+                      {f.length} bp
+                      {partText(f) && (
+                        <span className="vt-muted" data-testid="detect-part"
+                              title={`The catalogue entry is ${f.catalogueLength} bp; this says which of its bases match here, and how much longer or shorter the copy in this sequence is`}>
+                          {" "}· {partText(f)}
+                        </span>
+                      )}
+                    </td>
                     <td className={f.identity === 100 ? "vt-num vt-ok" : "vt-num"}>{f.identity.toFixed(1)} %</td>
                     <td className="vt-muted" title={f.note}>{f.source}</td>
                   </tr>

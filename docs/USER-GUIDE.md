@@ -409,8 +409,21 @@ table tells you which one your plasmid carries.
 
 Every entry in the catalogue is a real subsequence of a public GenBank record. The table shows
 which record it came from and the percent identity of the match, so you can judge a hit
-yourself. Tick the ones you want and they are added to the map, coloured by type, with their
-provenance kept in the feature's notes.
+yourself. The identity is over exactly the bases that are annotated, and no row is ever below
+the minimum identity you chose. Only the part of the element that is really there is
+annotated: the cloning sites around it are not counted as part of it. A coding sequence is
+annotated in whole codons of its own frame, from the vector's own start codon to its own stop
+codon when they sit in frame next to the match: a TAG where the catalogue has TAA is still the
+stop, and an ATG followed by a codon put in for an NcoI site (ATG GGG ATT…) is still the start.
+When the match is less than the whole catalogue entry, the Size column says which part, for
+example "708 bp · bases 4–711 of 711" for an mCherry whose first codon is not ATG, and the
+feature's notes say the same; "798 bp · 3 bp inserted" says the copy here has bases the
+catalogue entry does not. A coding sequence with an insertion or deletion that breaks its
+reading frame is marked "Frameshift" and left unticked: the match can be over 99 % while the
+protein is different after the break.
+
+Tick the ones you want and they are added to the map, coloured by type, with their provenance
+kept in the feature's notes.
 
 Features already annotated are shown greyed and left unticked. This includes elements inside a
 larger feature named after them, however long that feature is: vendors often draw one "CMV

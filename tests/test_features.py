@@ -5,6 +5,7 @@ from unittest import mock
 
 import pytest
 from Bio import SeqIO
+from Bio.Seq import Seq
 from cloning_helpers import clean_dna, rc
 
 from vettore import features as features_module
@@ -14,6 +15,7 @@ from vettore.features import (
     catalogue,
     detect,
     detect_payload,
+    shown_identity,
 )
 
 DATA = Path(__file__).parent / "data"
@@ -68,10 +70,136 @@ def test_a_gene_on_the_minus_strand_is_reported_as_reverse():
     sequence, circular = plasmid("MT612431.1")
     [egfp] = [m for m in detect(sequence, circular) if m.name == "EGFP"]
     assert egfp.strand == -1
-    # Read on the other strand, the match carries EGFP's own first residues.
-    assert "GGTGAGCAAGGGCGAGGAGCTGTTCACC" in rc(sequence[egfp.start : egfp.end + 1])
-    assert egfp.end - egfp.start + 1 == 720          # the whole CDS, not the aligned core only
-    assert 98.0 <= egfp.identity < 100.0             # two bases of the flank differ
+    # The EGFP here is fused at both ends (Gephyrin.FingR-GFP-CCR5TC): linker codons stand
+    # where the catalogue has ATG and AAG TAA. The annotation is the EGFP that is there, codons
+    # 2 to 238 in its own frame (VSKGEE…MDELY in the record's translation), not padded with
+    # the linkers to the catalogue's 720 bp; the record's own "GFP" (2147..2858) is 712.
+    cds = rc(sequence[egfp.start : egfp.end + 1])
+    assert cds.startswith("GTGAGCAAGGGCGAGGAGCTGTTCACC") and cds.endswith("GACGAGCTGTAC")
+    assert egfp.end - egfp.start + 1 == 711
+    assert egfp.part == (4, 714) and egfp.entry_length == 720
+    assert egfp.identity == 100.0
+
+
+# Both records carry an SV40 polyA cloned between sites that differ from the ones around the
+# catalogue entry; one base inside it differs too. (record, start, end), 0-based inclusive.
+SV40_POLYA_IN_RECORDS = [("HG530138.1", 6964, 7185), ("MT891341.1", 2008, 2229)]
+
+
+@pytest.mark.parametrize(("accession", "start", "end"), SV40_POLYA_IN_RECORDS)
+def test_an_element_is_annotated_without_the_junction_it_was_cloned_into(accession, start,
+                                                                        end):
+    """The bases around the element are the vector's, not the catalogue entry's (6 and 4 of
+    them, nearly all different), so they are not annotated as SV40 polyA, and the identity
+    shown is that of the 222 bp that are: 221 of them match. With the threshold at 98 % the
+    element is still found, and at the identity the threshold was tested on."""
+    sequence = record_sequence(accession)
+    for threshold in (95.0, 98.0):
+        [polya] = [m for m in detect(sequence, False, min_identity=threshold)
+                   if m.name == "SV40 polyA"]
+        assert (polya.start, polya.end) == (start, end), threshold
+        assert polya.identity == pytest.approx(100.0 * 221 / 222), threshold
+        assert polya.part == (7, 228) and polya.entry_length == 232, threshold
+
+
+@pytest.mark.parametrize("threshold", [90.0, 95.0, 98.0, 99.0, 100.0])
+def test_no_match_is_shown_below_the_identity_threshold(threshold):
+    """The threshold filters the number the table shows, on every fixture record."""
+    sequences = [(record_sequence(path.name.removeprefix("features-").removesuffix(".fasta")),
+                  False) for path in sorted(DATA.glob("features-*.fasta"))]
+    sequences += [plasmid(accession) for accession in ("MT612431.1", "PZ629150.1")]
+    for sequence, circular in sequences:
+        for match in detect(sequence, circular, min_identity=threshold):
+            assert match.identity >= threshold, (match.name, match.identity)
+            row = match.as_dict(len(sequence))
+            assert row["identity"] >= threshold, (match.name, row["identity"])
+
+
+def test_a_coding_sequence_runs_from_its_own_start_codon_in_frame():
+    """NeoR/KanR here starts ATG GGG ATT (an NcoI site put a codon in after the start), so
+    the alignment begins on the last G of that codon. The annotation is the ORF the record
+    itself annotates, ATG to TGA, with the codon put in counted as an insertion: it
+    translates as the record's MGIEQDG… and covers the whole 795 bp entry."""
+    sequence, circular = plasmid("cloning-multisite-destination-r4r2")
+    [neo] = [m for m in detect(sequence, circular) if m.name == "NeoR/KanR"]
+    cds = rc(sequence[neo.start : neo.end + 1])
+    assert len(cds) == 798
+    protein = str(Seq(cds).translate())
+    assert protein.startswith("MGIEQDGLHAGSPA") and protein.endswith("LDEFF*")
+    assert neo.part == (1, 795) and not neo.frameshift
+    # 798 columns: the ATG matches, the 3 bases put in count as differences, and 4 bases of
+    # the rest differ from the catalogue as they did before.
+    assert neo.identity == pytest.approx(100.0 * 791 / 798)
+
+
+def test_a_match_tells_which_part_of_the_entry_it_covers():
+    """mCherry in MT891341.1 has GTC where the catalogue starts ATG, and stops with TAG where
+    the catalogue has TAA. The stop is the vector's own and is annotated; the first codon is
+    not mCherry's start and is left out, and the row says the match is bases 4 to 711 of the
+    711 bp entry rather than letting the identity pass for the whole of it."""
+    sequence = record_sequence("MT891341.1")
+    [mcherry] = [m for m in detect(sequence, False) if m.name == "mCherry"]
+    assert sequence[mcherry.end - 2 : mcherry.end + 1] == "TAG"
+    row = mcherry.as_dict(len(sequence))
+    assert (row["length"], row["identity"]) == (708, shown_identity(100.0 * 707 / 708))
+    assert (row["catalogueFrom"], row["catalogueTo"], row["catalogueLength"]) == (4, 711, 711)
+
+
+@pytest.mark.parametrize("strand", [1, -1])
+def test_a_different_stop_codon_of_the_vector_is_part_of_the_cds(strand):
+    [egfp] = [f for f in catalogue() if f.name == "EGFP"]
+    assert egfp.sequence.endswith("TAA")
+    insert = egfp.sequence[:-3] + "TAG"
+    filler = clean_dna(400, 311)
+    construct = filler + (insert if strand == 1 else rc(insert)) + filler
+    [match] = [m for m in detect(construct, False) if m.name == "EGFP"]
+    assert (match.start, match.end, match.strand) == (400, 400 + 719, strand)
+    assert match.part == (1, 720) and match.identity == pytest.approx(100.0 * 719 / 720)
+
+
+@pytest.mark.parametrize(("linker", "start"), [("ATGGGC", 1), ("ATGCCC", 4), ("ATGTAA", 4),
+                                               ("ATG", 1)])
+def test_an_atg_before_the_match_is_the_start_only_in_an_ncoi_context(linker, start):
+    """EGFP without its ATG, after a linker. ATG GGC is the NcoI start (CCATGG) with a codon
+    put in; ATG CCC is a Met in a linker, and ATG TAA would put a stop in the protein: neither
+    is EGFP's start."""
+    [egfp] = [f for f in catalogue() if f.name == "EGFP"]
+    filler = clean_dna(400, 313)
+    for strand in (1, -1):
+        insert = linker + egfp.sequence[3:]
+        construct = filler + (insert if strand == 1 else rc(insert)) + filler
+        [match] = [m for m in detect(construct, False) if m.name == "EGFP"]
+        assert match.part[0] == start, (linker, strand)
+
+
+@pytest.mark.parametrize(("edit", "frameshift"), [(1, True), (2, True), (3, False)])
+def test_an_indel_that_breaks_the_reading_frame_is_flagged(edit, frameshift):
+    """One or two bases missing in the middle of EGFP leave a 99 % match whose protein is
+    garbage after that point; a whole codon missing does not."""
+    [egfp] = [f for f in catalogue() if f.name == "EGFP"]
+    filler = clean_dna(400, 312)
+    construct = filler + egfp.sequence[:360] + egfp.sequence[360 + edit :] + filler
+    [match] = [m for m in detect(construct, False, min_identity=95.0) if m.name == "EGFP"]
+    assert match.frameshift is frameshift
+    assert match.as_dict(len(construct))["frameshift"] is frameshift
+
+
+def test_an_insertion_and_a_deletion_that_make_up_for_each_other_are_flagged():
+    """One base in at 300, one out at 330: the frame is right again after, but the ten codons
+    between are another protein."""
+    [egfp] = [f for f in catalogue() if f.name == "EGFP"]
+    seq = egfp.sequence
+    filler = clean_dna(400, 314)
+    edited = seq[:300] + ("A" if seq[300] != "A" else "C") + seq[300:330] + seq[331:]
+    [match] = [m for m in detect(filler + edited + filler, False) if m.name == "EGFP"]
+    assert len(edited) == len(seq) and match.frameshift
+
+
+def test_one_mismatch_in_a_long_element_is_not_shown_as_100_percent():
+    assert shown_identity(100.0 * 3344 / 3345) == 99.9
+    assert shown_identity(98.0) == 98.0
+    assert shown_identity(100.0 * 49 / 50) == 98.0
+    assert shown_identity(100.0) == 100.0
 
 
 def test_a_truncated_itr_is_not_padded_to_full_length():
