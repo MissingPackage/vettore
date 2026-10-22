@@ -870,7 +870,8 @@ FIXTURES = (
 )
 
 #: Where each fixture loses an element, and which: the deleted-site count at which the
-#: shortest entry the fixture aligns has a cut in every one of its six seed windows. The
+#: shortest entry the fixture aligns runs out of seeds and falls below the identity
+#: threshold at the same time — measured, and explained in the test that asserts it. The
 #: stress plasmid gets there first because it carries 3×HA at 81 bp, which is also why it is
 #: pinned only to three sites.
 LOSES_AN_ELEMENT = {
@@ -913,20 +914,24 @@ def _diverged(feature, sites: int) -> str:
     return sequence
 
 
-def _losses(element_names: tuple[str, ...], sites: int) -> dict[str, tuple[int, ...]]:
-    """How many bases each *copy* of each element lost, by name, largest loss first.
+def _losses(element_names: tuple[str, ...],
+            sites: int) -> dict[tuple[str, str | None], tuple[int, ...]]:
+    """How many bases each copy of each element lost, keyed by (name, the element it sits
+    inside or ``None``), largest loss first.
 
-    By copy and not by name, because an entry can appear twice over: SaCas9 carries 3×HA at
-    base 3262, so a plasmid that lists both the nuclease and the tag has the tag reported
-    twice, and a cut in SaCas9 shortens the copy inside it only if it lands inside it. Keyed
-    by name alone, the copy inside SaCas9 would inherit the standalone copy's loss and its
-    floor would allow it to degrade by three points unnoticed.
+    Keyed by where the copy is and not by name alone, because an entry can appear twice over:
+    SaCas9 carries 3×HA at base 3262, so a plasmid that lists both the nuclease and the tag
+    has the tag reported twice, and a cut in SaCas9 shortens the copy inside it only if it
+    lands inside it. Keyed by name alone, the copy inside SaCas9 could inherit the standalone
+    copy's loss and degrade by three points unnoticed; keyed by name with the losses matched
+    to the copies in whatever order made them pass, it could still do so by trading values
+    with the standalone copy, which is why the test pairs them by position.
     """
     catalogued = {feature.name: feature for feature in catalogue()}
-    lost: dict[str, list[int]] = {}
+    lost: dict[tuple[str, str | None], list[int]] = {}
     for name in element_names:
         cuts, width = _cuts(catalogued[name], sites)
-        lost.setdefault(name, []).append(width * len(cuts))
+        lost.setdefault((name, None), []).append(width * len(cuts))
     for name in element_names:
         host = catalogued[name]
         cuts, width = _cuts(host, sites)
@@ -935,11 +940,15 @@ def _losses(element_names: tuple[str, ...], sites: int) -> dict[str, tuple[int, 
             if inner.name == host.name:
                 continue
             at = host.sequence.find(inner.sequence)
-            while at >= 0:            # every copy, and the bases gone from each, not the
-                lost.setdefault(inner.name, []).append(   # cuts that start inside it, since
-                    len(deleted & set(range(at, at + inner.length))))  # a cut can straddle
-                at = host.sequence.find(inner.sequence, at + 1)        # either end
-    return {name: tuple(sorted(counts, reverse=True)) for name, counts in lost.items()}
+            # Every copy, and the bases gone from each rather than the cuts that start
+            # inside it, so that a cut straddling either end counts for what it removes.
+            # No fixture reaches that case: SaCas9's 3×HA sits at 3262..3342 of 3345, and a
+            # cut lands inside it only past about forty sites.
+            while at >= 0:
+                lost.setdefault((inner.name, host.name), []).append(
+                    len(deleted & set(range(at, at + inner.length))))
+                at = host.sequence.find(inner.sequence, at + 1)
+    return {key: tuple(sorted(counts, reverse=True)) for key, counts in lost.items()}
 
 
 @functools.cache
@@ -1074,29 +1083,49 @@ def test_a_plasmid_is_annotated_the_same_however_its_elements_diverge(label, ele
         # The whole entry, not part of it: an annotation that dropped bases off an element's
         # head would otherwise satisfy the identity below by having less to be wrong about.
         assert match.part == (1, match.entry_length), f"{match.name} is partial: {match.part}"
-    # Then, per element and per copy of it, how far below 100 % it may read and how long it
-    # may be — both derived from the bases that copy lost rather than from a constant, so a
-    # shorter entry in some later fixture cannot fail them for no reason. Copies are paired
-    # worst with worst: fewer bases lost means a higher identity and a longer span. The floors
-    # are exact for every element these fixtures cut — measured slack zero everywhere —
-    # because the cuts are spaced far apart, so each deletion is one gap column and costs
-    # nothing else; cuts clustered together would cost a mismatch as well and would need a
-    # column of slack.
-    for name in sorted(set(names(diverged))):
-        copies = sorted((match for match in diverged if match.name == name),
-                        key=lambda match: match.identity, reverse=True)
-        floors = losses.get(name, (0,) * len(copies))
-        assert len(floors) >= len(copies), f"{name}: {len(copies)} copies, {floors}"
+    # Then, per copy of each element, how far below 100 % it may read and how long it may be
+    # — both derived from the bases that copy lost rather than from a constant, so a shorter
+    # entry in some later fixture cannot fail them for no reason. The floors are exact for
+    # every element these fixtures cut — measured slack zero everywhere — because the cuts
+    # are spaced far apart, so each deletion is one gap column and costs nothing else; cuts
+    # clustered together would cost a mismatch as well and would need a column of slack.
+    #
+    # A copy is matched to its floor by *where it is*, not by sorting the two lists together:
+    # the tag inside SaCas9 loses nothing while the standalone copy loses a codon, and sorted
+    # pairing is satisfied by those two values in either order, so the nested copy could
+    # still have degraded by three points as long as the standalone one read 100 %.
+    spans = {id(match): match.span(15_000) for match in diverged}
+
+    def host_of(match):
+        """The shortest other element whose span covers this one, or None for a copy that
+        stands on its own."""
+        covering = [other for other in diverged
+                    if other.name != match.name and spans[id(match)] <= spans[id(other)]]
+        if not covering:
+            return None
+        return min(covering, key=lambda other: len(spans[id(other)])).name
+
+    grouped: dict[tuple[str, str | None], list] = {}
+    for match in diverged:
+        grouped.setdefault((match.name, host_of(match)), []).append(match)
+    for (name, host), copies in sorted(grouped.items(), key=lambda item: item[0][0]):
+        floors = losses.get((name, host), (0,) * len(copies))
+        assert len(floors) >= len(copies), (
+            f"{name} in {host}: {len(copies)} copies, floors {floors}")
+        # Within one host the copies are indistinguishable, so there pair worst with worst:
+        # fewer bases lost means a higher identity and a longer span.
+        copies.sort(key=lambda match: match.identity, reverse=True)
         for match, lost in zip(copies, sorted(floors)):
             floor = 100.0 * (match.entry_length - lost) / match.entry_length
             assert match.identity >= floor - 1e-9, (
-                f"{name} at {match.identity:.3f} %, {lost} bases deleted of "
-                f"{match.entry_length}, so no lower than {floor:.3f} %"
+                f"{name} at {match.start} reads {match.identity:.3f} %, {lost} bases deleted "
+                f"of {match.entry_length}, so no lower than {floor:.3f} %"
             )
             # And the reported size moves with those bases, which is what the dialog turns
-            # into "N bp missing" against the catalogue entry.
+            # into "N bp missing" against the catalogue entry. No match in these fixtures
+            # crosses the origin, so this does not exercise a wrapping span.
             assert len(match.span(15_000)) == match.entry_length - lost, (
-                f"{name} spans {len(match.span(15_000))} bp, expected "
+                f"{name} at {match.start} spans {len(match.span(15_000))} bp, expected "
                 f"{match.entry_length - lost}"
             )
 
@@ -1106,13 +1135,28 @@ def test_enough_deleted_sites_stop_an_element_being_found_at_all(label, element_
                                                                  inverted, counts):
     """The other end of the curve, and the reason the pinned points stop where they do.
 
-    An element is found while *any* of its six seed windows is free of a cut — a seed after
-    the last cut still matches, shifted — so it is lost when every window holds one. With
-    evenly spaced cuts that happens as soon as the spacing drops below `SEED`, which is why
-    the casualty is always the shortest entry the fixture aligns: the AmpR promoter at 105 bp,
-    or 3×HA at 81 bp, and never a nuclease, whose first and last seeds survive any number of
-    cuts in between. This is what makes the cost a sawtooth rather than a ramp, and why a
-    bound on one point is not a ceiling.
+    Two things have to go for an element to disappear, and at these three boundaries both go
+    at once.
+
+    The engine aligns an element where one of its six seeds occurs *anywhere* in the
+    plasmid, so a window free of a cut is enough but is not required. With evenly spaced cuts
+    the two end windows last longest: the AmpR promoter still has its last window intact at
+    five sites, even though the spacing is already below `SEED` — so "spacing below `SEED`"
+    is not the rule. 3×HA is found at four sites with no window of its own left, because it
+    is three exact 27 bp repeats and the junction in front of it supplies a hit from outside
+    the copy.
+
+    What settles it is the identity floor underneath: a fixed number of deleted bases costs
+    an entry identity in inverse proportion to its length, so the shortest entries fall
+    through `DEFAULT_MIN_IDENTITY` first. At its boundary the AmpR promoter is at 94.29 %
+    (99 of 105 bases) and 3×HA at 93.83 %; one site earlier they read 95.24 % and 95.06 %,
+    which is how little margin the point below asserts. A nuclease is never the casualty: six
+    bases of 3345 is 99.8 %. So the casualties are the shortest entries each fixture aligns,
+    though "shortest" only orders them — at seven sites the AAV fixture also loses its
+    truncated ITR at 131 bp.
+
+    This is what makes the cost a sawtooth rather than a ramp, and why a bound on one point
+    is not a ceiling.
     """
     sites, casualty = LOSES_AN_ELEMENT[label]
     exact = collections.Counter(names(_annotated(element_names, 0, inverted)))
@@ -1122,7 +1166,9 @@ def test_enough_deleted_sites_stop_an_element_being_found_at_all(label, element_
     assert exact - lost == collections.Counter({casualty: 1}), f"{label}: {exact} -> {lost}"
     assert lost - exact == collections.Counter()
     # And one site fewer is still the same document, so the line is exactly here, and the
-    # last point the fixture pins is on the right side of it.
+    # last point the fixture pins is on the right side of it. This is the fragile assertion
+    # of the file: at that site count the casualty is a tenth of a point above the identity
+    # threshold, so a change to the scoring moves it.
     before = collections.Counter(names(_annotated(element_names, sites - 1, inverted)))
     assert before == exact
     assert max(counts) < sites
@@ -1133,8 +1179,8 @@ def test_the_budget_is_met_on_a_single_aav_vector_with_a_codon_lost_per_element(
     The cells tests are what fail on a regression; this one catches a cost that is not
     alignment, so it also times the heaviest element set that has a point inside the budget.
     The margins against the two seconds are 2.4x for the AAV point (0.85 s) and 1.7x for the
-    stress one (1.2 s), so a shared CI runner would have to be two thirds slower than this
-    machine for either to be a false failure."""
+    stress one (1.2 s), so a shared CI runner would have to be about two thirds slower than
+    this machine for either to be a false failure."""
     for element_names, sites, inverted in ((AAV_ELEMENTS, 1, AAV_INVERTED),
                                            (PACKED_ELEMENTS, 0, ())):
         sequence = _plasmid(element_names, sites, inverted)
