@@ -793,10 +793,10 @@ def test_a_label_naming_the_other_species_is_flagged(element, label, wrong):
 #   seconds  0.03   0.39   0.39   0.41   0.75   0.41   0.73
 #   same?    yes    yes    yes    yes    yes    yes    NO
 #
-# A single changed base is 15.4 M as well, so a deleted base and a changed one now cost the
+# A single changed base is 15.3 M, so a deleted base and a changed one now cost about the
 # same: that factor of two was the registers, and it is gone. The curve is flat at one pass per
 # copy, give or take the AAV2 ITR — a hairpin, so self-similar enough that `_merge_limit` will
-# not merge its registers, which is the slow creep from 15.37 to 15.46 M across the row — and
+# not merge its registers, which is the slow creep from 15.44 to 15.57 M across the row — and
 # except where the fixture's even spacing drops a cut inside a seed window. The engine places
 # its seeds at `round(i * (length - 18) / 5)` and the fixture its cuts at
 # `length // (sites + 1) * k`, which for four cuts coincide, and the registers that survive
@@ -810,8 +810,8 @@ def test_a_label_naming_the_other_species_is_flagged(element, label, wrong):
 # `Match.frameshift` is set, the dialog leaves the match unticked and shows an amber warning. One
 # deleted base per element flags SpCas9, SaCas9, tdTomato, mCherry, EGFP and AmpR, so a
 # fixture built that way is not the same plasmid to the user, and a nuclease with a frameshift
-# is not a vector anyone builds. Deleting a whole **codon** costs exactly the same (30.4 M on
-# the AAV fixture either way) and is a real variant, so that is what `_plasmid` does to a CDS.
+# is not a vector anyone builds. Deleting a whole **codon** costs the same (15.48 M on the
+# AAV fixture against 15.49 M) and is a real variant, so that is what `_plasmid` does to a CDS.
 #
 # What the plasmid holds matters as much as how far it diverges, and a fixture that packs
 # every awkward entry together measures a vector nobody builds. The three below are a single
@@ -984,30 +984,33 @@ def _plasmid(element_names: tuple[str, ...], sites: int = 0,
 #: grows. Figures for the catalogue as it stands and for the 60 entries PR #10 grows it to,
 #: keyed by (fixture, deleted sites). The bounds are sized for the grown one, since the
 #: criterion is written for it; the seconds are this machine's on the catalogue as it stands,
-#: for scale only, and are the same measurements the table above records.
+#: for scale only — they move by a tenth between runs on a machine with other work on it,
+#: which is why the bounds are in cells and not in them.
 #:
-#: Each bound sits a sixth to a fifth above the grown catalogue's figure — 17 to 22 %, the
+#: Each bound sits a sixth to a fifth above the grown catalogue's figure — 17 to 19 %, the
 #: spread being the rounding to a tidy number — except ("aav", 0): a
 #: verbatim AAV vector costs almost nothing precisely because every element is exact, so 2 M
-#: is nearly six times its cost and still an eighth of the 15.4 M it costs without the
+#: is nearly six times its cost and still an eighth of the 15.3 M it costs without the
 #: shortcut that makes it cheap.
 #:
 #: Each shortcut the engine takes was removed on a scratch copy to see which bounds notice.
 #: The one that reports an exact copy without aligning it is reached only where an element is
-#: exact, so removing it fails the three `sites == 0` bounds and leaves the other eight alone;
+#: exact, so removing it fails the three `sites == 0` bounds and leaves the other nine alone;
 #: removing the circular-copy skip fails every bound but `("aav", 0)`, which is too cheap for
-#: it to show; and removing the merge of neighbouring guesses fails all eight of the bounds
-#: with a deleted site in them. So these bounds are a regression guard and not the guard for
-#: the shortcuts themselves: that is
+#: it to show; and removing the merge of neighbouring guesses fails seven of the nine bounds
+#: with a deleted site in them. Not `("all-in-one", 4)`, where the merge costs more rather
+#: than less, so its bound is above its own per-offset cost by construction (84.1 M against
+#: 103 M); and not `("stress", 1)`, at 130.0 M against 136 M. So these bounds are a
+#: regression guard and not the guard for the shortcuts themselves: that is
 #: `test_the_copy_of_an_element_a_circular_search_appends_is_not_aligned`,
 #: `test_an_element_present_verbatim_is_found_without_aligning_it` and
 #: `test_the_registers_of_one_diverged_copy_are_aligned_once`, one each.
 ALIGNMENT_WORK = {
     #  fixture,    sites         36 entries         60 entries      seconds
     ("aav",        0):   2_000_000,  #    0.34 M / 15 p     0.34 M / 15 p     0.03
-    ("aav",        1):  19_000_000,  #   15.49 M / 29 p    15.49 M / 29 p     0.39
-    ("aav",        3):  19_000_000,  #   15.55 M / 31 p    15.55 M / 31 p     0.40
-    ("aav",        5):  19_000_000,  #   15.57 M / 32 p    15.57 M / 32 p     0.41
+    ("aav",        1):  18_500_000,  #   15.49 M / 29 p    15.49 M / 29 p     0.39
+    ("aav",        3):  18_500_000,  #   15.55 M / 31 p    15.55 M / 31 p     0.40
+    ("aav",        5):  18_500_000,  #   15.57 M / 32 p    15.57 M / 32 p     0.41
     ("all-in-one", 0):  26_000_000,  #   22.01 M /  9 p    22.24 M / 12 p     0.48
     ("all-in-one", 1):  60_000_000,  #   50.38 M / 22 p    50.61 M / 25 p     1.19
     ("all-in-one", 3):  74_000_000,  #   62.69 M / 30 p    62.92 M / 33 p     1.46
@@ -1185,18 +1188,26 @@ def test_enough_deleted_sites_stop_an_element_being_found_at_all(label, element_
     assert max(counts) < sites
 
 
-def test_the_budget_is_met_on_every_plausible_plasmid_these_fixtures_build():
+def test_the_budget_is_met_in_seconds_at_the_points_this_test_times():
     """S5.4's two seconds as they are written, in seconds, on the plasmids the criterion is
     for. The cells tests are what fail on a regression; this one catches a cost that is not
     alignment at all.
 
     The all-in-one plasmid is the case the criterion was missed on, at 2.3 s with a codon lost
-    per element and 5.5 s with five; it now takes 1.26 s and 1.21 s. The margins against the
-    two seconds on this machine are 5x for the AAV vector (0.40 s) and 1.6x for the all-in-one
-    one (1.26 s), so a shared runner would have to be half as fast again as this machine for
-    the tighter of them to be a false failure. The packed stress plasmid is **not** timed
-    here: at 2.6 s it is over the budget, which is recorded rather than asserted, because it
-    is a vector nobody builds — every awkward entry in the catalogue at once.
+    per element and 5.5 s with five; it now takes 1.11 s and 1.51 s on this machine. The
+    margins against the two seconds are about 5x for the AAV vector (0.35 to 0.38 s) and 1.3x
+    for the all-in-one one at five sites (1.51 s), which is the tightest of the four: a shared
+    runner a third slower than this machine would fail it with nothing having regressed, which
+    is why `ALIGNMENT_WORK` and not this test is where a regression shows.
+
+    Two plausible points are left out, and both are pinned in cells instead. The packed stress
+    plasmid, at 2.6 s, is over the budget: it is a vector nobody builds — every awkward entry
+    in the catalogue at once. And the all-in-one plasmid at **four** deleted sites sits on the
+    line at 1.95 to 2.07 s across runs, because there the fixture's cuts coincide with the
+    engine's seed positions and the merge cannot join the registers they leave; timing it
+    would be a coin toss on the machine rather than a statement about the code, so
+    `ALIGNMENT_WORK` pins its work and
+    `test_a_second_deleted_site_per_element_is_nearly_free` records why it is what it is.
     """
     for element_names, sites, inverted in ((AAV_ELEMENTS, 1, AAV_INVERTED),
                                            (AAV_ELEMENTS, 5, AAV_INVERTED),
@@ -1220,23 +1231,27 @@ def test_a_second_deleted_site_per_element_is_nearly_free():
     197.1 M against 78.6 M on the all-in-one one).
 
     A quarter rather than nothing, and the quarter is what checking the merge costs instead
-    of trusting it: 49.8 M cells if a run's one alignment is trusted, 62.7 M as the engine
-    actually does it. On this fixture every one of those re-queues is a run whose alignment
-    came back *below the thresholds*, which answers no guess in it and so sends all of them
-    back — tdTomato, a tandem dimer, for two runs and four extra passes of a 1431 bp entry
-    (9.8 M cells), and mCherry for two runs and five of a 711 bp one (3.0 M). The other
-    branch, an alignment that drifts onto a placement none of its guesses is at, fires
-    nowhere here; the one place it fires on any fixture is a 3×HA run on the packed stress
-    plasmid at three deleted sites.
+    of trusting it. Taking the all-in-one fixture at **three** deleted sites: 49.8 M cells if
+    a run's one alignment is trusted, 62.7 M as the engine actually does it. Every one of
+    those re-queues is a run whose alignment came back *below the thresholds*, which answers
+    no guess in it and so sends all of them back — tdTomato, a tandem dimer, for two runs and
+    four extra passes of a 1431 bp entry (9.8 M cells), and mCherry for two runs and five of a
+    711 bp one (3.0 M). The other branch, an alignment that drifts onto a placement none of
+    its guesses is at, fires nowhere here; the one place it fires on any fixture is a 3×HA run
+    on the packed stress plasmid at three deleted sites.
 
     The four-site trough is left out on purpose: there the fixture's cuts land in the seeds
-    themselves, the surviving registers end up further apart than `MERGE_GAP`, and SaCas9 is
-    aligned twice. That is a property of evenly spaced cuts, not of divergence — it is the
-    one point on this fixture where the engine does more work than aligning every guess
-    separately, 87.3 M cells against 84.1 M, and the only point where neither engine meets
-    S5.4's two seconds (2.07 s against 1.92 s). `ALIGNMENT_WORK` records it so it cannot
-    drift unseen, and `MERGE_GAP`'s own comment records what widening the gap would cost and
-    buy there.
+    themselves, the surviving registers end up further apart than `MERGE_GAP`, and SpCas9 is
+    aligned twice — its two guesses are 12 bases apart, because all four cuts fall ahead of
+    the last surviving seed and each of them takes a codon out. (SaCas9 is aligned once here;
+    on the AAV fixture it is SaCas9 the same arithmetic splits.) That is a property of evenly
+    spaced cuts, not of divergence — it is one of the two points the tests pin where the
+    engine does more work than aligning every guess separately, 87.3 M cells against 84.1 M
+    here and 40.4 M against 39.4 M on the packed stress plasmid with nothing deleted at all,
+    and the only one anywhere near S5.4's two seconds: 1.95 to 2.07 s across runs against
+    1.86 to 1.96 s per guess. So this is the one point where the merge neither saves work nor
+    leaves room against the budget. `ALIGNMENT_WORK` records it so it cannot drift unseen, and
+    `MERGE_GAP`'s own comment records what widening the gap would cost and buy there.
     """
     for element_names, inverted, slack in ((AAV_ELEMENTS, AAV_INVERTED, 1.01),
                                            (ALL_IN_ONE_ELEMENTS, (), 1.30)):
@@ -1532,7 +1547,15 @@ def test_a_run_whose_alignment_is_rejected_answers_none_of_its_guesses():
     checks, so what this test can pin is the work: at a threshold the merged alignment cannot
     meet, the engine does one pass per guess *plus* the run's own wasted one. Treat the run as
     having answered the guesses on it and that becomes one pass fewer than aligning them
-    separately, not one more."""
+    separately, not one more.
+
+    What it does not pin is this half of the condition on its own. On this construct the run's
+    alignment also drifts clear of both its guesses, so the diagonal check alone would send
+    them back, and deleting `hit is None` from the condition leaves the whole suite green. A
+    review then hunted for a construct where the rejection is the only thing holding — a run
+    rejected, its diagonals covering a guess, that guess accepted when aligned alone — and
+    found none in 5262 runs of more than one guess. So the clause is belt and braces, and what
+    this test asserts is the work it costs, not a loss it is known to prevent."""
     tag = entry("3×HA")
     body = tag.sequence * 2
     sequence = clean_dna(60, 99) + body[:65] + "AAAA" + body[65:] + clean_dna(60, 99)

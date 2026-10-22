@@ -322,10 +322,11 @@ def _match_long(target: str, query: str, length: int, min_identity: float,
     # are artificially even and costs almost everywhere else. The AAV fixture's four-site
     # trough halves, 29.6 M cells of dynamic programming to 15.3 M, and the all-in-one
     # fixture's goes 87.3 M to 62.1 M; of the points the tests pin, aav 1/3/5 and all-in-one
-    # 3/5 move by under a per cent, and the rest get *worse* — all-in-one 0 by 5.6 %,
-    # all-in-one 1 by 2.4 %, the packed stress plasmid by 18.4 % with no deleted site, 4.4 %
-    # with one and 4.6 % with three. A wider run is a wider window, a wider window drifts off
-    # its own guesses more often, and each one it drifts off is paid for separately below. The
+    # 3/5 move by under a per cent, the verbatim AAV vector does not move at all, and the
+    # remaining five get *worse* — all-in-one 0 by 5.6 %, all-in-one 1 by 2.4 %, the packed
+    # stress plasmid by 18.4 % with no deleted site, 4.4 % with one and 4.6 % with three. A
+    # wider run is a wider window, a wider window drifts off its own guesses more often, and
+    # each one it drifts off is paid for separately below. The
     # troughs are a property of evenly spaced cuts coinciding with the seed positions rather
     # than of divergence, so there is nothing here worth the extra base of distance at which
     # one alignment would have to stand in for two guesses.
@@ -383,7 +384,10 @@ def _match_long(target: str, query: str, length: int, min_identity: float,
         # placement that then fails the thresholds, no guess in the run has been answered,
         # however many of them lie on it, so they all go back: identity and coverage are not
         # monotone in alignment score, so a window that can only score higher can still come
-        # back with nothing where a narrower one would have reported a match.
+        # back with nothing where a narrower one would have reported a match. Belt and braces:
+        # a review looked for a construct where this half of the condition is the only thing
+        # holding — the run rejected, its diagonals over a guess, that guess accepted on its
+        # own — and found none in 5262 runs of more than one guess, so no test isolates it.
         # `len(group) > 1` is what makes this terminate as well as what makes it cheap: a
         # re-queued guess is a group of one, so it can never put anything back, and the
         # worklist is at most the runs plus the guesses in them.
