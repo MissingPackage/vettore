@@ -1928,13 +1928,30 @@ GROWN_ELEMENTS = (
 )
 
 
-def test_a_plasmid_packed_with_the_new_entries_keeps_the_two_second_budget():
-    """S5.4's budget against the entries the catalogue gained: 15 kb carrying every one of
-    them, which is the worst case the grown catalogue can be asked to search."""
-    parts = {f.name: f.sequence for f in catalogue()}
-    pieces = [parts[name] for name in GROWN_ELEMENTS]
+def _grown_plasmid(flawed: bool = False) -> str:
+    """15 kb carrying every entry S5.4 added. With ``flawed``, each entry long enough to be
+    aligned rather than matched exactly has its middle base deleted — the expensive case,
+    because the seeds either side of the deletion fall in two registers and the element is
+    aligned twice per strand. The short entries are left whole: at or below SHORT_FEATURE the
+    search asks for an exact match, so a copy missing a base is not found at all, which the
+    user guide says and which no budget can change."""
+    parts = {f.name: f for f in catalogue()}
+    pieces = []
+    for name in GROWN_ELEMENTS:
+        feature = parts[name]
+        sequence = feature.sequence
+        if flawed and feature.length >= SHORT_FEATURE:
+            middle = feature.length // 2
+            sequence = sequence[:middle] + sequence[middle + 1:]
+        pieces.append(sequence)
     assert sum(map(len, pieces)) <= 15_000, "the new elements no longer fit the budget"
-    sequence = ("".join(pieces) + clean_dna(15_000, 21))[:15_000]
+    return ("".join(pieces) + clean_dna(15_000, 21))[:15_000]
+
+
+def test_a_plasmid_packed_with_the_new_entries_keeps_the_two_second_budget():
+    """S5.4's budget against the entries the catalogue gained, each of them verbatim: the
+    best case, and the one a construct assembled from catalogue parts gives."""
+    sequence = _grown_plasmid()
     detect(sequence, circular=True)          # warm the catalogue and the aligner
     start = time.perf_counter()
     matches = detect(sequence, circular=True)
@@ -1943,6 +1960,24 @@ def test_a_plasmid_packed_with_the_new_entries_keeps_the_two_second_budget():
     _, cells = _alignment_work(sequence)
     assert cells <= MAX_ALIGNMENT_CELLS, f"{cells / 1e6:.1f} M cells of alignment"
     # Every element packed in is reported: a budget kept by missing them would be no use.
+    assert {m.name for m in matches} >= set(GROWN_ELEMENTS)
+
+
+def test_the_new_entries_keep_the_budget_when_each_copy_is_missing_a_base():
+    """The case that costs, and the one a real vector gives. A copy with a base missing puts
+    the seeds either side of it in different registers, so the element is aligned twice per
+    strand: on this plasmid that is 27.0 M cells against the 6.7 M of the verbatim one, four
+    times the work and 0.8 s. Still inside the budget, and every element is still reported —
+    which is the half of this that a faster engine could quietly lose.
+    """
+    sequence = _grown_plasmid(flawed=True)
+    detect(sequence, circular=True)          # warm the catalogue and the aligner
+    start = time.perf_counter()
+    matches = detect(sequence, circular=True)
+    elapsed = time.perf_counter() - start
+    assert elapsed < DETECTION_BUDGET, f"detection took {elapsed:.2f} s"
+    _, cells = _alignment_work(sequence)
+    assert cells <= MAX_ALIGNMENT_CELLS, f"{cells / 1e6:.1f} M cells of alignment"
     assert {m.name for m in matches} >= set(GROWN_ELEMENTS)
 
 
