@@ -222,6 +222,40 @@ def _frameshift(columns: list[Column]) -> bool:
     return shift % 3 != 0
 
 
+#: Two candidate positions this close together are the same copy of the element read in two
+#: registers, not two copies: an indel inside an element shifts every seed after it by the
+#: length of the indel, so one deleted base puts the seeds before it and the seeds after it a
+#: base apart, and a lost codon three. Aligning such a run once, over a window that holds all
+#: of it, costs one pass where it used to cost one per register, and the window grows by the
+#: distance between the first and the last of them rather than by its own length again.
+MERGE_GAP = 4
+#: and a run never spans more than this, so that what is merged can only be one copy: two
+#: copies of an entry whose starts are within a seed of each other overlap in all but SEED
+#: bases, which takes an entry that repeats itself at that shift, while copies far enough
+#: apart to be two matches are far further apart than a seed — a 6×HA tag is two 3×HA an
+#: entry length apart.
+#:
+#: The gap is the narrow part of the rule and is meant to be: with it widened to MERGE_SPAN
+#: the registers that survive an unlucky cut merge too, which on the AAV fixture takes four
+#: deleted sites per element from 29.6 M cells down to 15.3 M. No point this file pins moves
+#: by more than a per cent, because an indel has to land inside a seed window to separate the
+#: surviving registers by more than a few bases, so the wider gap buys nothing where it
+#: matters and spends the margin that makes the merge obviously safe.
+MERGE_SPAN = SEED
+
+
+def _offset_runs(offsets: list[int], gap: int = MERGE_GAP,
+                 span: int = MERGE_SPAN) -> list[tuple[int, int]]:
+    """``offsets``, in order, as (first, last) runs of neighbours: one alignment each."""
+    runs: list[tuple[int, int]] = []
+    for offset in offsets:
+        if runs and offset - runs[-1][1] <= gap and offset - runs[-1][0] <= span:
+            runs[-1] = (runs[-1][0], offset)
+        else:
+            runs.append((offset, offset))
+    return runs
+
+
 def _match_long(target: str, query: str, length: int, min_identity: float,
                 min_coverage: float, strand: int = 1, coding: bool = False) -> list[Hit]:
     """Matches of ``query`` (the catalogue entry, or its reverse complement on the minus
@@ -231,6 +265,7 @@ def _match_long(target: str, query: str, length: int, min_identity: float,
     results: list[Hit] = []
     aligner = _aligner()
     margin = max(30, len(query) // 10)
+    inexact: list[int] = []
     for offset in sorted(_candidate_offsets(target, query)):
         # A guess at or past the end of the sequence itself can only be the copy a circular
         # search appends, and the same seed hit also appears in the sequence a length earlier,
@@ -245,8 +280,10 @@ def _match_long(target: str, query: str, length: int, min_identity: float,
         if 100.0 >= min_identity and target[offset : offset + len(query)] == query:
             results.append((offset, offset + len(query) - 1, 100.0, 0, len(query), False))
             continue
-        window_start = max(0, offset - margin)
-        window = target[window_start : offset + len(query) + margin]
+        inexact.append(offset)
+    for first, last in _offset_runs(inexact):
+        window_start = max(0, first - margin)
+        window = target[window_start : last + len(query) + margin]
         if len(window) < SEED:
             continue
         alignments = aligner.align(window, query)

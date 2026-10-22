@@ -781,27 +781,26 @@ def test_a_label_naming_the_other_species_is_flagged(element, label, wrong):
 # **indel** splits the seeds into two registers and the element is aligned twice. So the
 # fixtures below diverge by deleting.
 #
-# What the cost tracks is the number of *surviving seed registers*, and with six seeds per
-# entry the ceiling is six. That is not the same as the number of deleted sites, and the two
-# come apart in a way worth knowing, because the fixtures space their cuts evenly and the
-# engine spaces its seeds evenly too. On the AAV fixture (36 entries, this machine):
+# What the cost tracks is the number of *places the engine aligns an element*, which used to be
+# the number of surviving seed registers and is now the number of copies: registers a few bases
+# apart are merged and aligned once (`MERGE_GAP`). That change is what brought the all-in-one
+# plasmid inside S5.4's two seconds, and it flattened the curve with it. On the AAV fixture
+# (36 entries, this machine):
 #
 #   sites     0      1      2      3      4      5      6
-#   cells   0.34 M 30.4 M 45.3 M 60.3 M 30.2 M 90.1 M 89.4 M
-#   seconds  0.04   0.85   1.24   1.67   0.83   2.56   2.37
+#   cells   0.34 M 15.4 M 15.3 M 15.3 M 29.6 M 15.4 M 29.5 M
+#   seconds  0.03   0.38   0.39   0.41   0.75   0.40   0.73
 #   same?    yes    yes    yes    yes    yes    yes    NO
 #
-# A single changed base, for comparison, is 15.3 M. So it is a sawtooth, not a ramp. At four
-# sites the even spacing drops every cut inside a seed window — the engine places its seeds at
-# `round(i * (length - 18) / 5)` and the fixture its cuts at `length // (sites + 1) * k`, which
-# for four cuts coincide — so four of the six seeds are destroyed and the cost halves. Five
-# evenly spaced sites is the ceiling: 90.1 M here, 197.1 M on the all-in-one plasmid, both
-# still annotated exactly as their verbatim selves. At six an element is no longer found at
-# all, and the cost does *not* collapse with it (89.4 M): only the four-site trough is cheap,
-# and "divergence heavy enough to destroy a seed is cheaper" is true of a destroyed seed, not
-# of heavier divergence in general. The bounds below pin that ceiling where the plasmid still
-# holds together, which is every fixture but the stress one, and the six-site edge has a test
-# of its own.
+# A single changed base is 15.3 M as well, so a deleted base and a changed one now cost the
+# same: that factor of two was the registers, and it is gone. The curve is flat at one pass per
+# copy except where the fixture's even spacing drops a cut inside a seed window — the engine
+# places its seeds at `round(i * (length - 18) / 5)` and the fixture its cuts at
+# `length // (sites + 1) * k`, which for four cuts coincide — and the registers that survive
+# are then further apart than the merge is willing to join, so SaCas9 is aligned twice and the
+# plasmid costs 29.6 M. At six sites an element is no longer found at all, which is the
+# boundary its own test asserts. The bounds below pin the points where the plasmid still holds
+# together.
 #
 # The third is to write a divergence the engine itself reports as a different document. A
 # **single** deleted base inside a coding sequence is a frameshift, and detection says so:
@@ -843,7 +842,8 @@ AAV_INVERTED = ("AAV2 ITR (truncated)",)
 #: promoter, a coding sequence and a terminator, with the WPRE where it belongs, in the 3' UTR
 #: between the nuclease and its polyA signal — and a backbone of one marker and two origins.
 #: 10.4 kb of catalogue elements, one nuclease, and nothing that has to fit a packaging limit.
-#: This is the plausible heavy case, and it is the one that misses S5.4's budget.
+#: This is the plausible heavy case: the one that used to miss S5.4's budget, at 2.3 s, and
+#: now meets it at 1.26 s.
 ALL_IN_ONE_ELEMENTS = (
     "U6 promoter (human)", "EF-1α promoter (human)", "SpCas9", "WPRE", "bGH polyA",
     "CMV promoter", "tdTomato", "SV40 polyA", "AmpR promoter", "AmpR", "ori", "f1 ori",
@@ -985,29 +985,32 @@ def _plasmid(element_names: tuple[str, ...], sites: int = 0,
 #:
 #: Each bound sits about 17 % above the grown catalogue's figure, except ("aav", 0): a
 #: verbatim AAV vector costs almost nothing precisely because every element is exact, so 2 M
-#: is nearly six times its cost and still only a seventh of the 15.3 M it costs without the
+#: is nearly six times its cost and still an eighth of the 15.4 M it costs without the
 #: shortcut that makes it cheap.
 #:
 #: Each shortcut the engine takes was removed on a scratch copy to see which bounds notice.
 #: The one that reports an exact copy without aligning it is reached only where an element is
 #: exact, so removing it fails the three `sites == 0` bounds and leaves the other eight alone;
 #: removing the circular-copy skip fails every bound but `("aav", 0)`, which is too cheap for
-#: it to show. So these bounds are a regression guard and not the guard for the shortcuts
-#: themselves: that is `test_the_copy_of_an_element_a_circular_search_appends_is_not_aligned`
-#: and `test_an_element_present_verbatim_is_found_without_aligning_it`, one each.
+#: it to show; and removing the merge of neighbouring guesses fails all eight of the bounds
+#: with a deleted site in them. So these bounds are a regression guard and not the guard for
+#: the shortcuts themselves: that is
+#: `test_the_copy_of_an_element_a_circular_search_appends_is_not_aligned`,
+#: `test_an_element_present_verbatim_is_found_without_aligning_it` and
+#: `test_the_registers_of_one_diverged_copy_are_aligned_once`, one each.
 ALIGNMENT_WORK = {
     #  fixture,    sites         36 entries         60 entries      seconds
-    ("aav",        0):   2_000_000,  #    0.34 M / 15 p     0.34 M / 15 p     0.04
-    ("aav",        1):  36_000_000,  #   30.38 M / 35 p    30.38 M / 35 p     0.85
-    ("aav",        3):  70_000_000,  #   60.28 M / 50 p    60.28 M / 50 p     1.67
-    ("aav",        5): 105_000_000,  #   90.09 M / 63 p    90.09 M / 63 p     2.56
-    ("all-in-one", 0):  26_000_000,  #   22.01 M /  9 p    22.24 M / 12 p     0.7
-    ("all-in-one", 1):  92_000_000,  #   78.56 M / 33 p    78.79 M / 36 p     2.3
-    ("all-in-one", 3): 165_000_000,  #  141.22 M / 59 p   141.45 M / 62 p     4.0
-    ("all-in-one", 5): 230_000_000,  #  197.14 M / 80 p   197.44 M / 84 p     5.5
-    ("stress",     0):  50_000_000,  #   39.36 M / 38 p    42.40 M / 42 p     1.2
-    ("stress",     1): 155_000_000,  #  129.98 M / 64 p   133.02 M / 68 p     3.8
-    ("stress",     3): 265_000_000,  #  222.89 M / 84 p   225.93 M / 88 p     6.3
+    ("aav",        0):   2_000_000,  #    0.34 M / 15 p     0.34 M / 15 p     0.03
+    ("aav",        1):  18_000_000,  #   15.37 M / 25 p    15.37 M / 25 p     0.40
+    ("aav",        3):  18_000_000,  #   15.31 M / 22 p    15.31 M / 22 p     0.38
+    ("aav",        5):  18_000_000,  #   15.35 M / 24 p    15.35 M / 24 p     0.40
+    ("all-in-one", 0):  26_000_000,  #   22.01 M /  9 p    22.24 M / 12 p     0.53
+    ("all-in-one", 1):  60_000_000,  #   50.38 M / 22 p    50.61 M / 25 p     1.26
+    ("all-in-one", 3):  59_000_000,  #   49.83 M / 21 p    50.06 M / 24 p     1.24
+    ("all-in-one", 5):  59_000_000,  #   49.89 M / 22 p    50.12 M / 25 p     1.21
+    ("stress",     0):  46_000_000,  #   37.26 M / 36 p    38.78 M / 38 p     0.97
+    ("stress",     1): 123_000_000,  #  103.56 M / 49 p   105.08 M / 51 p     2.58
+    ("stress",     3): 125_000_000,  #  104.77 M / 42 p   106.29 M / 44 p     2.63
 }
 
 
@@ -1048,8 +1051,7 @@ def _fixture_work(element_names: tuple[str, ...], sites: int,
 
 @pytest.mark.parametrize("label, element_names, inverted, sites", POINTS)
 def test_the_alignment_work_of_a_15kb_plasmid_is_pinned(label, element_names, inverted, sites):
-    """The work each point on the curve costs, pinned so that it cannot grow unnoticed — and,
-    for the all-in-one plasmid, so that whoever closes the budget gap sees the number move."""
+    """The work each point on the curve costs, pinned so that it cannot grow unnoticed."""
     bound = ALIGNMENT_WORK[label, sites]       # before the measurement, so a gap fails fast
     _, cells = _fixture_work(element_names, sites, inverted)
     assert cells <= bound, f"{label}, {sites} deleted sites: {cells / 1e6:.2f} M cells"
@@ -1178,43 +1180,52 @@ def test_enough_deleted_sites_stop_an_element_being_found_at_all(label, element_
     assert max(counts) < sites
 
 
-def test_the_budget_is_met_on_a_single_aav_vector_with_a_codon_lost_per_element():
-    """S5.4's two seconds as they are written, in seconds, on the vector the criterion is for.
-    The cells tests are what fail on a regression; this one catches a cost that is not
-    alignment, so it also times the heaviest element set that has a point inside the budget.
-    The margins against the two seconds are 2.4x for the AAV point (0.85 s) and 1.7x for the
-    stress one (1.2 s), so a shared CI runner would have to be about two thirds slower than
-    this machine for either to be a false failure."""
+def test_the_budget_is_met_on_every_plausible_plasmid_these_fixtures_build():
+    """S5.4's two seconds as they are written, in seconds, on the plasmids the criterion is
+    for. The cells tests are what fail on a regression; this one catches a cost that is not
+    alignment at all.
+
+    The all-in-one plasmid is the case the criterion was missed on, at 2.3 s with a codon lost
+    per element and 5.5 s with five; it now takes 1.26 s and 1.21 s. The margins against the
+    two seconds on this machine are 5x for the AAV vector (0.40 s) and 1.6x for the all-in-one
+    one (1.26 s), so a shared runner would have to be half as fast again as this machine for
+    the tighter of them to be a false failure. The packed stress plasmid is **not** timed
+    here: at 2.6 s it is over the budget, which is recorded rather than asserted, because it
+    is a vector nobody builds — every awkward entry in the catalogue at once.
+    """
     for element_names, sites, inverted in ((AAV_ELEMENTS, 1, AAV_INVERTED),
-                                           (PACKED_ELEMENTS, 0, ())):
+                                           (AAV_ELEMENTS, 5, AAV_INVERTED),
+                                           (ALL_IN_ONE_ELEMENTS, 1, ()),
+                                           (ALL_IN_ONE_ELEMENTS, 5, ())):
         sequence = _plasmid(element_names, sites, inverted)
         detect(sequence, circular=True)      # warm the catalogue and the aligner
         start = time.perf_counter()
         matches = detect(sequence, circular=True)
         elapsed = time.perf_counter() - start
         assert matches, "the plasmid should carry recognisable elements"
-        assert elapsed < DETECTION_BUDGET, f"detection took {elapsed:.2f} s"
+        assert elapsed < DETECTION_BUDGET, (
+            f"{len(element_names)} elements, {sites} deleted sites: {elapsed:.2f} s")
 
 
-def test_the_all_in_one_plasmid_is_still_far_enough_over_the_budget_to_record_it():
-    """The gap S5.4 still has, asserted rather than described.
+def test_a_second_deleted_site_per_element_is_very_nearly_free():
+    """What the merge bought, asserted rather than described: the cost no longer depends on
+    how many times an element has been cut, because the registers of one copy are one
+    alignment however many there are. Five deleted sites per element cost what one does, to
+    within a per cent, where they used to cost three times as much (90.1 M against 30.4 M on
+    the AAV fixture, 197.1 M against 78.6 M on the all-in-one one).
 
-    A dense all-in-one plasmid that has lost one codon per element takes about 2.3 s on this
-    machine, against 0.7 s for the same plasmid with its elements exact, and 4.5 s if it has
-    lost three. Nothing about it is exotic: 10.4 kb of ordinary elements, one nuclease, and a
-    codon variant in each — annotated identically to the verbatim plasmid, as the test above
-    holds.
-
-    Closing the gap means changing how an element's alignment is chosen, which can change
-    which variant is annotated and with what coordinates, so it is not a constant to tune.
-    The floor below is the point of this test: it fails on the day the engine gets fast
-    enough, and whoever sees it fail should record that S5.4's budget is met and delete it.
+    The four-site trough is left out on purpose: there the fixture's cuts land in the seeds
+    themselves, the surviving registers end up further apart than `MERGE_GAP`, and SaCas9 is
+    aligned twice. That is a property of evenly spaced cuts, not of divergence, and
+    `MERGE_GAP`'s own comment records what widening it would cost and buy.
     """
-    _, cells = _fixture_work(ALL_IN_ONE_ELEMENTS, 1, ())
-    assert cells >= 60_000_000, (
-        f"{cells / 1e6:.2f} M cells: the gap has closed. Re-time the fixture, record that "
-        f"S5.4's budget is met, and delete this test."
-    )
+    for element_names, inverted in ((AAV_ELEMENTS, AAV_INVERTED), (ALL_IN_ONE_ELEMENTS, ())):
+        _, one = _fixture_work(element_names, 1, inverted)
+        for sites in (3, 5):
+            _, several = _fixture_work(element_names, sites, inverted)
+            assert several <= 1.01 * one, (
+                f"{sites} deleted sites cost {several / 1e6:.2f} M cells against "
+                f"{one / 1e6:.2f} M for one")
 
 
 def test_a_plasmid_with_nothing_in_the_catalogue_is_ruled_out_without_aligning():
@@ -1275,6 +1286,66 @@ def test_both_copies_of_a_tandem_tag_are_reported():
     for match in (m for m in detect(sequence, circular=False) if m.name == tag.name):
         assert match.identity == 100.0
         assert match.end - match.start + 1 == tag.length
+
+
+def test_the_registers_of_one_diverged_copy_are_aligned_once():
+    """The merge, pinned where it is cheapest to see: one copy of one element, alone in a
+    flank, with a base taken out of it once, twice and three times. Each deletion shifts every
+    seed after it, so the engine guesses at two, three and four starts for the same copy, a
+    base apart. All of them are one alignment, and the match that comes out of it still covers
+    the whole entry at the copy's own start."""
+    feature = entry("AmpR promoter")
+    for sites in (1, 2, 3):
+        sequence = clean_dna(60, 21) + _diverged(feature, sites) + clean_dna(60, 22)
+        passes, _ = _alignment_work(sequence, circular=False, features=(feature,))
+        assert passes == 1, f"{sites} deleted sites took {passes} alignments"
+        [found] = detect(sequence, circular=False, features=(feature,))
+        assert found.start == 60
+        assert found.part == (1, feature.length)
+        assert len(found.span(len(sequence))) == feature.length - sites
+
+
+def test_two_diverged_copies_of_one_element_stay_two_matches():
+    """And the merge must not join two copies, which is how a wider version of this idea
+    failed a review on PR #5: it lost the second half of a 6×HA tag. Here both 3×HA copies
+    have lost a base, in different places, so neither is reported through the exact-copy
+    shortcut and both go through the alignment the merge decides the shape of."""
+    tag = entry("3×HA")
+    first = _diverged(tag, 1)
+    second = tag.sequence[:20] + tag.sequence[21:]
+    sequence = clean_dna(60, 23) + first + second + clean_dna(60, 24)
+    starts = {match.start for match in detect(sequence, circular=False, features=(tag,))}
+    assert 60 in starts, f"the first copy is missing: {sorted(starts)}"
+    assert 60 + len(first) in starts, f"the second copy is missing: {sorted(starts)}"
+
+
+def test_only_guesses_that_can_be_one_copy_are_merged():
+    """The rule itself, on numbers rather than sequence, because what it must never do is join
+    two copies. Neighbours within `MERGE_GAP` are one run; a wider step starts a new one; and a
+    run stops growing at `MERGE_SPAN`, so no window ever stretches over more than a seed's
+    worth of uncertainty however many registers line up."""
+    assert features_module._offset_runs([]) == []
+    assert features_module._offset_runs([10]) == [(10, 10)]
+    assert features_module._offset_runs([10, 11, 13]) == [(10, 13)]
+    assert features_module._offset_runs([10, 15]) == [(10, 10), (15, 15)]
+    assert features_module._offset_runs([10, 91, 92]) == [(10, 10), (91, 92)]
+    # Steps of three, a lost codon each: the run stops at MERGE_SPAN and the next one begins.
+    runs = features_module._offset_runs(list(range(10, 40, 3)))
+    assert runs == [(10, 28), (31, 37)]
+    assert all(last - first <= features_module.MERGE_SPAN for first, last in runs)
+
+
+def test_guesses_further_apart_than_the_gap_are_aligned_separately():
+    """The narrow half of the rule, measured on the case that shows it: a nuclease cut seven
+    times loses the seeds that would have bridged its registers, the ones left are six bases
+    apart, and it is aligned more than once. Two sites keep every register a codon apart and
+    cost one alignment. This is what the four-site trough on the AAV fixture is."""
+    feature = entry("SaCas9")
+    for sites, alignments in ((2, 1), (5, 1), (7, 3)):
+        sequence = clean_dna(60, 25) + _diverged(feature, sites) + clean_dna(60, 26)
+        passes, _ = _alignment_work(sequence, circular=False, features=(feature,))
+        assert passes == alignments, f"{sites} deleted sites took {passes} alignments"
+        assert detect(sequence, circular=False, features=(feature,))
 
 
 def test_a_tandem_array_reports_a_copy_for_every_repeat():
