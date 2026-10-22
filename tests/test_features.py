@@ -1,10 +1,13 @@
 import json
+import time
 from pathlib import Path
+from unittest import mock
 
 import pytest
 from Bio import SeqIO
 from cloning_helpers import clean_dna, rc
 
+from vettore import features as features_module
 from vettore.features import (
     DEFAULT_MIN_IDENTITY,
     SHORT_FEATURE,
@@ -626,3 +629,207 @@ def test_a_label_naming_the_other_species_is_flagged(element, label, wrong):
     assert out["label_warnings"] == (1 if wrong else 0)
     if wrong:
         assert row["labelWarning"].startswith(f"Annotated as “{label}”, but the sequence is the {element}")
+
+
+# ---- detection speed --------------------------------------------------------------------
+# S5.4 asks that detection stay under two seconds for a 15 kb plasmid with the grown
+# catalogue. The cost is not in the catalogue's size — a feature absent from the sequence is
+# ruled out by an exact seed search and costs almost nothing — but in the elements that *are*
+# there, each of which is aligned where its seeds land.
+#
+# A plasmid packed with elements copied exactly from the catalogue is therefore NOT the worst
+# case, and measuring only that one flatters the engine: an exact copy is taken as it stands
+# and costs no alignment at all. Promoters and ITRs differ between vectors by a few bases (the
+# reason this module aligns rather than searching), so the real worst case is a plasmid packed
+# with elements that are *nearly* the catalogue's. One changed base per element is enough to
+# double the work, and that plasmid is still annotated with the same 15 elements at 99.2–100 %
+# identity — the user cannot tell the two apart, so the tests must not either.
+
+DETECTION_BUDGET = 2.0
+
+#: The elements of the worst-case plasmid, named rather than taken by length, so that adding a
+#: catalogue entry cannot quietly change what is measured. They are the expensive and the
+#: awkward ones together: the two longest entries, the pairs close enough to seed on each other
+#: (SpCas9/SaCas9, tdTomato/mCherry, the two ITRs), an element that contains another (the CAG
+#: promoter opens with the whole CMV enhancer, SaCas9 ends with 3×HA), and the short exact
+#: sites. 14 kb of elements in a 15 kb plasmid.
+PACKED_ELEMENTS = (
+    "SpCas9", "SaCas9", "CAG promoter", "tdTomato", "mCherry", "EGFP", "AmpR", "ori",
+    "AAV2 ITR", "AAV2 ITR (truncated)", "3×HA", "loxP", "lox2272", "FRT",
+)
+
+
+def _packed_plasmid(budget: int = 15_000) -> str:
+    """``PACKED_ELEMENTS`` end to end, padded with random DNA to ``budget`` bp."""
+    parts = {f.name: f.sequence for f in catalogue()}
+    pieces = [parts[name] for name in PACKED_ELEMENTS]
+    assert sum(map(len, pieces)) <= budget, "the packed elements no longer fit the budget"
+    return ("".join(pieces) + clean_dna(budget, 11))[:budget]
+
+
+def _near_miss_plasmid(budget: int = 15_000) -> str:
+    """``_packed_plasmid`` with one base changed per element, away from every seed.
+
+    This is the realistic worst case. The change is placed where no seed covers it, so all six
+    seeds of each element still hit and the element is still found — at 99.2–100 % identity,
+    annotated exactly as the verbatim plasmid is — but no element is exact any more, so every
+    one of them is aligned in full.
+    """
+    parts = {f.name: f.sequence for f in catalogue()}
+    pieces = []
+    for name in PACKED_ELEMENTS:
+        sequence = parts[name]
+        seeded = {index for start, _ in features_module._seeds(sequence)
+                  for index in range(start, start + features_module.SEED)}
+        free = [index for index in range(len(sequence)) if index not in seeded]
+        if free:                       # the short exact sites are seed all the way through
+            at = free[len(free) // 2]
+            other = "A" if sequence[at] != "A" else "C"
+            sequence = sequence[:at] + other + sequence[at + 1:]
+        pieces.append(sequence)
+    return ("".join(pieces) + clean_dna(budget, 11))[:budget]
+
+
+#: The budget in the work itself: cells of dynamic programming, summed over every alignment
+#: pass. Cells rather than passes because a pass is not a fixed cost — it is the window's
+#: length times the query's — so a count of passes can stay flat while the work behind it
+#: grows. Today's figures, for the two plasmids above:
+#:
+#:   verbatim    39.4 M in 38 passes   (165.6 M in 102 before this engine's shortcuts)
+#:   near-miss   81.3 M in 48 passes   (165.6 M in 102 — the shortcuts cannot help it)
+#:
+#: The bounds are tight on purpose: at 80 M the verbatim bound would still pass with the
+#: circular-copy skip taken out altogether, which makes it no guard at all.
+MAX_ALIGNMENT_CELLS = 50_000_000
+MAX_ALIGNMENT_CELLS_NEAR_MISS = 95_000_000
+
+
+def _alignment_work(sequence: str, circular: bool = True, features=None) -> tuple[int, int]:
+    """(passes, cells) of dynamic programming detection spends on ``sequence``. This is the
+    measure a clock cannot give: the same numbers on any machine, where wall-clock time on a
+    shared CI runner says as much about the runner as about the code."""
+    aligner = features_module._aligner()
+    passes = cells = 0
+    original = aligner.align
+
+    def counted(target, query, *args, **kwargs):
+        nonlocal passes, cells
+        passes += 1
+        cells += len(target) * len(query)
+        return original(target, query, *args, **kwargs)
+
+    with mock.patch.object(aligner, "align", counted):
+        detect(sequence, circular=circular, features=features)
+    return passes, cells
+
+
+def test_detection_of_a_15kb_plasmid_stays_inside_its_alignment_budget():
+    """The regression guard for the time budget, in work rather than seconds."""
+    _, cells = _alignment_work(_packed_plasmid())
+    assert cells <= MAX_ALIGNMENT_CELLS, f"{cells / 1e6:.1f} M cells of alignment"
+
+
+def test_a_plasmid_of_near_miss_elements_is_the_case_still_over_the_budget():
+    """The realistic worst case, recorded rather than left out.
+
+    One changed base per element doubles the alignment work, because no element can be taken
+    as it stands any more. S5.4's two seconds are **not** met here: this plasmid takes about
+    2.3 s where the verbatim one takes 1.2 s, against 4.7 s before this engine's shortcuts. So
+    the criterion is met for a construct assembled from catalogue parts and missed for one
+    carrying a vector's own variants, and closing that gap means changing how an element's
+    alignment is chosen, not tuning a constant.
+
+    The bound below is the work as it stands, so that the gap cannot widen unnoticed while it
+    is open, and so that whoever closes it sees this number move.
+    """
+    sequence = _near_miss_plasmid()
+    matches = detect(sequence, circular=True)
+    assert len(matches) == len(detect(_packed_plasmid(), circular=True)), (
+        "the near-miss plasmid must be annotated like the verbatim one, or it is measuring "
+        "something else"
+    )
+    assert all(match.identity >= 99.0 for match in matches)
+    _, cells = _alignment_work(sequence)
+    assert cells <= MAX_ALIGNMENT_CELLS_NEAR_MISS, f"{cells / 1e6:.1f} M cells of alignment"
+
+
+def test_detection_of_a_15kb_plasmid_stays_within_its_time_budget():
+    """S5.4's budget as it is written, on a plasmid assembled from catalogue parts. The test
+    above records the case that is still over it. The cells tests are what fail on a
+    regression; this one catches a cost that is not alignment."""
+    sequence = _packed_plasmid()
+    detect(sequence, circular=True)          # warm the catalogue and the aligner
+    start = time.perf_counter()
+    matches = detect(sequence, circular=True)
+    elapsed = time.perf_counter() - start
+    assert matches, "the packed plasmid should carry recognisable elements"
+    assert elapsed < DETECTION_BUDGET, f"detection took {elapsed:.2f} s"
+
+
+def test_a_plasmid_with_nothing_in_the_catalogue_is_ruled_out_without_aligning():
+    """The guard for the catalogue's growth: a sequence holding none of its elements is
+    dismissed on the seed search alone, so entries can be added without slowing every
+    document down."""
+    sequence = clean_dna(15_000, 12)
+    assert detect(sequence, circular=True) == []
+    assert _alignment_work(sequence) == (0, 0)
+
+
+def test_the_copy_of_an_element_a_circular_search_appends_is_not_aligned():
+    """A circular search runs against the sequence doubled, so every element is found twice
+    and the copy past the end is dropped as a duplicate. It must not be aligned first: that
+    was half the work detection used to do."""
+    feature = max(catalogue(), key=lambda f: f.length)
+    # A copy with a few changed bases, so that it has to be aligned: an exact copy is taken as
+    # it stands and would hide the difference this test is looking for.
+    bases = list(feature.sequence)
+    for position in range(40, len(bases), 500):
+        bases[position] = "A" if bases[position] != "A" else "C"
+    sequence = clean_dna(300, 15) + "".join(bases) + clean_dna(300, 16)
+    linear, _ = _alignment_work(sequence, circular=False, features=(feature,))
+    circular, _ = _alignment_work(sequence, circular=True, features=(feature,))
+    assert linear > 0, "the mutated copy should need an alignment"
+    # Passes, not cells: a circular search looks at a doubled target, so the window around the
+    # genuine copy reaches further and costs a little more. What must not appear is a second
+    # pass for the appended copy.
+    assert circular == linear
+
+
+def test_an_element_present_verbatim_is_found_without_aligning_it():
+    """An exact copy is its own best local alignment, so it is reported without a dynamic
+    programming pass. The test pins the shortcut by failing if the aligner is used at all."""
+    feature = max(catalogue(), key=lambda f: f.length)
+    sequence = clean_dna(400, 13) + feature.sequence + clean_dna(400, 14)
+    [found] = detect(sequence, circular=False, features=(feature,))
+    assert found.identity == 100.0
+    assert found.start == 400
+    assert found.end == 400 + feature.length - 1
+    # Only this element is searched for, so any pass at all would be this one being aligned.
+    assert _alignment_work(sequence, circular=False, features=(feature,)) == (0, 0)
+
+
+def test_both_copies_of_a_tandem_tag_are_reported():
+    """A 6×HA tag is two 3×HA in a row, and 3×HA is itself three identical 27 bp repeats, so
+    the seeds hit in every register and the guesses at where the tag starts land closer
+    together than the search margin. Both copies must still be reported: an element that is
+    there verbatim and goes unreported is the one failure the engine cannot afford, and
+    grouping those guesses as one place to look caused exactly that.
+    """
+    tag = entry("3×HA")
+    head = clean_dna(414, 17)
+    sequence = head + tag.sequence + tag.sequence + clean_dna(414, 18)
+    starts = {m.start for m in detect(sequence, circular=False) if m.name == tag.name}
+    assert len(head) in starts, "the first tag is missing"
+    assert len(head) + tag.length in starts, "the second tag is missing"
+    for match in (m for m in detect(sequence, circular=False) if m.name == tag.name):
+        assert match.identity == 100.0
+        assert match.end - match.start + 1 == tag.length
+
+
+def test_a_tandem_array_reports_a_copy_for_every_repeat():
+    """The same thing as the array grows: however many copies are there, each is found."""
+    tag = entry("3×HA")
+    for copies in (2, 4, 8):
+        sequence = clean_dna(414, 19) + tag.sequence * copies + clean_dna(414, 20)
+        starts = {m.start for m in detect(sequence, circular=False) if m.name == tag.name}
+        assert {414 + i * tag.length for i in range(copies)} <= starts, copies

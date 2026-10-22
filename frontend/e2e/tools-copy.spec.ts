@@ -89,9 +89,12 @@ test.describe("when the system refuses the clipboard", () => {
     await expect(copyBox(page)).toContainText("did not let Vettore put this on the clipboard");
     await expect(page.getByTestId("copy-text")).toHaveValue(/^\S+\t[ACGT]+\n\S+\t[ACGT]+$/);
     await expect(page.getByTestId("cloning-copied")).toHaveCount(0);
-    // Escape closes the box only: the cloning dialog and its inputs stay.
-    await page.keyboard.press("Escape");
-    await expect(copyBox(page)).toBeHidden();
+    // Escape closes the box only: the cloning dialog and its inputs stay. A dialog still
+    // opening can miss the key: press again until the box has closed.
+    await expect(async () => {
+      await page.keyboard.press("Escape");
+      await expect(copyBox(page)).toBeHidden({ timeout: 1000 });
+    }).toPass({ timeout: 10_000 });
     await expect(dialog).toBeVisible();
   });
 

@@ -113,12 +113,25 @@ class Match:
                 "length": len(self.span(length))}
 
 
-def _match_long(target: str, feature: CatalogueFeature, query: str, strand: int,
+def _match_long(target: str, query: str, length: int,
                 min_identity: float, min_coverage: float) -> list[tuple[int, int, float]]:
     results: list[tuple[int, int, float]] = []
     aligner = _aligner()
-    for offset in _candidate_offsets(target, query):
-        margin = max(30, len(query) // 10)
+    margin = max(30, len(query) // 10)
+    for offset in sorted(_candidate_offsets(target, query)):
+        # A guess at or past the end of the sequence itself can only be the copy a circular
+        # search appends, and the same seed hit also appears in the sequence a length earlier,
+        # so that copy is found there instead. Aligning this one would be wasted work.
+        if offset >= length:
+            continue
+        # An element present verbatim is the best local alignment of itself under this
+        # scoring, in full and at no offset, so it needs no alignment: most catalogue elements
+        # sit in a vector unchanged, and this is what keeps detection quick on a plasmid full
+        # of them. Every guess is tested, because a repeated element (a 6×HA tag is two 3×HA
+        # in a row) gives one guess per copy and per register.
+        if 100.0 >= min_identity and target[offset : offset + len(query)] == query:
+            results.append((offset, offset + len(query) - 1, 100.0))
+            continue
         window_start = max(0, offset - margin)
         window = target[window_start : offset + len(query) + margin]
         if len(window) < SEED:
@@ -145,7 +158,6 @@ def _match_long(target: str, feature: CatalogueFeature, query: str, strand: int,
                     span = target[start : end + 1]
                     identity = 100.0 * sum(1 for a, b in zip(span, query) if a == b) / len(query)
             results.append((start, end, identity))
-    del strand, feature
     return results
 
 
@@ -177,7 +189,7 @@ def detect(sequence: str, circular: bool = False, min_identity: float = DEFAULT_
             query = feature.sequence if strand == 1 else _reverse_complement(feature.sequence)
             coverage = COVERAGE_BY_TYPE.get(feature.type, min_coverage)
             hits = (_match_short(target, query) if feature.length <= SHORT_FEATURE
-                    else _match_long(target, feature, query, strand, min_identity, coverage))
+                    else _match_long(target, query, length, min_identity, coverage))
             for start, end, identity in hits:
                 if start >= length:
                     continue  # the same hit also appears in the first copy
