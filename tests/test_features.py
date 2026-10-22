@@ -870,8 +870,8 @@ FIXTURES = (
 )
 
 #: Where each fixture loses an element, and which: the deleted-site count at which the
-#: shortest entry the fixture aligns runs out of seeds and falls below the identity
-#: threshold at the same time — measured, and explained in the test that asserts it. The
+#: shortest entry the fixture aligns has no seed left anywhere near its copy, measured, and
+#: explained in the test that asserts it — the identity floor is never reached. The
 #: stress plasmid gets there first because it carries 3×HA at 81 bp, which is also why it is
 #: pinned only to three sites.
 LOSES_AN_ELEMENT = {
@@ -1135,24 +1135,26 @@ def test_enough_deleted_sites_stop_an_element_being_found_at_all(label, element_
                                                                  inverted, counts):
     """The other end of the curve, and the reason the pinned points stop where they do.
 
-    Two things have to go for an element to disappear, and at these three boundaries both go
-    at once.
+    What ends an element is **seed exhaustion**, not the identity floor. The engine aligns an
+    element only where one of its six seeds occurs in the plasmid, and at each of these three
+    boundaries nothing is left to align: the AmpR promoter has no candidate offset at all,
+    and 3×HA still has five, but every one of them is inside the copy nested in SaCas9, 6 kb
+    from the standalone copy and far outside the alignment window around an offset. Dropping
+    `min_identity` to 0 brings neither of them back, so the floor is never reached and is not
+    the reason. (Were they anchored they would fail it: 94.29 % for the promoter, 93.83 % for
+    the tag. That is arithmetic about the deletions, not the engine's cause.)
 
-    The engine aligns an element where one of its six seeds occurs *anywhere* in the
-    plasmid, so a window free of a cut is enough but is not required. With evenly spaced cuts
-    the two end windows last longest: the AmpR promoter still has its last window intact at
-    five sites, even though the spacing is already below `SEED` — so "spacing below `SEED`"
-    is not the rule. 3×HA is found at four sites with no window of its own left, because it
-    is three exact 27 bp repeats and the junction in front of it supplies a hit from outside
-    the copy.
+    A seed window free of a cut is therefore sufficient but not necessary. With evenly spaced
+    cuts the end windows last longest — the AmpR promoter still has its last window intact at
+    five sites, with the spacing already below `SEED`, which is why "spacing below `SEED`" is
+    not the rule either — and 3×HA is found at four sites with no window of its own left,
+    because it is three exact 27 bp repeats and the junction in front of it supplies a hit
+    from two bases outside the copy.
 
-    What settles it is the identity floor underneath: a fixed number of deleted bases costs
-    an entry identity in inverse proportion to its length, so the shortest entries fall
-    through `DEFAULT_MIN_IDENTITY` first. At its boundary the AmpR promoter is at 94.29 %
-    (99 of 105 bases) and 3×HA at 93.83 %; one site earlier they read 95.24 % and 95.06 %,
-    which is how little margin the point below asserts. A nuclease is never the casualty: six
-    bases of 3345 is 99.8 %. So the casualties are the shortest entries each fixture aligns,
-    though "shortest" only orders them — at seven sites the AAV fixture also loses its
+    The casualties are the shortest entries each fixture aligns, because a cut spacing that
+    leaves no window of a 105 bp entry still leaves both end windows of a nuclease, which
+    also loses only 18 of its 3345 bases to six sites (99.46 %, since a CDS is cut by whole
+    codons). "Shortest" only orders them: at seven sites the AAV fixture also loses its
     truncated ITR at 131 bp.
 
     This is what makes the cost a sawtooth rather than a ramp, and why a bound on one point
@@ -1167,8 +1169,9 @@ def test_enough_deleted_sites_stop_an_element_being_found_at_all(label, element_
     assert lost - exact == collections.Counter()
     # And one site fewer is still the same document, so the line is exactly here, and the
     # last point the fixture pins is on the right side of it. This is the fragile assertion
-    # of the file: at that site count the casualty is a tenth of a point above the identity
-    # threshold, so a change to the scoring moves it.
+    # of the file: one site before it vanishes the casualty is still anchored but sits just
+    # above the identity threshold — 95.24 % for the AmpR promoter, 95.06 % for 3×HA — so
+    # either a change to the seed spacing or a change to the scoring moves this line.
     before = collections.Counter(names(_annotated(element_names, sites - 1, inverted)))
     assert before == exact
     assert max(counts) < sites
