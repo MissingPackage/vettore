@@ -226,12 +226,13 @@ ENTRIES: list[Entry] = [
           "encephalomyocarditis virus internal ribosome entry site; "
           "cross-check OQ427855.1 (99.7 %)"),
     # P2A and T2A: the self-cleaving peptides of multi-gene cassettes. Both are short and
-    # written in many codon versions, so no single entry finds them all. Of the records in
-    # this repository's fixtures that annotate one, 15 annotate T2A in 6 distinct sequences
-    # and 15 annotate P2A in 13; the versions below are the ones detection finds in the most
-    # of those records (T2A 8 of 15, P2A 6 of 15), which is why they were chosen over the
-    # others. A construct whose 2A is written another way is not found, and the user guide
-    # says so.
+    # written in many codon versions, so no single entry finds them all. The two below were
+    # picked by census rather than by preference: of the public records that annotate one of
+    # these peptides, 16 annotate T2A in 7 distinct sequences and 15 annotate P2A in 13, and
+    # these are the versions detection finds in the most of those records — T2A in 8 of the
+    # 16, P2A in 6 of the 15. tests/data/README.md lists every accession in that census, so
+    # the count can be repeated. A construct whose 2A is written another way is not found,
+    # and the user guide says so.
     Entry("P2A", "misc_feature", "LT962383.1", 1899, 1964,
           "porcine teschovirus-1 2A self-cleaving peptide, with its GSG linker; "
           "cross-check MG880225.1 (98.5 %)"),

@@ -437,8 +437,8 @@ epitope tags above all; Flp comes as two whole genes, FLPe and FLPo, which share
 their bases, so each is its own entry. For the rest the catalogue carries the version two
 unrelated vectors agree on, both named in the entry's notes, and a construct built from
 another version may not be recognised. The 2A peptides are the common case and the most
-variable: of the public records this project checked against, the P2A entry is found in 6 of
-the 15 that annotate a P2A, and the T2A entry in 8 of 15. What to do depends on how long the
+variable: of the public records that annotate one of these peptides, the P2A entry is found
+in 6 of the 15 that annotate a P2A, and the T2A entry in 8 of the 16 that annotate a T2A. What to do depends on how long the
 element is. For the 2A peptides, the IRES and anything else over 50 bases, lower the identity
 threshold for one run and the near match is found. At 50 bases or shorter — the Myc and V5
 tags, and the loxP, lox2272, loxN, FRT and F3 sites — the search asks for an exact match and

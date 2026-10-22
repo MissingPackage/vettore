@@ -131,6 +131,31 @@ curated feature table.
 | Myc tag, `AJ243205.1:147..179` | AJ243205.1, cloning vector pUR4546 (Harmsen et al., Mol Immunol 2000;37:579) | MF966512.1, epitope-tagged latrophilin-1 (University of Kent, direct submission), which carries it twice, 100 % |
 | V5 tag, `AM700585.1:70..111` | AM700585.1, V5-tagged FcεRIγ construct (Viertlböck et al., PNAS 2007;104:11718) | AY682091.1, DEC205 construct (Gurer et al., Blood 2008;112:1231), 100 % |
 
+### The 2A census
+
+The P2A and T2A entries were chosen by counting, not by preference. Searching E-utilities on
+2026-10-21 for records whose FEATURES table annotates one of these peptides gave the records
+below; each was fetched, the annotated span extracted, and Vettore's own `detect` run with
+that span as a one-entry catalogue against every other record in the list. The entries in the
+catalogue are the versions found in the most records. Only the two cited records and the two
+cross-checks are shipped as fixtures here — the census is repeated from the network, not
+offline, which is why the accessions are written down.
+
+**T2A** — 16 records, 7 distinct sequences; the entry (`ON417756.1:739..792`) is found in 8:
+
+KY825159.1, MK816962.1, MW503936.1, MW503937.1, MW503938.1, MW503939.1, MZ127811.1,
+ON417756.1, OQ427855.1, PQ659180.1, PQ671723.1, PQ671724.1, PQ671725.1, PV611053.1,
+PV611054.1, PZ285977.1
+
+**P2A** — 15 records, 13 distinct sequences; the entry (`LT962383.1:1899..1964`) is found in 6:
+
+KX151729.1, LT962381.1, LT962382.1, LT962383.1, MG880225.1, MK816962.1, MT559572.1,
+OK413188.1, OK413189.1, OP243710.1, OR961518.1, PV863446.1, PV863447.1, PZ036169.1,
+PZ259196.1
+
+The runner-up T2A version, which the review proposed as the entry (`MK816962.1:2103..2156`),
+is found in 2 of the 16.
+
 ## Sanger contig fixtures (`contig-*.ab1`)
 
 A forward and a reverse Sanger read of the same template (a COI barcode of the earthworm
