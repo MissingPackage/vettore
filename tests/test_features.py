@@ -789,8 +789,8 @@ def test_a_label_naming_the_other_species_is_flagged(element, label, wrong):
 # (36 entries, this machine):
 #
 #   sites     0      1      2      3      4      5      6
-#   cells   0.34 M 15.37M 15.38M 15.40M 29.57M 15.46M 29.56M
-#   seconds  0.03   0.38   0.38   0.39   0.74   0.41   0.73
+#   cells   0.34 M 15.49M 15.44M 15.55M 29.57M 15.57M 29.56M
+#   seconds  0.03   0.39   0.39   0.41   0.75   0.41   0.73
 #   same?    yes    yes    yes    yes    yes    yes    NO
 #
 # A single changed base is 15.4 M as well, so a deleted base and a changed one now cost the
@@ -868,7 +868,7 @@ PACKED_ELEMENTS = (
 #: `LOSES_AN_ELEMENT`, which is where that boundary is asserted.
 FIXTURES = (
     ("aav", AAV_ELEMENTS, AAV_INVERTED, (0, 1, 3, 5)),
-    ("all-in-one", ALL_IN_ONE_ELEMENTS, (), (0, 1, 3, 5)),
+    ("all-in-one", ALL_IN_ONE_ELEMENTS, (), (0, 1, 3, 4, 5)),
     ("stress", PACKED_ELEMENTS, (), (0, 1, 3)),
 )
 
@@ -986,7 +986,8 @@ def _plasmid(element_names: tuple[str, ...], sites: int = 0,
 #: criterion is written for it; the seconds are this machine's on the catalogue as it stands,
 #: for scale only, and are the same measurements the table above records.
 #:
-#: Each bound sits about 17 % above the grown catalogue's figure, except ("aav", 0): a
+#: Each bound sits a sixth to a fifth above the grown catalogue's figure — 17 to 22 %, the
+#: spread being the rounding to a tidy number — except ("aav", 0): a
 #: verbatim AAV vector costs almost nothing precisely because every element is exact, so 2 M
 #: is nearly six times its cost and still an eighth of the 15.4 M it costs without the
 #: shortcut that makes it cheap.
@@ -1004,16 +1005,17 @@ def _plasmid(element_names: tuple[str, ...], sites: int = 0,
 ALIGNMENT_WORK = {
     #  fixture,    sites         36 entries         60 entries      seconds
     ("aav",        0):   2_000_000,  #    0.34 M / 15 p     0.34 M / 15 p     0.03
-    ("aav",        1):  18_000_000,  #   15.37 M / 25 p    15.37 M / 25 p     0.40
-    ("aav",        3):  18_000_000,  #   15.40 M / 25 p    15.40 M / 25 p     0.38
-    ("aav",        5):  18_000_000,  #   15.46 M / 28 p    15.46 M / 28 p     0.40
-    ("all-in-one", 0):  26_000_000,  #   22.01 M /  9 p    22.24 M / 12 p     0.53
-    ("all-in-one", 1):  60_000_000,  #   50.38 M / 22 p    50.61 M / 25 p     1.26
-    ("all-in-one", 3):  70_000_000,  #   59.66 M / 25 p    59.89 M / 28 p     1.53
-    ("all-in-one", 5):  70_000_000,  #   59.72 M / 26 p    59.95 M / 29 p     1.50
-    ("stress",     0):  46_000_000,  #   37.26 M / 36 p    38.78 M / 38 p     0.97
-    ("stress",     1): 123_000_000,  #  103.56 M / 49 p   105.08 M / 51 p     2.58
-    ("stress",     3): 130_000_000,  #  109.79 M / 49 p   111.31 M / 51 p     2.62
+    ("aav",        1):  19_000_000,  #   15.49 M / 29 p    15.49 M / 29 p     0.39
+    ("aav",        3):  19_000_000,  #   15.55 M / 31 p    15.55 M / 31 p     0.40
+    ("aav",        5):  19_000_000,  #   15.57 M / 32 p    15.57 M / 32 p     0.41
+    ("all-in-one", 0):  26_000_000,  #   22.01 M /  9 p    22.24 M / 12 p     0.48
+    ("all-in-one", 1):  60_000_000,  #   50.38 M / 22 p    50.61 M / 25 p     1.19
+    ("all-in-one", 3):  74_000_000,  #   62.69 M / 30 p    62.92 M / 33 p     1.46
+    ("all-in-one", 4): 103_000_000,  #   87.27 M / 32 p    87.80 M / 39 p     2.07
+    ("all-in-one", 5):  74_000_000,  #   62.15 M / 30 p    62.53 M / 35 p     1.53
+    ("stress",     0):  52_000_000,  #   40.42 M / 39 p    44.22 M / 44 p     0.93
+    ("stress",     1): 136_000_000,  #  111.75 M / 58 p   115.55 M / 63 p     2.75
+    ("stress",     3): 147_000_000,  #  121.05 M / 65 p   124.85 M / 70 p     3.04
 }
 
 
@@ -1217,17 +1219,24 @@ def test_a_second_deleted_site_per_element_is_nearly_free():
     where they used to cost three times as much (90.1 M against 30.4 M on the AAV fixture,
     197.1 M against 78.6 M on the all-in-one one).
 
-    A quarter rather than nothing, and the quarter is what checking the merge costs instead of
-    trusting it. **tdTomato** is the clearest part: it is a tandem dimer, so the best alignment
-    over a run's window can land on the other monomer rather than on the guesses the run was
-    made of, and those guesses are then aligned on their own. On the all-in-one fixture it
-    is the only place it fires — four extra alignments of a 1431 bp entry, which is the whole
-    difference between 49.8 M cells and 59.7 M.
+    A quarter rather than nothing, and the quarter is what checking the merge costs instead
+    of trusting it: 49.8 M cells if a run's one alignment is trusted, 62.7 M as the engine
+    actually does it. On this fixture every one of those re-queues is a run whose alignment
+    came back *below the thresholds*, which answers no guess in it and so sends all of them
+    back — tdTomato, a tandem dimer, for two runs and four extra passes of a 1431 bp entry
+    (9.8 M cells), and mCherry for two runs and five of a 711 bp one (3.0 M). The other
+    branch, an alignment that drifts onto a placement none of its guesses is at, fires
+    nowhere here; the one place it fires on any fixture is a 3×HA run on the packed stress
+    plasmid at three deleted sites.
 
     The four-site trough is left out on purpose: there the fixture's cuts land in the seeds
     themselves, the surviving registers end up further apart than `MERGE_GAP`, and SaCas9 is
-    aligned twice. That is a property of evenly spaced cuts, not of divergence, and
-    `MERGE_GAP`'s own comment records what widening it would cost and buy.
+    aligned twice. That is a property of evenly spaced cuts, not of divergence — it is the
+    one point on this fixture where the engine does more work than aligning every guess
+    separately, 87.3 M cells against 84.1 M, and the only point where neither engine meets
+    S5.4's two seconds (2.07 s against 1.92 s). `ALIGNMENT_WORK` records it so it cannot
+    drift unseen, and `MERGE_GAP`'s own comment records what widening the gap would cost and
+    buy there.
     """
     for element_names, inverted, slack in ((AAV_ELEMENTS, AAV_INVERTED, 1.01),
                                            (ALL_IN_ONE_ELEMENTS, (), 1.30)):
@@ -1490,6 +1499,50 @@ def test_the_derived_limit_is_what_the_engine_merges_by():
     assert passes < ignored, (passes, ignored)
 
 
+def _passes(sequence: str, feature, **kwargs) -> tuple[int, int]:
+    """Alignments the engine does on ``sequence``, merged and with every guess on its own."""
+    aligner = features_module._aligner()
+    original, counted = aligner.align, [0]
+
+    def count(target, query, *args, **kwargs_):
+        counted[0] += 1
+        return original(target, query, *args, **kwargs_)
+
+    out = []
+    for runs in (None, lambda offsets, *_, **__: [(o, o) for o in sorted(offsets)]):
+        counted[0] = 0
+        with mock.patch.object(aligner, "align", count):
+            if runs is None:
+                detect(sequence, circular=False, features=(feature,), **kwargs)
+            else:
+                with mock.patch.object(features_module, "_offset_runs", runs):
+                    detect(sequence, circular=False, features=(feature,), **kwargs)
+        out.append(counted[0])
+    return out[0], out[1]
+
+
+def test_a_run_whose_alignment_is_rejected_answers_none_of_its_guesses():
+    """The other half of the same idea, and the one no construct distinguishes. When a run's
+    one alignment comes back *below* the identity or coverage threshold it has answered
+    nothing, however many of the run's guesses lie on it, so they all go back. Identity and
+    coverage are not monotone in alignment score, so a window that can only score higher can
+    still come back with nothing where a narrower one would have reported a match.
+
+    A review looked for a construct where that costs an annotation and found none in 31,680
+    checks, so what this test can pin is the work: at a threshold the merged alignment cannot
+    meet, the engine does one pass per guess *plus* the run's own wasted one. Treat the run as
+    having answered the guesses on it and that becomes one pass fewer than aligning them
+    separately, not one more."""
+    tag = entry("3×HA")
+    body = tag.sequence * 2
+    sequence = clean_dna(60, 99) + body[:65] + "AAAA" + body[65:] + clean_dna(60, 99)
+    merged, alone = _passes(sequence, tag, min_identity=100.0)
+    assert merged == alone + 1, (merged, alone)
+    # And nothing is lost by it: the same matches, in the same order.
+    with_merge, without = _with_and_without_the_merge(sequence, tag, min_identity=100.0)
+    assert with_merge == without
+
+
 def test_a_guess_the_merged_alignment_does_not_pass_through_is_aligned_on_its_own():
     """The merge's one real hazard, and the check that answers it. One window yields one
     alignment, and the best alignment over a run's window is not always the best alignment
@@ -1500,8 +1553,9 @@ def test_a_guess_the_merged_alignment_does_not_pass_through_is_aligned_on_its_ow
     instead, and the block at 87 is gone.
 
     No bound on the entry can see this, because it is a property of the target rather than of
-    the entry: 3×HA is 44.9 % the same as itself over every shift the merge uses, so its limit
-    is the full span. So the engine checks instead — the guesses the accepted alignment passes
+    the entry: 3×HA is at most 44.9 % the same as itself over the shifts the merge uses — that
+    at twelve bases, and under 31 % at fourteen of the eighteen — so its limit is the full
+    span. So the engine checks instead — the guesses the accepted alignment passes
     through, one per register it reads, are the ones it stands in for, and any other guess in
     the run is aligned on its own."""
     tag = entry("3×HA")

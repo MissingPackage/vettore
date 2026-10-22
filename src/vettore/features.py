@@ -318,14 +318,17 @@ def _match_long(target: str, query: str, length: int, min_identity: float,
     # Four is the narrow part of the rule and is meant to be: it is as far apart as the
     # registers of one copy get when the indel that split them is a lost codon or two. A cut
     # landing inside a seed window pushes the surviving registers further apart, and widening
-    # the gap to the span cap would merge those too. Measured, it buys almost nothing and
-    # costs where it does not: the AAV fixture's four-site trough halves, 29.6 M cells of
-    # dynamic programming to 15.3 M, and every other point the tests pin moves by under a per
-    # cent except the two cheapest all-in-one ones, which get 2 to 6 % *worse* — a wider run
-    # is a wider window, and a wider window drifts off its own guesses more often and pays for
-    # them separately below. The trough is a property of evenly spaced cuts rather than of
-    # divergence, so there is nothing here worth the extra base of distance at which one
-    # alignment would have to stand in for two guesses.
+    # the gap to the span cap would merge those too. Measured, it helps only where the cuts
+    # are artificially even and costs almost everywhere else. The AAV fixture's four-site
+    # trough halves, 29.6 M cells of dynamic programming to 15.3 M, and the all-in-one
+    # fixture's goes 87.3 M to 62.1 M; of the points the tests pin, aav 1/3/5 and all-in-one
+    # 3/5 move by under a per cent, and the rest get *worse* — all-in-one 0 by 5.6 %,
+    # all-in-one 1 by 2.4 %, the packed stress plasmid by 18.4 % with no deleted site, 4.4 %
+    # with one and 4.6 % with three. A wider run is a wider window, a wider window drifts off
+    # its own guesses more often, and each one it drifts off is paid for separately below. The
+    # troughs are a property of evenly spaced cuts coinciding with the seed positions rather
+    # than of divergence, so there is nothing here worth the extra base of distance at which
+    # one alignment would have to stand in for two guesses.
     #
     # Which is the thing this loop checks rather than assumes. One window yields one
     # alignment, and the best alignment over a run's window is not always the best alignment
@@ -381,6 +384,9 @@ def _match_long(target: str, query: str, length: int, min_identity: float,
         # however many of them lie on it, so they all go back: identity and coverage are not
         # monotone in alignment score, so a window that can only score higher can still come
         # back with nothing where a narrower one would have reported a match.
+        # `len(group) > 1` is what makes this terminate as well as what makes it cheap: a
+        # re-queued guess is a group of one, so it can never put anything back, and the
+        # worklist is at most the runs plus the guesses in them.
         missed = ([o for o in group if hit is None or o not in diagonals]
                   if len(group) > 1 else [])
         # The alignment is this run's answer when it stands in for at least one of the guesses
@@ -391,6 +397,14 @@ def _match_long(target: str, query: str, length: int, min_identity: float,
         # When it stands in for none of them it has drifted to a placement some other guess
         # will find on its own, so its answer is dropped rather than reported from here: that
         # leaves the results exactly the ones the guesses give one at a time.
+        # At the front and in order, so that a guess put back is aligned where it would have
+        # been had the run never been made: `_dedupe` keeps whichever of two overlapping
+        # copies it meets first, and an earlier version of this loop reordered the results and
+        # silently changed which of nine overlapping copies of a repeat survived. Nothing in
+        # the suite distinguishes this from appending, because a run either answers every
+        # guess in it or none, so the ones put back are the whole run and come back adjacent
+        # either way; it is written this way because the partial case is the one that would
+        # not, and it costs nothing to be right about it in advance.
         pending.extendleft((o, o, (o,)) for o in reversed(missed))
     return results
 
