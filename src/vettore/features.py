@@ -317,13 +317,15 @@ def _match_long(target: str, query: str, length: int, min_identity: float,
         inexact.append(offset)
     # Four is the narrow part of the rule and is meant to be: it is as far apart as the
     # registers of one copy get when the indel that split them is a lost codon or two. A cut
-    # landing inside a seed window pushes the surviving registers further apart than that, and
-    # widening the gap to the span cap would merge those too — on the AAV fixture it takes the
-    # four-site trough from 29.6 M cells of dynamic programming to 15.3 M, and 8 to 26 % off
-    # four of the points the tests pin (aav 0 sites -23 %, stress 0 -26 %, 1 site -12 %,
-    # 3 sites -8 %). That is real, and it is still not worth it: every extra base of gap is a
-    # base of distance at which the one alignment could land somewhere other than the guesses
-    # it stands in for.
+    # landing inside a seed window pushes the surviving registers further apart, and widening
+    # the gap to the span cap would merge those too. Measured, it buys almost nothing and
+    # costs where it does not: the AAV fixture's four-site trough halves, 29.6 M cells of
+    # dynamic programming to 15.3 M, and every other point the tests pin moves by under a per
+    # cent except the two cheapest all-in-one ones, which get 2 to 6 % *worse* — a wider run
+    # is a wider window, and a wider window drifts off its own guesses more often and pays for
+    # them separately below. The trough is a property of evenly spaced cuts rather than of
+    # divergence, so there is nothing here worth the extra base of distance at which one
+    # alignment would have to stand in for two guesses.
     #
     # Which is the thing this loop checks rather than assumes. One window yields one
     # alignment, and the best alignment over a run's window is not always the best alignment
@@ -373,7 +375,14 @@ def _match_long(target: str, query: str, length: int, min_identity: float,
                         hit = (in_target[0], in_target[-1], identity, in_query[0],
                                in_query[-1] + 1, coding and _frameshift(chosen))
                         break
-        missed = [o for o in group if o not in diagonals] if len(group) > 1 else []
+        # A guess is stood in for only by an answer that was accepted and that the alignment
+        # passes through. When the alignment over the wider window scores highest on a
+        # placement that then fails the thresholds, no guess in the run has been answered,
+        # however many of them lie on it, so they all go back: identity and coverage are not
+        # monotone in alignment score, so a window that can only score higher can still come
+        # back with nothing where a narrower one would have reported a match.
+        missed = ([o for o in group if hit is None or o not in diagonals]
+                  if len(group) > 1 else [])
         # The alignment is this run's answer when it stands in for at least one of the guesses
         # it was made from; the guesses it never passes through are aligned on their own,
         # next, so that the results stay in the order the guesses are in.

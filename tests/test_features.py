@@ -1213,14 +1213,14 @@ def test_the_budget_is_met_on_every_plausible_plasmid_these_fixtures_build():
 def test_a_second_deleted_site_per_element_is_nearly_free():
     """What the merge bought, asserted rather than described: the cost barely depends on how
     many times an element has been cut, because the registers of one copy are one alignment
-    however many there are. Five deleted sites per element cost a fifth more than one does,
+    however many there are. Five deleted sites per element cost a quarter more than one does,
     where they used to cost three times as much (90.1 M against 30.4 M on the AAV fixture,
     197.1 M against 78.6 M on the all-in-one one).
 
-    A fifth rather than nothing, and the fifth is **tdTomato**: it is a tandem dimer, so the
-    best alignment over a run's window can land on the other monomer rather than on the
-    guesses the run was made of, and those guesses are then aligned on their own. That is the
-    check `_match_long` makes instead of trusting the merge, and on the all-in-one fixture it
+    A quarter rather than nothing, and the quarter is what checking the merge costs instead of
+    trusting it. **tdTomato** is the clearest part: it is a tandem dimer, so the best alignment
+    over a run's window can land on the other monomer rather than on the guesses the run was
+    made of, and those guesses are then aligned on their own. On the all-in-one fixture it
     is the only place it fires — four extra alignments of a 1431 bp entry, which is the whole
     difference between 49.8 M cells and 59.7 M.
 
@@ -1230,7 +1230,7 @@ def test_a_second_deleted_site_per_element_is_nearly_free():
     `MERGE_GAP`'s own comment records what widening it would cost and buy.
     """
     for element_names, inverted, slack in ((AAV_ELEMENTS, AAV_INVERTED, 1.01),
-                                           (ALL_IN_ONE_ELEMENTS, (), 1.20)):
+                                           (ALL_IN_ONE_ELEMENTS, (), 1.30)):
         _, one = _fixture_work(element_names, 1, inverted)
         for sites in (3, 5):
             _, several = _fixture_work(element_names, sites, inverted)
@@ -1384,18 +1384,29 @@ def test_the_coverage_floor_is_part_of_how_far_apart_two_guesses_may_be():
     assert features_module._merge_limit(tract, DEFAULT_MIN_IDENTITY, coverage) <= 2
 
 
-def _without_the_merge(sequence: str, feature) -> list[int]:
-    """The starts the engine reports with every guess aligned on its own: the behaviour the
-    merge has to reproduce exactly, and the only statement of that worth asserting."""
+def _records(matches) -> list[tuple]:
+    return [(m.name, m.start, m.end, m.strand, round(m.identity, 6), m.part, m.frameshift)
+            for m in matches]
+
+
+def _with_and_without_the_merge(sequence: str, feature, **kwargs) -> tuple[list, list]:
+    """What the engine reports, and what it reports with every guess aligned on its own. The
+    merge has to reproduce the second exactly, in order as well as in content: `_dedupe` keeps
+    whichever of two overlapping copies it meets first, so a reordering is an annotation
+    change."""
+    merged = _records(detect(sequence, circular=False, features=(feature,), **kwargs))
     with mock.patch.object(features_module, "_offset_runs",
                            lambda offsets, *_, **__: [(o, o) for o in sorted(offsets)]):
-        return sorted(m.start for m in detect(sequence, circular=False, features=(feature,)))
+        alone = _records(detect(sequence, circular=False, features=(feature,), **kwargs))
+    return merged, alone
 
 
 def test_a_partly_covered_repeat_entry_keeps_every_copy():
     """The same tract end to end: nine overlapping copies in a longer tract, every one of them
     reported, on bases 11-58 of 68 — the tract alone, just over the 70 % floor — and every one
-    at 100 % identity. An identity-only limit reported three."""
+    at 100 % identity. An identity-only limit reported three; the coverage term and the
+    diagonal check each recover them, which is why this asserts against the engine's own
+    per-guess output rather than against either guard."""
     tract = features_module.CatalogueFeature(
         name="(CAG)16 polyQ tract", type="repeat_region",
         sequence="CAGATTTTCA" + "CAG" * 16 + "AAAGCGGCAC", note="", source="test")
@@ -1403,7 +1414,8 @@ def test_a_partly_covered_repeat_entry_keeps_every_copy():
     found = detect(sequence, circular=False, features=(tract,))
     starts = sorted(m.start for m in found)
     assert starts == list(range(60, 60 + 6 * 9, 6)), starts
-    assert starts == _without_the_merge(sequence, tract), starts
+    merged, alone = _with_and_without_the_merge(sequence, tract)
+    assert merged == alone
     [first] = [m for m in found if m.start == 60]
     assert first.identity == 100.0 and first.part == (11, 58)
     assert 100.0 * 48 / tract.length < features_module.DEFAULT_MIN_COVERAGE
@@ -1458,6 +1470,26 @@ def test_the_limit_narrows_a_run_however_close_its_steps_are():
     assert features_module._offset_runs([20, 10, 11]) == [(10, 11), (20, 20)]
 
 
+def test_the_derived_limit_is_what_the_engine_merges_by():
+    """`_merge_limit` is handed to `_offset_runs` as the span, and this is the only test that
+    would notice if that stopped happening: the diagonal check recovers the copies either way,
+    so correctness alone does not pin it, but the work does. A (CA)30 entry has a limit of one,
+    so the guesses two bases apart through a long CA array are never joined; merge them and the
+    engine pays for the run as well as for the guesses it then puts back."""
+    repeat = features_module.CatalogueFeature(
+        name="(CA)30", type="misc_feature", sequence="CA" * 30, note="", source="test")
+    assert features_module._merge_limit(
+        repeat.sequence, DEFAULT_MIN_IDENTITY, DEFAULT_MIN_COVERAGE) == 1
+    array = "CA" * 90
+    middle = len(array) // 2
+    sequence = clean_dna(60, 32) + array[:middle] + "G" + array[middle + 1:] + clean_dna(60, 33)
+    passes, _ = _alignment_work(sequence, circular=False, features=(repeat,))
+    with mock.patch.object(features_module, "_merge_limit",
+                           lambda *_, **__: features_module.MERGE_SPAN):
+        ignored, _ = _alignment_work(sequence, circular=False, features=(repeat,))
+    assert passes < ignored, (passes, ignored)
+
+
 def test_a_guess_the_merged_alignment_does_not_pass_through_is_aligned_on_its_own():
     """The merge's one real hazard, and the check that answers it. One window yields one
     alignment, and the best alignment over a run's window is not always the best alignment
@@ -1489,18 +1521,30 @@ def test_a_guess_the_merged_alignment_does_not_pass_through_is_aligned_on_its_ow
     diagonals = {t - q for t, q, _ in columns if t is not None and q is not None}
     assert diagonals.isdisjoint({87, 91}), sorted(diagonals)
     # All three blocks are reported even so, which is the point of the check.
-    starts = sorted(m.start for m in detect(sequence, circular=False, features=(tag,)))
-    assert starts == [60, 87, 145], starts
-    assert starts == _without_the_merge(sequence, tag), starts
+    found = detect(sequence, circular=False, features=(tag,))
+    assert sorted(m.start for m in found) == [60, 87, 145]
+    merged, alone = _with_and_without_the_merge(sequence, tag)
+    assert merged == alone
+    # And the drifted answer is dropped rather than reported from that run, so the engine
+    # hands `_dedupe` exactly the hits the guesses give one at a time, no extra copy of the
+    # block the run drifted onto.
+    def raw():
+        return sorted(features_module._match_long(
+            sequence, tag.sequence, len(sequence), DEFAULT_MIN_IDENTITY, DEFAULT_MIN_COVERAGE))
+    with mock.patch.object(features_module, "_offset_runs",
+                           lambda offsets, *_, **__: [(o, o) for o in sorted(offsets)]):
+        one_at_a_time = raw()
+    assert raw() == one_at_a_time
 
 
 def test_a_repeating_entry_keeps_every_copy():
     """A (CA)30 entry inside a longer, imperfect CA array: every register of the array is a
     copy of the entry, and each must be reported. One base in the middle of the array differs,
     so the copies that cover it are aligned rather than found verbatim, and a fixed gap of four
-    would align two of their registers together and lose one. The limit computed from the entry
-    is what keeps them apart, and the engine must give exactly what aligning every guess on
-    its own gives."""
+    joins two of their registers into one run. What keeps the copies is the diagonal check
+    rather than the limit — the limit stops them being merged in the first place, and the test
+    below pins that separately — and either way the engine must give exactly what aligning
+    every guess on its own gives."""
     repeat = features_module.CatalogueFeature(
         name="(CA)30", type="misc_feature", sequence="CA" * 30, note="", source="test")
     array = "CA" * 90
@@ -1509,7 +1553,8 @@ def test_a_repeating_entry_keeps_every_copy():
     found = detect(sequence, circular=False, features=(repeat,))
     starts = sorted(match.start for match in found)
     assert starts == [60, 68, 76, 84, 152, 160, 168, 176, 188], starts
-    assert starts == _without_the_merge(sequence, repeat), starts
+    merged, alone = _with_and_without_the_merge(sequence, repeat)
+    assert merged == alone
     # The copy that straddles the changed base is the one a fixed gap loses.
     [straddling] = [match for match in found if match.start == 188]
     assert straddling.part == (1, repeat.length)
