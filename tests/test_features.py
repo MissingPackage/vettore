@@ -12,6 +12,7 @@ from cloning_helpers import clean_dna, rc
 
 from vettore import features as features_module
 from vettore.features import (
+    DEFAULT_MIN_COVERAGE,
     DEFAULT_MIN_IDENTITY,
     SHORT_FEATURE,
     catalogue,
@@ -788,15 +789,17 @@ def test_a_label_naming_the_other_species_is_flagged(element, label, wrong):
 # (36 entries, this machine):
 #
 #   sites     0      1      2      3      4      5      6
-#   cells   0.34 M 15.4 M 15.3 M 15.3 M 29.6 M 15.4 M 29.5 M
-#   seconds  0.03   0.38   0.39   0.41   0.75   0.40   0.73
+#   cells   0.34 M 15.37M 15.38M 15.40M 29.57M 15.46M 29.56M
+#   seconds  0.05   0.42   0.41   0.42   0.77   0.41   0.74
 #   same?    yes    yes    yes    yes    yes    yes    NO
 #
-# A single changed base is 15.3 M as well, so a deleted base and a changed one now cost the
+# A single changed base is 15.4 M as well, so a deleted base and a changed one now cost the
 # same: that factor of two was the registers, and it is gone. The curve is flat at one pass per
-# copy except where the fixture's even spacing drops a cut inside a seed window — the engine
-# places its seeds at `round(i * (length - 18) / 5)` and the fixture its cuts at
-# `length // (sites + 1) * k`, which for four cuts coincide — and the registers that survive
+# copy, give or take the AAV2 ITR — a hairpin, so self-similar enough that `_merge_limit` will
+# not merge its registers, which is the slow creep from 15.37 to 15.46 M across the row — and
+# except where the fixture's even spacing drops a cut inside a seed window. The engine places
+# its seeds at `round(i * (length - 18) / 5)` and the fixture its cuts at
+# `length // (sites + 1) * k`, which for four cuts coincide, and the registers that survive
 # are then further apart than the merge is willing to join, so SaCas9 is aligned twice and the
 # plasmid costs 29.6 M. At six sites an element is no longer found at all, which is the
 # boundary its own test asserts. The bounds below pin the points where the plasmid still holds
@@ -1002,15 +1005,15 @@ ALIGNMENT_WORK = {
     #  fixture,    sites         36 entries         60 entries      seconds
     ("aav",        0):   2_000_000,  #    0.34 M / 15 p     0.34 M / 15 p     0.03
     ("aav",        1):  18_000_000,  #   15.37 M / 25 p    15.37 M / 25 p     0.40
-    ("aav",        3):  18_000_000,  #   15.31 M / 22 p    15.31 M / 22 p     0.38
-    ("aav",        5):  18_000_000,  #   15.35 M / 24 p    15.35 M / 24 p     0.40
+    ("aav",        3):  18_000_000,  #   15.40 M / 25 p    15.40 M / 25 p     0.38
+    ("aav",        5):  18_000_000,  #   15.46 M / 28 p    15.46 M / 28 p     0.40
     ("all-in-one", 0):  26_000_000,  #   22.01 M /  9 p    22.24 M / 12 p     0.53
     ("all-in-one", 1):  60_000_000,  #   50.38 M / 22 p    50.61 M / 25 p     1.26
     ("all-in-one", 3):  59_000_000,  #   49.83 M / 21 p    50.06 M / 24 p     1.24
     ("all-in-one", 5):  59_000_000,  #   49.89 M / 22 p    50.12 M / 25 p     1.21
     ("stress",     0):  46_000_000,  #   37.26 M / 36 p    38.78 M / 38 p     0.97
     ("stress",     1): 123_000_000,  #  103.56 M / 49 p   105.08 M / 51 p     2.58
-    ("stress",     3): 125_000_000,  #  104.77 M / 42 p   106.29 M / 44 p     2.63
+    ("stress",     3): 125_000_000,  #  104.85 M / 45 p   106.37 M / 47 p     2.72
 }
 
 
@@ -1339,38 +1342,99 @@ def test_only_guesses_that_can_be_one_copy_are_merged():
 
 
 def test_how_far_apart_two_guesses_may_be_comes_from_the_entry_itself():
-    """What makes the merge safe is not the constant but the entry: two *copies* of an element
-    `d` bases apart can both be reported only if the element is at least `2 * min_identity -
-    100` the same as itself shifted `d` along, so below that figure two guesses that close
-    cannot be two copies. Every catalogue entry is far below it, so every entry merges over the
-    full span; a microsatellite would not, and that is the point of computing it."""
+    """What makes the merge safe is not a constant but the entry. A reported copy of an entry
+    `L` bases long agrees with the entry at all but `slack` bases — it may leave
+    `100 - min_coverage` per cent of them unaligned and differ at `100 - min_identity` per
+    cent of the rest — so two copies `shift` apart force the entry to be
+    `(L - shift - 2 * slack) / (L - shift)` the same as itself at that shift. Below that, two
+    guesses that close cannot be two copies."""
     assert features_module._self_similarity("CA" * 30, 1) == 0.0
     assert features_module._self_similarity("CA" * 30, 2) == 100.0
     # A (CA)30 entry repeats itself two bases over, so nothing beyond one base may be merged.
-    assert features_module._merge_limit("CA" * 30, DEFAULT_MIN_IDENTITY) == 1
+    assert features_module._merge_limit("CA" * 30, DEFAULT_MIN_IDENTITY, 100.0) == 1
     # A (GGGGS)6 linker repeats itself fifteen bases over, which is beyond what a run spans.
-    assert features_module._merge_limit("GGAGGAGGAGGATCA" * 6, DEFAULT_MIN_IDENTITY) == 14
+    assert features_module._merge_limit(
+        "GGAGGAGGAGGATCA" * 6, DEFAULT_MIN_IDENTITY, 100.0) == 14
     real = entry("EGFP").sequence
-    assert features_module._merge_limit(real, DEFAULT_MIN_IDENTITY) == features_module.MERGE_SPAN
+    assert features_module._merge_limit(
+        real, DEFAULT_MIN_IDENTITY, DEFAULT_MIN_COVERAGE) == features_module.MERGE_SPAN
 
 
-def test_no_catalogue_entry_repeats_itself_within_a_merged_window():
-    """The premise the merge rests on, over the whole catalogue and at the loosest threshold
-    the dialog offers, so that an entry added later cannot quietly break it. The limit above
-    protects the engine either way; this test is what tells whoever adds a repeating element
-    that its copies now cost one alignment each."""
-    loosest = min(90.0, DEFAULT_MIN_IDENTITY)
-    allowed = 2 * loosest - 100.0
-    for feature in catalogue():
-        if feature.length <= SHORT_FEATURE:
-            continue
-        worst = max(features_module._self_similarity(feature.sequence, shift)
-                    for shift in range(1, features_module.MERGE_SPAN + 1))
-        assert worst < allowed, (
-            f"{feature.name} is {worst:.1f}% the same as itself within a merged window, "
-            f"against the {allowed:.0f}% two reported copies would need"
-        )
-        assert features_module._merge_limit(feature.sequence, loosest) == features_module.MERGE_SPAN
+def test_the_coverage_floor_is_part_of_how_far_apart_two_guesses_may_be():
+    """The term that review round 9 found missing, and the one that bites. A `repeat_region`
+    entry only has to be 70 % covered, so a copy may ignore nearly a third of the entry and
+    still be reported at 100 % identity — which an identity-only bound does not see at all. A
+    (CAG)16 polyQ tract with unique flanks is exactly that shape: it is reported on its tract
+    alone, the tract repeats itself every three bases, and the identity-only bound merged six
+    of its nine copies away."""
+    tract = "CAGATTTTCA" + "CAG" * 16 + "AAAGCGGCAC"
+    # It is not self-similar enough for an identity-only bound to narrow anything...
+    assert features_module._merge_limit(tract, DEFAULT_MIN_IDENTITY, 100.0) \
+        == features_module.MERGE_SPAN
+    # ...but at the coverage a repeat_region is held to, almost nothing may be merged.
+    coverage = features_module.COVERAGE_BY_TYPE["repeat_region"]
+    assert features_module._merge_limit(tract, DEFAULT_MIN_IDENTITY, coverage) <= 2
+
+
+def test_a_partly_covered_repeat_entry_keeps_every_copy():
+    """The same tract end to end: nine overlapping copies in a longer tract, every one of them
+    reported. Hold the limit at the full span, as an identity-only bound does for this entry,
+    and three are reported instead of nine — and one of the three sits at a start the engine
+    would not otherwise report at all."""
+    tract = features_module.CatalogueFeature(
+        name="(CAG)16 polyQ tract", type="repeat_region",
+        sequence="CAGATTTTCA" + "CAG" * 16 + "AAAGCGGCAC", note="", source="test")
+    sequence = clean_dna(60, 32) + "CAG" * 36 + clean_dna(60, 33)
+    starts = sorted(m.start for m in detect(sequence, circular=False, features=(tract,)))
+    assert starts == list(range(60, 60 + 6 * 9, 6)), starts
+    with mock.patch.object(features_module, "_merge_limit",
+                           lambda *_, **__: features_module.MERGE_SPAN):
+        held = sorted(m.start for m in detect(sequence, circular=False, features=(tract,)))
+    assert held == [60, 75, 96], held
+
+
+def test_which_catalogue_entries_the_limit_narrows():
+    """The catalogue's own self-similarity, pinned at every threshold the dialog offers, so
+    that an entry added later cannot quietly change what the merge does. Three shipped entries
+    are narrowed and they are the right three: both AAV2 ITRs, which are hairpins and so are
+    genuinely self-similar, and 3×FLAG, which is three copies of one 24 bp tag. Everything
+    else merges over the full span. This is the test, not `_merge_limit`, that tells whoever
+    adds a repeating element that its copies now cost one alignment each."""
+    narrowed = {}
+    for min_identity in (90.0, 95.0, 98.0, 100.0):
+        for feature in catalogue():
+            if feature.length <= SHORT_FEATURE:
+                continue
+            coverage = features_module.COVERAGE_BY_TYPE.get(
+                feature.type, features_module.DEFAULT_MIN_COVERAGE)
+            limit = features_module._merge_limit(feature.sequence, min_identity, coverage)
+            if limit != features_module.MERGE_SPAN:
+                narrowed[(min_identity, feature.name)] = limit
+    assert narrowed == {
+        (90.0, "AAV2 ITR"): 0, (90.0, "AAV2 ITR (truncated)"): 1, (90.0, "3×FLAG"): 8,
+        (95.0, "AAV2 ITR"): 1, (95.0, "AAV2 ITR (truncated)"): 1, (95.0, "3×FLAG"): 14,
+        (98.0, "AAV2 ITR"): 1, (98.0, "AAV2 ITR (truncated)"): 3,
+        (100.0, "AAV2 ITR"): 3, (100.0, "AAV2 ITR (truncated)"): 3,
+    }, narrowed
+
+
+def test_both_halves_of_the_limit_are_load_bearing():
+    """The limit narrows the gap and the span, and a regression that drops either half must
+    fail. `_offset_runs` is called with `min(MERGE_GAP, limit)` and `limit`: a run of guesses
+    one base apart is held by the gap alone, and a run of guesses four apart over a long
+    stretch by the span alone."""
+    offsets_one_apart = [10, 11, 12, 13, 14]
+    offsets_four_apart = [10, 14, 18, 22, 26]
+    # Gap 1, span 18: the close run merges whole, the four-apart run not at all.
+    assert features_module._offset_runs(offsets_one_apart, 1, 18) == [(10, 14)]
+    assert features_module._offset_runs(offsets_four_apart, 1, 18) == \
+        [(o, o) for o in offsets_four_apart]
+    # Gap 4, span 2: the close run stops at the span, the four-apart run at the first step.
+    assert features_module._offset_runs(offsets_one_apart, 4, 2) == [(10, 12), (13, 14)]
+    assert features_module._offset_runs(offsets_four_apart, 4, 2) == \
+        [(o, o) for o in offsets_four_apart]
+    # Sorted rather than trusted: an unsorted list must not build a backwards run.
+    assert features_module._offset_runs([20, 10, 11]) == [(10, 11), (20, 20)]
 
 
 def test_a_repeating_entry_keeps_every_copy():

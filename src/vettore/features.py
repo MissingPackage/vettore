@@ -244,24 +244,34 @@ def _self_similarity(query: str, shift: int) -> float:
     return 100.0 * same / (len(query) - shift)
 
 
-def _merge_limit(query: str, min_identity: float, span: int = MERGE_SPAN) -> int:
+def _merge_limit(query: str, min_identity: float, min_coverage: float = 100.0,
+                 span: int = MERGE_SPAN) -> int:
     """How far apart two guesses may be before they could be two copies rather than one.
 
-    This is what makes the merge safe, and it is not a constant. For two *copies* of the
-    entry ``shift`` bases apart to be reported, the plasmid has to hold the entry twice over,
-    offset by that much, each of them at least ``min_identity`` the same as the entry — which
-    makes the entry at least ``2 * min_identity - 100`` the same as *itself* shifted that far.
-    Below that figure, two guesses that close together cannot be two copies, so aligning them
-    once cannot lose one. The limit covers every shift up to the one it returns, because a run
-    grows a neighbour at a time and its ends are what must not be two copies.
+    This is what makes the merge safe, and it is not a constant. A reported copy of an entry
+    `L` bases long agrees with the entry at all but ``slack`` of its bases: it may leave
+    ``100 - min_coverage`` per cent of them out of the alignment altogether, and differ at
+    ``100 - min_identity`` per cent of the rest. Two copies ``shift`` bases apart overlap over
+    ``L - shift`` bases, and every base of that overlap where both copies agree with the entry
+    is a base where the entry agrees with *itself* shifted ``shift`` along. So the entry has to
+    be at least ``(L - shift - 2 * slack) / (L - shift)`` the same as itself at that shift for
+    two copies to sit there at all, and below that figure two guesses that close together
+    cannot be two copies — aligning them once cannot lose one.
 
-    No catalogue entry comes close: the worst is 3×FLAG, 70 % the same as itself fifteen bases
-    over, against the 80 % the lowest threshold the dialog offers allows. A microsatellite
-    entry would, and must not be merged — a ``(CA)30`` entry inside a longer CA array loses a
-    copy without this.
+    Both terms matter, and the coverage one is the one that bites. A `repeat_region` entry only
+    has to be 70 % covered, so a copy may ignore a third of the entry and still be reported at
+    100 % identity: a (CAG)16 polyQ tract with unique flanks is reported on its tract alone,
+    nine times over in a longer tract, and an identity-only bound merges six of them away.
+
+    The bound is ungapped, which is why the catalogue invariant is a test of its own rather
+    than something to infer from here.
     """
-    allowed = 2 * min_identity - 100.0
+    length = len(query)
+    slack = length * (1.0 - min_identity * min_coverage / 10_000.0)
     for shift in range(1, span + 1):
+        if shift >= length:
+            return span
+        allowed = 100.0 * (1.0 - 2.0 * slack / (length - shift))
         if _self_similarity(query, shift) >= allowed:
             return shift - 1
     return span
@@ -271,7 +281,7 @@ def _offset_runs(offsets: list[int], gap: int = MERGE_GAP,
                  span: int = MERGE_SPAN) -> list[tuple[int, int]]:
     """``offsets``, in order, as (first, last) runs of neighbours: one alignment each."""
     runs: list[tuple[int, int]] = []
-    for offset in offsets:
+    for offset in sorted(offsets):
         if runs and offset - runs[-1][1] <= gap and offset - runs[-1][0] <= span:
             runs[-1] = (runs[-1][0], offset)
         else:
@@ -312,7 +322,7 @@ def _match_long(target: str, query: str, length: int, min_identity: float,
     # four of the points the tests pin (aav 0 sites -23 %, stress 0 -26 %, 1 site -12 %,
     # 3 sites -8 %). That is real, and it is still not worth it: every extra base of gap is a
     # base of distance at which two copies of some future entry could be merged into one.
-    limit = _merge_limit(query, min_identity) if len(inexact) > 1 else 0
+    limit = _merge_limit(query, min_identity, min_coverage) if len(inexact) > 1 else 0
     for first, last in _offset_runs(inexact, min(MERGE_GAP, limit), limit):
         window_start = max(0, first - margin)
         window = target[window_start : last + len(query) + margin]
