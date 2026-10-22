@@ -1,3 +1,5 @@
+import collections
+import functools
 import json
 import time
 from pathlib import Path
@@ -765,71 +767,248 @@ def test_a_label_naming_the_other_species_is_flagged(element, label, wrong):
 # ruled out by an exact seed search and costs almost nothing — but in the elements that *are*
 # there, each of which is aligned where its seeds land.
 #
-# A plasmid packed with elements copied exactly from the catalogue is therefore NOT the worst
-# case, and measuring only that one flatters the engine: an exact copy is taken as it stands
-# and costs no alignment at all. Promoters and ITRs differ between vectors by a few bases (the
-# reason this module aligns rather than searching), so the real worst case is a plasmid packed
-# with elements that are *nearly* the catalogue's. One changed base per element is enough to
-# double the work, and that plasmid is still annotated with the same 15 elements at 99.2–100 %
-# identity — the user cannot tell the two apart, so the tests must not either.
+# Three mistakes are easy here, and earlier versions of these tests made all three.
+#
+# The first is to measure a plasmid of elements copied *exactly* from the catalogue. That is
+# the best case, not the worst: an exact copy is taken as it stands and costs no alignment at
+# all. Promoters, ITRs and reporters differ between vectors by a few bases — the reason this
+# module aligns rather than searching — so the case to measure is a plasmid whose elements are
+# nearly the catalogue's.
+#
+# The second is to assume the costly divergence is a changed base. It is not. The cost is the
+# number of candidate offsets, not the number of mismatches: a substitution at a position no
+# seed covers leaves all six seeds in one register, so the element is aligned once, while an
+# **indel** splits the seeds into two registers and the element is aligned twice. So the
+# fixtures below diverge by deleting.
+#
+# What the cost tracks is the number of *surviving seed registers*, and with six seeds per
+# entry the ceiling is six. That is not the same as the number of deleted sites, and the two
+# come apart in a way worth knowing, because the fixtures space their cuts evenly and the
+# engine spaces its seeds evenly too. On the AAV fixture (36 entries, this machine):
+#
+#   sites     0      1      2      3      4      5      6
+#   cells   0.34 M 30.4 M 45.3 M 60.3 M 30.2 M 90.1 M 89.4 M
+#   seconds  0.04   0.85   1.24   1.67   0.83   2.56   2.37
+#   same?    yes    yes    yes    yes    yes    yes    NO
+#
+# A single changed base, for comparison, is 15.3 M. So it is a sawtooth, not a ramp. At four
+# sites the even spacing drops every cut inside a seed window — the engine places its seeds at
+# `round(i * (length - 18) / 5)` and the fixture its cuts at `length // (sites + 1) * k`, which
+# for four cuts coincide — so four of the six seeds are destroyed and the cost halves. Five
+# evenly spaced sites is the ceiling: 90.1 M here, 197.1 M on the all-in-one plasmid, both
+# still annotated exactly as their verbatim selves. At six an element is no longer found at
+# all, and the cost does *not* collapse with it (89.4 M): only the four-site trough is cheap,
+# and "divergence heavy enough to destroy a seed is cheaper" is true of a destroyed seed, not
+# of heavier divergence in general. The bounds below pin that ceiling where the plasmid still
+# holds together, which is every fixture but the stress one, and the six-site edge has a test
+# of its own.
+#
+# The third is to write a divergence the engine itself reports as a different document. A
+# **single** deleted base inside a coding sequence is a frameshift, and detection says so:
+# `Match.frameshift` is set, the dialog leaves the match unticked and shows an amber warning. One
+# deleted base per element flags SpCas9, SaCas9, tdTomato, mCherry, EGFP and AmpR, so a
+# fixture built that way is not the same plasmid to the user, and a nuclease with a frameshift
+# is not a vector anyone builds. Deleting a whole **codon** costs exactly the same (30.4 M on
+# the AAV fixture either way) and is a real variant, so that is what `_plasmid` does to a CDS.
+#
+# What the plasmid holds matters as much as how far it diverges, and a fixture that packs
+# every awkward entry together measures a vector nobody builds. The three below are a single
+# AAV nuclease vector, a dense all-in-one expression plasmid, and that packed plasmid, kept as
+# a stress case and named as one.
 
 DETECTION_BUDGET = 2.0
 
-#: The elements of the worst-case plasmid, named rather than taken by length, so that adding a
-#: catalogue entry cannot quietly change what is measured. They are the expensive and the
-#: awkward ones together: the two longest entries, the pairs close enough to seed on each other
-#: (SpCas9/SaCas9, tdTomato/mCherry, the two ITRs), an element that contains another (the CAG
-#: promoter opens with the whole CMV enhancer, SaCas9 ends with 3×HA), and the short exact
-#: sites. 14 kb of elements in a 15 kb plasmid.
+#: A single-AAV nuclease vector, with the elements of pX601 the catalogue carries, in that
+#: construct's own order: the AAV ends, the CMV–SaCas9–bGH polyA cassette, the U6 promoter of
+#: the sgRNA cassette downstream of it, and the plasmid backbone. (The catalogue has no sgRNA
+#: scaffold, so the U6 promoter is all there is of that cassette.) SaCas9 rather than SpCas9
+#: because that is the point of the design: ITR to ITR is 4291 bp **including both ITRs**,
+#: inside AAV's ~4.7 kb packaging limit, where the same vector built on CAG and SpCas9 would
+#: be 6687 bp on the same basis. SaCas9's entry carries its 3×HA tag internally, in frame at
+#: base 3262 and immediately before its stop codon, so the tag is not listed separately:
+#: appended after the stop it would never be translated. Detection reports it as a tenth
+#: match inside the ninth element, which is why the counts below are 10 and not 9.
+AAV_ELEMENTS = (
+    "AAV2 ITR", "CMV promoter", "SaCas9", "bGH polyA", "U6 promoter (human)",
+    "AAV2 ITR (truncated)", "AmpR promoter", "AmpR", "ori",
+)
+
+#: The second ITR of a real AAV plasmid is inverted. It is also the only element any of these
+#: fixtures puts on the minus strand.
+AAV_INVERTED = ("AAV2 ITR (truncated)",)
+
+#: A dense all-in-one expression plasmid, not a viral genome: the U6 promoter of an sgRNA
+#: cassette at the head, as lentiCRISPR vectors carry it (the catalogue has no scaffold, so
+#: the promoter is all there is of that cassette), then two complete cassettes — each a
+#: promoter, a coding sequence and a terminator, with the WPRE where it belongs, in the 3' UTR
+#: between the nuclease and its polyA signal — and a backbone of one marker and two origins.
+#: 10.4 kb of catalogue elements, one nuclease, and nothing that has to fit a packaging limit.
+#: This is the plausible heavy case, and it is the one that misses S5.4's budget.
+ALL_IN_ONE_ELEMENTS = (
+    "U6 promoter (human)", "EF-1α promoter (human)", "SpCas9", "WPRE", "bGH polyA",
+    "CMV promoter", "tdTomato", "SV40 polyA", "AmpR promoter", "AmpR", "ori", "f1 ori",
+)
+
+#: The stress case, not a layout: both nucleases at once, and with them the pairs close enough
+#: to seed on each other (SpCas9/SaCas9, tdTomato/mCherry, the two ITRs), an element that
+#: contains another (the CAG promoter opens with the whole CMV enhancer, SaCas9 ends with
+#: 3×HA), and the short exact sites. 14 kb of elements in a 15 kb plasmid. Named rather than
+#: taken by length, so that adding a catalogue entry cannot quietly change what is measured.
 PACKED_ELEMENTS = (
     "SpCas9", "SaCas9", "CAG promoter", "tdTomato", "mCherry", "EGFP", "AmpR", "ori",
     "AAV2 ITR", "AAV2 ITR (truncated)", "3×HA", "loxP", "lox2272", "FRT",
 )
 
+#: Each fixture with the points on the cost curve the tests pin for it: none, one deleted site
+#: per element, three, and five where five is still annotated as the verbatim plasmid is. The
+#: stress plasmid is not pinned at five because it loses an element there — see
+#: `LOSES_AN_ELEMENT`, which is where that boundary is asserted.
+FIXTURES = (
+    ("aav", AAV_ELEMENTS, AAV_INVERTED, (0, 1, 3, 5)),
+    ("all-in-one", ALL_IN_ONE_ELEMENTS, (), (0, 1, 3, 5)),
+    ("stress", PACKED_ELEMENTS, (), (0, 1, 3)),
+)
 
-def _packed_plasmid(budget: int = 15_000) -> str:
-    """``PACKED_ELEMENTS`` end to end, padded with random DNA to ``budget`` bp."""
-    parts = {f.name: f.sequence for f in catalogue()}
-    pieces = [parts[name] for name in PACKED_ELEMENTS]
-    assert sum(map(len, pieces)) <= budget, "the packed elements no longer fit the budget"
-    return ("".join(pieces) + clean_dna(budget, 11))[:budget]
+#: Where each fixture loses an element, and which: the deleted-site count at which the
+#: shortest entry the fixture aligns has no seed left anywhere near its copy, measured, and
+#: explained in the test that asserts it — the identity floor is never reached. The
+#: stress plasmid gets there first because it carries 3×HA at 81 bp, which is also why it is
+#: pinned only to three sites.
+LOSES_AN_ELEMENT = {
+    "aav": (6, "AmpR promoter"),         # 105 bp
+    "all-in-one": (6, "AmpR promoter"),  # 105 bp
+    "stress": (5, "3×HA"),               #  81 bp, the copy that stands on its own
+}
+
+#: One case per (fixture, deleted sites), named so a failure says which.
+POINTS = tuple(
+    pytest.param(label, element_names, inverted, sites, id=f"{label}-{sites}")
+    for label, element_names, inverted, counts in FIXTURES for sites in counts
+)
+DIVERGED_POINTS = tuple(point for point in POINTS if point.values[3])
 
 
-def _near_miss_plasmid(budget: int = 15_000) -> str:
-    """``_packed_plasmid`` with one base changed per element, away from every seed.
+def _cuts(feature, sites: int) -> tuple[list[int], int]:
+    """Where ``_diverged`` cuts ``feature`` and how wide each cut is.
 
-    This is the realistic worst case. The change is placed where no seed covers it, so all six
-    seeds of each element still hit and the element is still found — at 99.2–100 % identity,
-    annotated exactly as the verbatim plasmid is — but no element is exact any more, so every
-    one of them is aligned in full.
+    A coding sequence loses a whole codon at each site, so its reading frame survives and
+    detection does not flag it; anything else loses a single base. An entry the engine
+    searches rather than aligns is left alone, because deleting a base of a 34 bp loxP does
+    not make it a near miss, it makes it absent — the engine's own predicate is
+    ``feature.length <= SHORT_FEATURE``.
     """
-    parts = {f.name: f.sequence for f in catalogue()}
+    if not sites or feature.length <= SHORT_FEATURE:
+        return [], 0
+    width = 3 if feature.type == "CDS" else 1
+    step = feature.length // (sites + 1)
+    cuts = [step * index for index in range(1, sites + 1)]
+    return [at - at % 3 if width == 3 else at for at in cuts], width
+
+
+def _diverged(feature, sites: int) -> str:
+    """``feature``'s sequence with ``sites`` stretches deleted, evenly spaced."""
+    sequence = feature.sequence
+    cuts, width = _cuts(feature, sites)
+    for at in reversed(cuts):
+        sequence = sequence[:at] + sequence[at + width:]
+    return sequence
+
+
+def _losses(element_names: tuple[str, ...],
+            sites: int) -> dict[tuple[str, str | None], tuple[int, ...]]:
+    """How many bases each copy of each element lost, keyed by (name, the element it sits
+    inside or ``None``), largest loss first.
+
+    Keyed by where the copy is and not by name alone, because an entry can appear twice over:
+    SaCas9 carries 3×HA at base 3262, so a plasmid that lists both the nuclease and the tag
+    has the tag reported twice, and a cut in SaCas9 shortens the copy inside it only if it
+    lands inside it. Keyed by name alone, the copy inside SaCas9 could inherit the standalone
+    copy's loss and degrade by three points unnoticed; keyed by name with the losses matched
+    to the copies in whatever order made them pass, it could still do so by trading values
+    with the standalone copy, which is why the test pairs them by position.
+    """
+    catalogued = {feature.name: feature for feature in catalogue()}
+    lost: dict[tuple[str, str | None], list[int]] = {}
+    for name in element_names:
+        cuts, width = _cuts(catalogued[name], sites)
+        lost.setdefault((name, None), []).append(width * len(cuts))
+    for name in element_names:
+        host = catalogued[name]
+        cuts, width = _cuts(host, sites)
+        deleted = {cut + offset for cut in cuts for offset in range(width)}
+        for inner in catalogue():
+            if inner.name == host.name:
+                continue
+            at = host.sequence.find(inner.sequence)
+            # Every copy, and the bases gone from each rather than the cuts that start
+            # inside it, so that a cut straddling either end counts for what it removes.
+            # No fixture reaches that case: SaCas9's 3×HA sits at 3262..3342 of 3345, and a
+            # cut lands inside it only past about forty sites.
+            while at >= 0:
+                lost.setdefault((inner.name, host.name), []).append(
+                    len(deleted & set(range(at, at + inner.length))))
+                at = host.sequence.find(inner.sequence, at + 1)
+    return {key: tuple(sorted(counts, reverse=True)) for key, counts in lost.items()}
+
+
+@functools.cache
+def _plasmid(element_names: tuple[str, ...], sites: int = 0,
+             inverted: tuple[str, ...] = ()) -> str:
+    """``element_names`` end to end, diverged by ``sites`` deletions each, padded to 15 kb.
+
+    Whatever ``sites`` is, the plasmid carries the same elements as the verbatim one: all of
+    them found, in the same order, as many of them, none flagged, each covering its whole
+    entry, and each at an identity no lower than the bases that element lost. It is a
+    genuinely shorter plasmid, so every element's reported size, coordinates and identity move
+    with the bases it lost, and the dialog says "N bp missing" against the catalogue entry —
+    that is the engine being right, not a different annotation.
+    ``test_a_plasmid_is_annotated_the_same_however_its_elements_diverge`` holds all of it.
+    """
+    catalogued = {feature.name: feature for feature in catalogue()}
+    unknown = set(element_names) - set(catalogued)
+    assert not unknown, f"not in the catalogue: {sorted(unknown)}"
     pieces = []
-    for name in PACKED_ELEMENTS:
-        sequence = parts[name]
-        seeded = {index for start, _ in features_module._seeds(sequence)
-                  for index in range(start, start + features_module.SEED)}
-        free = [index for index in range(len(sequence)) if index not in seeded]
-        if free:                       # the short exact sites are seed all the way through
-            at = free[len(free) // 2]
-            other = "A" if sequence[at] != "A" else "C"
-            sequence = sequence[:at] + other + sequence[at + 1:]
-        pieces.append(sequence)
-    return ("".join(pieces) + clean_dna(budget, 11))[:budget]
+    for name in element_names:
+        sequence = _diverged(catalogued[name], sites)
+        pieces.append(rc(sequence) if name in inverted else sequence)
+    assert sum(map(len, pieces)) <= 15_000, f"{element_names} no longer fit the budget"
+    return ("".join(pieces) + clean_dna(15_000, 11))[:15_000]
 
 
 #: The budget in the work itself: cells of dynamic programming, summed over every alignment
 #: pass. Cells rather than passes because a pass is not a fixed cost — it is the window's
 #: length times the query's — so a count of passes can stay flat while the work behind it
-#: grows. Today's figures, for the two plasmids above:
+#: grows. Figures for the catalogue as it stands and for the 60 entries PR #10 grows it to,
+#: keyed by (fixture, deleted sites). The bounds are sized for the grown one, since the
+#: criterion is written for it; the seconds are this machine's on the catalogue as it stands,
+#: for scale only, and are the same measurements the table above records.
 #:
-#:   verbatim    39.4 M in 38 passes   (165.6 M in 102 before this engine's shortcuts)
-#:   near-miss   81.3 M in 48 passes   (165.6 M in 102 — the shortcuts cannot help it)
+#: Each bound sits about 17 % above the grown catalogue's figure, except ("aav", 0): a
+#: verbatim AAV vector costs almost nothing precisely because every element is exact, so 2 M
+#: is nearly six times its cost and still only a seventh of the 15.3 M it costs without the
+#: shortcut that makes it cheap.
 #:
-#: The bounds are tight on purpose: at 80 M the verbatim bound would still pass with the
-#: circular-copy skip taken out altogether, which makes it no guard at all.
-MAX_ALIGNMENT_CELLS = 50_000_000
-MAX_ALIGNMENT_CELLS_NEAR_MISS = 95_000_000
+#: Each shortcut the engine takes was removed on a scratch copy to see which bounds notice.
+#: The one that reports an exact copy without aligning it is reached only where an element is
+#: exact, so removing it fails the three `sites == 0` bounds and leaves the other eight alone;
+#: removing the circular-copy skip fails every bound but `("aav", 0)`, which is too cheap for
+#: it to show. So these bounds are a regression guard and not the guard for the shortcuts
+#: themselves: that is `test_the_copy_of_an_element_a_circular_search_appends_is_not_aligned`
+#: and `test_an_element_present_verbatim_is_found_without_aligning_it`, one each.
+ALIGNMENT_WORK = {
+    #  fixture,    sites         36 entries         60 entries      seconds
+    ("aav",        0):   2_000_000,  #    0.34 M / 15 p     0.34 M / 15 p     0.04
+    ("aav",        1):  36_000_000,  #   30.38 M / 35 p    30.38 M / 35 p     0.85
+    ("aav",        3):  70_000_000,  #   60.28 M / 50 p    60.28 M / 50 p     1.67
+    ("aav",        5): 105_000_000,  #   90.09 M / 63 p    90.09 M / 63 p     2.56
+    ("all-in-one", 0):  26_000_000,  #   22.01 M /  9 p    22.24 M / 12 p     0.7
+    ("all-in-one", 1):  92_000_000,  #   78.56 M / 33 p    78.79 M / 36 p     2.3
+    ("all-in-one", 3): 165_000_000,  #  141.22 M / 59 p   141.45 M / 62 p     4.0
+    ("all-in-one", 5): 230_000_000,  #  197.14 M / 80 p   197.44 M / 84 p     5.5
+    ("stress",     0):  50_000_000,  #   39.36 M / 38 p    42.40 M / 42 p     1.2
+    ("stress",     1): 155_000_000,  #  129.98 M / 64 p   133.02 M / 68 p     3.8
+    ("stress",     3): 265_000_000,  #  222.89 M / 84 p   225.93 M / 88 p     6.3
+}
 
 
 def _alignment_work(sequence: str, circular: bool = True, features=None) -> tuple[int, int]:
@@ -851,47 +1030,191 @@ def _alignment_work(sequence: str, circular: bool = True, features=None) -> tupl
     return passes, cells
 
 
-def test_detection_of_a_15kb_plasmid_stays_inside_its_alignment_budget():
-    """The regression guard for the time budget, in work rather than seconds."""
-    _, cells = _alignment_work(_packed_plasmid())
-    assert cells <= MAX_ALIGNMENT_CELLS, f"{cells / 1e6:.1f} M cells of alignment"
+@functools.cache
+def _annotated(element_names: tuple[str, ...], sites: int,
+               inverted: tuple[str, ...]) -> tuple:
+    """``detect`` on a fixture, remembered: eleven pinned points and eight annotation cases ask
+    for the same plasmids, and each detection is seconds. The matches come back shared, since
+    ``Match`` is not frozen, so read them and do not write to them."""
+    return tuple(detect(_plasmid(element_names, sites, inverted), circular=True))
 
 
-def test_a_plasmid_of_near_miss_elements_is_the_case_still_over_the_budget():
-    """The realistic worst case, recorded rather than left out.
+@functools.cache
+def _fixture_work(element_names: tuple[str, ...], sites: int,
+                  inverted: tuple[str, ...]) -> tuple[int, int]:
+    """``_alignment_work`` on a fixture, remembered for the same reason."""
+    return _alignment_work(_plasmid(element_names, sites, inverted))
 
-    One changed base per element doubles the alignment work, because no element can be taken
-    as it stands any more. S5.4's two seconds are **not** met here: this plasmid takes about
-    2.3 s where the verbatim one takes 1.2 s, against 4.7 s before this engine's shortcuts. So
-    the criterion is met for a construct assembled from catalogue parts and missed for one
-    carrying a vector's own variants, and closing that gap means changing how an element's
-    alignment is chosen, not tuning a constant.
 
-    The bound below is the work as it stands, so that the gap cannot widen unnoticed while it
-    is open, and so that whoever closes it sees this number move.
-    """
-    sequence = _near_miss_plasmid()
-    matches = detect(sequence, circular=True)
-    assert len(matches) == len(detect(_packed_plasmid(), circular=True)), (
-        "the near-miss plasmid must be annotated like the verbatim one, or it is measuring "
-        "something else"
+@pytest.mark.parametrize("label, element_names, inverted, sites", POINTS)
+def test_the_alignment_work_of_a_15kb_plasmid_is_pinned(label, element_names, inverted, sites):
+    """The work each point on the curve costs, pinned so that it cannot grow unnoticed — and,
+    for the all-in-one plasmid, so that whoever closes the budget gap sees the number move."""
+    bound = ALIGNMENT_WORK[label, sites]       # before the measurement, so a gap fails fast
+    _, cells = _fixture_work(element_names, sites, inverted)
+    assert cells <= bound, f"{label}, {sites} deleted sites: {cells / 1e6:.2f} M cells"
+
+
+@pytest.mark.parametrize("label, element_names, inverted, sites", DIVERGED_POINTS)
+def test_a_plasmid_is_annotated_the_same_however_its_elements_diverge(label, element_names,
+                                                                     inverted, sites):
+    """A diverged fixture is only worth measuring if it carries the same elements as the
+    verbatim one, so this is the correctness half of every number above, and it is what the
+    comment's claim rests on. Absolute, not relative: an engine that stopped finding things
+    would make the cells go *down* and pass every bound."""
+    exact = _annotated(element_names, 0, inverted)
+    assert set(element_names) <= set(names(exact)), (
+        f"missing from the verbatim plasmid: {sorted(set(element_names) - set(names(exact)))}"
     )
-    assert all(match.identity >= 99.0 for match in matches)
-    _, cells = _alignment_work(sequence)
-    assert cells <= MAX_ALIGNMENT_CELLS_NEAR_MISS, f"{cells / 1e6:.1f} M cells of alignment"
+    diverged = _annotated(element_names, sites, inverted)
+    # The same elements, in the same order, and as many of them: a tag inside a coding
+    # sequence (SaCas9 carries 3×HA) is reported too, and must not quietly disappear.
+    assert names(diverged) == names(exact)
+    # None of them flagged, where a single deleted base rather than a codon would flag every
+    # coding sequence and the dialog would leave them unticked.
+    assert [match.frameshift for match in diverged] == [match.frameshift for match in exact]
+    # Not one of them flagged — asserted outright, and not only as parity with the verbatim
+    # plasmid, which an engine that flagged both would satisfy while the words above were
+    # false.
+    assert not any(match.frameshift for match in diverged)
+    assert not any(match.frameshift for match in exact)
+    losses = _losses(element_names, sites)
+    for match in diverged:
+        # The whole entry, not part of it: an annotation that dropped bases off an element's
+        # head would otherwise satisfy the identity below by having less to be wrong about.
+        assert match.part == (1, match.entry_length), f"{match.name} is partial: {match.part}"
+    # Then, per copy of each element, how far below 100 % it may read and how long it may be
+    # — both derived from the bases that copy lost rather than from a constant, so a shorter
+    # entry in some later fixture cannot fail them for no reason. The floors are exact for
+    # every element these fixtures cut — measured slack zero everywhere — because the cuts
+    # are spaced far apart, so each deletion is one gap column and costs nothing else; cuts
+    # clustered together would cost a mismatch as well and would need a column of slack.
+    #
+    # A copy is matched to its floor by *where it is*, not by sorting the two lists together:
+    # the tag inside SaCas9 loses nothing while the standalone copy loses a codon, and sorted
+    # pairing is satisfied by those two values in either order, so the nested copy could
+    # still have degraded by three points as long as the standalone one read 100 %.
+    spans = {id(match): match.span(15_000) for match in diverged}
+
+    def host_of(match):
+        """The shortest other element whose span covers this one, or None for a copy that
+        stands on its own."""
+        covering = [other for other in diverged
+                    if other.name != match.name and spans[id(match)] <= spans[id(other)]]
+        if not covering:
+            return None
+        return min(covering, key=lambda other: len(spans[id(other)])).name
+
+    grouped: dict[tuple[str, str | None], list] = {}
+    for match in diverged:
+        grouped.setdefault((match.name, host_of(match)), []).append(match)
+    for (name, host), copies in sorted(grouped.items(), key=lambda item: item[0][0]):
+        floors = losses.get((name, host), (0,) * len(copies))
+        assert len(floors) >= len(copies), (
+            f"{name} in {host}: {len(copies)} copies, floors {floors}")
+        # Within one host the copies are indistinguishable, so there pair worst with worst:
+        # fewer bases lost means a higher identity and a longer span.
+        copies.sort(key=lambda match: match.identity, reverse=True)
+        for match, lost in zip(copies, sorted(floors)):
+            floor = 100.0 * (match.entry_length - lost) / match.entry_length
+            assert match.identity >= floor - 1e-9, (
+                f"{name} at {match.start} reads {match.identity:.3f} %, {lost} bases deleted "
+                f"of {match.entry_length}, so no lower than {floor:.3f} %"
+            )
+            # And the reported size moves with those bases, which is what the dialog turns
+            # into "N bp missing" against the catalogue entry. No match in these fixtures
+            # crosses the origin, so this does not exercise a wrapping span.
+            assert len(match.span(15_000)) == match.entry_length - lost, (
+                f"{name} at {match.start} spans {len(match.span(15_000))} bp, expected "
+                f"{match.entry_length - lost}"
+            )
 
 
-def test_detection_of_a_15kb_plasmid_stays_within_its_time_budget():
-    """S5.4's budget as it is written, on a plasmid assembled from catalogue parts. The test
-    above records the case that is still over it. The cells tests are what fail on a
-    regression; this one catches a cost that is not alignment."""
-    sequence = _packed_plasmid()
-    detect(sequence, circular=True)          # warm the catalogue and the aligner
-    start = time.perf_counter()
-    matches = detect(sequence, circular=True)
-    elapsed = time.perf_counter() - start
-    assert matches, "the packed plasmid should carry recognisable elements"
-    assert elapsed < DETECTION_BUDGET, f"detection took {elapsed:.2f} s"
+@pytest.mark.parametrize("label, element_names, inverted, counts", FIXTURES)
+def test_enough_deleted_sites_stop_an_element_being_found_at_all(label, element_names,
+                                                                 inverted, counts):
+    """The other end of the curve, and the reason the pinned points stop where they do.
+
+    What ends an element is **seed exhaustion**, not the identity floor. The engine aligns an
+    element only where one of its six seeds occurs in the plasmid, and at each of these three
+    boundaries nothing is left to align: the AmpR promoter has no candidate offset at all,
+    and 3×HA still has five, but every one of them comes from a seed hit inside the copy
+    nested in SaCas9, 6 kb from the standalone copy and far outside the alignment window
+    around an offset. Dropping
+    `min_identity` to 0 brings neither of them back, so the floor is never reached and is not
+    the reason. (Were they anchored they would fail it: 94.29 % for the promoter, 93.83 % for
+    the tag. That is arithmetic about the deletions, not the engine's cause.)
+
+    A seed window free of a cut is therefore sufficient but not necessary. With evenly spaced
+    cuts the end windows last longest — the AmpR promoter still has its last window intact at
+    five sites, with the spacing already below `SEED`, which is why "spacing below `SEED`" is
+    not the rule either — and 3×HA is found at four sites with no window of its own left,
+    because it is three exact 27 bp repeats and the junction in front of it supplies a hit
+    from two bases outside the copy.
+
+    The casualties are the shortest entries each fixture aligns, because a cut spacing that
+    leaves no window of a 105 bp entry still leaves both end windows of a nuclease, which
+    also loses only 18 of its 3345 bases to six sites (99.46 %, since a CDS is cut by whole
+    codons). "Shortest" only orders them: at seven sites the AAV fixture also loses its
+    truncated ITR at 131 bp.
+
+    This is what makes the cost a sawtooth rather than a ramp, and why a bound on one point
+    is not a ceiling.
+    """
+    sites, casualty = LOSES_AN_ELEMENT[label]
+    exact = collections.Counter(names(_annotated(element_names, 0, inverted)))
+    lost = collections.Counter(names(_annotated(element_names, sites, inverted)))
+    # One copy of one named element, and nothing gained: a bare inequality of the two lists
+    # would be satisfied by an element appearing, or by the order changing.
+    assert exact - lost == collections.Counter({casualty: 1}), f"{label}: {exact} -> {lost}"
+    assert lost - exact == collections.Counter()
+    # And one site fewer is still the same document, so the line is exactly here, and the
+    # last point the fixture pins is on the right side of it. This is the fragile assertion
+    # of the file: one site before it vanishes the casualty is still anchored but sits just
+    # above the identity threshold — 95.24 % for the AmpR promoter, 95.06 % for 3×HA — so
+    # either a change to the seed spacing or a change to the scoring moves this line.
+    before = collections.Counter(names(_annotated(element_names, sites - 1, inverted)))
+    assert before == exact
+    assert max(counts) < sites
+
+
+def test_the_budget_is_met_on_a_single_aav_vector_with_a_codon_lost_per_element():
+    """S5.4's two seconds as they are written, in seconds, on the vector the criterion is for.
+    The cells tests are what fail on a regression; this one catches a cost that is not
+    alignment, so it also times the heaviest element set that has a point inside the budget.
+    The margins against the two seconds are 2.4x for the AAV point (0.85 s) and 1.7x for the
+    stress one (1.2 s), so a shared CI runner would have to be about two thirds slower than
+    this machine for either to be a false failure."""
+    for element_names, sites, inverted in ((AAV_ELEMENTS, 1, AAV_INVERTED),
+                                           (PACKED_ELEMENTS, 0, ())):
+        sequence = _plasmid(element_names, sites, inverted)
+        detect(sequence, circular=True)      # warm the catalogue and the aligner
+        start = time.perf_counter()
+        matches = detect(sequence, circular=True)
+        elapsed = time.perf_counter() - start
+        assert matches, "the plasmid should carry recognisable elements"
+        assert elapsed < DETECTION_BUDGET, f"detection took {elapsed:.2f} s"
+
+
+def test_the_all_in_one_plasmid_is_still_far_enough_over_the_budget_to_record_it():
+    """The gap S5.4 still has, asserted rather than described.
+
+    A dense all-in-one plasmid that has lost one codon per element takes about 2.3 s on this
+    machine, against 0.7 s for the same plasmid with its elements exact, and 4.5 s if it has
+    lost three. Nothing about it is exotic: 10.4 kb of ordinary elements, one nuclease, and a
+    codon variant in each — annotated identically to the verbatim plasmid, as the test above
+    holds.
+
+    Closing the gap means changing how an element's alignment is chosen, which can change
+    which variant is annotated and with what coordinates, so it is not a constant to tune.
+    The floor below is the point of this test: it fails on the day the engine gets fast
+    enough, and whoever sees it fail should record that S5.4's budget is met and delete it.
+    """
+    _, cells = _fixture_work(ALL_IN_ONE_ELEMENTS, 1, ())
+    assert cells >= 60_000_000, (
+        f"{cells / 1e6:.2f} M cells: the gap has closed. Re-time the fixture, record that "
+        f"S5.4's budget is met, and delete this test."
+    )
 
 
 def test_a_plasmid_with_nothing_in_the_catalogue_is_ruled_out_without_aligning():
