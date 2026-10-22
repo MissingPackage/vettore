@@ -1186,6 +1186,19 @@ PACKED_ELEMENTS = (
     "AAV2 ITR", "AAV2 ITR (truncated)", "3×HA", "loxP", "lox2272", "FRT",
 )
 
+#: The entries S5.4 added, packed the same way: the long recombinases and markers first, then
+#: the promoters of the cell-line pretests, then the short sites and tags. 10.3 kb of elements
+#: none of which the other fixtures carry, so this is the one that says what the new half of
+#: the catalogue costs on its own. Named rather than taken by length, for the same reason as
+#: PACKED_ELEMENTS.
+GROWN_ELEMENTS = (
+    "FLPe", "FLPo", "Cre", "HygR (hph)", "CBh promoter", "PuroR (pac)", "EMCV IRES",
+    "β-actin promoter (human)", "hGH polyA", "BlastR (bsd)", "ZeoR (ble)",
+    "SV40 early promoter", "TRE promoter (tight)", "EFS promoter (human)", "WPRE3",
+    "RSV LTR promoter", "HSV TK promoter", "rabbit β-globin polyA", "P2A", "T2A",
+    "loxN", "F3", "Myc tag", "V5 tag",
+)
+
 #: Each fixture with the points on the cost curve the tests pin for it: none, one deleted site
 #: per element, three, and five where five is still annotated as the verbatim plasmid is. The
 #: stress plasmid is not pinned at five because it loses an element there — see
@@ -1194,6 +1207,9 @@ FIXTURES = (
     ("aav", AAV_ELEMENTS, AAV_INVERTED, (0, 1, 3, 5)),
     ("all-in-one", ALL_IN_ONE_ELEMENTS, (), (0, 1, 3, 4, 5)),
     ("stress", PACKED_ELEMENTS, (), (0, 1, 3)),
+    # Pinned only to one site: the entries S5.4 added include T2A at 54 bp, barely above
+    # SHORT_FEATURE, and three deletions in 54 bases leave it no seed at all.
+    ("grown", GROWN_ELEMENTS, (), (0, 1)),
 )
 
 #: Where each fixture loses an element, and which: the deleted-site count at which the
@@ -1205,6 +1221,7 @@ LOSES_AN_ELEMENT = {
     "aav": (6, "AmpR promoter"),         # 105 bp
     "all-in-one": (6, "AmpR promoter"),  # 105 bp
     "stress": (5, "3×HA"),               #  81 bp, the copy that stands on its own
+    "grown": (3, "T2A"),                 #  54 bp, the shortest entry S5.4 aligns
 }
 
 #: One case per (fixture, deleted sites), named so a failure says which.
@@ -1354,6 +1371,9 @@ ALIGNMENT_WORK = {
     ("stress",     0):  52_000_000,  #   40.42 M / 39 p    44.22 M / 44 p     0.93
     ("stress",     1): 136_000_000,  #  111.75 M / 58 p   115.55 M / 63 p     2.75
     ("stress",     3): 147_000_000,  #  121.05 M / 65 p   124.85 M / 70 p     3.04
+    # The S5.4 fixture exists only in the grown catalogue, so it has one column.
+    ("grown",      0):   8_000_000,  #        —           0.00 M /  0 p     0.00
+    ("grown",      1):  32_000_000,  #        —           0.00 M /  0 p     0.00
 }
 
 
@@ -1914,79 +1934,6 @@ def test_an_element_present_verbatim_is_found_without_aligning_it():
     assert found.end == 400 + feature.length - 1
     # Only this element is searched for, so any pass at all would be this one being aligned.
     assert _alignment_work(sequence, circular=False, features=(feature,)) == (0, 0)
-
-
-#: The entries the catalogue gained with S5.4, packed the same way: the long recombinases and
-#: markers first, then the promoters of the cell-line pretests, then the short sites and tags.
-#: Named rather than taken by length, for the same reason as PACKED_ELEMENTS.
-GROWN_ELEMENTS = (
-    "FLPe", "FLPo", "Cre", "HygR (hph)", "CBh promoter", "PuroR (pac)", "EMCV IRES",
-    "β-actin promoter (human)", "hGH polyA", "BlastR (bsd)", "ZeoR (ble)",
-    "SV40 early promoter", "TRE promoter (tight)", "EFS promoter (human)", "WPRE3",
-    "RSV LTR promoter", "HSV TK promoter", "rabbit β-globin polyA", "P2A", "T2A",
-    "loxN", "F3", "Myc tag", "V5 tag",
-)
-
-
-def _grown_plasmid(flawed: bool = False) -> str:
-    """15 kb carrying every entry S5.4 added. With ``flawed``, each entry long enough to be
-    aligned rather than matched exactly has its middle base deleted — the expensive case,
-    because the seeds either side of the deletion fall in two registers and the element is
-    aligned twice per strand. The short entries are left whole: at or below SHORT_FEATURE the
-    search asks for an exact match, so a copy missing a base is not found at all, which the
-    user guide says and which no budget can change."""
-    parts = {f.name: f for f in catalogue()}
-    pieces = []
-    for name in GROWN_ELEMENTS:
-        feature = parts[name]
-        sequence = feature.sequence
-        if flawed and feature.length >= SHORT_FEATURE:
-            middle = feature.length // 2
-            sequence = sequence[:middle] + sequence[middle + 1:]
-        pieces.append(sequence)
-    assert sum(map(len, pieces)) <= 15_000, "the new elements no longer fit the budget"
-    return ("".join(pieces) + clean_dna(15_000, 21))[:15_000]
-
-
-def test_a_plasmid_packed_with_the_new_entries_keeps_the_two_second_budget():
-    """S5.4's budget against the entries the catalogue gained, each of them verbatim: the
-    best case, and the one a construct assembled from catalogue parts gives."""
-    sequence = _grown_plasmid()
-    detect(sequence, circular=True)          # warm the catalogue and the aligner
-    start = time.perf_counter()
-    matches = detect(sequence, circular=True)
-    elapsed = time.perf_counter() - start
-    assert elapsed < DETECTION_BUDGET, f"detection took {elapsed:.2f} s"
-    _, cells = _alignment_work(sequence)
-    assert cells <= MAX_ALIGNMENT_CELLS, f"{cells / 1e6:.1f} M cells of alignment"
-    # Every element packed in is reported: a budget kept by missing them would be no use.
-    assert {m.name for m in matches} >= set(GROWN_ELEMENTS)
-
-
-def test_the_new_entries_keep_the_budget_when_each_copy_is_missing_a_base():
-    """The case that costs, and the one a real vector gives. A copy with a base missing puts
-    the seeds either side of it in different registers, so the element is aligned twice per
-    strand: on this plasmid that is 27.0 M cells against the 6.7 M of the verbatim one, four
-    times the work and 0.8 s. Still inside the budget, and every element is still reported —
-    which is the half of this that a faster engine could quietly lose.
-    """
-    sequence = _grown_plasmid(flawed=True)
-    detect(sequence, circular=True)          # warm the catalogue and the aligner
-    start = time.perf_counter()
-    matches = detect(sequence, circular=True)
-    elapsed = time.perf_counter() - start
-    assert elapsed < DETECTION_BUDGET, f"detection took {elapsed:.2f} s"
-    _, cells = _alignment_work(sequence)
-    assert cells <= MAX_ALIGNMENT_CELLS, f"{cells / 1e6:.1f} M cells of alignment"
-    assert {m.name for m in matches} >= set(GROWN_ELEMENTS)
-
-
-def test_the_catalogue_grew_without_slowing_the_plasmid_it_was_measured_on():
-    """The packed plasmid of the entries that were already there is searched against the
-    grown catalogue here: the same work as before, because the entries added to the catalogue
-    are not in this sequence and the seed search rules them out."""
-    _, cells = _alignment_work(_packed_plasmid())
-    assert cells <= MAX_ALIGNMENT_CELLS, f"{cells / 1e6:.1f} M cells of alignment"
 
 
 def test_the_cbh_promoter_is_not_reported_on_a_cag_promoter():
