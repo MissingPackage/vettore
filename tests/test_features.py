@@ -765,35 +765,59 @@ def test_a_label_naming_the_other_species_is_flagged(element, label, wrong):
 # ruled out by an exact seed search and costs almost nothing — but in the elements that *are*
 # there, each of which is aligned where its seeds land.
 #
-# A plasmid packed with elements copied exactly from the catalogue is therefore NOT the worst
-# case, and measuring only that one flatters the engine: an exact copy is taken as it stands
-# and costs no alignment at all. Promoters and ITRs differ between vectors by a few bases (the
-# reason this module aligns rather than searching), so the case to measure is a plasmid whose
-# elements are *nearly* the catalogue's. One changed base per element is enough to double the
-# work, and such a plasmid is still annotated with the same elements at 99.2–100 % identity —
-# the user cannot tell the two apart, so the tests must not either.
+# Two mistakes are easy here, and the first version of these tests made both.
 #
-# What the plasmid holds matters as much as how far it diverges, and here it is easy to
-# measure a vector nobody builds. Cost is one alignment per seed guess on each element
-# *present*, so it is driven by the long entries: SpCas9 is 4272 bp and SaCas9 3345 bp, and a
-# 15 kb plasmid carrying both spends half of itself on two nucleases that no construct uses
-# together — one is chosen. That plasmid is kept below, as a stress case and nothing more.
-# The budget is measured on ``REALISTIC_ELEMENTS``: one nuclease, one tag, the AAV ends and
-# the backbone, which is how an editing vector is actually laid out.
+# The first is to measure a plasmid of elements copied *exactly* from the catalogue. That is
+# the best case, not the worst: an exact copy is taken as it stands and costs no alignment at
+# all. Promoters, ITRs and reporters differ between vectors by a few bases — the reason this
+# module aligns rather than searching — so the case to measure is a plasmid whose elements are
+# nearly the catalogue's.
+#
+# The second is to assume the costly divergence is a changed base. It is not. The cost is the
+# number of candidate offsets, not the number of mismatches: a substitution at a position no
+# seed covers leaves all six seeds in one register, so the element is aligned once, while a
+# single-base **indel** splits the seeds into two registers and the element is aligned twice,
+# per strand. One deleted base per element costs about 1.6x what one changed base costs, and
+# the two are indistinguishable to the user — every element still found, none below 99 %. So
+# `near_miss` deletes a base. Heavier divergence is *cheaper*, because the seeds stop hitting
+# and the element is ruled out without an alignment.
+#
+# What the plasmid holds matters as much as how far it diverges, and a fixture that packs
+# every awkward entry together measures a vector nobody builds. The three below are a typical
+# single-AAV nuclease vector, a dense all-in-one lentiviral vector, and that packed plasmid,
+# kept as a stress case and named as one.
 
 DETECTION_BUDGET = 2.0
 
-#: A dense but plausible editing vector: the AAV ends, a strong ubiquitous promoter, one
-#: nuclease, a tag, and the plasmid backbone. 7.8 kb of elements in a 15 kb plasmid — denser
-#: than any record in ``tests/data``, where the heaviest file aligns 21.9 M cells.
-REALISTIC_ELEMENTS = (
-    "AAV2 ITR", "CAG promoter", "SpCas9", "3×HA", "AAV2 ITR (truncated)", "AmpR", "ori",
+#: A single-AAV nuclease vector, laid out as pX601 is: the AAV ends, an sgRNA cassette, a
+#: compact promoter, the small nuclease, a terminator, and the plasmid backbone. SaCas9 rather
+#: than SpCas9 and CMV rather than CAG because that is the point of the design — the cargo
+#: between the ITRs is 4291 bp, inside AAV's ~4.7 kb packaging limit, which CAG + SpCas9
+#: (5945 bp) is not. SaCas9's entry carries its 3xHA tag internally, before its stop codon,
+#: so the tag is not listed separately: appended after the stop it would never be translated.
+AAV_ELEMENTS = (
+    "AAV2 ITR", "U6 promoter (human)", "CMV promoter", "SaCas9", "bGH polyA",
+    "AAV2 ITR (truncated)", "AmpR promoter", "AmpR", "ori",
+)
+
+#: The second ITR of a real AAV plasmid is inverted, which is also what puts an element on the
+#: minus strand of these fixtures.
+AAV_INVERTED = ("AAV2 ITR (truncated)",)
+
+#: A dense all-in-one lentiviral vector, laid out as lentiCRISPRv2 is: an sgRNA cassette, a
+#: strong ubiquitous promoter, the large nuclease, a terminator, the WPRE, a reporter with its
+#: own terminator, and the backbone. 10.2 kb of catalogue elements, and no ITR, so nothing
+#: about it has to fit a packaging limit. This is the plausible heavy case, and it is the one
+#: that misses S5.4's budget.
+LENTIVIRAL_ELEMENTS = (
+    "U6 promoter (human)", "EF-1α promoter (human)", "SpCas9", "bGH polyA", "WPRE",
+    "tdTomato", "SV40 polyA", "AmpR promoter", "AmpR", "ori", "f1 ori",
 )
 
 #: The stress case, not a layout: both nucleases at once, and with them the pairs close enough
 #: to seed on each other (SpCas9/SaCas9, tdTomato/mCherry, the two ITRs), an element that
 #: contains another (the CAG promoter opens with the whole CMV enhancer, SaCas9 ends with
-#: 3×HA), and the short exact sites. 14 kb of elements in a 15 kb plasmid. Named rather than
+#: 3xHA), and the short exact sites. 14 kb of elements in a 15 kb plasmid. Named rather than
 #: taken by length, so that adding a catalogue entry cannot quietly change what is measured.
 PACKED_ELEMENTS = (
     "SpCas9", "SaCas9", "CAG promoter", "tdTomato", "mCherry", "EGFP", "AmpR", "ori",
@@ -801,51 +825,67 @@ PACKED_ELEMENTS = (
 )
 
 
-def _plasmid(names: tuple[str, ...], near_miss: bool = False, budget: int = 15_000) -> str:
-    """``names`` end to end, padded with random DNA to ``budget`` bp.
+def _plasmid(element_names: tuple[str, ...], near_miss: bool = False,
+             inverted: tuple[str, ...] = (), budget: int = 15_000) -> str:
+    """``element_names`` end to end, padded with random DNA to ``budget`` bp.
 
-    With ``near_miss``, one base of each element is changed at a position no seed covers, so
-    all six seeds of the element still hit and it is still found — annotated exactly as the
-    verbatim copy is — but none of them is exact any more, so every one is aligned in full.
+    With ``near_miss``, the middle base of each element is deleted. That is the costly
+    divergence (see above) and it leaves the plasmid indistinguishable from the verbatim one
+    to the user: every element still found, at its own coordinates, none below 99 %.
+
+    A short exact site is left alone, because it is not aligned at all — under
+    ``SHORT_FEATURE`` the module searches for it verbatim, so deleting a base of a 34 bp loxP
+    does not make it a near miss, it makes it absent. Everything on the alignment path is
+    diverged, with no exemptions: the assertion below is what keeps it that way, because the
+    six seeds tile any entry shorter than 109 bp and a seed-aware change would quietly skip
+    ``3xHA``, ``3xFLAG``, ``AmpR promoter`` and more.
     """
-    parts = {feature.name: feature.sequence for feature in catalogue()}
+    catalogued = {feature.name: feature for feature in catalogue()}
+    unknown = set(element_names) - set(catalogued)
+    assert not unknown, f"not in the catalogue: {sorted(unknown)}"
     pieces = []
-    for name in names:
-        sequence = parts[name]
-        if near_miss:
-            seeded = {index for start, _ in features_module._seeds(sequence)
-                      for index in range(start, start + features_module.SEED)}
-            free = [index for index in range(len(sequence)) if index not in seeded]
-            if free:                   # the short exact sites are seed all the way through
-                at = free[len(free) // 2]
-                other = "A" if sequence[at] != "A" else "C"
-                sequence = sequence[:at] + other + sequence[at + 1:]
+    for name in element_names:
+        feature = catalogued[name]
+        sequence = feature.sequence
+        if near_miss and feature.length >= SHORT_FEATURE:
+            at = len(sequence) // 2
+            sequence = sequence[:at] + sequence[at + 1:]
+        elif near_miss:
+            assert feature.length < SHORT_FEATURE, name     # searched, not aligned
+        if name in inverted:
+            sequence = rc(sequence)
         pieces.append(sequence)
-    assert sum(map(len, pieces)) <= budget, f"{names} no longer fit the budget"
+    assert sum(map(len, pieces)) <= budget, f"{element_names} no longer fit the budget"
     return ("".join(pieces) + clean_dna(budget, 11))[:budget]
 
 
 #: The budget in the work itself: cells of dynamic programming, summed over every alignment
 #: pass. Cells rather than passes because a pass is not a fixed cost — it is the window's
 #: length times the query's — so a count of passes can stay flat while the work behind it
-#: grows. Today's figures, for the plasmids above, with the catalogue as it stands and with
-#: the 60 entries PR #10 grows it to — the bounds are sized for the grown one, since the
-#: criterion is written for it:
+#: grows. Today's figures, with the catalogue as it stands and with the 60 entries PR #10
+#: grows it to. The bounds are sized for the grown one, since the criterion is written for it,
+#: and the seconds are this machine's, for scale only:
 #:
-#:                          36 entries              60 entries
-#:   realistic, verbatim    16.9 M in 19 passes     20.0 M in 23     0.58 s
-#:   realistic, near-miss   43.5 M in 25 passes     46.5 M in 29     1.23 s
-#:   stress, verbatim       39.4 M in 38 passes     42.4 M in 42     1.11 s
-#:   stress, near-miss      81.3 M in 48 passes     84.3 M in 52     2.39 s
+#:                              36 entries        60 entries        seconds
+#:   AAV, verbatim               0.3 M / 15 p      0.3 M / 15 p      0.05
+#:   AAV, one base deleted      30.4 M / 35 p     30.4 M / 35 p      0.90
+#:   lentiviral, verbatim       22.0 M /  9 p     22.2 M / 12 p      0.66
+#:   lentiviral, one deleted    78.5 M / 31 p     78.7 M / 34 p      2.3    <- over budget
+#:   stress, verbatim           39.4 M / 38 p     42.4 M / 42 p      1.2
+#:   stress, one deleted       130.0 M / 64 p    133.0 M / 68 p      4.0
 #:
-#: (165.6 M in 102 passes for either stress plasmid before the shortcuts this engine takes.)
-#: The bounds are tight on purpose: a loose one is no guard at all. At 80 M the verbatim
-#: stress bound would still pass with the circular-copy skip taken out altogether, and each
-#: bound here fails if either shortcut is removed.
-MAX_ALIGNMENT_CELLS_REALISTIC = 23_000_000
-MAX_ALIGNMENT_CELLS_REALISTIC_NEAR_MISS = 52_000_000
+#: Every bound here was checked by removing each of the engine's two shortcuts and watching
+#: it fail. The one that reports an exact copy without aligning it can only be guarded by a
+#: **verbatim** fixture, since a fixture in which no element is exact never reaches it; the
+#: circular-copy skip is guarded by all six. The AAV verbatim case costs almost nothing
+#: precisely because every element is exact, so its bound looks generous in ratio and is
+#: still exceeded fifty-fold without that shortcut.
+MAX_ALIGNMENT_CELLS_AAV = 2_000_000
+MAX_ALIGNMENT_CELLS_AAV_NEAR_MISS = 40_000_000
+MAX_ALIGNMENT_CELLS_LENTIVIRAL = 26_000_000
+MAX_ALIGNMENT_CELLS_LENTIVIRAL_NEAR_MISS = 95_000_000
 MAX_ALIGNMENT_CELLS = 50_000_000
-MAX_ALIGNMENT_CELLS_NEAR_MISS = 95_000_000
+MAX_ALIGNMENT_CELLS_NEAR_MISS = 150_000_000
 
 
 def _alignment_work(sequence: str, circular: bool = True, features=None) -> tuple[int, int]:
@@ -867,48 +907,78 @@ def _alignment_work(sequence: str, circular: bool = True, features=None) -> tupl
     return passes, cells
 
 
-def test_a_realistic_dense_plasmid_stays_inside_its_alignment_budget():
-    """S5.4's budget on the vector it is written for, in work rather than seconds, and in
-    both the case that costs nothing to recognise and the one that costs most."""
-    _, verbatim = _alignment_work(_plasmid(REALISTIC_ELEMENTS))
-    assert verbatim <= MAX_ALIGNMENT_CELLS_REALISTIC, f"{verbatim / 1e6:.1f} M cells"
-    _, near_miss = _alignment_work(_plasmid(REALISTIC_ELEMENTS, near_miss=True))
-    assert near_miss <= MAX_ALIGNMENT_CELLS_REALISTIC_NEAR_MISS, (
-        f"{near_miss / 1e6:.1f} M cells"
+@pytest.mark.parametrize("element_names, inverted, verbatim_bound, near_miss_bound", [
+    (AAV_ELEMENTS, AAV_INVERTED, MAX_ALIGNMENT_CELLS_AAV, MAX_ALIGNMENT_CELLS_AAV_NEAR_MISS),
+    (LENTIVIRAL_ELEMENTS, (), MAX_ALIGNMENT_CELLS_LENTIVIRAL,
+     MAX_ALIGNMENT_CELLS_LENTIVIRAL_NEAR_MISS),
+    (PACKED_ELEMENTS, (), MAX_ALIGNMENT_CELLS, MAX_ALIGNMENT_CELLS_NEAR_MISS),
+])
+def test_the_alignment_work_of_a_15kb_plasmid_is_pinned(element_names, inverted,
+                                                        verbatim_bound, near_miss_bound):
+    """The work each fixture costs, pinned so that it cannot grow unnoticed — and, for the
+    lentiviral plasmid, so that whoever closes the budget gap sees the number move."""
+    _, verbatim = _alignment_work(_plasmid(element_names, inverted=inverted))
+    assert verbatim <= verbatim_bound, f"{verbatim / 1e6:.1f} M cells, verbatim"
+    _, near_miss = _alignment_work(
+        _plasmid(element_names, near_miss=True, inverted=inverted))
+    assert near_miss <= near_miss_bound, f"{near_miss / 1e6:.1f} M cells, one base deleted"
+
+
+@pytest.mark.parametrize("element_names, inverted", [
+    (AAV_ELEMENTS, AAV_INVERTED), (LENTIVIRAL_ELEMENTS, ()), (PACKED_ELEMENTS, ()),
+])
+def test_a_plasmid_is_annotated_the_same_whether_or_not_its_elements_are_exact(element_names,
+                                                                              inverted):
+    """A near-miss fixture is only worth measuring if it is the same document to the user, so
+    this is the correctness half of every number above. Absolute, not relative: an engine that
+    stopped finding things would make the cells go *down* and pass every bound."""
+    exact = detect(_plasmid(element_names, inverted=inverted), circular=True)
+    assert set(element_names) <= set(names(exact)), (
+        f"missing from the verbatim plasmid: {sorted(set(element_names) - set(names(exact)))}"
     )
-
-
-def test_a_realistic_dense_plasmid_is_annotated_the_same_whether_or_not_it_is_exact():
-    """The near-miss plasmid is only worth measuring if it is the same document to the user:
-    the same elements, all of them still above any threshold anyone would set."""
-    exact = detect(_plasmid(REALISTIC_ELEMENTS), circular=True)
-    near_miss = detect(_plasmid(REALISTIC_ELEMENTS, near_miss=True), circular=True)
+    near_miss = detect(_plasmid(element_names, near_miss=True, inverted=inverted),
+                       circular=True)
     assert names(near_miss) == names(exact)
-    assert all(match.identity >= 99.0 for match in near_miss)
+    # One base out of the shortest aligned element in any fixture, the 81 bp 3×HA, is 98.8 %.
+    # Nobody sets a threshold above that to find a tag, so the two plasmids read the same.
+    assert all(match.identity >= 98.5 for match in near_miss)
 
 
-def test_the_stress_plasmid_of_two_nucleases_is_recorded_so_the_work_cannot_grow():
-    """Not a vector anyone builds — SpCas9 and SaCas9 in one 15 kb plasmid — and the only
-    case that passes two seconds, at about 2.4 s against 4.7 s before this engine's
-    shortcuts. It is pinned rather than dropped: it is where a regression shows first,
-    because it holds every awkward pair in the catalogue at once."""
-    _, cells = _alignment_work(_plasmid(PACKED_ELEMENTS))
-    assert cells <= MAX_ALIGNMENT_CELLS, f"{cells / 1e6:.1f} M cells of alignment"
-    _, cells = _alignment_work(_plasmid(PACKED_ELEMENTS, near_miss=True))
-    assert cells <= MAX_ALIGNMENT_CELLS_NEAR_MISS, f"{cells / 1e6:.1f} M cells of alignment"
-
-
-def test_detection_of_a_15kb_plasmid_stays_within_its_time_budget():
-    """S5.4's budget as it is written, in seconds, on the realistic vector and on the
-    divergence that costs most. The cells tests are what fail on a regression; this one
-    catches a cost that is not alignment."""
-    sequence = _plasmid(REALISTIC_ELEMENTS, near_miss=True)
+def test_the_budget_is_met_on_a_typical_single_aav_vector():
+    """S5.4's two seconds as they are written, in seconds, on the vector the criterion is for
+    and on the divergence that costs most. The cells tests are what fail on a regression; this
+    one catches a cost that is not alignment."""
+    sequence = _plasmid(AAV_ELEMENTS, near_miss=True, inverted=AAV_INVERTED)
     detect(sequence, circular=True)          # warm the catalogue and the aligner
     start = time.perf_counter()
     matches = detect(sequence, circular=True)
     elapsed = time.perf_counter() - start
     assert matches, "the plasmid should carry recognisable elements"
     assert elapsed < DETECTION_BUDGET, f"detection took {elapsed:.2f} s"
+
+
+def test_the_budget_is_missed_on_a_dense_all_in_one_lentiviral_vector():
+    """The gap S5.4 still has, recorded rather than left out.
+
+    A lentiCRISPRv2-style vector with one base deleted per element takes about 2.7 s on this
+    machine, against 0.6 s for the same plasmid with its elements exact. Nothing about it is
+    exotic: 10.2 kb of ordinary elements, one nuclease, and a single-base deletion in each —
+    the plasmid the user sees is annotated identically to the verbatim one.
+
+    Closing the gap means changing how an element's alignment is chosen, which can change
+    which variant is annotated and with what coordinates, so it is not a constant to tune.
+    This test does not assert the plasmid is slow — a bound that fails when someone fixes the
+    engine is a bad bound. It records that the cost here is what the fixtures above pin, and
+    the docstring records why that number is over budget.
+    """
+    sequence = _plasmid(LENTIVIRAL_ELEMENTS, near_miss=True)
+    _, cells = _alignment_work(sequence)
+    assert cells > _alignment_work(_plasmid(AAV_ELEMENTS, near_miss=True,
+                                            inverted=AAV_INVERTED))[1], (
+        "the lentiviral plasmid is the heavy case; if it is no longer heavier than the AAV "
+        "one, the fixtures have drifted"
+    )
+    assert cells <= MAX_ALIGNMENT_CELLS_LENTIVIRAL_NEAR_MISS
 
 
 def test_a_plasmid_with_nothing_in_the_catalogue_is_ruled_out_without_aligning():
