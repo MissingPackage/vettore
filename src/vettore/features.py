@@ -222,16 +222,29 @@ def _frameshift(columns: list[Column]) -> bool:
     return shift % 3 != 0
 
 
-def _match_long(target: str, feature: CatalogueFeature, query: str, strand: int,
-                min_identity: float, min_coverage: float) -> list[Hit]:
+def _match_long(target: str, query: str, length: int, min_identity: float,
+                min_coverage: float, strand: int = 1, coding: bool = False) -> list[Hit]:
+    """Matches of ``query`` (the catalogue entry, or its reverse complement on the minus
+    ``strand``) in ``target``. With ``coding``, each is annotated in whole codons of its own
+    frame, from its start to its stop codon when the vector has them (the catalogue's CDS
+    entries run from ATG to stop, so the frame is the same on both strands)."""
     results: list[Hit] = []
-    # A coding sequence is annotated in whole codons of its own frame, from its start to its
-    # stop codon when the vector has them (the catalogue's CDS entries run from ATG to stop,
-    # so the frame is the same on both strands).
-    coding = feature.type == "CDS" and len(query) % 3 == 0
     aligner = _aligner()
-    for offset in _candidate_offsets(target, query):
-        margin = max(30, len(query) // 10)
+    margin = max(30, len(query) // 10)
+    for offset in sorted(_candidate_offsets(target, query)):
+        # A guess at or past the end of the sequence itself can only be the copy a circular
+        # search appends, and the same seed hit also appears in the sequence a length earlier,
+        # so that copy is found there instead. Aligning this one would be wasted work.
+        if offset >= length:
+            continue
+        # An element present verbatim is the best local alignment of itself under this
+        # scoring, in full and at no offset, so it needs no alignment: most catalogue elements
+        # sit in a vector unchanged, and this is what keeps detection quick on a plasmid full
+        # of them. Every guess is tested, because a repeated element (a 6×HA tag is two 3×HA
+        # in a row) gives one guess per copy and per register.
+        if 100.0 >= min_identity and target[offset : offset + len(query)] == query:
+            results.append((offset, offset + len(query) - 1, 100.0, 0, len(query), False))
+            continue
         window_start = max(0, offset - margin)
         window = target[window_start : offset + len(query) + margin]
         if len(window) < SEED:
@@ -261,7 +274,6 @@ def _match_long(target: str, feature: CatalogueFeature, query: str, strand: int,
                 results.append((in_target[0], in_target[-1], identity, in_query[0],
                                 in_query[-1] + 1, coding and _frameshift(chosen)))
                 break
-    del feature
     return results
 
 
@@ -293,7 +305,9 @@ def detect(sequence: str, circular: bool = False, min_identity: float = DEFAULT_
             query = feature.sequence if strand == 1 else _reverse_complement(feature.sequence)
             coverage = COVERAGE_BY_TYPE.get(feature.type, min_coverage)
             hits = (_match_short(target, query) if feature.length <= SHORT_FEATURE
-                    else _match_long(target, feature, query, strand, min_identity, coverage))
+                    else _match_long(target, query, length, min_identity, coverage,
+                                     strand=strand,
+                                     coding=feature.type == "CDS" and feature.length % 3 == 0))
             for start, end, identity, first, last, frameshift in hits:
                 if start >= length:
                     continue  # the same hit also appears in the first copy
