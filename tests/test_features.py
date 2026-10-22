@@ -12,6 +12,7 @@ from cloning_helpers import clean_dna, rc
 
 from vettore import features as features_module
 from vettore.features import (
+    DEFAULT_MIN_COVERAGE,
     DEFAULT_MIN_IDENTITY,
     SHORT_FEATURE,
     catalogue,
@@ -781,35 +782,36 @@ def test_a_label_naming_the_other_species_is_flagged(element, label, wrong):
 # **indel** splits the seeds into two registers and the element is aligned twice. So the
 # fixtures below diverge by deleting.
 #
-# What the cost tracks is the number of *surviving seed registers*, and with six seeds per
-# entry the ceiling is six. That is not the same as the number of deleted sites, and the two
-# come apart in a way worth knowing, because the fixtures space their cuts evenly and the
-# engine spaces its seeds evenly too. On the AAV fixture (36 entries, this machine):
+# What the cost tracks is the number of *places the engine aligns an element*, which used to be
+# the number of surviving seed registers and is now the number of copies: registers a few bases
+# apart are merged and aligned once (`MERGE_GAP`). That change is what brought the all-in-one
+# plasmid inside S5.4's two seconds, and it flattened the curve with it. On the AAV fixture
+# (36 entries, this machine):
 #
 #   sites     0      1      2      3      4      5      6
-#   cells   0.34 M 30.4 M 45.3 M 60.3 M 30.2 M 90.1 M 89.4 M
-#   seconds  0.04   0.85   1.24   1.67   0.83   2.56   2.37
+#   cells   0.34 M 15.49M 15.44M 15.55M 29.57M 15.57M 29.56M
+#   seconds  0.03   0.39   0.39   0.41   0.75   0.41   0.73
 #   same?    yes    yes    yes    yes    yes    yes    NO
 #
-# A single changed base, for comparison, is 15.3 M. So it is a sawtooth, not a ramp. At four
-# sites the even spacing drops every cut inside a seed window — the engine places its seeds at
-# `round(i * (length - 18) / 5)` and the fixture its cuts at `length // (sites + 1) * k`, which
-# for four cuts coincide — so four of the six seeds are destroyed and the cost halves. Five
-# evenly spaced sites is the ceiling: 90.1 M here, 197.1 M on the all-in-one plasmid, both
-# still annotated exactly as their verbatim selves. At six an element is no longer found at
-# all, and the cost does *not* collapse with it (89.4 M): only the four-site trough is cheap,
-# and "divergence heavy enough to destroy a seed is cheaper" is true of a destroyed seed, not
-# of heavier divergence in general. The bounds below pin that ceiling where the plasmid still
-# holds together, which is every fixture but the stress one, and the six-site edge has a test
-# of its own.
+# A single changed base is 15.3 M, so a deleted base and a changed one now cost about the
+# same: that factor of two was the registers, and it is gone. The curve is flat at one pass per
+# copy, give or take the AAV2 ITR — a hairpin, so self-similar enough that `_merge_limit` will
+# not merge its registers, which is the slow creep from 15.44 to 15.57 M across the row — and
+# except where the fixture's even spacing drops a cut inside a seed window. The engine places
+# its seeds at `round(i * (length - 18) / 5)` and the fixture its cuts at
+# `length // (sites + 1) * k`, which for four cuts coincide, and the registers that survive
+# are then further apart than the merge is willing to join, so SaCas9 is aligned twice and the
+# plasmid costs 29.6 M. At six sites an element is no longer found at all, which is the
+# boundary its own test asserts. The bounds below pin the points where the plasmid still holds
+# together.
 #
 # The third is to write a divergence the engine itself reports as a different document. A
 # **single** deleted base inside a coding sequence is a frameshift, and detection says so:
 # `Match.frameshift` is set, the dialog leaves the match unticked and shows an amber warning. One
 # deleted base per element flags SpCas9, SaCas9, tdTomato, mCherry, EGFP and AmpR, so a
 # fixture built that way is not the same plasmid to the user, and a nuclease with a frameshift
-# is not a vector anyone builds. Deleting a whole **codon** costs exactly the same (30.4 M on
-# the AAV fixture either way) and is a real variant, so that is what `_plasmid` does to a CDS.
+# is not a vector anyone builds. Deleting a whole **codon** costs the same (15.48 M on the
+# AAV fixture against 15.49 M) and is a real variant, so that is what `_plasmid` does to a CDS.
 #
 # What the plasmid holds matters as much as how far it diverges, and a fixture that packs
 # every awkward entry together measures a vector nobody builds. The three below are a single
@@ -843,7 +845,8 @@ AAV_INVERTED = ("AAV2 ITR (truncated)",)
 #: promoter, a coding sequence and a terminator, with the WPRE where it belongs, in the 3' UTR
 #: between the nuclease and its polyA signal — and a backbone of one marker and two origins.
 #: 10.4 kb of catalogue elements, one nuclease, and nothing that has to fit a packaging limit.
-#: This is the plausible heavy case, and it is the one that misses S5.4's budget.
+#: This is the plausible heavy case: the one that used to miss S5.4's budget, at 2.3 s, and
+#: now meets it at 1.26 s.
 ALL_IN_ONE_ELEMENTS = (
     "U6 promoter (human)", "EF-1α promoter (human)", "SpCas9", "WPRE", "bGH polyA",
     "CMV promoter", "tdTomato", "SV40 polyA", "AmpR promoter", "AmpR", "ori", "f1 ori",
@@ -865,7 +868,7 @@ PACKED_ELEMENTS = (
 #: `LOSES_AN_ELEMENT`, which is where that boundary is asserted.
 FIXTURES = (
     ("aav", AAV_ELEMENTS, AAV_INVERTED, (0, 1, 3, 5)),
-    ("all-in-one", ALL_IN_ONE_ELEMENTS, (), (0, 1, 3, 5)),
+    ("all-in-one", ALL_IN_ONE_ELEMENTS, (), (0, 1, 3, 4, 5)),
     ("stress", PACKED_ELEMENTS, (), (0, 1, 3)),
 )
 
@@ -981,33 +984,41 @@ def _plasmid(element_names: tuple[str, ...], sites: int = 0,
 #: grows. Figures for the catalogue as it stands and for the 60 entries PR #10 grows it to,
 #: keyed by (fixture, deleted sites). The bounds are sized for the grown one, since the
 #: criterion is written for it; the seconds are this machine's on the catalogue as it stands,
-#: for scale only, and are the same measurements the table above records.
+#: for scale only — they move by a tenth between runs on a machine with other work on it,
+#: which is why the bounds are in cells and not in them.
 #:
-#: Each bound sits about 17 % above the grown catalogue's figure, except ("aav", 0): a
+#: Each bound sits a sixth to a fifth above the grown catalogue's figure — 17 to 19 %, the
+#: spread being the rounding to a tidy number — except ("aav", 0): a
 #: verbatim AAV vector costs almost nothing precisely because every element is exact, so 2 M
-#: is nearly six times its cost and still only a seventh of the 15.3 M it costs without the
+#: is nearly six times its cost and still an eighth of the 15.3 M it costs without the
 #: shortcut that makes it cheap.
 #:
 #: Each shortcut the engine takes was removed on a scratch copy to see which bounds notice.
 #: The one that reports an exact copy without aligning it is reached only where an element is
-#: exact, so removing it fails the three `sites == 0` bounds and leaves the other eight alone;
+#: exact, so removing it fails the three `sites == 0` bounds and leaves the other nine alone;
 #: removing the circular-copy skip fails every bound but `("aav", 0)`, which is too cheap for
-#: it to show. So these bounds are a regression guard and not the guard for the shortcuts
-#: themselves: that is `test_the_copy_of_an_element_a_circular_search_appends_is_not_aligned`
-#: and `test_an_element_present_verbatim_is_found_without_aligning_it`, one each.
+#: it to show; and removing the merge of neighbouring guesses fails seven of the nine bounds
+#: with a deleted site in them. Not `("all-in-one", 4)`, where the merge costs more rather
+#: than less, so its bound is above its own per-offset cost by construction (84.1 M against
+#: 103 M); and not `("stress", 1)`, at 130.0 M against 136 M. So these bounds are a
+#: regression guard and not the guard for the shortcuts themselves: that is
+#: `test_the_copy_of_an_element_a_circular_search_appends_is_not_aligned`,
+#: `test_an_element_present_verbatim_is_found_without_aligning_it` and
+#: `test_the_registers_of_one_diverged_copy_are_aligned_once`, one each.
 ALIGNMENT_WORK = {
     #  fixture,    sites         36 entries         60 entries      seconds
-    ("aav",        0):   2_000_000,  #    0.34 M / 15 p     0.34 M / 15 p     0.04
-    ("aav",        1):  36_000_000,  #   30.38 M / 35 p    30.38 M / 35 p     0.85
-    ("aav",        3):  70_000_000,  #   60.28 M / 50 p    60.28 M / 50 p     1.67
-    ("aav",        5): 105_000_000,  #   90.09 M / 63 p    90.09 M / 63 p     2.56
-    ("all-in-one", 0):  26_000_000,  #   22.01 M /  9 p    22.24 M / 12 p     0.7
-    ("all-in-one", 1):  92_000_000,  #   78.56 M / 33 p    78.79 M / 36 p     2.3
-    ("all-in-one", 3): 165_000_000,  #  141.22 M / 59 p   141.45 M / 62 p     4.0
-    ("all-in-one", 5): 230_000_000,  #  197.14 M / 80 p   197.44 M / 84 p     5.5
-    ("stress",     0):  50_000_000,  #   39.36 M / 38 p    42.40 M / 42 p     1.2
-    ("stress",     1): 155_000_000,  #  129.98 M / 64 p   133.02 M / 68 p     3.8
-    ("stress",     3): 265_000_000,  #  222.89 M / 84 p   225.93 M / 88 p     6.3
+    ("aav",        0):   2_000_000,  #    0.34 M / 15 p     0.34 M / 15 p     0.03
+    ("aav",        1):  18_500_000,  #   15.49 M / 29 p    15.49 M / 29 p     0.39
+    ("aav",        3):  18_500_000,  #   15.55 M / 31 p    15.55 M / 31 p     0.40
+    ("aav",        5):  18_500_000,  #   15.57 M / 32 p    15.57 M / 32 p     0.41
+    ("all-in-one", 0):  26_000_000,  #   22.01 M /  9 p    22.24 M / 12 p     0.48
+    ("all-in-one", 1):  60_000_000,  #   50.38 M / 22 p    50.61 M / 25 p     1.19
+    ("all-in-one", 3):  74_000_000,  #   62.69 M / 30 p    62.92 M / 33 p     1.46
+    ("all-in-one", 4): 103_000_000,  #   87.27 M / 32 p    87.80 M / 39 p     2.07
+    ("all-in-one", 5):  74_000_000,  #   62.15 M / 30 p    62.53 M / 35 p     1.53
+    ("stress",     0):  52_000_000,  #   40.42 M / 39 p    44.22 M / 44 p     0.93
+    ("stress",     1): 136_000_000,  #  111.75 M / 58 p   115.55 M / 63 p     2.75
+    ("stress",     3): 147_000_000,  #  121.05 M / 65 p   124.85 M / 70 p     3.04
 }
 
 
@@ -1048,8 +1059,7 @@ def _fixture_work(element_names: tuple[str, ...], sites: int,
 
 @pytest.mark.parametrize("label, element_names, inverted, sites", POINTS)
 def test_the_alignment_work_of_a_15kb_plasmid_is_pinned(label, element_names, inverted, sites):
-    """The work each point on the curve costs, pinned so that it cannot grow unnoticed — and,
-    for the all-in-one plasmid, so that whoever closes the budget gap sees the number move."""
+    """The work each point on the curve costs, pinned so that it cannot grow unnoticed."""
     bound = ALIGNMENT_WORK[label, sites]       # before the measurement, so a gap fails fast
     _, cells = _fixture_work(element_names, sites, inverted)
     assert cells <= bound, f"{label}, {sites} deleted sites: {cells / 1e6:.2f} M cells"
@@ -1178,43 +1188,79 @@ def test_enough_deleted_sites_stop_an_element_being_found_at_all(label, element_
     assert max(counts) < sites
 
 
-def test_the_budget_is_met_on_a_single_aav_vector_with_a_codon_lost_per_element():
-    """S5.4's two seconds as they are written, in seconds, on the vector the criterion is for.
-    The cells tests are what fail on a regression; this one catches a cost that is not
-    alignment, so it also times the heaviest element set that has a point inside the budget.
-    The margins against the two seconds are 2.4x for the AAV point (0.85 s) and 1.7x for the
-    stress one (1.2 s), so a shared CI runner would have to be about two thirds slower than
-    this machine for either to be a false failure."""
+def test_the_budget_is_met_in_seconds_at_the_points_this_test_times():
+    """S5.4's two seconds as they are written, in seconds, on the plasmids the criterion is
+    for. The cells tests are what fail on a regression; this one catches a cost that is not
+    alignment at all.
+
+    The all-in-one plasmid is the case the criterion was missed on, at 2.3 s with a codon lost
+    per element and 5.5 s with five; it now takes 1.11 s and 1.51 s on this machine. The
+    margins against the two seconds are about 5x for the AAV vector (0.35 to 0.38 s) and 1.3x
+    for the all-in-one one at five sites (1.51 s), which is the tightest of the four: a shared
+    runner a third slower than this machine would fail it with nothing having regressed, which
+    is why `ALIGNMENT_WORK` and not this test is where a regression shows.
+
+    Two plausible points are left out, and both are pinned in cells instead. The packed stress
+    plasmid, at 2.6 s, is over the budget: it is a vector nobody builds — every awkward entry
+    in the catalogue at once. And the all-in-one plasmid at **four** deleted sites sits on the
+    line at 1.95 to 2.07 s across runs, because there the fixture's cuts coincide with the
+    engine's seed positions and the merge cannot join the registers they leave; timing it
+    would be a coin toss on the machine rather than a statement about the code, so
+    `ALIGNMENT_WORK` pins its work and
+    `test_a_second_deleted_site_per_element_is_nearly_free` records why it is what it is.
+    """
     for element_names, sites, inverted in ((AAV_ELEMENTS, 1, AAV_INVERTED),
-                                           (PACKED_ELEMENTS, 0, ())):
+                                           (AAV_ELEMENTS, 5, AAV_INVERTED),
+                                           (ALL_IN_ONE_ELEMENTS, 1, ()),
+                                           (ALL_IN_ONE_ELEMENTS, 5, ())):
         sequence = _plasmid(element_names, sites, inverted)
         detect(sequence, circular=True)      # warm the catalogue and the aligner
         start = time.perf_counter()
         matches = detect(sequence, circular=True)
         elapsed = time.perf_counter() - start
         assert matches, "the plasmid should carry recognisable elements"
-        assert elapsed < DETECTION_BUDGET, f"detection took {elapsed:.2f} s"
+        assert elapsed < DETECTION_BUDGET, (
+            f"{len(element_names)} elements, {sites} deleted sites: {elapsed:.2f} s")
 
 
-def test_the_all_in_one_plasmid_is_still_far_enough_over_the_budget_to_record_it():
-    """The gap S5.4 still has, asserted rather than described.
+def test_a_second_deleted_site_per_element_is_nearly_free():
+    """What the merge bought, asserted rather than described: the cost barely depends on how
+    many times an element has been cut, because the registers of one copy are one alignment
+    however many there are. Five deleted sites per element cost a quarter more than one does,
+    where they used to cost three times as much (90.1 M against 30.4 M on the AAV fixture,
+    197.1 M against 78.6 M on the all-in-one one).
 
-    A dense all-in-one plasmid that has lost one codon per element takes about 2.3 s on this
-    machine, against 0.7 s for the same plasmid with its elements exact, and 4.5 s if it has
-    lost three. Nothing about it is exotic: 10.4 kb of ordinary elements, one nuclease, and a
-    codon variant in each — annotated identically to the verbatim plasmid, as the test above
-    holds.
+    A quarter rather than nothing, and the quarter is what checking the merge costs instead
+    of trusting it. Taking the all-in-one fixture at **three** deleted sites: 49.8 M cells if
+    a run's one alignment is trusted, 62.7 M as the engine actually does it. Every one of
+    those re-queues is a run whose alignment came back *below the thresholds*, which answers
+    no guess in it and so sends all of them back — tdTomato, a tandem dimer, for two runs and
+    four extra passes of a 1431 bp entry (9.8 M cells), and mCherry for two runs and five of a
+    711 bp one (3.0 M). The other branch, an alignment that drifts onto a placement none of
+    its guesses is at, fires nowhere here; the one place it fires on any fixture is a 3×HA run
+    on the packed stress plasmid at three deleted sites.
 
-    Closing the gap means changing how an element's alignment is chosen, which can change
-    which variant is annotated and with what coordinates, so it is not a constant to tune.
-    The floor below is the point of this test: it fails on the day the engine gets fast
-    enough, and whoever sees it fail should record that S5.4's budget is met and delete it.
+    The four-site trough is left out on purpose: there the fixture's cuts land in the seeds
+    themselves, the surviving registers end up further apart than `MERGE_GAP`, and SpCas9 is
+    aligned twice — its two guesses are 12 bases apart, because all four cuts fall ahead of
+    the last surviving seed and each of them takes a codon out. (SaCas9 is aligned once here;
+    on the AAV fixture it is SaCas9 the same arithmetic splits.) That is a property of evenly
+    spaced cuts, not of divergence — it is one of the two points the tests pin where the
+    engine does more work than aligning every guess separately, 87.3 M cells against 84.1 M
+    here and 40.4 M against 39.4 M on the packed stress plasmid with nothing deleted at all,
+    and the only one anywhere near S5.4's two seconds: 1.95 to 2.07 s across runs against
+    1.86 to 1.96 s per guess. So this is the one point where the merge neither saves work nor
+    leaves room against the budget. `ALIGNMENT_WORK` records it so it cannot drift unseen, and
+    `MERGE_GAP`'s own comment records what widening the gap would cost and buy there.
     """
-    _, cells = _fixture_work(ALL_IN_ONE_ELEMENTS, 1, ())
-    assert cells >= 60_000_000, (
-        f"{cells / 1e6:.2f} M cells: the gap has closed. Re-time the fixture, record that "
-        f"S5.4's budget is met, and delete this test."
-    )
+    for element_names, inverted, slack in ((AAV_ELEMENTS, AAV_INVERTED, 1.01),
+                                           (ALL_IN_ONE_ELEMENTS, (), 1.30)):
+        _, one = _fixture_work(element_names, 1, inverted)
+        for sites in (3, 5):
+            _, several = _fixture_work(element_names, sites, inverted)
+            assert several <= slack * one, (
+                f"{sites} deleted sites cost {several / 1e6:.2f} M cells against "
+                f"{one / 1e6:.2f} M for one")
 
 
 def test_a_plasmid_with_nothing_in_the_catalogue_is_ruled_out_without_aligning():
@@ -1275,6 +1321,334 @@ def test_both_copies_of_a_tandem_tag_are_reported():
     for match in (m for m in detect(sequence, circular=False) if m.name == tag.name):
         assert match.identity == 100.0
         assert match.end - match.start + 1 == tag.length
+
+
+def test_the_registers_of_one_diverged_copy_are_aligned_once():
+    """The merge, pinned where it is cheapest to see: one copy of one element, alone in a
+    flank, with a base taken out of it once, twice and three times. Each deletion shifts every
+    seed after it, so the engine guesses at two, three and two starts for the same copy, one
+    to three bases apart (offsets 59-60, 58-60 and 57/60 as measured: the third cut falls
+    inside a seed window and destroys that seed, which is why the third case has two guesses
+    rather than four and why they are three apart). All of them are one alignment, and the
+    match that comes out of it still covers the whole entry at the copy's own start."""
+    feature = entry("AmpR promoter")
+    for sites in (1, 2, 3):
+        sequence = clean_dna(60, 21) + _diverged(feature, sites) + clean_dna(60, 22)
+        passes, _ = _alignment_work(sequence, circular=False, features=(feature,))
+        assert passes == 1, f"{sites} deleted sites took {passes} alignments"
+        [found] = detect(sequence, circular=False, features=(feature,))
+        assert found.start == 60
+        assert found.part == (1, feature.length)
+        assert len(found.span(len(sequence))) == feature.length - sites
+
+
+def test_two_diverged_copies_of_one_element_stay_two_matches():
+    """And the merge must not join two copies, which is how a wider version of this idea
+    failed a review on PR #5: it lost the second half of a 6×HA tag. Here both 3×HA copies
+    have lost a base, in different places, so neither is reported through the exact-copy
+    shortcut and both go through the alignment the merge decides the shape of."""
+    tag = entry("3×HA")
+    first = _diverged(tag, 1)
+    second = tag.sequence[:20] + tag.sequence[21:]
+    sequence = clean_dna(60, 23) + first + second + clean_dna(60, 24)
+    starts = {match.start for match in detect(sequence, circular=False, features=(tag,))}
+    assert 60 in starts, f"the first copy is missing: {sorted(starts)}"
+    assert 60 + len(first) in starts, f"the second copy is missing: {sorted(starts)}"
+
+
+def test_only_guesses_that_can_be_one_copy_are_merged():
+    """The rule itself, on numbers rather than sequence, because what it must never do is join
+    two copies. Neighbours within the gap are one run; a wider step starts a new one; and a run
+    stops growing at the span, so no window stretches over more than a seed's worth of
+    uncertainty however many registers line up. Whether those two figures are safe for a given
+    entry is the next test's business, not this one's."""
+    assert features_module._offset_runs([]) == []
+    assert features_module._offset_runs([10]) == [(10, 10)]
+    assert features_module._offset_runs([10, 11, 13]) == [(10, 13)]
+    assert features_module._offset_runs([10, 15]) == [(10, 10), (15, 15)]
+    assert features_module._offset_runs([10, 91, 92]) == [(10, 10), (91, 92)]
+    # Steps of three, a lost codon each: the run stops at MERGE_SPAN and the next one begins.
+    runs = features_module._offset_runs(list(range(10, 40, 3)))
+    assert runs == [(10, 28), (31, 37)]
+    assert all(last - first <= features_module.MERGE_SPAN for first, last in runs)
+
+
+def test_how_far_apart_two_guesses_may_be_comes_from_the_entry_itself():
+    """What makes the merge safe is not a constant but the entry. A reported copy of an entry
+    `L` bases long agrees with the entry at all but `slack` bases — it may leave
+    `100 - min_coverage` per cent of them unaligned and differ at `100 - min_identity` per
+    cent of the rest — so two copies `shift` apart force the entry to be
+    `(L - shift - 2 * slack) / (L - shift)` the same as itself at that shift. Below that, two
+    guesses that close cannot be two copies."""
+    assert features_module._self_similarity("CA" * 30, 1) == 0.0
+    assert features_module._self_similarity("CA" * 30, 2) == 100.0
+    # A (CA)30 entry repeats itself two bases over, so nothing beyond one base may be merged.
+    assert features_module._merge_limit("CA" * 30, DEFAULT_MIN_IDENTITY, 100.0) == 1
+    # A (GGGGS)6 linker repeats itself fifteen bases over, which is beyond what a run spans.
+    assert features_module._merge_limit(
+        "GGAGGAGGAGGATCA" * 6, DEFAULT_MIN_IDENTITY, 100.0) == 14
+    real = entry("EGFP").sequence
+    assert features_module._merge_limit(
+        real, DEFAULT_MIN_IDENTITY, DEFAULT_MIN_COVERAGE) == features_module.MERGE_SPAN
+
+
+def test_the_coverage_floor_is_part_of_how_far_apart_two_guesses_may_be():
+    """The term that review round 9 found missing, and the one that bites. A `repeat_region`
+    entry only has to be 70 % covered, so a copy may ignore nearly a third of the entry and
+    still be reported at 100 % identity — which an identity-only bound does not see at all. A
+    (CAG)16 polyQ tract with unique flanks is exactly that shape: it is reported on its tract
+    alone, the tract repeats itself every three bases, and the identity-only bound merged six
+    of its nine copies away."""
+    tract = "CAGATTTTCA" + "CAG" * 16 + "AAAGCGGCAC"
+    # It is not self-similar enough for an identity-only bound to narrow anything...
+    assert features_module._merge_limit(tract, DEFAULT_MIN_IDENTITY, 100.0) \
+        == features_module.MERGE_SPAN
+    # ...but at the coverage a repeat_region is held to, almost nothing may be merged.
+    coverage = features_module.COVERAGE_BY_TYPE["repeat_region"]
+    assert features_module._merge_limit(tract, DEFAULT_MIN_IDENTITY, coverage) <= 2
+
+
+def _records(matches) -> list[tuple]:
+    return [(m.name, m.start, m.end, m.strand, round(m.identity, 6), m.part, m.frameshift)
+            for m in matches]
+
+
+def _with_and_without_the_merge(sequence: str, feature, **kwargs) -> tuple[list, list]:
+    """What the engine reports, and what it reports with every guess aligned on its own. The
+    merge has to reproduce the second exactly, in order as well as in content: `_dedupe` keeps
+    whichever of two overlapping copies it meets first, so a reordering is an annotation
+    change."""
+    merged = _records(detect(sequence, circular=False, features=(feature,), **kwargs))
+    with mock.patch.object(features_module, "_offset_runs",
+                           lambda offsets, *_, **__: [(o, o) for o in sorted(offsets)]):
+        alone = _records(detect(sequence, circular=False, features=(feature,), **kwargs))
+    return merged, alone
+
+
+def test_a_partly_covered_repeat_entry_keeps_every_copy():
+    """The same tract end to end: nine overlapping copies in a longer tract, every one of them
+    reported, on bases 11-58 of 68 — the tract alone, just over the 70 % floor — and every one
+    at 100 % identity. An identity-only limit reported three; the coverage term and the
+    diagonal check each recover them, which is why this asserts against the engine's own
+    per-guess output rather than against either guard."""
+    tract = features_module.CatalogueFeature(
+        name="(CAG)16 polyQ tract", type="repeat_region",
+        sequence="CAGATTTTCA" + "CAG" * 16 + "AAAGCGGCAC", note="", source="test")
+    sequence = clean_dna(60, 32) + "CAG" * 36 + clean_dna(60, 33)
+    found = detect(sequence, circular=False, features=(tract,))
+    starts = sorted(m.start for m in found)
+    assert starts == list(range(60, 60 + 6 * 9, 6)), starts
+    merged, alone = _with_and_without_the_merge(sequence, tract)
+    assert merged == alone
+    [first] = [m for m in found if m.start == 60]
+    assert first.identity == 100.0 and first.part == (11, 58)
+    assert 100.0 * 48 / tract.length < features_module.DEFAULT_MIN_COVERAGE
+    assert 100.0 * 48 / tract.length >= features_module.COVERAGE_BY_TYPE["repeat_region"]
+
+
+def test_which_catalogue_entries_the_limit_narrows():
+    """The catalogue's own self-similarity, pinned at every threshold the dialog offers, so
+    that an entry added later cannot quietly change what the merge does. Three shipped entries
+    are narrowed and they are the right three: both AAV2 ITRs, which are hairpins and so are
+    genuinely self-similar, and 3×FLAG, which is three copies of one 24 bp tag. Everything
+    else merges over the full span, which is why no measured figure moved when the coverage
+    floor went into the bound.
+
+    What this table is not is the thing that keeps a repeating entry safe. An entry whose
+    internal period is longer than `MERGE_SPAN` — 3×HA's is 27 — is never narrowed and so is
+    absent here, and that is the shape review round 10 lost a copy of. What answers that is
+    `_match_long` checking which guesses its alignment passes through; see
+    `test_a_guess_the_merged_alignment_does_not_pass_through_is_aligned_on_its_own`."""
+    narrowed = {}
+    for min_identity in (90.0, 95.0, 98.0, 100.0):
+        for feature in catalogue():
+            if feature.length <= SHORT_FEATURE:
+                continue
+            coverage = features_module.COVERAGE_BY_TYPE.get(
+                feature.type, features_module.DEFAULT_MIN_COVERAGE)
+            limit = features_module._merge_limit(feature.sequence, min_identity, coverage)
+            if limit != features_module.MERGE_SPAN:
+                narrowed[(min_identity, feature.name)] = limit
+    assert narrowed == {
+        (90.0, "AAV2 ITR"): 0, (90.0, "AAV2 ITR (truncated)"): 1, (90.0, "3×FLAG"): 8,
+        (95.0, "AAV2 ITR"): 1, (95.0, "AAV2 ITR (truncated)"): 1, (95.0, "3×FLAG"): 14,
+        (98.0, "AAV2 ITR"): 1, (98.0, "AAV2 ITR (truncated)"): 3,
+        (100.0, "AAV2 ITR"): 3, (100.0, "AAV2 ITR (truncated)"): 3,
+    }, narrowed
+
+
+def test_the_limit_narrows_a_run_however_close_its_steps_are():
+    """The derived limit is handed to `_offset_runs` as the span, and the span alone is what
+    it narrows: capping the gap by it as well would change nothing, because a step wider than
+    the limit already puts the offset further than the limit from the run's first guess.
+    (Checked exhaustively: over every subset of 0..25 of size up to six and every limit up to
+    the span, `min(MERGE_GAP, limit)` and `MERGE_GAP` give the same runs, without exception.)"""
+    close = [10, 11, 12, 13, 14]
+    apart = [10, 14, 18, 22, 26]
+    assert features_module._offset_runs(close, 4, 18) == [(10, 14)]
+    assert features_module._offset_runs(close, 4, 2) == [(10, 12), (13, 14)]
+    assert features_module._offset_runs(close, 4, 0) == [(o, o) for o in close]
+    assert features_module._offset_runs(apart, 4, 18) == [(10, 26)]
+    assert features_module._offset_runs(apart, 4, 2) == [(o, o) for o in apart]
+    # Sorted rather than trusted: an unsorted list must not build a backwards run.
+    assert features_module._offset_runs([20, 10, 11]) == [(10, 11), (20, 20)]
+
+
+def test_the_derived_limit_is_what_the_engine_merges_by():
+    """`_merge_limit` is handed to `_offset_runs` as the span, and this is the only test that
+    would notice if that stopped happening: the diagonal check recovers the copies either way,
+    so correctness alone does not pin it, but the work does. A (CA)30 entry has a limit of one,
+    so the guesses two bases apart through a long CA array are never joined; merge them and the
+    engine pays for the run as well as for the guesses it then puts back."""
+    repeat = features_module.CatalogueFeature(
+        name="(CA)30", type="misc_feature", sequence="CA" * 30, note="", source="test")
+    assert features_module._merge_limit(
+        repeat.sequence, DEFAULT_MIN_IDENTITY, DEFAULT_MIN_COVERAGE) == 1
+    array = "CA" * 90
+    middle = len(array) // 2
+    sequence = clean_dna(60, 32) + array[:middle] + "G" + array[middle + 1:] + clean_dna(60, 33)
+    passes, _ = _alignment_work(sequence, circular=False, features=(repeat,))
+    with mock.patch.object(features_module, "_merge_limit",
+                           lambda *_, **__: features_module.MERGE_SPAN):
+        ignored, _ = _alignment_work(sequence, circular=False, features=(repeat,))
+    assert passes < ignored, (passes, ignored)
+
+
+def _passes(sequence: str, feature, **kwargs) -> tuple[int, int]:
+    """Alignments the engine does on ``sequence``, merged and with every guess on its own."""
+    aligner = features_module._aligner()
+    original, counted = aligner.align, [0]
+
+    def count(target, query, *args, **kwargs_):
+        counted[0] += 1
+        return original(target, query, *args, **kwargs_)
+
+    out = []
+    for runs in (None, lambda offsets, *_, **__: [(o, o) for o in sorted(offsets)]):
+        counted[0] = 0
+        with mock.patch.object(aligner, "align", count):
+            if runs is None:
+                detect(sequence, circular=False, features=(feature,), **kwargs)
+            else:
+                with mock.patch.object(features_module, "_offset_runs", runs):
+                    detect(sequence, circular=False, features=(feature,), **kwargs)
+        out.append(counted[0])
+    return out[0], out[1]
+
+
+def test_a_run_whose_alignment_is_rejected_answers_none_of_its_guesses():
+    """The other half of the same idea, and the one no construct distinguishes. When a run's
+    one alignment comes back *below* the identity or coverage threshold it has answered
+    nothing, however many of the run's guesses lie on it, so they all go back. Identity and
+    coverage are not monotone in alignment score, so a window that can only score higher can
+    still come back with nothing where a narrower one would have reported a match.
+
+    A review looked for a construct where that costs an annotation and found none in 31,680
+    checks, so what this test can pin is the work: at a threshold the merged alignment cannot
+    meet, the engine does one pass per guess *plus* the run's own wasted one. Treat the run as
+    having answered the guesses on it and that becomes one pass fewer than aligning them
+    separately, not one more.
+
+    What it does not pin is this half of the condition on its own. On this construct the run's
+    alignment also drifts clear of both its guesses, so the diagonal check alone would send
+    them back, and deleting `hit is None` from the condition leaves the whole suite green. A
+    review then hunted for a construct where the rejection is the only thing holding — a run
+    rejected, its diagonals covering a guess, that guess accepted when aligned alone — and
+    found none in 5262 runs of more than one guess. So the clause is belt and braces, and what
+    this test asserts is the work it costs, not a loss it is known to prevent."""
+    tag = entry("3×HA")
+    body = tag.sequence * 2
+    sequence = clean_dna(60, 99) + body[:65] + "AAAA" + body[65:] + clean_dna(60, 99)
+    merged, alone = _passes(sequence, tag, min_identity=100.0)
+    assert merged == alone + 1, (merged, alone)
+    # And nothing is lost by it: the same matches, in the same order.
+    with_merge, without = _with_and_without_the_merge(sequence, tag, min_identity=100.0)
+    assert with_merge == without
+
+
+def test_a_guess_the_merged_alignment_does_not_pass_through_is_aligned_on_its_own():
+    """The merge's one real hazard, and the check that answers it. One window yields one
+    alignment, and the best alignment over a run's window is not always the best alignment
+    over the window of each guess in it: a wider window can hold a better-scoring placement
+    elsewhere and drift to it. A 6×HA tag — the two shipped 3×HA entries end to end — with
+    four bases inserted in its second repeat does exactly that. The insertion puts two guesses
+    four bases apart, the run's window reaches back over the first block and reports that
+    instead, and the block at 87 is gone.
+
+    No bound on the entry can see this, because it is a property of the target rather than of
+    the entry: 3×HA is at most 44.9 % the same as itself over the shifts the merge uses — that
+    at twelve bases, and under 31 % at fourteen of the eighteen — so its limit is the full
+    span. So the engine checks instead — the guesses the accepted alignment passes
+    through, one per register it reads, are the ones it stands in for, and any other guess in
+    the run is aligned on its own."""
+    tag = entry("3×HA")
+    body = tag.sequence * 2
+    sequence = clean_dna(60, 99) + body[:65] + "AAAA" + body[65:] + clean_dna(60, 99)
+    limit = features_module._merge_limit(
+        tag.sequence, DEFAULT_MIN_IDENTITY, DEFAULT_MIN_COVERAGE)
+    assert limit == features_module.MERGE_SPAN, "the bound sees nothing here, by design"
+    offsets = sorted(features_module._candidate_offsets(sequence, tag.sequence))
+    assert (87, 91) in features_module._offset_runs(offsets, features_module.MERGE_GAP, limit)
+    # That run's own window drifts: its best alignment reads the block at 60, passing through
+    # neither 87 nor 91, so neither guess is accounted for and both are aligned again.
+    margin = max(30, tag.length // 10)
+    columns = features_module._columns(
+        features_module._aligner().align(
+            sequence[87 - margin : 91 + tag.length + margin], tag.sequence)[0], 87 - margin)
+    diagonals = {t - q for t, q, _ in columns if t is not None and q is not None}
+    assert diagonals.isdisjoint({87, 91}), sorted(diagonals)
+    # All three blocks are reported even so, which is the point of the check.
+    found = detect(sequence, circular=False, features=(tag,))
+    assert sorted(m.start for m in found) == [60, 87, 145]
+    merged, alone = _with_and_without_the_merge(sequence, tag)
+    assert merged == alone
+    # And the drifted answer is dropped rather than reported from that run, so the engine
+    # hands `_dedupe` exactly the hits the guesses give one at a time, no extra copy of the
+    # block the run drifted onto.
+    def raw():
+        return sorted(features_module._match_long(
+            sequence, tag.sequence, len(sequence), DEFAULT_MIN_IDENTITY, DEFAULT_MIN_COVERAGE))
+    with mock.patch.object(features_module, "_offset_runs",
+                           lambda offsets, *_, **__: [(o, o) for o in sorted(offsets)]):
+        one_at_a_time = raw()
+    assert raw() == one_at_a_time
+
+
+def test_a_repeating_entry_keeps_every_copy():
+    """A (CA)30 entry inside a longer, imperfect CA array: every register of the array is a
+    copy of the entry, and each must be reported. One base in the middle of the array differs,
+    so the copies that cover it are aligned rather than found verbatim, and a fixed gap of four
+    joins two of their registers into one run. What keeps the copies is the diagonal check
+    rather than the limit — the limit stops them being merged in the first place, and the test
+    below pins that separately — and either way the engine must give exactly what aligning
+    every guess on its own gives."""
+    repeat = features_module.CatalogueFeature(
+        name="(CA)30", type="misc_feature", sequence="CA" * 30, note="", source="test")
+    array = "CA" * 90
+    at = len(array) // 2
+    sequence = clean_dna(60, 31) + array[:at] + "G" + array[at + 1:] + clean_dna(60, 32)
+    found = detect(sequence, circular=False, features=(repeat,))
+    starts = sorted(match.start for match in found)
+    assert starts == [60, 68, 76, 84, 152, 160, 168, 176, 188], starts
+    merged, alone = _with_and_without_the_merge(sequence, repeat)
+    assert merged == alone
+    # The copy that straddles the changed base is the one a fixed gap loses.
+    [straddling] = [match for match in found if match.start == 188]
+    assert straddling.part == (1, repeat.length)
+    assert straddling.identity == pytest.approx(96.67, abs=0.01)
+
+
+def test_guesses_further_apart_than_the_gap_are_aligned_separately():
+    """The narrow half of the rule, measured on the case that shows it: a nuclease cut seven
+    times loses the seeds that would have bridged its registers, the ones left are six bases
+    apart, and it is aligned more than once. Two sites keep every register a codon apart and
+    cost one alignment. This is what the four-site trough on the AAV fixture is."""
+    feature = entry("SaCas9")
+    for sites, alignments in ((2, 1), (5, 1), (7, 3)):
+        sequence = clean_dna(60, 25) + _diverged(feature, sites) + clean_dna(60, 26)
+        passes, _ = _alignment_work(sequence, circular=False, features=(feature,))
+        assert passes == alignments, f"{sites} deleted sites took {passes} alignments"
+        assert detect(sequence, circular=False, features=(feature,))
 
 
 def test_a_tandem_array_reports_a_copy_for_every_repeat():

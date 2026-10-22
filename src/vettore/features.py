@@ -16,6 +16,7 @@ from __future__ import annotations
 import json
 import math
 import re
+from collections import deque
 from dataclasses import dataclass
 from functools import lru_cache
 from importlib import resources
@@ -222,6 +223,73 @@ def _frameshift(columns: list[Column]) -> bool:
     return shift % 3 != 0
 
 
+#: Two candidate positions this close together are the same copy of the element read in two
+#: registers, not two copies: an indel inside an element shifts every seed after it by the
+#: length of the indel, so one deleted base puts the seeds before it and the seeds after it a
+#: base apart, and a lost codon three. Aligning such a run once, over a window that holds all
+#: of it, costs one pass where it used to cost one per register, and the window grows by the
+#: distance between the first and the last of them rather than by its own length again.
+MERGE_GAP = 4
+#: The furthest a run may reach, however many registers line up: beyond a seed's length the
+#: registers no longer come from one indel inside one copy. `_merge_limit` narrows both figures
+#: for an entry that repeats itself, which is what makes the merge safe; see there.
+MERGE_SPAN = SEED
+
+
+@lru_cache(maxsize=4096)
+def _self_similarity(query: str, shift: int) -> float:
+    """How much of the entry matches itself shifted ``shift`` bases along, without gaps."""
+    if shift >= len(query):
+        return 0.0
+    same = sum(a == b for a, b in zip(query[shift:], query[:-shift]))
+    return 100.0 * same / (len(query) - shift)
+
+
+def _merge_limit(query: str, min_identity: float, min_coverage: float = 100.0,
+                 span: int = MERGE_SPAN) -> int:
+    """How far apart two guesses may be before they could be two copies rather than one.
+
+    This is what makes the merge safe, and it is not a constant. A reported copy of an entry
+    `L` bases long agrees with the entry at all but ``slack`` of its bases: it may leave
+    ``100 - min_coverage`` per cent of them out of the alignment altogether, and differ at
+    ``100 - min_identity`` per cent of the rest. Two copies ``shift`` bases apart overlap over
+    ``L - shift`` bases, and every base of that overlap where both copies agree with the entry
+    is a base where the entry agrees with *itself* shifted ``shift`` along. So the entry has to
+    be at least ``(L - shift - 2 * slack) / (L - shift)`` the same as itself at that shift for
+    two copies to sit there at all, and below that figure two guesses that close together
+    cannot be two copies — aligning them once cannot lose one.
+
+    Both terms matter, and the coverage one is the one that bites. A `repeat_region` entry only
+    has to be 70 % covered, so a copy may ignore a third of the entry and still be reported at
+    100 % identity: a (CAG)16 polyQ tract with unique flanks is reported on its tract alone,
+    nine times over in a longer tract, and an identity-only bound merges six of them away.
+
+    The bound is ungapped, which is why the catalogue invariant is a test of its own rather
+    than something to infer from here.
+    """
+    length = len(query)
+    slack = length * (1.0 - min_identity * min_coverage / 10_000.0)
+    for shift in range(1, span + 1):
+        if shift >= length:
+            return span
+        allowed = 100.0 * (1.0 - 2.0 * slack / (length - shift))
+        if _self_similarity(query, shift) >= allowed:
+            return shift - 1
+    return span
+
+
+def _offset_runs(offsets: list[int], gap: int = MERGE_GAP,
+                 span: int = MERGE_SPAN) -> list[tuple[int, int]]:
+    """``offsets``, in order, as (first, last) runs of neighbours: one alignment each."""
+    runs: list[tuple[int, int]] = []
+    for offset in sorted(offsets):
+        if runs and offset - runs[-1][1] <= gap and offset - runs[-1][0] <= span:
+            runs[-1] = (runs[-1][0], offset)
+        else:
+            runs.append((offset, offset))
+    return runs
+
+
 def _match_long(target: str, query: str, length: int, min_identity: float,
                 min_coverage: float, strand: int = 1, coding: bool = False) -> list[Hit]:
     """Matches of ``query`` (the catalogue entry, or its reverse complement on the minus
@@ -231,6 +299,7 @@ def _match_long(target: str, query: str, length: int, min_identity: float,
     results: list[Hit] = []
     aligner = _aligner()
     margin = max(30, len(query) // 10)
+    inexact: list[int] = []
     for offset in sorted(_candidate_offsets(target, query)):
         # A guess at or past the end of the sequence itself can only be the copy a circular
         # search appends, and the same seed hit also appears in the sequence a length earlier,
@@ -245,35 +314,102 @@ def _match_long(target: str, query: str, length: int, min_identity: float,
         if 100.0 >= min_identity and target[offset : offset + len(query)] == query:
             results.append((offset, offset + len(query) - 1, 100.0, 0, len(query), False))
             continue
-        window_start = max(0, offset - margin)
-        window = target[window_start : offset + len(query) + margin]
-        if len(window) < SEED:
-            continue
-        alignments = aligner.align(window, query)
-        if not len(alignments):
-            continue
-        # The annotation is the aligned region and nothing else, so the identity tested here is
-        # the identity the user reads. Ends of the catalogue entry that the local alignment
-        # left out are not added back: under this scoring a dropped end is at least 40 %
-        # mismatches, and in real vectors it is the junction the element was cloned into (a
-        # BamHI site before an SV40 polyA, the linker of a GFP fusion), not the element. The
-        # match says which bases of the entry it covers, so a shorter match is never silent.
-        columns = _columns(alignments[0], window_start)
-        choices = [columns]
-        if coding:
-            cut = _whole_codons(columns)
-            # The start and stop codons count towards the identity; if they would take it
-            # under the threshold, the match is shown without them rather than not at all.
-            choices = [_codon_ends(cut, target, query, strand), cut] if cut else []
-        for chosen in choices:
-            in_target = [t for t, _, _ in chosen if t is not None]
-            in_query = [q for _, q, _ in chosen if q is not None]
-            coverage = 100.0 * len(in_query) / len(query)
-            identity = 100.0 * sum(same for _, _, same in chosen) / len(chosen)
-            if identity >= min_identity and coverage >= min_coverage:
-                results.append((in_target[0], in_target[-1], identity, in_query[0],
-                                in_query[-1] + 1, coding and _frameshift(chosen)))
-                break
+        inexact.append(offset)
+    # Four is the narrow part of the rule and is meant to be: it is as far apart as the
+    # registers of one copy get when the indel that split them is a lost codon or two. A cut
+    # landing inside a seed window pushes the surviving registers further apart, and widening
+    # the gap to the span cap would merge those too. Measured, it helps only where the cuts
+    # are artificially even and costs almost everywhere else. The AAV fixture's four-site
+    # trough halves, 29.6 M cells of dynamic programming to 15.3 M, and the all-in-one
+    # fixture's goes 87.3 M to 62.1 M; of the points the tests pin, aav 1/3/5 and all-in-one
+    # 3/5 move by under a per cent, the verbatim AAV vector does not move at all, and the
+    # remaining five get *worse* — all-in-one 0 by 5.6 %, all-in-one 1 by 2.4 %, the packed
+    # stress plasmid by 18.4 % with no deleted site, 4.4 % with one and 4.6 % with three. A
+    # wider run is a wider window, a wider window drifts off its own guesses more often, and
+    # each one it drifts off is paid for separately below. The
+    # troughs are a property of evenly spaced cuts coinciding with the seed positions rather
+    # than of divergence, so there is nothing here worth the extra base of distance at which
+    # one alignment would have to stand in for two guesses.
+    #
+    # Which is the thing this loop checks rather than assumes. One window yields one
+    # alignment, and the best alignment over a run's window is not always the best alignment
+    # over the window of each guess in it: a wider window can hold a better-scoring placement
+    # elsewhere and drift to it, and then the copy a narrower window would have found is gone.
+    # A 6×HA tag with four bases inserted does exactly that — the run's window reaches back
+    # over the first copy and reports it twice instead of reporting the second. So after the
+    # alignment, the guesses it actually passes through (its diagonals, one per register it
+    # reads) are the ones it stands in for; any other guess in the run is put back on the
+    # worklist on its own, which is what it would have cost before the merge. The common case,
+    # the registers of one copy, is wholly accounted for by its own alignment and still costs
+    # one pass.
+    limit = _merge_limit(query, min_identity, min_coverage) if len(inexact) > 1 else 0
+    pending = deque((first, last, tuple(o for o in inexact if first <= o <= last))
+                    for first, last in _offset_runs(inexact, MERGE_GAP, limit))
+    while pending:
+        first, last, group = pending.popleft()
+        window_start = max(0, first - margin)
+        window = target[window_start : last + len(query) + margin]
+        hit: Hit | None = None
+        diagonals: set[int] = set()
+        if len(window) >= SEED:
+            alignments = aligner.align(window, query)
+            if len(alignments):
+                # The annotation is the aligned region and nothing else, so the identity tested
+                # here is the identity the user reads. Ends of the catalogue entry that the
+                # local alignment left out are not added back: under this scoring a dropped end
+                # is at least 40 % mismatches, and in real vectors it is the junction the
+                # element was cloned into (a BamHI site before an SV40 polyA, the linker of a
+                # GFP fusion), not the element. The match says which bases of the entry it
+                # covers, so a shorter match is never silent.
+                columns = _columns(alignments[0], window_start)
+                diagonals = {t - q for t, q, _ in columns if t is not None and q is not None}
+                choices = [columns]
+                if coding:
+                    cut = _whole_codons(columns)
+                    # The start and stop codons count towards the identity; if they would take
+                    # it under the threshold, the match is shown without them rather than not
+                    # at all.
+                    choices = [_codon_ends(cut, target, query, strand), cut] if cut else []
+                for chosen in choices:
+                    in_target = [t for t, _, _ in chosen if t is not None]
+                    in_query = [q for _, q, _ in chosen if q is not None]
+                    coverage = 100.0 * len(in_query) / len(query)
+                    identity = 100.0 * sum(same for _, _, same in chosen) / len(chosen)
+                    if identity >= min_identity and coverage >= min_coverage:
+                        hit = (in_target[0], in_target[-1], identity, in_query[0],
+                               in_query[-1] + 1, coding and _frameshift(chosen))
+                        break
+        # A guess is stood in for only by an answer that was accepted and that the alignment
+        # passes through. When the alignment over the wider window scores highest on a
+        # placement that then fails the thresholds, no guess in the run has been answered,
+        # however many of them lie on it, so they all go back: identity and coverage are not
+        # monotone in alignment score, so a window that can only score higher can still come
+        # back with nothing where a narrower one would have reported a match. Belt and braces:
+        # a review looked for a construct where this half of the condition is the only thing
+        # holding — the run rejected, its diagonals over a guess, that guess accepted on its
+        # own — and found none in 5262 runs of more than one guess, so no test isolates it.
+        # `len(group) > 1` is what makes this terminate as well as what makes it cheap: a
+        # re-queued guess is a group of one, so it can never put anything back, and the
+        # worklist is at most the runs plus the guesses in them.
+        missed = ([o for o in group if hit is None or o not in diagonals]
+                  if len(group) > 1 else [])
+        # The alignment is this run's answer when it stands in for at least one of the guesses
+        # it was made from; the guesses it never passes through are aligned on their own,
+        # next, so that the results stay in the order the guesses are in.
+        if hit is not None and len(missed) < len(group):
+            results.append(hit)
+        # When it stands in for none of them it has drifted to a placement some other guess
+        # will find on its own, so its answer is dropped rather than reported from here: that
+        # leaves the results exactly the ones the guesses give one at a time.
+        # At the front and in order, so that a guess put back is aligned where it would have
+        # been had the run never been made: `_dedupe` keeps whichever of two overlapping
+        # copies it meets first, and an earlier version of this loop reordered the results and
+        # silently changed which of nine overlapping copies of a repeat survived. Nothing in
+        # the suite distinguishes this from appending, because a run either answers every
+        # guess in it or none, so the ones put back are the whole run and come back adjacent
+        # either way; it is written this way because the partial case is the one that would
+        # not, and it costs nothing to be right about it in advance.
+        pending.extendleft((o, o, (o,)) for o in reversed(missed))
     return results
 
 
