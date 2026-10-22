@@ -1291,9 +1291,11 @@ def test_both_copies_of_a_tandem_tag_are_reported():
 def test_the_registers_of_one_diverged_copy_are_aligned_once():
     """The merge, pinned where it is cheapest to see: one copy of one element, alone in a
     flank, with a base taken out of it once, twice and three times. Each deletion shifts every
-    seed after it, so the engine guesses at two, three and four starts for the same copy, a
-    base apart. All of them are one alignment, and the match that comes out of it still covers
-    the whole entry at the copy's own start."""
+    seed after it, so the engine guesses at two, three and two starts for the same copy, one
+    to three bases apart (offsets 59-60, 58-60 and 57/60 as measured: the third cut falls
+    inside a seed window and destroys that seed, which is why the third case has two guesses
+    rather than four and why they are three apart). All of them are one alignment, and the
+    match that comes out of it still covers the whole entry at the copy's own start."""
     feature = entry("AmpR promoter")
     for sites in (1, 2, 3):
         sequence = clean_dna(60, 21) + _diverged(feature, sites) + clean_dna(60, 22)
@@ -1321,9 +1323,10 @@ def test_two_diverged_copies_of_one_element_stay_two_matches():
 
 def test_only_guesses_that_can_be_one_copy_are_merged():
     """The rule itself, on numbers rather than sequence, because what it must never do is join
-    two copies. Neighbours within `MERGE_GAP` are one run; a wider step starts a new one; and a
-    run stops growing at `MERGE_SPAN`, so no window ever stretches over more than a seed's
-    worth of uncertainty however many registers line up."""
+    two copies. Neighbours within the gap are one run; a wider step starts a new one; and a run
+    stops growing at the span, so no window stretches over more than a seed's worth of
+    uncertainty however many registers line up. Whether those two figures are safe for a given
+    entry is the next test's business, not this one's."""
     assert features_module._offset_runs([]) == []
     assert features_module._offset_runs([10]) == [(10, 10)]
     assert features_module._offset_runs([10, 11, 13]) == [(10, 13)]
@@ -1333,6 +1336,61 @@ def test_only_guesses_that_can_be_one_copy_are_merged():
     runs = features_module._offset_runs(list(range(10, 40, 3)))
     assert runs == [(10, 28), (31, 37)]
     assert all(last - first <= features_module.MERGE_SPAN for first, last in runs)
+
+
+def test_how_far_apart_two_guesses_may_be_comes_from_the_entry_itself():
+    """What makes the merge safe is not the constant but the entry: two *copies* of an element
+    `d` bases apart can both be reported only if the element is at least `2 * min_identity -
+    100` the same as itself shifted `d` along, so below that figure two guesses that close
+    cannot be two copies. Every catalogue entry is far below it, so every entry merges over the
+    full span; a microsatellite would not, and that is the point of computing it."""
+    assert features_module._self_similarity("CA" * 30, 1) == 0.0
+    assert features_module._self_similarity("CA" * 30, 2) == 100.0
+    # A (CA)30 entry repeats itself two bases over, so nothing beyond one base may be merged.
+    assert features_module._merge_limit("CA" * 30, DEFAULT_MIN_IDENTITY) == 1
+    # A (GGGGS)6 linker repeats itself fifteen bases over, which is beyond what a run spans.
+    assert features_module._merge_limit("GGAGGAGGAGGATCA" * 6, DEFAULT_MIN_IDENTITY) == 14
+    real = entry("EGFP").sequence
+    assert features_module._merge_limit(real, DEFAULT_MIN_IDENTITY) == features_module.MERGE_SPAN
+
+
+def test_no_catalogue_entry_repeats_itself_within_a_merged_window():
+    """The premise the merge rests on, over the whole catalogue and at the loosest threshold
+    the dialog offers, so that an entry added later cannot quietly break it. The limit above
+    protects the engine either way; this test is what tells whoever adds a repeating element
+    that its copies now cost one alignment each."""
+    loosest = min(90.0, DEFAULT_MIN_IDENTITY)
+    allowed = 2 * loosest - 100.0
+    for feature in catalogue():
+        if feature.length <= SHORT_FEATURE:
+            continue
+        worst = max(features_module._self_similarity(feature.sequence, shift)
+                    for shift in range(1, features_module.MERGE_SPAN + 1))
+        assert worst < allowed, (
+            f"{feature.name} is {worst:.1f}% the same as itself within a merged window, "
+            f"against the {allowed:.0f}% two reported copies would need"
+        )
+        assert features_module._merge_limit(feature.sequence, loosest) == features_module.MERGE_SPAN
+
+
+def test_a_repeating_entry_keeps_every_copy():
+    """A (CA)30 entry inside a longer, imperfect CA array: every register of the array is a
+    copy of the entry, and each must be reported. One base in the middle of the array differs,
+    so the copies that cover it are aligned rather than found verbatim, and a fixed gap of four
+    would align two of their registers together and lose one. The limit computed from the entry
+    is what keeps them apart."""
+    repeat = features_module.CatalogueFeature(
+        name="(CA)30", type="misc_feature", sequence="CA" * 30, note="", source="test")
+    array = "CA" * 90
+    at = len(array) // 2
+    sequence = clean_dna(60, 31) + array[:at] + "G" + array[at + 1:] + clean_dna(60, 32)
+    found = detect(sequence, circular=False, features=(repeat,))
+    starts = sorted(match.start for match in found)
+    assert starts == [60, 68, 76, 84, 152, 160, 168, 176, 188], starts
+    # The copy that straddles the changed base is the one a fixed gap loses.
+    [straddling] = [match for match in found if match.start == 188]
+    assert straddling.part == (1, repeat.length)
+    assert straddling.identity == pytest.approx(96.67, abs=0.01)
 
 
 def test_guesses_further_apart_than_the_gap_are_aligned_separately():

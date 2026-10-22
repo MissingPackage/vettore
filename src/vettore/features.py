@@ -229,19 +229,42 @@ def _frameshift(columns: list[Column]) -> bool:
 #: of it, costs one pass where it used to cost one per register, and the window grows by the
 #: distance between the first and the last of them rather than by its own length again.
 MERGE_GAP = 4
-#: and a run never spans more than this, so that what is merged can only be one copy: two
-#: copies of an entry whose starts are within a seed of each other overlap in all but SEED
-#: bases, which takes an entry that repeats itself at that shift, while copies far enough
-#: apart to be two matches are far further apart than a seed — a 6×HA tag is two 3×HA an
-#: entry length apart.
-#:
-#: The gap is the narrow part of the rule and is meant to be: with it widened to MERGE_SPAN
-#: the registers that survive an unlucky cut merge too, which on the AAV fixture takes four
-#: deleted sites per element from 29.6 M cells down to 15.3 M. No point this file pins moves
-#: by more than a per cent, because an indel has to land inside a seed window to separate the
-#: surviving registers by more than a few bases, so the wider gap buys nothing where it
-#: matters and spends the margin that makes the merge obviously safe.
+#: The furthest a run may reach, however many registers line up: beyond a seed's length the
+#: registers no longer come from one indel inside one copy. `_merge_limit` narrows both figures
+#: for an entry that repeats itself, which is what makes the merge safe; see there.
 MERGE_SPAN = SEED
+
+
+@lru_cache(maxsize=4096)
+def _self_similarity(query: str, shift: int) -> float:
+    """How much of the entry matches itself shifted ``shift`` bases along, without gaps."""
+    if shift >= len(query):
+        return 0.0
+    same = sum(a == b for a, b in zip(query[shift:], query[:-shift]))
+    return 100.0 * same / (len(query) - shift)
+
+
+def _merge_limit(query: str, min_identity: float, span: int = MERGE_SPAN) -> int:
+    """How far apart two guesses may be before they could be two copies rather than one.
+
+    This is what makes the merge safe, and it is not a constant. For two *copies* of the
+    entry ``shift`` bases apart to be reported, the plasmid has to hold the entry twice over,
+    offset by that much, each of them at least ``min_identity`` the same as the entry — which
+    makes the entry at least ``2 * min_identity - 100`` the same as *itself* shifted that far.
+    Below that figure, two guesses that close together cannot be two copies, so aligning them
+    once cannot lose one. The limit covers every shift up to the one it returns, because a run
+    grows a neighbour at a time and its ends are what must not be two copies.
+
+    No catalogue entry comes close: the worst is 3×FLAG, 70 % the same as itself fifteen bases
+    over, against the 80 % the lowest threshold the dialog offers allows. A microsatellite
+    entry would, and must not be merged — a ``(CA)30`` entry inside a longer CA array loses a
+    copy without this.
+    """
+    allowed = 2 * min_identity - 100.0
+    for shift in range(1, span + 1):
+        if _self_similarity(query, shift) >= allowed:
+            return shift - 1
+    return span
 
 
 def _offset_runs(offsets: list[int], gap: int = MERGE_GAP,
@@ -281,7 +304,16 @@ def _match_long(target: str, query: str, length: int, min_identity: float,
             results.append((offset, offset + len(query) - 1, 100.0, 0, len(query), False))
             continue
         inexact.append(offset)
-    for first, last in _offset_runs(inexact):
+    # Four is the narrow part of the rule and is meant to be: it is as far apart as the
+    # registers of one copy get when the indel that split them is a lost codon or two. A cut
+    # landing inside a seed window pushes the surviving registers further apart than that, and
+    # widening the gap to the span cap would merge those too — on the AAV fixture it takes the
+    # four-site trough from 29.6 M cells of dynamic programming to 15.3 M, and 8 to 26 % off
+    # four of the points the tests pin (aav 0 sites -23 %, stress 0 -26 %, 1 site -12 %,
+    # 3 sites -8 %). That is real, and it is still not worth it: every extra base of gap is a
+    # base of distance at which two copies of some future entry could be merged into one.
+    limit = _merge_limit(query, min_identity) if len(inexact) > 1 else 0
+    for first, last in _offset_runs(inexact, min(MERGE_GAP, limit), limit):
         window_start = max(0, first - margin)
         window = target[window_start : last + len(query) + margin]
         if len(window) < SEED:
