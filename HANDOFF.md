@@ -68,8 +68,9 @@ annotated tag and the GitHub release notes.
    `frontend/src/tools/alignmentMultiple.tsx`), not a bundled aligner: nothing to package.
    On simulated families it recovers 92 % of the true residue pairs against FAMSA's 94 %
    (measured locally, not a dependency). Still to do: check against a published alignment
-   of AAV serotype capsid genes once their records can be fetched (NCBI was not reachable
-   from the build machine); today the AAV check uses the AAV2 and AAV9 VP1 fixtures.
+   of AAV serotype capsid genes once their records can be fetched; today the AAV check uses
+   the AAV2 and AAV9 VP1 fixtures. NCBI is reachable from a cloud session again since
+   2026-10-21, so that check is no longer blocked on the network.
 5. Printing in the Linux (Qt WebEngine) window; history graph.
 6. S6.3 File → Open from NCBI… (`src/vettore/ncbi.py`, `frontend/src/files/NcbiDialog.tsx`) is
    built: the only network call, NCBI E-utilities `efetch` with the accession alone; preference
