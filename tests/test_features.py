@@ -777,10 +777,12 @@ def test_a_label_naming_the_other_species_is_flagged(element, label, wrong):
 # number of candidate offsets, not the number of mismatches: a substitution at a position no
 # seed covers leaves all six seeds in one register, so the element is aligned once, while a
 # single-base **indel** splits the seeds into two registers and the element is aligned twice,
-# per strand. One deleted base per element costs about 1.6x what one changed base costs, and
-# the two are indistinguishable to the user — every element still found, none below 99 %. So
-# `near_miss` deletes a base. Heavier divergence is *cheaper*, because the seeds stop hitting
-# and the element is ruled out without an alignment.
+# per strand. One deleted base per element costs 1.6 to 2 times what one changed base costs
+# (30.4 M against 15.3 M cells on the AAV fixture below, 78.5 M against 50.2 M on the
+# lentiviral one), and the two are indistinguishable to the user — every element still found,
+# at its own coordinates, none below 98.8 %. So `near_miss` deletes a base. Heavier divergence
+# is *cheaper*, because the seeds stop hitting and the element is ruled out without an
+# alignment.
 #
 # What the plasmid holds matters as much as how far it diverges, and a fixture that packs
 # every awkward entry together measures a vector nobody builds. The three below are a typical
