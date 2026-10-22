@@ -16,6 +16,7 @@ from __future__ import annotations
 import json
 import math
 import re
+from collections import deque
 from dataclasses import dataclass
 from functools import lru_cache
 from importlib import resources
@@ -321,38 +322,67 @@ def _match_long(target: str, query: str, length: int, min_identity: float,
     # four-site trough from 29.6 M cells of dynamic programming to 15.3 M, and 8 to 26 % off
     # four of the points the tests pin (aav 0 sites -23 %, stress 0 -26 %, 1 site -12 %,
     # 3 sites -8 %). That is real, and it is still not worth it: every extra base of gap is a
-    # base of distance at which two copies of some future entry could be merged into one.
+    # base of distance at which the one alignment could land somewhere other than the guesses
+    # it stands in for.
+    #
+    # Which is the thing this loop checks rather than assumes. One window yields one
+    # alignment, and the best alignment over a run's window is not always the best alignment
+    # over the window of each guess in it: a wider window can hold a better-scoring placement
+    # elsewhere and drift to it, and then the copy a narrower window would have found is gone.
+    # A 6×HA tag with four bases inserted does exactly that — the run's window reaches back
+    # over the first copy and reports it twice instead of reporting the second. So after the
+    # alignment, the guesses it actually passes through (its diagonals, one per register it
+    # reads) are the ones it stands in for; any other guess in the run is put back on the
+    # worklist on its own, which is what it would have cost before the merge. The common case,
+    # the registers of one copy, is wholly accounted for by its own alignment and still costs
+    # one pass.
     limit = _merge_limit(query, min_identity, min_coverage) if len(inexact) > 1 else 0
-    for first, last in _offset_runs(inexact, min(MERGE_GAP, limit), limit):
+    pending = deque((first, last, tuple(o for o in inexact if first <= o <= last))
+                    for first, last in _offset_runs(inexact, MERGE_GAP, limit))
+    while pending:
+        first, last, group = pending.popleft()
         window_start = max(0, first - margin)
         window = target[window_start : last + len(query) + margin]
-        if len(window) < SEED:
-            continue
-        alignments = aligner.align(window, query)
-        if not len(alignments):
-            continue
-        # The annotation is the aligned region and nothing else, so the identity tested here is
-        # the identity the user reads. Ends of the catalogue entry that the local alignment
-        # left out are not added back: under this scoring a dropped end is at least 40 %
-        # mismatches, and in real vectors it is the junction the element was cloned into (a
-        # BamHI site before an SV40 polyA, the linker of a GFP fusion), not the element. The
-        # match says which bases of the entry it covers, so a shorter match is never silent.
-        columns = _columns(alignments[0], window_start)
-        choices = [columns]
-        if coding:
-            cut = _whole_codons(columns)
-            # The start and stop codons count towards the identity; if they would take it
-            # under the threshold, the match is shown without them rather than not at all.
-            choices = [_codon_ends(cut, target, query, strand), cut] if cut else []
-        for chosen in choices:
-            in_target = [t for t, _, _ in chosen if t is not None]
-            in_query = [q for _, q, _ in chosen if q is not None]
-            coverage = 100.0 * len(in_query) / len(query)
-            identity = 100.0 * sum(same for _, _, same in chosen) / len(chosen)
-            if identity >= min_identity and coverage >= min_coverage:
-                results.append((in_target[0], in_target[-1], identity, in_query[0],
-                                in_query[-1] + 1, coding and _frameshift(chosen)))
-                break
+        hit: Hit | None = None
+        diagonals: set[int] = set()
+        if len(window) >= SEED:
+            alignments = aligner.align(window, query)
+            if len(alignments):
+                # The annotation is the aligned region and nothing else, so the identity tested
+                # here is the identity the user reads. Ends of the catalogue entry that the
+                # local alignment left out are not added back: under this scoring a dropped end
+                # is at least 40 % mismatches, and in real vectors it is the junction the
+                # element was cloned into (a BamHI site before an SV40 polyA, the linker of a
+                # GFP fusion), not the element. The match says which bases of the entry it
+                # covers, so a shorter match is never silent.
+                columns = _columns(alignments[0], window_start)
+                diagonals = {t - q for t, q, _ in columns if t is not None and q is not None}
+                choices = [columns]
+                if coding:
+                    cut = _whole_codons(columns)
+                    # The start and stop codons count towards the identity; if they would take
+                    # it under the threshold, the match is shown without them rather than not
+                    # at all.
+                    choices = [_codon_ends(cut, target, query, strand), cut] if cut else []
+                for chosen in choices:
+                    in_target = [t for t, _, _ in chosen if t is not None]
+                    in_query = [q for _, q, _ in chosen if q is not None]
+                    coverage = 100.0 * len(in_query) / len(query)
+                    identity = 100.0 * sum(same for _, _, same in chosen) / len(chosen)
+                    if identity >= min_identity and coverage >= min_coverage:
+                        hit = (in_target[0], in_target[-1], identity, in_query[0],
+                               in_query[-1] + 1, coding and _frameshift(chosen))
+                        break
+        missed = [o for o in group if o not in diagonals] if len(group) > 1 else []
+        # The alignment is this run's answer when it stands in for at least one of the guesses
+        # it was made from; the guesses it never passes through are aligned on their own,
+        # next, so that the results stay in the order the guesses are in.
+        if hit is not None and len(missed) < len(group):
+            results.append(hit)
+        # When it stands in for none of them it has drifted to a placement some other guess
+        # will find on its own, so its answer is dropped rather than reported from here: that
+        # leaves the results exactly the ones the guesses give one at a time.
+        pending.extendleft((o, o, (o,)) for o in reversed(missed))
     return results
 
 
