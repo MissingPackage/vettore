@@ -1223,6 +1223,13 @@ LOSES_AN_ELEMENT = {
     "stress": (5, "3×HA"),               #  81 bp, the copy that stands on its own
     "grown": (3, "T2A"),                 #  54 bp, the shortest entry S5.4 aligns
 }
+#: Both halves of the "grown" boundary are measured, not reasoned: at three sites exactly
+#: the T2A goes and nothing else, and nothing is reported that the verbatim plasmid does not
+#: report. At two sites nothing is lost at all, and the T2A — cut at 18 and 36 of its 54
+#: bases, which leaves the first seed window free — sits at 96.30 %, 1.30 points above the
+#: 95 % floor. That is the thinnest margin in this fixture: P2A has 1.97 and the rabbit
+#: β-globin polyA 2.98. Worth writing down because adding another short entry to
+#: GROWN_ELEMENTS is what would break it, and the failure would read as a budget problem.
 
 #: One case per (fixture, deleted sites), named so a failure says which.
 POINTS = tuple(
