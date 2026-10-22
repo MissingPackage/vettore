@@ -1,3 +1,4 @@
+import collections
 import functools
 import json
 import time
@@ -860,13 +861,23 @@ PACKED_ELEMENTS = (
 
 #: Each fixture with the points on the cost curve the tests pin for it: none, one deleted site
 #: per element, three, and five where five is still annotated as the verbatim plasmid is. The
-#: stress plasmid is not pinned at five because it loses elements there, which is the
-#: seed-destruction boundary and is asserted in its own test below.
+#: stress plasmid is not pinned at five because it loses an element there — see
+#: `LOSES_AN_ELEMENT`, which is where that boundary is asserted.
 FIXTURES = (
     ("aav", AAV_ELEMENTS, AAV_INVERTED, (0, 1, 3, 5)),
     ("all-in-one", ALL_IN_ONE_ELEMENTS, (), (0, 1, 3, 5)),
     ("stress", PACKED_ELEMENTS, (), (0, 1, 3)),
 )
+
+#: Where each fixture loses an element, and which: the deleted-site count at which the
+#: shortest entry the fixture aligns has a cut in every one of its six seed windows. The
+#: stress plasmid gets there first because it carries 3×HA at 81 bp, which is also why it is
+#: pinned only to three sites.
+LOSES_AN_ELEMENT = {
+    "aav": (6, "AmpR promoter"),         # 105 bp
+    "all-in-one": (6, "AmpR promoter"),  # 105 bp
+    "stress": (5, "3×HA"),               #  81 bp, the copy that stands on its own
+}
 
 #: One case per (fixture, deleted sites), named so a failure says which.
 POINTS = tuple(
@@ -902,31 +913,33 @@ def _diverged(feature, sites: int) -> str:
     return sequence
 
 
-def _losses(element_names: tuple[str, ...], sites: int) -> dict[str, int]:
-    """How many bases each element of the fixture lost, by name.
+def _losses(element_names: tuple[str, ...], sites: int) -> dict[str, tuple[int, ...]]:
+    """How many bases each *copy* of each element lost, by name, largest loss first.
 
-    Including the entries the fixture does not list: SaCas9 carries 3×HA at base 3262 and
-    detection reports the tag as well as the nuclease, and a cut in SaCas9 shortens the tag
-    only if it lands inside it. Without that, a floor derived from the site count would let
-    that copy of the tag degrade by three points unnoticed.
+    By copy and not by name, because an entry can appear twice over: SaCas9 carries 3×HA at
+    base 3262, so a plasmid that lists both the nuclease and the tag has the tag reported
+    twice, and a cut in SaCas9 shortens the copy inside it only if it lands inside it. Keyed
+    by name alone, the copy inside SaCas9 would inherit the standalone copy's loss and its
+    floor would allow it to degrade by three points unnoticed.
     """
     catalogued = {feature.name: feature for feature in catalogue()}
-    lost = {}
+    lost: dict[str, list[int]] = {}
     for name in element_names:
-        feature = catalogued[name]
-        cuts, width = _cuts(feature, sites)
-        lost[name] = width * len(cuts)
+        cuts, width = _cuts(catalogued[name], sites)
+        lost.setdefault(name, []).append(width * len(cuts))
     for name in element_names:
         host = catalogued[name]
         cuts, width = _cuts(host, sites)
+        deleted = {cut + offset for cut in cuts for offset in range(width)}
         for inner in catalogue():
-            if inner.name in lost or inner.length >= host.length:
+            if inner.name == host.name:
                 continue
             at = host.sequence.find(inner.sequence)
-            if at < 0:
-                continue
-            lost[inner.name] = width * sum(at <= cut < at + inner.length for cut in cuts)
-    return lost
+            while at >= 0:            # every copy, and the bases gone from each, not the
+                lost.setdefault(inner.name, []).append(   # cuts that start inside it, since
+                    len(deleted & set(range(at, at + inner.length))))  # a cut can straddle
+                at = host.sequence.find(inner.sequence, at + 1)        # either end
+    return {name: tuple(sorted(counts, reverse=True)) for name, counts in lost.items()}
 
 
 @functools.cache
@@ -958,7 +971,8 @@ def _plasmid(element_names: tuple[str, ...], sites: int = 0,
 #: length times the query's — so a count of passes can stay flat while the work behind it
 #: grows. Figures for the catalogue as it stands and for the 60 entries PR #10 grows it to,
 #: keyed by (fixture, deleted sites). The bounds are sized for the grown one, since the
-#: criterion is written for it; the seconds are this machine's, for scale only.
+#: criterion is written for it; the seconds are this machine's on the catalogue as it stands,
+#: for scale only, and are the same measurements the table above records.
 #:
 #: Each bound sits about 17 % above the grown catalogue's figure, except ("aav", 0): a
 #: verbatim AAV vector costs almost nothing precisely because every element is exact, so 2 M
@@ -974,10 +988,10 @@ def _plasmid(element_names: tuple[str, ...], sites: int = 0,
 #: and `test_an_element_present_verbatim_is_found_without_aligning_it`, one each.
 ALIGNMENT_WORK = {
     #  fixture,    sites         36 entries         60 entries      seconds
-    ("aav",        0):   2_000_000,  #    0.34 M / 15 p     0.34 M / 15 p     0.05
-    ("aav",        1):  36_000_000,  #   30.38 M / 35 p    30.38 M / 35 p     0.9
-    ("aav",        3):  70_000_000,  #   60.28 M / 50 p    60.28 M / 50 p     1.7
-    ("aav",        5): 105_000_000,  #   90.09 M / 63 p    90.09 M / 63 p     2.5
+    ("aav",        0):   2_000_000,  #    0.34 M / 15 p     0.34 M / 15 p     0.04
+    ("aav",        1):  36_000_000,  #   30.38 M / 35 p    30.38 M / 35 p     0.85
+    ("aav",        3):  70_000_000,  #   60.28 M / 50 p    60.28 M / 50 p     1.67
+    ("aav",        5): 105_000_000,  #   90.09 M / 63 p    90.09 M / 63 p     2.56
     ("all-in-one", 0):  26_000_000,  #   22.01 M /  9 p    22.24 M / 12 p     0.7
     ("all-in-one", 1):  92_000_000,  #   78.56 M / 33 p    78.79 M / 36 p     2.3
     ("all-in-one", 3): 165_000_000,  #  141.22 M / 59 p   141.45 M / 62 p     4.0
@@ -1010,8 +1024,9 @@ def _alignment_work(sequence: str, circular: bool = True, features=None) -> tupl
 @functools.cache
 def _annotated(element_names: tuple[str, ...], sites: int,
                inverted: tuple[str, ...]) -> tuple:
-    """``detect`` on a fixture, remembered: nine pinned points and eight annotation cases ask
-    for the same plasmids, and each detection is seconds."""
+    """``detect`` on a fixture, remembered: eleven pinned points and eight annotation cases ask
+    for the same plasmids, and each detection is seconds. The matches come back shared, since
+    ``Match`` is not frozen, so read them and do not write to them."""
     return tuple(detect(_plasmid(element_names, sites, inverted), circular=True))
 
 
@@ -1049,44 +1064,77 @@ def test_a_plasmid_is_annotated_the_same_however_its_elements_diverge(label, ele
     # None of them flagged, where a single deleted base rather than a codon would flag every
     # coding sequence and the dialog would leave them unticked.
     assert [match.frameshift for match in diverged] == [match.frameshift for match in exact]
+    # Not one of them flagged — asserted outright, and not only as parity with the verbatim
+    # plasmid, which an engine that flagged both would satisfy while the words above were
+    # false.
+    assert not any(match.frameshift for match in diverged)
+    assert not any(match.frameshift for match in exact)
     losses = _losses(element_names, sites)
     for match in diverged:
         # The whole entry, not part of it: an annotation that dropped bases off an element's
         # head would otherwise satisfy the identity below by having less to be wrong about.
         assert match.part == (1, match.entry_length), f"{match.name} is partial: {match.part}"
-        # And no further below 100 % than the bases that element lost — derived from what was
-        # deleted from it rather than from a constant, so a shorter entry in some later
-        # fixture cannot fail it for no reason. It is exact for these fixtures, whose cuts are
-        # spaced far apart: each deletion is one gap column and costs nothing else. Cuts
-        # clustered together would cost a mismatch as well, and would need a column of slack.
-        lost = losses.get(match.name, 0)
-        floor = 100.0 * (match.entry_length - lost) / match.entry_length
-        assert match.identity >= floor - 1e-9, (
-            f"{match.name} at {match.identity:.3f} %, {lost} bases deleted of "
-            f"{match.entry_length}, so no lower than {floor:.3f} %"
-        )
+    # Then, per element and per copy of it, how far below 100 % it may read and how long it
+    # may be — both derived from the bases that copy lost rather than from a constant, so a
+    # shorter entry in some later fixture cannot fail them for no reason. Copies are paired
+    # worst with worst: fewer bases lost means a higher identity and a longer span. The floors
+    # are exact for every element these fixtures cut — measured slack zero everywhere —
+    # because the cuts are spaced far apart, so each deletion is one gap column and costs
+    # nothing else; cuts clustered together would cost a mismatch as well and would need a
+    # column of slack.
+    for name in sorted(set(names(diverged))):
+        copies = sorted((match for match in diverged if match.name == name),
+                        key=lambda match: match.identity, reverse=True)
+        floors = losses.get(name, (0,) * len(copies))
+        assert len(floors) >= len(copies), f"{name}: {len(copies)} copies, {floors}"
+        for match, lost in zip(copies, sorted(floors)):
+            floor = 100.0 * (match.entry_length - lost) / match.entry_length
+            assert match.identity >= floor - 1e-9, (
+                f"{name} at {match.identity:.3f} %, {lost} bases deleted of "
+                f"{match.entry_length}, so no lower than {floor:.3f} %"
+            )
+            # And the reported size moves with those bases, which is what the dialog turns
+            # into "N bp missing" against the catalogue entry.
+            assert len(match.span(15_000)) == match.entry_length - lost, (
+                f"{name} spans {len(match.span(15_000))} bp, expected "
+                f"{match.entry_length - lost}"
+            )
 
 
 @pytest.mark.parametrize("label, element_names, inverted, counts", FIXTURES)
 def test_enough_deleted_sites_stop_an_element_being_found_at_all(label, element_names,
                                                                  inverted, counts):
-    """The other end of the curve, and the reason the pinned points stop where they do: with
-    six seeds per entry, six evenly spaced deleted sites leave no seed intact, the element is
-    ruled out without an alignment, and the plasmid is no longer the same document. This is
-    what makes the cost a sawtooth rather than a ramp, and it is why a bound on one point is
-    not a ceiling."""
-    exact = names(_annotated(element_names, 0, inverted))
-    assert names(_annotated(element_names, 6, inverted)) != exact
-    # And the last count the fixture pins is still the same document, so the line is here.
-    assert names(_annotated(element_names, max(counts), inverted)) == exact
+    """The other end of the curve, and the reason the pinned points stop where they do.
+
+    An element is found while *any* of its six seed windows is free of a cut — a seed after
+    the last cut still matches, shifted — so it is lost when every window holds one. With
+    evenly spaced cuts that happens as soon as the spacing drops below `SEED`, which is why
+    the casualty is always the shortest entry the fixture aligns: the AmpR promoter at 105 bp,
+    or 3×HA at 81 bp, and never a nuclease, whose first and last seeds survive any number of
+    cuts in between. This is what makes the cost a sawtooth rather than a ramp, and why a
+    bound on one point is not a ceiling.
+    """
+    sites, casualty = LOSES_AN_ELEMENT[label]
+    exact = collections.Counter(names(_annotated(element_names, 0, inverted)))
+    lost = collections.Counter(names(_annotated(element_names, sites, inverted)))
+    # One copy of one named element, and nothing gained: a bare inequality of the two lists
+    # would be satisfied by an element appearing, or by the order changing.
+    assert exact - lost == collections.Counter({casualty: 1}), f"{label}: {exact} -> {lost}"
+    assert lost - exact == collections.Counter()
+    # And one site fewer is still the same document, so the line is exactly here, and the
+    # last point the fixture pins is on the right side of it.
+    before = collections.Counter(names(_annotated(element_names, sites - 1, inverted)))
+    assert before == exact
+    assert max(counts) < sites
 
 
 def test_the_budget_is_met_on_a_single_aav_vector_with_a_codon_lost_per_element():
     """S5.4's two seconds as they are written, in seconds, on the vector the criterion is for.
     The cells tests are what fail on a regression; this one catches a cost that is not
     alignment, so it also times the heaviest element set that has a point inside the budget.
-    The margins are 2.2x for the AAV point and 1.65x for the stress one; a shared CI runner
-    would have to be two thirds slower than this machine for either to be a false failure."""
+    The margins against the two seconds are 2.4x for the AAV point (0.85 s) and 1.7x for the
+    stress one (1.2 s), so a shared CI runner would have to be two thirds slower than this
+    machine for either to be a false failure."""
     for element_names, sites, inverted in ((AAV_ELEMENTS, 1, AAV_INVERTED),
                                            (PACKED_ELEMENTS, 0, ())):
         sequence = _plasmid(element_names, sites, inverted)
