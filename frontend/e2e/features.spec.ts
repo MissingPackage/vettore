@@ -210,3 +210,44 @@ test("a coding sequence with a codon put in after its ATG says so", async ({ pag
   await expect(row).toContainText("798 bp");
   await expect(row.getByTestId("detect-part")).toHaveText("· 3 bp inserted");
 });
+
+test("two indels that cancel out are not called a frameshift", async ({ page }) => {
+  const catalogue = JSON.parse(fs.readFileSync(
+    path.resolve(import.meta.dirname, "../../src/vettore/data/common_features.json"), "utf-8"));
+  const egfp: string = catalogue.features.find((f: { name: string }) => f.name === "EGFP").sequence;
+  let state = 11;
+  const filler = Array.from({ length: 400 }, () => {
+    state = (state * 1103515245 + 12345) % 2 ** 31;
+    return "ACGT"[state % 4];
+  }).join("");
+  // One base rotated 18 places, as in pIRESpuro's pac: six codons differ, the protein is whole.
+  const rotated = egfp.slice(0, 300) + egfp.slice(301, 319) + egfp[300] + egfp.slice(319);
+  await page.goto(`/?token=${TOKEN}`);
+  await newPlasmid(page, "EGFP-rotated", filler + rotated + filler);
+  await menu(page, "Features", "Detect Common Features…");
+  const row = page.getByTestId("detect-row").filter({ hasText: "EGFP" });
+  await expect(row).toBeVisible({ timeout: 30_000 });
+  await expect(row.getByTestId("detect-frameshift")).toHaveCount(0);
+  await expect(row.getByTestId("detect-part")).toHaveText("· 6 residues changed by indels");
+  await expect(row.getByRole("checkbox")).toBeChecked();
+});
+
+test("a stop codon inside a coding sequence is named and not ticked", async ({ page }) => {
+  const catalogue = JSON.parse(fs.readFileSync(
+    path.resolve(import.meta.dirname, "../../src/vettore/data/common_features.json"), "utf-8"));
+  const egfp: string = catalogue.features.find((f: { name: string }) => f.name === "EGFP").sequence;
+  let state = 13;
+  const filler = Array.from({ length: 400 }, () => {
+    state = (state * 1103515245 + 12345) % 2 ** 31;
+    return "ACGT"[state % 4];
+  }).join("");
+  // TAA in place of codon 151: a 99.6 % match whose protein ends at residue 151.
+  const nonsense = egfp.slice(0, 450) + "TAA" + egfp.slice(453);
+  await page.goto(`/?token=${TOKEN}`);
+  await newPlasmid(page, "EGFP-nonsense", filler + nonsense + filler);
+  await menu(page, "Features", "Detect Common Features…");
+  const row = page.getByTestId("detect-row").filter({ hasText: "EGFP" });
+  await expect(row).toBeVisible({ timeout: 30_000 });
+  await expect(row.getByTestId("detect-stop")).toContainText("at residue 151");
+  await expect(row.getByRole("checkbox")).not.toBeChecked();
+});

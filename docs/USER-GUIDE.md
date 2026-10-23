@@ -425,7 +425,12 @@ example "708 bp · bases 4–711 of 711" for an mCherry whose first codon is not
 feature's notes say the same; "798 bp · 3 bp inserted" says the copy here has bases the
 catalogue entry does not. A coding sequence with an insertion or deletion that breaks its
 reading frame is marked "Frameshift" and left unticked: the match can be over 99 % while the
-protein is different after the break. A record that annotates an element on its lower strand
+protein is different after the break. An insertion and a deletion that cancel each other out
+only change the residues between them: when that is a few residues the row says so ("5
+residues changed by indels") and is ticked as usual; when it is more than 10, a stretch of the
+protein is another sequence, and the row is amber and unticked. A stop codon inside the
+protein, from a substitution or from indels, is marked "Premature stop" with the residue where
+the protein ends, and left unticked too. A record that annotates an element on its lower strand
 is cited as `LT727488.1:complement(3997..4178)`: the element is stored the way a vector reads
 it.
 

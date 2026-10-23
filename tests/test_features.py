@@ -199,15 +199,42 @@ def test_an_indel_that_breaks_the_reading_frame_is_flagged(edit, frameshift):
     assert match.as_dict(len(construct))["frameshift"] is frameshift
 
 
-def test_an_insertion_and_a_deletion_that_make_up_for_each_other_are_flagged():
-    """One base in at 300, one out at 330: the frame is right again after, but the ten codons
-    between are another protein."""
+def _egfp_edited(edit) -> str:
     [egfp] = [f for f in catalogue() if f.name == "EGFP"]
-    seq = egfp.sequence
+    return edit(egfp.sequence)
+
+
+@pytest.mark.parametrize(("edit", "changed", "stop", "warning"), [
+    # One base rotated 18 places, as in the pac gene of the pIRESpuro vectors (Z75185.1):
+    # the aligner reads it as a deletion and an insertion, and six residues of a whole
+    # protein differ.
+    (lambda s: s[:300] + s[301:319] + s[300] + s[319:], 6, 0, False),
+    # One base in at 300 and one out at 330: eleven residues differ, more than a few.
+    (lambda s: s[:300] + ("A" if s[300] != "A" else "C") + s[300:330] + s[331:], 11, 0, True),
+    # A T in at 303 and a base out at 333: the codons between read TAA, a stop at residue 102.
+    (lambda s: s[:303] + "T" + s[303:333] + s[334:], 11, 102, True),
+    # One base in at 150 and one out at 550: the frame comes back, 130 residues later.
+    (lambda s: s[:150] + "A" + s[150:550] + s[551:], 130, 0, True),
+    # No indel, a TAA in place of codon 151: the protein ends there.
+    (lambda s: s[:450] + "TAA" + s[453:], 0, 151, False),
+])
+def test_indels_that_cancel_out_and_stops_inside_a_cds(edit, changed, stop, warning):
+    """The frame is right again after the second indel, so it is not a frameshift: the row
+    says how many residues differ (counted on the translations, as a biologist would), is
+    amber past a few, and a stop codon inside the protein, from indels or a substitution, is
+    named with the residue where the protein ends."""
+    edited = _egfp_edited(edit)
+    protein = str(Seq(edited).translate())
+    assert (protein.find("*") + 1 if "*" in protein[:-1] else 0) == stop
     filler = clean_dna(400, 314)
-    edited = seq[:300] + ("A" if seq[300] != "A" else "C") + seq[300:330] + seq[331:]
-    [match] = [m for m in detect(filler + edited + filler, False) if m.name == "EGFP"]
-    assert len(edited) == len(seq) and match.frameshift
+    for strand in (1, -1):
+        construct = filler + (edited if strand == 1 else rc(edited)) + filler
+        [match] = [m for m in detect(construct, False) if m.name == "EGFP"]
+        assert not match.frameshift, strand
+        assert (match.shifted, match.stop) == (changed, stop), strand
+        row = match.as_dict(len(construct))
+        assert (row["residuesChanged"], row["shiftWarning"]) == (changed, warning)
+        assert row["prematureStop"] == (stop or None)
 
 
 def test_one_mismatch_in_a_long_element_is_not_shown_as_100_percent():
@@ -1988,22 +2015,13 @@ def test_the_cbh_promoter_is_not_reported_on_a_cag_promoter():
     assert "CBh promoter" not in names(detect(cag.sequence, circular=False))
 
 
-def test_the_pac_of_a_pirespuro_vector_is_reported_and_called_a_frameshift():
-    """A known wrong word, recorded rather than left to be discovered twice.
-
-    Z75185.1 is pIRES-P, of the pIRESpuro family, and its pac is a complete gene: 603 bases,
+def test_the_pac_of_a_pirespuro_vector_is_reported_as_an_intact_gene():
+    """Z75185.1 is pIRES-P, of the pIRESpuro family, and its pac is a complete gene: 603 bases,
     divisible by three, a 200-residue protein with no internal stop. It differs from the entry
     over an 18-base window that reads as one base rotated — a deletion and an insertion
     nineteen bases apart — and the aligner prefers that to the mismatches an ungapped placement
-    would need. The engine's rule then calls a compensated indel pair a frameshift, which is
-    what it documents, and the user is shown "Frameshift" over a gene whose protein is intact
-    outside those six codons.
-
-    The element is still reported, at honest coordinates, unticked and with a warning that asks
-    the user to look, so this errs towards caution rather than towards a silent wrong
-    annotation. The word belongs to the engine's story, not to the catalogue's, and the thread
-    that owns it has been told. This test holds the shape of the case so that a fix there shows
-    up here as a failure to update rather than as a silent change of answer.
+    would need. The indels cancel out, so this is not a frameshift: the row counts the residues
+    the rotation changes (5), names no premature stop, and is ticked like any other match.
     """
     pac = entry("PuroR (pac)")
     [match] = [m for m in detect(record_sequence("Z75185.1")) if m.name == pac.name]
@@ -2015,7 +2033,9 @@ def test_the_pac_of_a_pirespuro_vector_is_reported_and_called_a_frameshift():
     protein = str(Seq(found).translate())
     assert protein.endswith("*") and "*" not in protein[:-1], "the gene is intact"
     assert len(protein) - 1 == 200, len(protein) - 1
-    assert match.frameshift is True, "if this fails, the engine was fixed: drop this test"
+    assert not match.frameshift and not match.stop
+    assert match.shifted == 5
+    assert match.as_dict(len(record_sequence("Z75185.1")))["shiftWarning"] is False
 
 
 def test_both_copies_of_a_tandem_tag_are_reported():
@@ -2371,3 +2391,18 @@ def test_a_tandem_array_reports_a_copy_for_every_repeat():
         sequence = clean_dna(414, 19) + tag.sequence * copies + clean_dna(414, 20)
         starts = {m.start for m in detect(sequence, circular=False) if m.name == tag.name}
         assert {414 + i * tag.length for i in range(copies)} <= starts, copies
+
+
+def test_indels_adding_up_to_a_codon_count_the_residues_that_really_change():
+    """Two bases in at 285 and one at 309 put a whole codon in: compared position by position,
+    every residue after the extra one would count as changed. The count is the edit distance
+    between the two stretches of protein."""
+    [kan] = [f for f in catalogue() if f.name == "KanR"]
+    seq = kan.sequence
+    edited = seq[:285] + "GC" + seq[285:309] + "A" + seq[309:]
+    filler = clean_dna(400, 315)
+    [match] = [m for m in detect(filler + edited + filler, False) if m.name == "KanR"]
+    assert not match.frameshift and not match.stop
+    mine, theirs = str(Seq(edited).translate()), str(Seq(seq).translate())
+    assert len(mine) == len(theirs) + 1
+    assert match.shifted == 7

@@ -130,14 +130,20 @@ def _candidate_offsets(target: str, feature: str) -> set[int]:
     return offsets
 
 
-#: (start, end, identity, first, last, frameshift) of a hit: start and end on the target,
-#: inclusive; first and last the bases of the query it covers, as a 0-based half-open range;
-#: frameshift whether the indels inside a coding sequence break its reading frame.
-Hit = tuple[int, int, float, int, int, bool]
+#: (start, end, identity, first, last, frameshift, shifted) of a hit: start and end on the
+#: target, inclusive; first and last the bases of the query it covers, as a 0-based half-open
+#: range; frameshift whether the indels inside a coding sequence break its reading frame;
+#: shifted how many residues indels that make up for each other change, when that leaves the
+#: protein whole (no stop, frame restored).
+Hit = tuple[int, int, float, int, int, bool, int]
 
 Column = tuple[int | None, int | None, bool]
 
 STOP_CODONS = frozenset({"TAA", "TAG", "TGA"})
+
+#: Indels that cancel out but change more residues than this are still shown in amber and
+#: left unticked: the protein has no stop, but a stretch of it is another sequence.
+SHIFT_WARNING = 10
 
 
 @dataclass
@@ -153,6 +159,8 @@ class Match:
     entry_length: int    # length of the catalogue entry
     part: tuple[int, int]  # the bases of the entry the match covers, 1-based inclusive
     frameshift: bool = False  # a coding sequence whose indels break its reading frame
+    shifted: int = 0     # residues changed by indels that cancel out, the frame restored
+    stop: int = 0        # the residue at which a premature stop codon ends the protein
 
     def span(self, length: int) -> set[int]:
         if self.start <= self.end:
@@ -165,7 +173,10 @@ class Match:
                 "identity": shown_identity(self.identity), "note": self.note,
                 "source": self.source, "length": len(self.span(length)),
                 "catalogueLength": self.entry_length, "catalogueFrom": self.part[0],
-                "catalogueTo": self.part[1], "frameshift": self.frameshift}
+                "catalogueTo": self.part[1], "frameshift": self.frameshift,
+                "residuesChanged": self.shifted,
+                "shiftWarning": self.shifted > SHIFT_WARNING,
+                "prematureStop": self.stop or None}
 
 
 def shown_identity(identity: float) -> float:
@@ -250,20 +261,91 @@ def _ncoi_codon(codon: str, strand: int) -> bool:
     return codon[0] == "G" and codon not in STOP_CODONS
 
 
-def _frameshift(columns: list[Column]) -> bool:
-    """Whether the gaps inside an alignment break its reading frame: overall, or over a codon
-    or more between an insertion and a deletion that make up for each other."""
+def _translate(bases: str) -> str:
+    return str(Seq(bases[: len(bases) - len(bases) % 3]).translate())
+
+
+def _frameshift(columns: list[Column], target: str, query: str,
+                strand: int) -> tuple[bool, int]:
+    """(frameshift, changed) for a coding sequence annotated over ``columns``.
+
+    The reading frame is broken when the gaps leave it shifted at the end. Gaps that restore
+    it (an insertion and a deletion, one base rotated by a few places as in the pac gene of
+    the pIRESpuro vectors) only change the residues between them, as substitutions would. Each
+    such stretch is read from the codon of its first indel to the codon of its last, in the
+    vector and in the entry, and ``changed`` counts the residues that differ (a stop they bring
+    in is found with every other premature stop, by ``_premature_stop``). The annotation
+    starts on a codon of the entry's frame, so the vector's codons are counted from there, on
+    its own coding strand."""
+    in_target = [t for t, _, _ in columns if t is not None]
+    first, last = in_target[0], in_target[-1]
+    length = len(query)
+    entry = query if strand == 1 else _reverse_complement(query)
+
+    def vector_codons(a: int, b: int) -> str:
+        lo, hi = sorted((a - first) // 3 if strand == 1 else (last - a) // 3
+                        for a in (a, b))
+        if strand == 1:
+            return target[first + 3 * lo : first + 3 * (hi + 1)]
+        return _reverse_complement(target[last - 3 * hi - 2 : last - 3 * lo + 1])
+
+    def entry_codons(a: int, b: int) -> str:
+        lo, hi = sorted((q if strand == 1 else length - 1 - q) // 3 for q in (a, b))
+        return entry[3 * lo : 3 * (hi + 1)]
+
     shift = 0
-    out_of_frame = 0
+    changed = 0
+    anchor: tuple[int, int] | None = None     # the last aligned pair before a stretch
+    opened: tuple[int, int] | None = None     # where the current stretch began
+    read_out = False                          # whether any base in it was read out of frame
     for t, q, _ in columns:
+        before = shift
         shift += (q is None) - (t is None)
-        if shift % 3 and q is not None:
-            out_of_frame += 1
-            if out_of_frame >= 3:
-                return True
-        elif shift % 3 == 0:
-            out_of_frame = 0
-    return shift % 3 != 0
+        if t is not None and q is not None:
+            if before % 3 == 0 and shift % 3 == 0:
+                if opened is not None:
+                    mine = _translate(vector_codons(opened[0], t))
+                    theirs = _translate(entry_codons(opened[1], q))
+                    # A codon put in or taken out whole is an in-frame indel, which the row
+                    # already shows as bases inserted or missing; only bases read in another
+                    # frame count as changed residues.
+                    if read_out:
+                        changed += _residue_edits(mine, theirs)
+                    opened, read_out = None, False
+                anchor = (t, q)
+            elif shift % 3:
+                read_out = True
+        elif before % 3 == 0 and shift % 3 and opened is None and anchor is not None:
+            opened = anchor
+    if shift % 3 or opened is not None:
+        return True, 0
+    return False, changed
+
+
+def _residue_edits(a: str, b: str) -> int:
+    """How many residues differ between two stretches of protein: position by position when
+    they are the same length, and otherwise the fewest substitutions, insertions and deletions
+    (indels adding up to a whole codon make one a residue longer, and comparing them position
+    by position would count every residue after the extra one as different)."""
+    if len(a) == len(b):
+        return sum(x != y for x, y in zip(a, b))
+    previous = list(range(len(b) + 1))
+    for i, x in enumerate(a, 1):
+        current = [i]
+        for j, y in enumerate(b, 1):
+            current.append(min(previous[j] + 1, current[j - 1] + 1, previous[j - 1] + (x != y)))
+        previous = current
+    return previous[-1]
+
+
+def _premature_stop(coding: str) -> int:
+    """The residue, counted from 1, at which a stop codon ends the protein of ``coding`` (read
+    from its first base) before its last codon; 0 when there is none. A stop codon that a
+    substitution or two indels bring into a coding sequence leave a 99 % match whose protein
+    ends early."""
+    protein = _translate(coding)
+    found = protein.find("*")
+    return found + 1 if 0 <= found < len(protein) - 1 else 0
 
 
 #: Two candidate positions this close together are the same copy of the element read in two
@@ -355,7 +437,7 @@ def _match_long(target: str, query: str, length: int, min_identity: float,
         # of them. Every guess is tested, because a repeated element (a 6×HA tag is two 3×HA
         # in a row) gives one guess per copy and per register.
         if 100.0 >= min_identity and target[offset : offset + len(query)] == query:
-            results.append((offset, offset + len(query) - 1, 100.0, 0, len(query), False))
+            results.append((offset, offset + len(query) - 1, 100.0, 0, len(query), False, 0))
             continue
         inexact.append(offset)
     # Four is the narrow part of the rule and is meant to be: it is as far apart as the
@@ -419,8 +501,10 @@ def _match_long(target: str, query: str, length: int, min_identity: float,
                     coverage = 100.0 * len(in_query) / len(query)
                     identity = 100.0 * sum(same for _, _, same in chosen) / len(chosen)
                     if identity >= min_identity and coverage >= min_coverage:
+                        frameshift, shifted = (_frameshift(chosen, target, query, strand)
+                                               if coding else (False, 0))
                         hit = (in_target[0], in_target[-1], identity, in_query[0],
-                               in_query[-1] + 1, coding and _frameshift(chosen))
+                               in_query[-1] + 1, frameshift, shifted)
                         break
         # A guess is stood in for only by an answer that was accepted and that the alignment
         # passes through. When the alignment over the wider window scores highest on a
@@ -460,7 +544,7 @@ def _match_short(target: str, query: str) -> list[Hit]:
     results = []
     start = target.find(query)
     while start != -1:
-        results.append((start, start + len(query) - 1, 100.0, 0, len(query), False))
+        results.append((start, start + len(query) - 1, 100.0, 0, len(query), False, 0))
         start = target.find(query, start + 1)
     return results
 
@@ -487,17 +571,22 @@ def detect(sequence: str, circular: bool = False, min_identity: float = DEFAULT_
                     else _match_long(target, query, length, min_identity, coverage,
                                      strand=strand,
                                      coding=feature.type == "CDS" and feature.length % 3 == 0))
-            for start, end, identity, first, last, frameshift in hits:
+            for start, end, identity, first, last, frameshift, shifted in hits:
                 if start >= length:
                     continue  # the same hit also appears in the first copy
                 # The query is the entry's reverse complement on the minus strand.
                 part = ((first + 1, last) if strand == 1
                         else (feature.length - last + 1, feature.length - first))
+                stop = 0
+                if feature.type == "CDS" and not frameshift:
+                    bases = target[start : end + 1]
+                    stop = _premature_stop(bases if strand == 1 else _reverse_complement(bases))
                 found.append(Match(name=feature.name, type=feature.type, start=start % length,
                                    end=end % length if circular else min(end, length - 1),
                                    strand=strand, identity=identity, note=feature.note,
                                    source=feature.source, entry_length=feature.length,
-                                   part=part, frameshift=frameshift))
+                                   part=part, frameshift=frameshift, shifted=shifted,
+                                   stop=stop))
     return _dedupe(found, length)
 
 
