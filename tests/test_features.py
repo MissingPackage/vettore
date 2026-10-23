@@ -1161,7 +1161,7 @@ DETECTION_BUDGET = 2.0
 # `test_the_document_is_not_walked_in_python_once_per_element` pins the scan the clock could not
 # see, by charging the document for what is asked of it rather than timing it. That last one is
 # what the fourth refutation above was reaching for, and it needs no threshold at all: the
-# engine asks the document for 267 things and a base-by-base scan for 3,962,927 of its bases.
+# engine asks the document for 387 things and a base-by-base scan for 6,361,551 of its bases.
 
 #: A single-AAV nuclease vector, with the elements of pX601 the catalogue carries, in that
 #: construct's own order: the AAV ends, the CMV–SaCas9–bGH polyA cassette, the U6 promoter of
@@ -1359,7 +1359,7 @@ def _plasmid(element_names: tuple[str, ...], sites: int = 0,
 #:
 #: Each bound sits about a sixth to a fifth above the grown catalogue's figure — 16 to 20 %,
 #: the spread being the rounding to a tidy number, with ("grown", 1) lowest at 16.3 % and
-#: ("grown", 0) highest at 20.3 % — except ("aav", 0): a
+#: ("grown", 0) highest at 20.2 % — except ("aav", 0): a
 #: verbatim AAV vector costs almost nothing precisely because every element is exact, so 2 M
 #: is nearly six times its cost and still an eighth of the 15.3 M it costs without the
 #: shortcut that makes it cheap.
@@ -1771,28 +1771,30 @@ def test_the_document_is_not_walked_in_python_once_per_element():
     It can be asserted without a clock, because the property that matters is not a duration. It
     is that the document is not read out of the C layer **once per element**: that is what
     separates the regression from a correct implementation that also reads the document in
-    Python, and it is why neither bound below is a constant. Measured here, over the 33 entries
-    and a 15 kb document, in 10 ms (the test as a whole costs 0.21 s, most of it the
-    instrument's own check below):
+    Python, and it is why neither bound below is a constant. Measured here, over the 53 entries
+    longer than `SHORT_FEATURE` and a 15 kb document, in 13 ms (the test as a whole costs
+    0.26 s, most of it the instrument's own check below). Six of the nine figures move with the
+    catalogue, so they were taken again when S5.4 grew it from 36 entries to 60; the index's
+    and the regex reader's do not, since those read the document and not the entries:
 
-        as shipped, `str.find`                            267 things asked of the document
+        as shipped, `str.find`                            387 things asked of the document
         a k-mer index built once per document         269,694 bases    correct, and quicker
         a compiled-regex IUPAC reader                       0          correct
-        base by base, exactness preserved           3,962,927          the regression
-        base by base over a `.upper()` copy           495,000          the regression
-        base by base over `document + ""`             495,000          the regression
-        base by base over `document.encode()`         495,000          the regression
-        base by base over `iter(document)`            495,000          the regression
-        `document.startswith(seed, i)` per position  2,966,634          the regression
+        base by base, exactness preserved           6,361,551          the regression
+        base by base over a `.upper()` copy           795,000          the regression
+        base by base over `document + ""`             795,000          the regression
+        base by base over `document.encode()`         795,000          the regression
+        base by base over `iter(document)`            795,000          the regression
+        `document.startswith(seed, i)` per position  4,764,594          the regression
 
     All nine find exactly the same offsets. The index is not a straw man: on this container it
-    is 1.4x quicker than `str.find` on the verbatim fixture (0.029 s against 0.042 s) and level
-    with it at one deleted site, so a test that forbade it would be sending a developer to C to
+    is 1.4x quicker than `str.find` on the verbatim fixture (0.029 s against 0.042 s, at the
+    36 entries of the time) and level with it at one deleted site, so a test that forbade it would be sending a developer to C to
     undo a speed-up. Note that it reads *more* bases per pass than any of the regressions — a
     window of `SEED` bases at every position — and still costs the least, because it reads them
     once where each of the others reads the whole document again for every entry. So the bound
     is one windowed pass over the document, and what it forbids is the per-element repetition:
-    at 33 entries the cheapest of the regressions is already 1.7x above it, and every extra
+    at 53 entries the cheapest of the regressions is already 2.8x above it, and every extra
     entry takes it further over while the index stays put. (Which is also why
     `assert len(long_enough) > 20` above is load-bearing and not decoration: at nineteen entries
     a full read per entry would fit inside the bound.) The count is then taken again on the same
@@ -1844,7 +1846,8 @@ def test_the_document_is_not_walked_in_python_once_per_element():
     # So before a low count below is trusted, check the instrument against the regression it
     # exists to catch — and against *both* of the ways it charges, since a review found that a
     # control going only through `__getitem__` passes with the rest of the instrument blind.
-    # Two entries are enough, and keep this to 0.2 s rather than the 3.7 s all 33 would cost.
+    # Two entries are enough, and keep this to 0.06 s rather than the 1.8 s all 53 would cost
+    # on this container (0.2 s against 3.7 s when there were 33, on a slower one).
     # Entries the fixture actually carries, because the equality below is vacuous on an element
     # that is absent: the two longest are SpCas9 and SaCas9, and this is the SaCas9 vector.
     a_couple = [element for element in long_enough

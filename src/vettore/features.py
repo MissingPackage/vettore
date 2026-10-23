@@ -669,22 +669,18 @@ def _names_another_element(label: str, element: str) -> bool:
     return bool(others) and not any(element in HOLDS.get(name, ()) for name in others)
 
 
-#: Kinds a label can name outright, where naming one rules the others out: a feature called
-#: "…intron" is not a polyA signal, whatever name it shares with one. Promoters and enhancers
-#: are deliberately absent, because a CMV enhancer-and-promoter block is labelled either way
-#: and neither label is wrong.
-#: A word in a label and the catalogue types it rules out, so that a label sharing a name with
-#: an entry of a kind it cannot be is not read as claiming to be that entry: "rabbit β-globin
-#: intron", the piece a CAG promoter is made of, shares "β-globin" with the rabbit β-globin
-#: polyA signal and is not it.
+#: A word a label can use to say outright what kind of element it is, and the catalogue types
+#: that word rules out. It keeps a label that shares a name with an entry of a kind it cannot
+#: be from being read as claiming to be that entry: "rabbit β-globin intron", the piece a CAG
+#: promoter is made of, shares "β-globin" with the rabbit β-globin polyA signal and is not it.
 #:
 #: Stated as what each word excludes, not as what it allows. Reading it the other way around
 #: made a word the catalogue has no type for exclude everything at once: nothing here is typed
 #: ``intron``, so "EF-1α promoter with intron A" and "hPGK (intron-less)" contradicted all
 #: sixty entries and switched the wrong-label warning off altogether.
 #:
-#: Promoters and enhancers do not exclude each other on purpose, because a CMV
-#: enhancer-and-promoter block is labelled either way and neither label is wrong.
+#: Promoters and enhancers do not exclude each other, on purpose: a CMV enhancer-and-promoter
+#: block is labelled either way and neither label is wrong.
 _KIND_WORDS = {"intron": frozenset({"polyA_signal"}),
                "polya": frozenset({"promoter", "enhancer"}),
                "polyadenylation": frozenset({"promoter", "enhancer"})}
