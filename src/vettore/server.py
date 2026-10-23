@@ -18,7 +18,19 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import alignment, app_info, digest_planner, fileio, gel, primer_design, sanger, settings, tm
+from . import (
+    alignment,
+    app_info,
+    digest_planner,
+    fileio,
+    gel,
+    msa,
+    ncbi,
+    primer_design,
+    sanger,
+    settings,
+    tm,
+)
 from . import features as common_features
 from .cloning.api import router as cloning_router
 from .cloning.base import CloningError, dna_sequence
@@ -179,6 +191,7 @@ ACTIONS: tuple[tuple[str, str], ...] = (
     ("/api/primer-design/", "Designing primers"),
     ("/api/cloning/", "The simulation"),
     ("/api/app/samples", "Opening the sample"),
+    ("/api/ncbi/", "Opening the record from NCBI"),
     ("/api/unsaved", "Counting the documents with unsaved changes"),
     ("/api/hand-over", "Opening the file"),
     ("/api/desktop/file-associations", "Changing which program opens sequence files"),
@@ -273,7 +286,7 @@ def create_app(token: str, static_dir: Path | None,
 
     app.include_router(cloning_router)
     # Feature modules own their routes; each exposes ``router``.
-    for module in (alignment, primer_design, app_info):
+    for module in (alignment, msa, primer_design, app_info, ncbi):
         app.include_router(module.router)
 
     @app.exception_handler(fileio.UnsupportedFile)

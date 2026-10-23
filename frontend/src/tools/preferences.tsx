@@ -317,6 +317,28 @@ function PreferencesDialog(props: ToolProps) {
 
         <OpenWithVettore />
 
+        <div className="vt-field" data-testid="pref-ncbi-field">
+          <span className="vt-field-label">Internet</span>
+          <label className="bp3-control bp3-checkbox vt-pref-check">
+            <input
+              type="checkbox"
+              data-testid="pref-ncbi"
+              checked={prefs.allowNcbi}
+              aria-describedby="pref-ncbi-hint"
+              onChange={(e) => change({ allowNcbi: e.target.checked },
+                                      e.target.checked ? "Open from NCBI is in the File menu"
+                                                       : "Open from NCBI is hidden")}
+            />
+            <span className="bp3-control-indicator" />
+            Allow Open from NCBI
+          </label>
+          <span className="vt-field-hint" id="pref-ncbi-hint">
+            File → Open from NCBI… downloads a public GenBank record by its accession number. It is
+            the only thing in Vettore that uses the internet, and only when you ask; it sends the
+            accession number and nothing else. Turned off, the menu item is hidden.
+          </span>
+        </div>
+
         {saved && (
           <Callout intent="success" data-testid="pref-saved">{saved}.</Callout>
         )}

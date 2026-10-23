@@ -3,7 +3,8 @@
 Vettore is an offline plasmid editor and cloning simulator. It follows the way bench work
 flows — open a construct, read its map and sites, plan the cloning, order the primers, verify
 the clone — and runs entirely on your own computer: no account, no internet, no data leaves
-the machine.
+the machine. The one exception is **File → Open from NCBI…**, which downloads a public record
+when you ask for it and sends nothing but the accession number.
 
 ## Contents
 
@@ -107,6 +108,32 @@ open the same help you find in the Help menu once a file is open.
   [Preferences](#preferences-file--preferences).
 
 Your `.dna` files open with their features, colours, primers (including 5′ tails) and topology.
+
+### Opening a record from NCBI (File → Open from NCBI…)
+
+Type a GenBank accession number, such as `MT612431.1`, `M77789.2` or `NC_001422.1`, and press
+**Open** (or Enter). Vettore downloads the record from NCBI and opens it as a new tab, not yet
+saved (save it with Ctrl+S to keep it). The welcome screen has the same link.
+
+- This is the only thing in Vettore that uses the internet, and only when you press Open. Only
+  the accession number is sent: no sequence and no file leaves your computer, and no account is
+  needed.
+- Without a connection the dialog says so and stays open, so you can try again; everything
+  else in Vettore works offline as always.
+- A wrong or unknown accession is named in the message, and a protein accession is pointed
+  out as such. An accession copied with words around it ("GenBank: MT612431.1") works too.
+- Records over 2,000,000 bp (a bacterial genome or a chromosome) are refused before they are
+  downloaded: download the region you need from the NCBI website and open that file. The
+  master record of a sequencing project holds no sequence; open one of its contigs.
+- Vettore opens whole records. A region written after the accession
+  (`NC_045512.2:21563-25384`) is refused rather than silently opening the whole record: open
+  the record and select the region, or download a chromosome region from the NCBI website.
+  SRA, BioProject, BioSample and PubMed Central identifiers are pointed out as such.
+- Typed without a version (`M77789`), the record opens under the version NCBI sends
+  (`M77789.2`), so you know which one you have.
+- The tab's History starts with "Opened from NCBI" and the accession.
+- To hide the menu item, untick **Allow Open from NCBI** in
+  [Preferences](#preferences-file--preferences).
 
 ## Copy and paste sequences
 
@@ -382,8 +409,21 @@ table tells you which one your plasmid carries.
 
 Every entry in the catalogue is a real subsequence of a public GenBank record. The table shows
 which record it came from and the percent identity of the match, so you can judge a hit
-yourself. Tick the ones you want and they are added to the map, coloured by type, with their
-provenance kept in the feature's notes.
+yourself. The identity is over exactly the bases that are annotated, and no row is ever below
+the minimum identity you chose. Only the part of the element that is really there is
+annotated: the cloning sites around it are not counted as part of it. A coding sequence is
+annotated in whole codons of its own frame, from the vector's own start codon to its own stop
+codon when they sit in frame next to the match: a TAG where the catalogue has TAA is still the
+stop, and an ATG followed by a codon put in for an NcoI site (ATG GGG ATT…) is still the start.
+When the match is less than the whole catalogue entry, the Size column says which part, for
+example "708 bp · bases 4–711 of 711" for an mCherry whose first codon is not ATG, and the
+feature's notes say the same; "798 bp · 3 bp inserted" says the copy here has bases the
+catalogue entry does not. A coding sequence with an insertion or deletion that breaks its
+reading frame is marked "Frameshift" and left unticked: the match can be over 99 % while the
+protein is different after the break.
+
+Tick the ones you want and they are added to the map, coloured by type, with their provenance
+kept in the feature's notes.
 
 Features already annotated are shown greyed and left unticked. This includes elements inside a
 larger feature named after them, however long that feature is: vendors often draw one "CMV
@@ -453,6 +493,19 @@ Click a row to list every difference in the reference's numbering, for example `
 If a sequence resembles the reference only in part (two plasmids that share a backbone but carry different cassettes), the table says *partial match* and only the shared region is shown. A sequence that shares nothing with the reference, or only a few bases by chance, is left out, with a note saying so.
 
 Limits: up to 10 sequences at a time (reference included), each up to 15,000 bp. A large comparison takes a few seconds per sequence. To compare part of a bigger sequence, make a new file from that region first (**Actions → New File from Selection**).
+
+### All to each other
+
+**Each to the reference** answers "where do these differ from this one?". To see several sequences side by side with none of them privileged (variants of a construct, capsid genes of several serotypes), choose **All to each other** at the top of the dialog, tick at least two sequences and press **Align**.
+
+The sequences are turned to the strand of the first circular sequence ticked (the first one ticked, when none is circular); each sequence is turned by the one it resembles most, so two constructs that share only an inverted element (a FLEx cassette, a loxP site) do not flip each other. Circular sequences are all opened at the same place, inside sequence they share (normally their base 1, unless they differ there, for example when one file starts inside a cassette the others lack), and away from any linear sequence (an amplicon, a read), so that nothing is cut in two; the table then says where each plasmid's origin moved. The most similar ones are lined up first, then the groups with each other (a progressive alignment, as ClustalW does), so similar sequences end up next to each other in the view. A bar shows how far the alignment has got; **Stop** abandons it.
+
+- The table gives each sequence's length, strand, the alignment columns it covers and how identical it is to the consensus.
+- **Conservation** draws, for every stretch of columns, the share of the sequences that carry the column's most common base: tall blue bars are conserved, short orange ones variable. A gap never counts as agreement, so a 10 bp insertion in one sequence out of ten shows as 10 %. Columns covered by a single sequence (the overhanging end of a longer one), or holding only N, compare nothing and are drawn as short grey stubs. Hover a bar for its columns; the most variable stretches are listed under it.
+- The view stacks the sequences under a **Consensus** row (the most common base of each column; an ambiguity code such as R where two are equally common; a gap where most sequences have one). Coloured marks are differences from the consensus.
+- **Differences between two sequences**: pick any two to list every difference of the first from the second, in the second's own numbering and strand, as in the reference mode. **Copy list** copies it for a spreadsheet. Only stretches the two have in common are compared: where both carry unrelated sequence (two inserts in one backbone, say), the stretch is named as *not compared* instead of being listed as hundreds of mutations. Insertions and deletions are always listed as differences, however long. A divergent but related stretch, such as the variable regions of two AAV serotypes, is still compared; unrelated sequence on both sides is recognised from about 150 bp, so a shorter one may be listed as a cluster of differences. Two circular sequences are compared all the way round, so a difference next to base 1 is reported like any other. At the ends of linear sequences, comparison stops where the two stop matching: an adapter, a barcode or a homology arm (from 10 bp, less than half of it identical) is named as not compared rather than listed as mutations; a shorter or still similar end, such as a SNP at the last base of an amplicon, is compared. The edge of a not-compared stretch is set by where the two start matching again, so a difference within about 6 bp of it may fall inside the stretch: check those few bases by eye in the alignment. Near the ends of two linear sequences, before the first or after the last stretch of 12 identical bases (between very divergent sequences, such as a codon-optimised gene and the native one, 8 identical bases, or failing that the last 30 bp), nothing beyond holds the alignment: several differences packed there can be read as substitutions or as an insertion or deletion, so they are listed marked *uncertain* (and noted in the copied list); check them against the trace. The list is worked out for the two sequences alone, so between divergent sequences it can group differences unlike the stacked view, which was built for all of them: a gap there may be listed as a mismatch here. An N facing a base is not a difference; such positions are counted apart.
+
+A sequence that shares nothing with the others is left out with a note. Limits: up to 50 sequences, each up to 15,000 bp and 150,000 bp in all (10 plasmids of 15 kb, or 50 genes of 3 kb); the largest take a few seconds.
 
 ## Verifying a clone by sequencing (Tools → Align to Reference DNA Sequence…)
 
@@ -574,6 +627,8 @@ What Vettore starts from, kept between sessions:
   shows their buffers. Empty by default.
 - **Minimum identity when detecting common features** — 95 % by default. Lower it to catch
   variants (a promoter a few bases off), raise it to 100 % to accept exact matches only.
+- **Allow Open from NCBI** — on by default. Untick it and **File → Open from NCBI…** (and its
+  link on the welcome screen) is hidden, so nothing in Vettore can use the internet.
 
 - **Open sequence files with Vettore when you double-click them** — only in the Vettore you
   downloaded. Tick it and `.dna`, `.gb`, `.gbk`, `.gbff`, `.ape`, `.embl`, `.fa`, `.fasta`,

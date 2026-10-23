@@ -8,6 +8,9 @@ export interface Difference {
   end: number;
   reference: string;
   sequence: string;
+  /** All to each other only: near an end of the two, where nothing beyond holds the
+   *  alignment, so the same bases could read as another mix of substitutions and indels. */
+  uncertain?: boolean;
 }
 
 export interface DifferenceCounts {
@@ -56,8 +59,10 @@ export function summarizeCounts(c: DifferenceCounts): string {
 
 /** Tab-separated, one difference per line, for pasting into a spreadsheet. */
 export function differencesAsTsv(name: string, diffs: Difference[]): string {
-  const header = "sequence\tkind\tstart\tend\treference bases\tsequence bases";
-  const rows = diffs.map((d) => [name, d.kind, d.start, d.end, d.reference, d.sequence].join("\t"));
+  const notes = diffs.some((d) => d.uncertain);
+  const header = "sequence\tkind\tstart\tend\treference bases\tsequence bases" + (notes ? "\tnote" : "");
+  const rows = diffs.map((d) => [name, d.kind, d.start, d.end, d.reference, d.sequence,
+    ...(notes ? [d.uncertain ? "near the end: uncertain" : ""] : [])].join("\t"));
   return [header, ...rows].join("\n");
 }
 

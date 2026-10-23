@@ -162,3 +162,51 @@ test.describe("on a 1366 × 768 screen", () => {
     expect(select!.x + select!.width).toBeLessThanOrEqual(body!.x + body!.width + 1);
   });
 });
+
+test("a match that covers part of its catalogue entry says which bases", async ({ page }) => {
+  // mCherry in pT-PGK-mCherry has GTC for the catalogue's ATG and stops with TAG, not TAA:
+  // the row shows the 708 bp from the second codon to the stop, and that they are bases
+  // 4–711 of the entry.
+  const fasta = fs.readFileSync(data("features-MT891341.1.fasta"), "utf-8");
+  const bases = fasta.split("\n").filter((line) => !line.startsWith(">")).join("").toUpperCase();
+  await page.goto(`/?token=${TOKEN}`);
+  await newPlasmid(page, "pT-PGK-mCherry", bases);
+  await menu(page, "Features", "Detect Common Features…");
+  const row = page.getByTestId("detect-row").filter({ hasText: "mCherry" });
+  await expect(row).toBeVisible({ timeout: 30_000 });
+  await expect(row).toContainText("708 bp");
+  await expect(row.getByTestId("detect-part")).toHaveText("· bases 4–711 of 711");
+  await expect(row).toContainText("99.8 %");
+});
+
+test("a coding sequence with a broken reading frame is flagged and not ticked", async ({ page }) => {
+  const catalogue = JSON.parse(fs.readFileSync(
+    path.resolve(import.meta.dirname, "../../src/vettore/data/common_features.json"), "utf-8"));
+  const egfp: string = catalogue.features.find((f: { name: string }) => f.name === "EGFP").sequence;
+  // Filler that matches nothing in the catalogue, the same on every run.
+  let state = 7;
+  const filler = Array.from({ length: 400 }, () => {
+    state = (state * 1103515245 + 12345) % 2 ** 31;
+    return "ACGT"[state % 4];
+  }).join("");
+  // One base missing in the middle of EGFP: still a 99.9 % match, but not EGFP after it.
+  await page.goto(`/?token=${TOKEN}`);
+  await newPlasmid(page, "EGFP-frameshift", filler + egfp.slice(0, 360) + egfp.slice(361) + filler);
+  await menu(page, "Features", "Detect Common Features…");
+  const row = page.getByTestId("detect-row").filter({ hasText: "EGFP" });
+  await expect(row).toBeVisible({ timeout: 30_000 });
+  await expect(row.getByTestId("detect-frameshift")).toContainText("breaks the reading frame");
+  await expect(row.getByRole("checkbox")).not.toBeChecked();
+});
+
+test("a coding sequence with a codon put in after its ATG says so", async ({ page }) => {
+  // NeoR in this destination vector starts ATG GGG ATT (an NcoI site): the row annotates the
+  // ORF from that ATG and says the copy has 3 bp the catalogue entry does not.
+  await page.goto(`/?token=${TOKEN}`);
+  await newPlasmid(page, "pDEST-R4-R2", genbankSequence("cloning-multisite-destination-r4r2.gb"));
+  await menu(page, "Features", "Detect Common Features…");
+  const row = page.getByTestId("detect-row").filter({ hasText: "NeoR/KanR" });
+  await expect(row).toBeVisible({ timeout: 30_000 });
+  await expect(row).toContainText("798 bp");
+  await expect(row.getByTestId("detect-part")).toHaveText("· 3 bp inserted");
+});

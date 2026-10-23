@@ -1,6 +1,8 @@
-// Tools → Align Multiple Sequences: open documents aligned to a reference (star alignment in
-// the engine, src/vettore/alignment.py), stacked in Open Vector Editor's alignment view the
-// same way as Sanger reads, with a per-sequence list of differences in reference numbering.
+// Tools → Align Multiple Sequences, two ways. "Each to the reference": open documents aligned
+// to a reference (star alignment in the engine, src/vettore/alignment.py), stacked in Open
+// Vector Editor's alignment view the same way as Sanger reads, with a per-sequence list of
+// differences in reference numbering. "All to each other": a progressive alignment
+// (alignmentMultiple.tsx).
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as Blueprint from "@blueprintjs/core";
 import { Button, Classes } from "@blueprintjs/core";
@@ -9,6 +11,7 @@ import { call } from "../api";
 import { store } from "../store";
 import { useCopyText } from "../cloning/useCopyText";
 import type { Tool, ToolProps } from "./types";
+import { AllToEachOther } from "./alignmentMultiple";
 import {
   choicePrompt,
   choiceProblem,
@@ -59,8 +62,19 @@ interface AlignResult {
 
 const bp = (value: number) => value.toLocaleString("en-US");
 
+type Mode = "reference" | "all";
+
+const MODE_INTRO: Record<Mode, string> = {
+  reference: "Lines up open sequences against a reference, on either strand, and lists every "
+    + "difference in the reference's numbering.",
+  all: "Lines up open sequences with each other, no sequence privileged: the most similar are "
+    + "aligned first, then the groups with each other. Shows a consensus, how conserved each "
+    + "column is, and the differences between any two.",
+};
+
 function AlignMultipleSequences(props: ToolProps) {
   const { docs } = props;
+  const [mode, setMode] = useState<Mode>("reference");
   const [limits, setLimits] = useState<AlignmentLimits>(DEFAULT_LIMITS);
   const lengths = useMemo(
     () => Object.fromEntries(docs.map((d) => [d.editorName, d.data()?.sequence?.length ?? 0])),
@@ -143,6 +157,7 @@ function AlignMultipleSequences(props: ToolProps) {
   };
 
   const row = result?.sequences[selected] ?? null;
+  const star = mode === "reference";
   const copy = async () => {
     if (!row) return;
     setCopied(false);
@@ -157,12 +172,26 @@ function AlignMultipleSequences(props: ToolProps) {
             style={{ width: "92vw", maxWidth: 1500 }} canOutsideClickClose={false}>
       {/* Blueprint's Dialog does not forward unknown props, so the test id lives here. */}
       <div className={`${Classes.DIALOG_BODY} vt-msa`} data-testid="msa-dialog">
-        <p className="vt-msa-intro">
-          Lines up open sequences against a reference, on either strand, and lists every
-          difference in the reference's numbering.
-        </p>
+        {docs.length >= 2 && (
+          <div className="vt-msa-modes" role="radiogroup" aria-label="How to align">
+            {(["reference", "all"] as Mode[]).map((m) => (
+              <label key={m} className={`vt-msa-mode${mode === m ? " is-active" : ""}`}>
+                <input type="radio" name="vt-msa-mode" data-testid={`msa-mode-${m}`}
+                       checked={mode === m} onChange={() => setMode(m)} />
+                {m === "reference" ? "Each to the reference" : "All to each other"}
+              </label>
+            ))}
+          </div>
+        )}
+        <p className="vt-msa-intro">{MODE_INTRO[mode]}</p>
 
-        {docs.length < 2 ? (
+        {/* Kept mounted while hidden: switching modes back and forth keeps both results. */}
+        {docs.length >= 2 && (
+          <div className="vt-msa-panel" hidden={mode !== "all"}>
+            <AllToEachOther {...props} names={names} lengths={lengths} />
+          </div>
+        )}
+        {mode === "all" ? null : docs.length < 2 ? (
           <Callout intent="primary" data-testid="msa-empty">
             Open at least two sequences to compare (File → Open…). The sequence in the active tab
             is used as the reference.
@@ -239,19 +268,19 @@ function AlignMultipleSequences(props: ToolProps) {
           </div>
         )}
 
-        {error && (
+        {star && error && (
           <Callout intent="danger" title="Could not align" data-testid="msa-error">{error}</Callout>
         )}
-        {result?.warnings.map((w, i) => (
+        {star && result?.warnings.map((w, i) => (
           <Callout key={i} intent="warning" data-testid="msa-warning">{w}</Callout>
         ))}
-        {result && result.sequences.length === 0 && !error && (
+        {star && result && result.sequences.length === 0 && !error && (
           <Callout intent="warning">
             None of the chosen sequences could be aligned to {result.reference.name}.
           </Callout>
         )}
 
-        {result && result.sequences.length > 0 && (
+        {star && result && result.sequences.length > 0 && (
           <>
             <table className="bp3-html-table bp3-html-table-condensed bp3-interactive vt-table"
                    data-testid="msa-summary">

@@ -9,6 +9,20 @@ The download links in the README always point to the latest release.
 - The verdict is given on the consensus: a difference is confirmed when two reads show it at Q20 or better, or one read at Q30 or better, and no good read shows something else; otherwise it says to check the trace.
 - Save Consensus opens the consensus as a new document, with the plasmid's features, every difference annotated (those to check say so), the clearly called stretches annotated "Sanger verified (n reads)" and the bases no read called clearly marked.
 
+## Unreleased — Detect Common Features keeps to its identity threshold
+
+- Fixed: with the minimum identity at 98 %, Detect Common Features could still list an element at 95 % (an SV40 polyA in pTAL7B and in pT-PGK-mCherry). The bases that differed were the cloning sites around the element, which were annotated as part of it. Only the part of the element that is really there is annotated now, the identity shown is over exactly those bases, and no row is below the threshold.
+- A coding sequence is annotated in whole codons of its own frame, from the vector's own start and stop codons when they sit in frame next to the match: a NeoR whose ATG is followed by an inserted NcoI codon runs ATG GGG ATT… to its stop, as the record annotates it, and an mCherry that stops with TAG keeps its stop.
+- A coding sequence whose insertions or deletions break the reading frame, overall or over a codon or more between two that make up for each other, is marked "Frameshift" and not ticked, instead of passing as a 99 % match.
+- When a match covers only part of the catalogue entry, the Size column and the feature's notes say which part ("708 bp · bases 4–711 of 711"), and how many bases the copy here has more or fewer than that part ("3 bp inserted").
+- An identity just below 100 % (one mismatch in SaCas9 is 99.97 %) is shown as 99.9 %, not 100.0 %.
+
+## Unreleased — opening a record from NCBI
+
+- File → Open from NCBI… opens a public GenBank record by its accession number (for example MT612431.1) as a new, unsaved document; the welcome screen has the same link. It is the only thing in Vettore that uses the internet, only when you press Open, and it sends nothing but the accession number; no account is needed.
+- Offline, the dialog says so plainly and stays open; nothing else in Vettore changes. A mistyped, unknown or protein accession, a genome too large to open (over 2 Mb, refused before downloading) and a network that blocks secure connections each get one sentence saying what to do. An accession typed without its version opens under the version NCBI sends.
+- File → Preferences → Allow Open from NCBI (on by default) hides the menu item when unticked.
+
 ## Unreleased — a lighter, clearer frame
 
 - The frame is lighter: toolbar tools that are on are white keys with a thin blue outline instead of solid squares, document tabs lose their folder borders, and the view tabs (Map, Sequence, Enzymes…) are one segmented control whose white marker slides to the open view. Nothing moved: menus, tabs, panes and shortcuts are where they were.
@@ -26,6 +40,12 @@ The download links in the README always point to the latest release.
 - Enzymes that Dam or Dcm methylation blocks on the plasmids are left out and named, unless the DNA comes from a dam−/dcm− strain.
 - File → Preferences → My enzymes keeps the enzymes in your freezer, each with the buffer you digest it in (empty until you fill it in; a list, or two columns enzyme and buffer, can be pasted from a spreadsheet); the digest planner tries them first.
 - Find Diagnostic Digest shows each enzyme's buffer next to it, ranks double digests in one buffer before those that need two, and says what to do when a pair needs two different buffers; the copied protocol carries the buffers too.
+
+## Unreleased — aligning several sequences to each other
+
+- Tools → Align Multiple Sequences… has a second mode, **All to each other**: a progressive alignment (guide tree from shared words, most similar sequences first) of up to 50 sequences, with no reference privileged. Strand and origin follow the first circular sequence; each sequence is turned by its closest relative, and a fragment across a plasmid's origin lines up in one piece. One that shares nothing with the others is left out with a note.
+- The result shows a consensus row on top of the stacked sequences, a conservation bar with the most variable stretches listed under it, each sequence's identity to the consensus, and the differences between any two sequences you pick, in the first one's numbering, ready to copy into a spreadsheet. Unrelated stretches (two inserts in one backbone) are named as not compared rather than listed as mutations, and N is never counted as a difference. The two are realigned to each other where needed, so gaps the other sequences required never show up as an insertion and a deletion between them.
+- The alignment runs in the background with a progress bar and can be stopped; 10 plasmids of 15 kb take a few seconds.
 
 ## 0.3.1 — more promoters, with their species
 
