@@ -513,3 +513,32 @@ def test_a_deleted_stretch_across_the_origin_maps_to_nothing():
     assert _new_range(8, 0, start_of, kept, cursor, True) is None
     assert _new_range(7, 1, start_of, kept, cursor, True) == (6, 0)
 
+
+
+# ---- fifth review ------------------------------------------------------------------------------
+
+def test_a_join_no_read_runs_across_is_not_verified():
+    """A forward read ending exactly where a reverse read begins: an insertion there would be
+    clipped off both read ends by the local alignment, so the join is not verified."""
+    from vettore.contig import contig_payload
+
+    reference = REFERENCE[:400]
+    forward = hand_read("F", reference[20:200], reference[20:200], 20)
+    reverse = hand_read("R", reference[200:372], reference[200:372], 200, strand=-1)
+    result = contig_payload(reference, False, [forward, reverse], doc("p", reference, False))
+    assert result["differences"] == []
+    assert [d["kind"] for d in result["disagreements"]] == ["not read across"]
+    assert result["disagreements"][0]["position"] == 201
+    assert result["doubtful"] == 1
+    assert not any(r["start"] <= 200 and r["end"] >= 201 for r in result["verified"])
+
+
+def test_a_read_round_a_whole_small_ring_does_not_read_its_own_join():
+    from vettore.contig import contig_payload
+
+    ring = clean_dna(150, 306)
+    read = ring[40:] + ring[:40]
+    whole = hand_read("whole", read, read, 40)
+    result = contig_payload(ring, True, [whole], doc("pSmall", ring, True))
+    assert [d["kind"] for d in result["disagreements"]] == ["not read across"]
+    assert result["disagreements"][0]["position"] == 41

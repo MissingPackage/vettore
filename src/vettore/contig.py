@@ -86,7 +86,7 @@ def _vote(calls: list[Call], reference_value: str) -> tuple[str, bool]:
         groups[call.value] = groups.get(call.value, 0) + call.quality
     counts = {value: sum(1 for c in calls if c.value == value) for value in groups}
     winner = max(groups, key=lambda value: (groups[value], counts[value],
-                                            value == reference_value))
+                                            value == reference_value, value))
     tied = any(value != winner and score == groups[winner] for value, score in groups.items())
     return winner, tied
 
@@ -187,9 +187,19 @@ def contig_payload(reference: str, circular: bool, reads: list[AlignedRead],
             bases, inserts = per_read[i]
             if previous not in bases or position not in bases:
                 continue
+            if len(bases) == length and position == reads[i].offset % length:
+                continue             # a read round a whole small ring: its own end and start
             text, quality = inserts.get(position, ("", min(bases[previous].quality,
                                                            bases[position].quality)))
             slot.append(Call(i, text, quality))
+        if not slot:
+            # Both sides are read, but no read runs across the join between them: what the
+            # clone has there (bases a local alignment clips off the read ends) is unknown.
+            if depth[previous] and depth[position]:
+                doubtful.add(position)
+                disagreements.append({"kind": "not read across", "position": position + 1,
+                                      "reference": "", "consensus": "", "calls": []})
+            return
         votes = [c for c in slot if _clear(c.value)]
         unclear_calls = [c for c in slot if not _clear(c.value)]
         if not votes:
@@ -384,8 +394,9 @@ def _new_range(start: int, end: int, start_of: list[int], kept: list[bool],
         if new_end < new_start:
             return None
         return new_start % new_length, new_end
-    if not any(kept[p] for p in _positions(start, end, len(kept))):
-        return None                  # across the origin, and every base of it deleted
+    if (not any(kept[p] for p in _positions(start, end, len(kept)))
+            and (start_of[end] - start_of[start]) % new_length == 0):
+        return None                  # across the origin, every base deleted, nothing inserted
     return new_start % new_length, new_end % new_length if circular else new_end
 
 

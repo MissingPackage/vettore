@@ -75,6 +75,16 @@ describe("contigVerdict", () => {
     expect(v.text).toContain("3 covered positions are not verified: good reads conflict there, a difference is not confirmed, or only calls under Q20");
   });
 
+  it("says when no read runs across the join between two reads", () => {
+    const v = contigVerdict(contig({
+      doubtful: 1,
+      disagreements: [{ kind: "not read across", position: 201, reference: "", consensus: "", calls: [] }],
+    }), "pCOI", 61.4);
+    expect(v.ok).toBe(false);
+    expect(v.text).toContain("No read runs across the join between two reads");
+    expect(v.text).not.toContain("The reads disagree");
+  });
+
   it("does not pass a clone where some covered bases have no clear call", () => {
     const v = contigVerdict(contig({ unclear: 2 }), "pCOI", 61.4);
     expect(v.ok).toBe(false);

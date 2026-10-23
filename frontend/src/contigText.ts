@@ -27,7 +27,7 @@ export interface ContigCall {
 }
 
 export interface Disagreement {
-  kind: "base" | "insertion" | "no call";
+  kind: "base" | "insertion" | "no call" | "not read across";
   position: number;
   reference: string;
   consensus: string;
@@ -97,11 +97,16 @@ export function evidence(d: ContigDifference): string {
 export function contigVerdict(contig: Contig, referenceName: string, coveragePercent: number): { text: string; ok: boolean } {
   const where = `${coveragePercent} % of ${referenceName}`;
   const total = contig.differences.length;
-  const disputed = contig.disagreements.filter((d) => d.kind !== "no call").length;
+  const disputed = contig.disagreements.filter((d) => d.kind === "base" || d.kind === "insertion").length;
+  const unread = contig.disagreements.filter((d) => d.kind === "not read across").length;
   const settled = (disputed
     ? ` The reads disagree at ${n(disputed)} place${disputed === 1 ? "" : "s"} (listed under Contig); the consensus`
       + " takes the call with the most quality behind it, and the plasmid's base where the reads are even."
     : "")
+    + (unread
+      ? ` No read runs across ${unread === 1 ? "the join" : `${n(unread)} joins`} between two reads (listed under`
+        + " Contig): extra bases there would not show, so read across it with another primer."
+      : "")
     + (contig.doubtful
       ? ` ${n(contig.doubtful)} covered position${contig.doubtful === 1 ? " is" : "s are"} not verified: good reads`
         + ` conflict there, a difference is not confirmed, or only calls under Q${SUPPORTING_QUALITY} back it. Check ${contig.doubtful === 1 ? "it" : "them"}`

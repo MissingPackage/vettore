@@ -105,9 +105,13 @@ export default function SangerContig(props: {
             <tbody>
               {disputed.map((d, i) => (
                 <tr key={i}>
-                  <td>{n(d.position)}{d.kind === "insertion" ? " (before)" : ""}</td>
+                  <td>{n(d.position)}{d.kind === "insertion" || d.kind === "not read across" ? " (before)" : ""}</td>
                   <td>{d.reference || "—"}</td>
-                  <td>{d.kind === "no call" ? "no clear call: reference kept" : d.consensus || "—"}</td>
+                  <td>
+                    {d.kind === "no call" ? "no clear call: reference kept"
+                      : d.kind === "not read across" ? "no read runs across this join: not verified"
+                        : d.consensus || "—"}
+                  </td>
                   <td className="vt-muted">{d.calls.map(call).join(" · ")}</td>
                 </tr>
               ))}
