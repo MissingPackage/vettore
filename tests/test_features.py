@@ -893,9 +893,8 @@ DETECTION_BUDGET = 2.0
 # the one cost too small for any clock; and
 # `test_the_document_is_not_walked_in_python_once_per_element` pins the scan the clock could not
 # see, by charging the document for what is asked of it rather than timing it. That last one is
-# what the
-# fourth refutation above was reaching for, and it needs no threshold at all: the engine asks
-# the document for 267 things and a base-by-base scan for 3,962,927 of its bases.
+# what the fourth refutation above was reaching for, and it needs no threshold at all: the
+# engine asks the document for 267 things and a base-by-base scan for 3,962,927 of its bases.
 
 #: A single-AAV nuclease vector, with the elements of pX601 the catalogue carries, in that
 #: construct's own order: the AAV ends, the CMV–SaCas9–bGH polyA cassette, the U6 promoter of
@@ -1350,9 +1349,10 @@ class _WatchesHowItIsRead(str):
     Three ways to the bases go round the instance entirely and are charged **nothing**, even
     once per element, and no `str` subclass can close them:
 
-      * the buffer protocol — `bytes(document, "ascii")`, `bytearray(...)`, and anything that
-        uses it, which includes Biopython: `str(Seq(document))` is charged 0, and this module's
-        own `_reverse_complement` is written that way;
+      * a C-level constructor or codec, which reads the characters with no method call at all —
+        `bytes(document, "ascii")`, `bytearray(...)`, and anything built on them, which includes
+        Biopython, since `Seq.__init__` encodes a `str` that way: `str(Seq(document))` is
+        charged 0, and this module's own `_reverse_complement` is written like that;
       * an unbound call, `str.__getitem__(document, i)` or `str.upper(document)`, which finds
         the method on the type;
       * a call on some *other* object that takes the document as an argument, such as
@@ -1455,12 +1455,12 @@ def test_the_document_is_not_walked_in_python_once_per_element():
     than `SHORT_FEATURE`, which is the largest single part of what detection does on a plasmid
     whose elements are not diverged — the common case, since an element present verbatim is
     taken whole without being aligned at all. `str.find` does that scan in C. Pulling it into
-    Python costs 40x there (0.040 s to 1.60 s on the verbatim AAV fixture, medians) and 2.8x to
-    19x on the real records in `tests/data`, while leaving every annotation and, where the
-    rewrite preserves exactness, every cell of `ALIGNMENT_WORK` untouched. The factor is widest
-    where there is least alignment to dilute it, so the cheap records suffer worst and the
-    dearest one, which pays most of its time inside the aligner, only doubles. The figures,
-    and how much they move between containers, are in `_candidate_offsets`. Four rounds of timed
+    Python costs 40x there (0.040 s to 1.60 s on the verbatim AAV fixture, medians), while
+    leaving every annotation and, where the rewrite preserves exactness, every cell of
+    `ALIGNMENT_WORK` untouched. On the real records the factor is widest where there is least
+    alignment to dilute it, so the cheap ones suffer worst and the dearest of them, which pays
+    most of its time inside the aligner, costs under three times as much. Those figures, and
+    how much they move between containers, are in `_candidate_offsets`. Four rounds of timed
     assertions could not separate any of it from a slower machine.
 
     It can be asserted without a clock, because the property that matters is not a duration. It
@@ -1498,8 +1498,9 @@ def test_the_document_is_not_walked_in_python_once_per_element():
     pass while costing 46x to 75x on the verbatim fixture:
 
       * a copy taken by any of the three routes that go round the document's own methods, even
-        *per element*: the buffer protocol, including `str(Seq(document))`, which is the idiom
-        this module's own `_reverse_complement` uses; an unbound `str.__getitem__(document, i)`;
+        *per element*: a C-level constructor or codec, including `str(Seq(document))`, which is
+        the idiom this module's own `_reverse_complement` uses; an unbound
+        `str.__getitem__(document, i)`;
         and `"".join([document])`. `_WatchesHowItIsRead`'s docstring has the list, and no `str`
         subclass can close it. A developer adding a protein-level search writes
         `str(Seq(target).translate())` and this test will not see the walk that follows;
@@ -1538,8 +1539,11 @@ def test_the_document_is_not_walked_in_python_once_per_element():
     # So before a low count below is trusted, check the instrument against the regression it
     # exists to catch — and against *both* of the ways it charges, since a review found that a
     # control going only through `__getitem__` passes with the rest of the instrument blind.
-    # Two entries are enough, and keep this to 0.2 s rather than the 2.5 s all 33 would cost.
-    a_couple = long_enough[:2]
+    # Two entries are enough, and keep this to 0.2 s rather than the 3.7 s all 33 would cost.
+    # Entries the fixture actually carries, because the equality below is vacuous on an element
+    # that is absent: the two longest are SpCas9 and SaCas9, and this is the SaCas9 vector.
+    a_couple = [element for element in long_enough
+                if features_module._candidate_offsets(document, element.sequence)][:2]
     subscripted = _bases_taken_from_the_document(document, a_couple, _a_base_at_a_time)
     assert subscripted > 100_000, (
         f"the instrument charged a base-by-base scan over {len(a_couple)} entries only "
@@ -1555,9 +1559,11 @@ def test_the_document_is_not_walked_in_python_once_per_element():
         f"{len(document)} bp document, so it is not watching how the document is copied")
     # And the reference regression really is the engine's scan, so that the control above
     # cannot be satisfied by a scan that is merely expensive.
-    assert all(_a_base_at_a_time(document, element.sequence)
-               == features_module._candidate_offsets(document, element.sequence)
-               for element in a_couple), "the reference scan is not the engine's scan"
+    found = [features_module._candidate_offsets(document, element.sequence)
+             for element in a_couple]
+    assert len(a_couple) == 2 and all(found), (a_couple, found)
+    assert [_a_base_at_a_time(document, element.sequence) for element in a_couple] == found, (
+        "the reference scan is not the engine's scan")
     for target in (document, document * 2):
         #: One windowed pass over it — `SEED` bases at each position, which is what building an
         #: index costs — plus one base per seed per entry.
