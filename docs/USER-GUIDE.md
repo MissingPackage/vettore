@@ -26,6 +26,7 @@ when you ask for it and sends nothing but the accession number.
 - [Choosing a diagnostic digest](#choosing-a-diagnostic-digest-tools--find-diagnostic-digest)
 - [Saving and sharing](#saving-and-sharing)
 - [History of a file](#history-of-a-file)
+- [Where a construct came from](#where-a-construct-came-from-the-lineage-tab)
 - [Preferences](#preferences-file--preferences)
 - [Help menu](#help-menu)
 - [Keyboard shortcuts](#keyboard-shortcuts)
@@ -161,7 +162,7 @@ for you to send back.
 | Menu bar | File, Edit, View, Enzymes, Features, Primers, Actions, Tools, Help |
 | Toolbar | Save, undo/redo, cut sites, features, ORFs, find, visibility |
 | Document tabs | One per open file; the open one has a blue line along its top edge |
-| View tabs | Map, Sequence, Enzymes, Features, Primers, History — also Ctrl+1 … Ctrl+6 |
+| View tabs | Map, Sequence, Enzymes, Features, Primers, History, Lineage — also Ctrl+1 … Ctrl+7 |
 | Enzyme set | The set shown on the map (top right) |
 | Status bar | Length, topology and %GC; for a selection also its range, length, %GC and Tm |
 | Messages | Top right; they stay until you close them (×) or click **Dismiss all**. Confirmations such as "Saved" disappear on their own |
@@ -179,6 +180,8 @@ selected, and Enter or Space uses it.
   (Ctrl+1) to see it there.
 - **Features** / **Primers** — sortable tables; double-click a row to edit it.
 - **History** — where the file came from (see [History of a file](#history-of-a-file)).
+- **Lineage** — the tree of the documents it was made from (see
+  [Where a construct came from](#where-a-construct-came-from-the-lineage-tab)).
 
 ## Enzymes
 
@@ -600,6 +603,34 @@ on, so **Open "…"** shows an input exactly as it was when the step ran, even i
 changed since or was never saved. **Copy** puts the step — parameters and primers — on the
 clipboard for your notebook.
 
+The History is written into the files you save, in a comment that other programs ignore, so a
+file you open months later still knows where the construct came from.
+
+What that comment contains is worth knowing before you send the file to someone else: besides
+the steps and their parameters, it holds **a full copy of the sequence and features of every
+input** of every step, and **the path of the file each input was open from** on your computer
+(`C:\Users\you\plasmids\backbone.gb`), which is what lets Vettore offer to open that file
+again later. A construct's file therefore also carries its parents' sequences and something of
+your folder layout, and is larger than the sequence alone.
+
+**File → Preferences → History in saved files** turns all of that off if you would rather save
+plain files, for sharing or for a vendor's order; the History then lasts as long as the
+document stays open. A file whose History is very large (many steps, each with a copy of a
+large plasmid) keeps the nearest copies and leaves the furthest out, and says so where a copy
+would be.
+
+## Where a construct came from (the Lineage tab)
+
+The **Lineage** tab (Ctrl+7) draws the document at the top and, under it, the documents it was
+made from, each with its size and the step it came out of, back as far as the History goes (up
+to 20 steps). Every line says which step was run on it, so a chain of clonings reads from the
+construct in front of you back to the backbone you started from.
+
+- **Open the snapshot** opens an input exactly as it was when the step ran, in a new tab.
+- **Open the file** opens the file that input was saved in, as it is on disk now; it is offered
+  only while that file is still there, and Vettore says so when it is not.
+- **Copy the lineage** copies the tree as indented lines, for a notebook or a methods section.
+
 ## Preferences (File → Preferences…)
 
 What Vettore starts from, kept between sessions:
@@ -613,6 +644,11 @@ What Vettore starts from, kept between sessions:
   or new lines) or two columns copied from a spreadsheet, enzyme and buffer; names Vettore
   does not know are pointed out. **Tools → Find Diagnostic Digest…** tries these first and
   shows their buffers. Empty by default.
+- **History in saved files** — on by default: a saved file carries the document's History and
+  its lineage in a comment other programs ignore, with a copy of the sequence and features of
+  everything each step was run on and the path each input was open from. Untick it to save
+  files that carry the sequence and its features only — worth doing before you send a
+  construct outside the lab.
 - **Minimum identity when detecting common features** — 95 % by default. Lower it to catch
   variants (a promoter a few bases off), raise it to 100 % to accept exact matches only.
 - **Allow Open from NCBI** — on by default. Untick it and **File → Open from NCBI…** (and its
@@ -656,7 +692,7 @@ On a Mac keyboard, use ⌘ instead of Ctrl.
 
 | Views | |
 |---|---|
-| Ctrl+1 … Ctrl+6 | Map, Sequence, Enzymes, Features, Primers, History |
+| Ctrl+1 … Ctrl+7 | Map, Sequence, Enzymes, Features, Primers, History, Lineage |
 
 | Finding and selecting | |
 |---|---|

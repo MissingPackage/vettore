@@ -31,3 +31,13 @@ export function dirName(path: string): string {
   const i = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"));
   return i > 0 ? path.slice(0, i) : "";
 }
+
+/** The file name of a path, on either platform's separator. */
+export function baseName(path: string): string {
+  return path.split(/[\\/]/).pop() ?? path;
+}
+
+/** The file name without its extension: the name a document opened from a file takes. */
+export function stem(path: string): string {
+  return baseName(path).replace(/\.[^.]+$/, "");
+}

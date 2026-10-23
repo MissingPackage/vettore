@@ -14,12 +14,15 @@ import {
   baseName,
   canSaveInPlace,
   createDocument,
+  dataToSave,
   editorState,
   markSaved,
   needsSave,
   now,
   removeDocument,
+  snapshotOf,
   stem,
+  takeHistory,
   uniqueName,
   type Doc,
 } from "./documents";
@@ -33,6 +36,7 @@ import DetectFeaturesDialog from "./DetectFeaturesDialog";
 import { actionById, type CloningAction } from "./cloning/registry";
 import type { CloningResult, OpenDoc, Product } from "./cloning/types";
 import HistoryView from "./HistoryView";
+import LineageView from "./LineageView";
 import EditorSlot from "./EditorSlot";
 import EnzymesView from "./EnzymesView";
 import StatusLine from "./StatusLine";
@@ -43,7 +47,7 @@ import { applyEnzymeSet, ENZYME_SETS, type EnzymeSetId } from "./enzymeSets";
 import { ENZYMES } from "./enzymeLogic";
 import { OVERLAY_VIEWS, showView, VIEWS, type ViewId } from "./views";
 import ViewTabs from "./ViewTabs";
-import { applyChrome, usePreferences } from "./preferences";
+import { applyChrome, loadPreferences, usePreferences } from "./preferences";
 import { ACCEPT, dirName, SAVE_EXTENSION, safeFileName, type SaveKind } from "./files/formats";
 import { addNotice, dismissNotice, messageOf, type Notice, type NoticeKind } from "./files/notices";
 import NoticeStack from "./files/NoticeStack";
@@ -252,7 +256,9 @@ export default function App() {
       ? { label, records, fileName, incomplete: !!result.warnings?.length }
       : null;
     const taken = docsRef.current.map((d) => d.name);
-    const created = result.documents.map((data) => {
+    const created = result.documents.map((fromFile) => {
+      // The History the file carries belongs to the document, not to the editor's data.
+      const { data, history } = takeHistory(fromFile);
       const sequenceData = result.path ? data : distinctName(data, taken);
       return createDocument(
         sequenceData,
@@ -266,6 +272,7 @@ export default function App() {
           ...(source ? { saveInPlace: !!result.path && !!result.writable, source } : {}),
           // Pasted text and a download exist nowhere else; a file or an untouched sample does.
           neverSaved: origin === null || !!accession,
+          history,
         },
       );
     });
@@ -447,7 +454,7 @@ export default function App() {
     // Snapshot the inputs as they are now, so History can reopen them after they change.
     const parents = docsRef.current
       .filter((d) => product.parents.includes(d.name))
-      .map((d) => ({ name: d.name, data: editorState(d.editorName)?.sequenceData as SequenceData }))
+      .map((d) => snapshotOf(d, editorState(d.editorName)?.sequenceData as SequenceData))
       .filter((p) => p.data);
     const sequenceData = distinctName(product.doc as SequenceData, docsRef.current.map((d) => d.name));
     const doc = createDocument(sequenceData, null, {
@@ -484,9 +491,10 @@ export default function App() {
 
   const saveDoc = useCallback(
     async (doc: Doc, saveAs: boolean): Promise<boolean> => {
-      const sequenceData = editorState(doc.editorName)?.sequenceData as SequenceData;
-      if (!sequenceData) return false;
+      const editorData = editorState(doc.editorName)?.sequenceData as SequenceData;
+      if (!editorData) return false;
       const current = docsRef.current.find((d) => d.editorName === doc.editorName) ?? doc;
+      const sequenceData = dataToSave(editorData, current, loadPreferences().saveHistory);
       try {
         const desktop = await whenDesktopReady(0);
         if (!desktop) {
@@ -538,7 +546,8 @@ export default function App() {
   /** Write a copy in another format; the document keeps its own file. */
   const exportAs = useCallback(
     async (doc: Doc, kind: SaveKind) => {
-      const sequenceData = editorState(doc.editorName)?.sequenceData as SequenceData;
+      const sequenceData = dataToSave(editorState(doc.editorName)?.sequenceData as SequenceData,
+                                      doc, loadPreferences().saveHistory);
       const filename = `${safeFileName(doc.name)}${SAVE_EXTENSION[kind]}`;
       try {
         const desktop = await whenDesktopReady(0);
@@ -713,7 +722,7 @@ export default function App() {
 
   useEffect(() => {
     // Keep the map tab in sync with the topology (circular map vs linear map).
-    if (activeDoc && activeDoc.view !== "history") showView(activeDoc.editorName, activeDoc.view, circular);
+    if (activeDoc && !OVERLAY_VIEWS.includes(activeDoc.view)) showView(activeDoc.editorName, activeDoc.view, circular);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, circular]);
 
@@ -956,6 +965,16 @@ export default function App() {
                 <HistoryView
                   doc={activeDoc}
                   onReopen={(data, from) => openDocument({ ...data, name: `${data.name} (from History)` }, "Reopened", from)}
+                />
+              </EditorSlot>
+            )}
+            {activeDoc.view === "lineage" && (
+              <EditorSlot editorName={activeDoc.editorName} placement="overlay">
+                <LineageView
+                  doc={activeDoc}
+                  data={editorState(activeDoc.editorName)?.sequenceData as SequenceData}
+                  onReopen={(data, from) => openDocument({ ...data, name: `${data.name} (from the Lineage)` }, "Reopened", from)}
+                  onOpenFile={openPath}
                 />
               </EditorSlot>
             )}

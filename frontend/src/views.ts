@@ -2,7 +2,8 @@
 import { actions } from "@teselagen/ove";
 import { store } from "./store";
 
-export type ViewId = "map" | "sequence" | "enzymes" | "features" | "primers" | "history";
+export type ViewId = "map" | "sequence" | "enzymes" | "features" | "primers" | "history"
+  | "lineage";
 
 export const VIEWS: { id: ViewId; label: string; hotkey: string }[] = [
   { id: "map", label: "Map", hotkey: "1" },
@@ -11,6 +12,7 @@ export const VIEWS: { id: ViewId; label: string; hotkey: string }[] = [
   { id: "features", label: "Features", hotkey: "4" },
   { id: "primers", label: "Primers", hotkey: "5" },
   { id: "history", label: "History", hotkey: "6" },
+  { id: "lineage", label: "Lineage", hotkey: "7" },
 ];
 
 const PROPERTIES_TAB: Partial<Record<ViewId, string>> = {
@@ -19,7 +21,7 @@ const PROPERTIES_TAB: Partial<Record<ViewId, string>> = {
 };
 
 /** Views rendered by Vettore itself on top of the editor panels. */
-export const OVERLAY_VIEWS: ViewId[] = ["enzymes", "history"];
+export const OVERLAY_VIEWS: ViewId[] = ["enzymes", "history", "lineage"];
 
 /** A single full-width panel group: one view at a time fills the document area. */
 export function panelsFor(circular: boolean, view: ViewId = "map") {

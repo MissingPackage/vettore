@@ -276,3 +276,27 @@ def test_dropped_files_are_split_into_paths_and_unresolved_names():
     script = drop_script(payload)
     assert script.startswith(f'window.dispatchEvent(new CustomEvent("{DROP_EVENT}"')
     assert '"/data/a.gb"' in script
+
+
+def test_paths_exist_tells_the_lineage_view_which_files_are_still_there(tmp_path):
+    """The Lineage view offers "open the file" only for files that are still on disk (S6.1)."""
+    there = tmp_path / "backbone.gb"
+    there.write_text("x", encoding="utf-8")
+    body = {"paths": [str(there), str(tmp_path / "gone.gb"), str(tmp_path), ""]}
+    r = client().post("/api/paths-exist", json=body, headers={TOKEN_HEADER: TOKEN})
+    assert r.status_code == 200
+    assert r.json() == {"existing": [str(there)]}
+
+
+def test_a_saved_file_keeps_the_history_and_gives_it_back(tmp_path):
+    """Save and open again through the API: the History travels with the document (S6.1)."""
+    c = client()
+    history = [{"time": "t", "action": "Opened", "detail": "backbone.gb"}]
+    data = {"name": "pSaved", "sequence": "ACGT" * 30, "circular": True,
+            "features": [], "primers": [], "history": history}
+    path = str(tmp_path / "pSaved.gb")
+    saved = c.post("/api/save-path", json={"path": path, "sequenceData": data},
+                   headers={TOKEN_HEADER: TOKEN})
+    assert saved.status_code == 200
+    opened = c.post("/api/open-path", json={"path": path}, headers={TOKEN_HEADER: TOKEN})
+    assert opened.json()["documents"][0]["history"] == history

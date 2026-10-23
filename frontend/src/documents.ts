@@ -1,22 +1,11 @@
 // Open documents: one OVE editor instance (editorName) per document.
 import { actions, updateEditor } from "@teselagen/ove";
 import type { SequenceData } from "./api";
-import type { WrongClone } from "./cloning/types";
+import type { HistoryEntry } from "./history";
 import { store } from "./store";
 import type { EnzymeSetId } from "./enzymeSets";
 import { loadPreferences } from "./preferences";
 import { panelsFor, type ViewId } from "./views";
-
-export interface HistoryEntry {
-  time: string;
-  action: string;
-  detail?: string;
-  /** Snapshots of the input documents of a cloning step, so they can be reopened later. */
-  parents?: { name: string; data: SequenceData }[];
-  /** The other outcomes of that cloning step (other products, reverse insert, empty vector),
-   * offered by Find Diagnostic Digest as the wrong clones to tell apart. */
-  wrongClones?: WrongClone[];
-}
 
 /** The file a document was opened from, as the engine described it. */
 export interface DocSource {
@@ -66,7 +55,13 @@ export function createDocument(
   sequenceData: SequenceData,
   path: string | null,
   firstEntry: HistoryEntry,
-  options?: { saveInPlace?: boolean; source?: DocSource; neverSaved?: boolean },
+  options?: {
+    saveInPlace?: boolean;
+    source?: DocSource;
+    neverSaved?: boolean;
+    /** Steps the file was saved with (S6.1); they come before `firstEntry`, which is newer. */
+    history?: HistoryEntry[];
+  },
 ): Doc {
   const editorName = `doc-${++counter}`;
   updateEditor(store, editorName, {
@@ -85,7 +80,7 @@ export function createDocument(
     neverSaved: options?.neverSaved ?? false,
     view: "map",
     enzymeSet: loadPreferences().enzymeSet,
-    history: [firstEntry],
+    history: [...(options?.history ?? []), firstEntry],
   };
 }
 
@@ -99,16 +94,18 @@ export function editorState(editorName: string) {
 }
 
 export { isDirty, needsSave, uniqueName } from "./files/unsaved";
+export {
+  cleanHistory,
+  dataToSave,
+  LINEAGE_DEPTH,
+  snapshotOf,
+  takeHistory,
+  type HistoryEntry,
+  type HistoryParent,
+} from "./history";
+export { baseName, stem } from "./files/formats";
 
 export function markSaved(editorName: string) {
   const id = editorState(editorName)?.sequenceData?.stateTrackingId;
   store.dispatch(actions.lastSavedIdUpdate(id ?? "initialLoadId", { editorName }));
-}
-
-export function baseName(path: string): string {
-  return path.split(/[\\/]/).pop() ?? path;
-}
-
-export function stem(path: string): string {
-  return baseName(path).replace(/\.[^.]+$/, "");
 }

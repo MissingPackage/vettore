@@ -17,7 +17,7 @@ describe("keyboard shortcut list", () => {
   it("lists one view shortcut per view tab", () => {
     const views = SHORTCUT_GROUPS.find((g) => g.title === "Views");
     expect(views?.shortcuts.map((s) => s.keys)).toEqual([
-      "Ctrl+1", "Ctrl+2", "Ctrl+3", "Ctrl+4", "Ctrl+5", "Ctrl+6",
+      "Ctrl+1", "Ctrl+2", "Ctrl+3", "Ctrl+4", "Ctrl+5", "Ctrl+6", "Ctrl+7",
     ]);
   });
 

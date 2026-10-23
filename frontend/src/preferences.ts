@@ -25,6 +25,8 @@ export interface Preferences {
   /** File → Open from NCBI… is in the menu: the one thing in Vettore that uses the internet,
    * and only when the user asks. On by default; turning it off hides the menu item. */
   allowNcbi: boolean;
+  /** Saved files keep the document's History, so its lineage survives the file (S6.1). */
+  saveHistory: boolean;
 }
 
 export type ChromeTheme = "light" | "dark" | "system";
@@ -46,6 +48,7 @@ const DEFAULTS: Preferences = {
   myEnzymes: [],
   enzymeBuffers: {},
   allowNcbi: true,
+  saveHistory: true,
 };
 
 function clean(stored: Partial<Preferences>): Preferences {
@@ -57,6 +60,7 @@ function clean(stored: Partial<Preferences>): Preferences {
     prefs.detectMinIdentity = DEFAULTS.detectMinIdentity;
   }
   if (!CHROME_THEMES.some((t) => t.id === prefs.chrome)) prefs.chrome = DEFAULTS.chrome;
+  prefs.saveHistory = prefs.saveHistory !== false;
   prefs.myEnzymes = knownEnzymes(prefs.myEnzymes);
   prefs.enzymeBuffers = cleanBuffers(prefs.enzymeBuffers);
   if (typeof prefs.allowNcbi !== "boolean") prefs.allowNcbi = DEFAULTS.allowNcbi;

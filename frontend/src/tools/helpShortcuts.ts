@@ -40,6 +40,7 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { keys: "Ctrl+4", what: "Features" },
       { keys: "Ctrl+5", what: "Primers" },
       { keys: "Ctrl+6", what: "History" },
+      { keys: "Ctrl+7", what: "Lineage" },
     ],
   },
   {

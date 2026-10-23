@@ -42,6 +42,7 @@ release zip attached to a GitHub Release, and a short "what's new" note.
 - **S3 — Verification tools**: simulate agarose gel, align Sanger reads (`.ab1`) to reference, multiple alignment, detect common features, primer design.
 - **S4 — Polish**: history graph, print/PDF, preferences, keyboard-shortcut parity, file associations, AAV helpers (ITR-to-ITR cargo size).
 - **S5 — Screening and lab memory**: S5.1 diagnostic digest planner (started); next S5.3 lab primer library, S5.2 Sanger contig, S5.4 human and mouse elements in the catalogue.
+- **S6 — Lineage and comparison**: S6.1 construct lineage (started); next S6.2 progressive multiple alignment, S6.3 optional NCBI import.
 
 ## User stories
 
@@ -62,7 +63,7 @@ release zip attached to a GitHub Release, and a short "what's new" note.
 - [ ] Opening a corrupt file shows an error dialog naming the file; the app keeps running.
 
 **S1.2 Views.** As a bench scientist I want the map, sequence, enzyme, feature and primer views I am used to, so that I find everything where I expect it.
-- [ ] View tabs at the bottom: Map, Sequence, Enzymes, Features, Primers, History.
+- [ ] View tabs at the bottom: Map, Sequence, Enzymes, Features, Primers, History, Lineage.
 - [ ] Map: circular for circular molecules, linear otherwise; toggle available.
 - [ ] Sequence: double-strand rows with features, primers, cut sites, translations.
 - [ ] Enzymes: table of enzymes in the current set with number of sites and positions.
@@ -181,6 +182,24 @@ have to download and save it first.
   network (`src/vettore/ncbi.py` is the only module that does).
 - Preference "Allow Open from NCBI", on by default; off hides the menu item and the link.
 - Not included: uploading sequences anywhere (no BLAST).
+### S6 — Lineage and comparison
+
+**S6.1 Construct lineage.** As a bench scientist I want to see where a construct came from,
+across files and months, so that I can retrace and repeat a cloning.
+
+- Saving keeps the document's History in the file [DECIDED 2026-10-21: in the file, with a
+  preference to leave it out]: GenBank in a COMMENT block that other programs ignore, `.dna` in
+  its notes. The History is JSON, compressed and written as base64 in short lines, so a reader
+  that re-wraps or re-indents the comment changes nothing but white space. Reopening restores
+  the History and the snapshots of its inputs; a damaged block is ignored and the file still
+  opens.
+- A History too large for a file (`lineage.MAX_BLOB`) is written without the snapshots, which
+  are then marked as missing; the steps are always kept.
+- The Lineage tab draws a tree from the document back to its starting files: each node has its
+  name, size, the step it came out of and the step that was run on it, to 20 steps. A node with
+  a snapshot opens it; a node whose file is still on disk also offers the file itself.
+- Tested round trip through Biopython reading and writing the file, and end to end through a
+  cloning, a save and a reopen.
 
 ## Read first
 
