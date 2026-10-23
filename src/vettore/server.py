@@ -432,7 +432,7 @@ def create_app(token: str, static_dir: Path | None,
                 raise HTTPException(422, f"“{read.filename}” did not reach the engine intact; "
                                          "add it again.") from exc
         return sanger.alignment_payload(name, reference, bool(body.reference.get("circular")),
-                                        reads, body.cutoff)
+                                        reads, body.cutoff, body.reference)
 
     @app.get("/api/gel/ladders")
     def gel_ladders() -> dict[str, Any]:

@@ -2,7 +2,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import * as Blueprint from "@blueprintjs/core";
 import { Button, Classes } from "@blueprintjs/core";
 import { AlignmentView, addAlignment } from "@teselagen/ove";
-import { api } from "./api";
+import { api, type SequenceData } from "./api";
+import SangerContig from "./SangerContig";
+import { type Contig, contigVerdict } from "./contigText";
 import { store } from "./store";
 import type { OpenDoc } from "./cloning/types";
 
@@ -45,6 +47,8 @@ interface SangerResult {
   reference: { name: string; length: number; circular: boolean };
   coverage_percent: number;
   first_covered: number;
+  /** The consensus of the reads that aligned (null when none did). */
+  contig: Contig | null;
 }
 
 const TRIM_LEVELS = [
@@ -95,92 +99,23 @@ function Differences(props: { read: ReadSummary }) {
   );
 }
 
-/** Whether a read's aligned span (1-based, inclusive, wrapping past the origin) covers a position. */
-function covers(read: ReadSummary, position: number): boolean {
-  return read.start <= read.end
-    ? read.start <= position && position <= read.end
-    : position >= read.start || position <= read.end;
-}
-
-/** A difference from the reference, however many reads show it. */
-interface Event {
-  /** Reads that show it. */
-  seenBy: number;
-  /** Reads whose aligned span includes its position. */
-  covering: number;
-  /** Every read that shows it calls it on a low-quality base. */
-  weak: boolean;
-}
-
-/** The differences of all reads, each reference event once: two reads over one mutation are one mutation. */
-function events(reads: ReadSummary[]): Event[] {
-  const byKey = new Map<string, { position: number; seenBy: number; weak: boolean }>();
-  for (const r of reads) {
-    for (const d of r.discrepancies) {
-      const key = `${d.kind}:${d.position}:${d.reference}:${d.read}`;
-      const weak = d.quality !== undefined && d.quality < GOOD_QUALITY;
-      const seen = byKey.get(key);
-      if (seen) {
-        seen.seenBy += 1;
-        seen.weak = seen.weak && weak;
-      } else {
-        byKey.set(key, { position: d.position, seenBy: 1, weak });
-      }
-    }
-  }
-  return [...byKey.values()].map((e) => ({
-    seenBy: e.seenBy,
-    covering: Math.max(e.seenBy, reads.filter((r) => covers(r, e.position)).length),
-    weak: e.weak,
-  }));
-}
-
-/** "It is", "Both are", "All 3 are", "2 of them are": the subject for `count` of `total` items. */
-function subject(count: number, total: number, singular: string, plural: string): string {
-  if (count === total) {
-    if (total === 1) return `It ${singular}`;
-    return total === 2 ? `Both ${plural}` : `All ${n(total)} ${plural}`;
-  }
-  return `${n(count)} of them ${count === 1 ? singular : plural}`;
-}
-
-/** One sentence that answers "is my clone right?" for the reads that aligned. */
+/** One sentence that answers "is my clone right?": from the one read, or from the consensus of several. */
 function verdict(result: SangerResult): { text: string; ok: boolean } {
-  const reads = result.reads.length;
+  if (result.contig && result.reads.length > 1) {
+    return contigVerdict(result.contig, result.reference.name, result.coverage_percent);
+  }
   const where = `${result.coverage_percent} % of ${result.reference.name}`;
-  const found = events(result.reads);
-  const total = found.length;
-  if (total === 0) {
-    const who = reads === 1 ? "the read matches" : `all ${reads} reads match`;
-    const cover = reads === 1 ? "it covers" : "they cover";
-    return { ok: true, text: `No differences: ${who} ${result.reference.name} wherever ${cover} it (${where}).` };
+  const diffs = result.reads[0].discrepancies;
+  if (!diffs.length) {
+    return { ok: true, text: `No differences: the read matches ${result.reference.name} wherever it covers it (${where}).` };
   }
-  const parts = [
-    `${n(total)} difference${total === 1 ? "" : "s"} ${reads === 1 ? "in 1 read" : `across ${n(reads)} reads`}`
-      + ` (covering ${where}).`,
-  ];
-  if (reads > 1) {
-    const shared = found.filter((e) => e.seenBy > 1).length;
-    const disputed = found.filter((e) => e.covering > e.seenBy).length;
-    if (total === 1) {
-      const [e] = found;
-      if (e.covering > 1 && e.seenBy === e.covering) {
-        parts.push(`${e.covering === 2 ? "Both reads" : `All ${n(e.covering)} reads`} covering it show it.`);
-      } else if (e.covering > 1) {
-        parts.push(`Only ${n(e.seenBy)} of the ${n(e.covering)} reads covering it show${e.seenBy === 1 ? "s" : ""} it:`
-          + " check that peak in the chromatogram.");
-      }
-    } else {
-      if (shared) parts.push(`${subject(shared, total, "is", "are")} seen in more than one read.`);
-      if (disputed) {
-        parts.push(`${subject(disputed, total, "is", "are")} missing from another read that covers the same`
-          + ` place: check ${disputed === 1 ? "that peak" : "those peaks"} in the chromatogram.`);
-      }
-    }
-  }
-  const weak = found.filter((e) => e.weak).length;
+  const total = diffs.length;
+  const parts = [`${n(total)} difference${total === 1 ? "" : "s"} in 1 read (covering ${where}).`];
+  const weak = diffs.filter((d) => d.quality !== undefined && d.quality < GOOD_QUALITY).length;
   if (weak) {
-    parts.push(`${subject(weak, total, "sits", "sit")} on low-quality bases (under Q${GOOD_QUALITY}, more than 1`
+    const who = weak === total ? (total === 1 ? "It sits" : total === 2 ? "Both sit" : `All ${n(total)} sit`)
+      : `${n(weak)} of them ${weak === 1 ? "sits" : "sit"}`;
+    parts.push(`${who} on low-quality bases (under Q${GOOD_QUALITY}, more than 1`
       + ` chance in 100 of a wrong call): check ${weak === 1 ? "that peak" : "those peaks"} in the chromatogram`
       + ` before trusting ${weak === 1 ? "it" : "them"}.`);
   }
@@ -188,7 +123,12 @@ function verdict(result: SangerResult): { text: string; ok: boolean } {
 }
 
 /** Tools → Align to Reference DNA Sequence: verify a clone against the expected plasmid. */
-export default function SangerDialog(props: { active: OpenDoc | null; onClose: () => void }) {
+export default function SangerDialog(props: {
+  active: OpenDoc | null;
+  onClose: () => void;
+  /** Opens a new document (Save consensus). */
+  openDocument?: (data: SequenceData, action: string, detail?: string) => void;
+}) {
   const [files, setFiles] = useState<File[]>([]);
   const [cutoff, setCutoff] = useState(0.05);
   const [result, setResult] = useState<SangerResult | null>(null);
@@ -333,6 +273,17 @@ export default function SangerDialog(props: { active: OpenDoc | null; onClose: (
               behind it. In the view below, red marks are mismatches and grey marks are regions a
               read does not cover.
             </p>
+            {result.contig && result.reads.length > 1 && (
+              <SangerContig
+                contig={result.contig}
+                referenceLength={result.reference.length}
+                onSave={props.openDocument && ((doc) => {
+                  const reads = result.reads.map((r) => r.name).join(", ");
+                  props.openDocument!(doc, "Sanger consensus",
+                    `${n(result.reads.length)} reads over ${result.reference.name}: ${reads}`);
+                })}
+              />
+            )}
             <div className="vt-alignment" data-testid="sanger-alignment">
               <AlignmentView id={ALIGNMENT_ID} height={420} />
             </div>

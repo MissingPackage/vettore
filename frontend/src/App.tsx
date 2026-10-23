@@ -1075,7 +1075,7 @@ export default function App() {
       )}
       {sangerOpen && (
         <SangerDialog active={openDocs.find((d) => d.editorName === active) ?? null}
-                      onClose={() => setSangerOpen(false)} />
+                      onClose={() => setSangerOpen(false)} openDocument={openDocument} />
       )}
       {gelOpen && (
         <GelDialog docs={openDocs} active={openDocs.find((d) => d.editorName === active) ?? null}

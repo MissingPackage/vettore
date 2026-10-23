@@ -158,12 +158,25 @@ def test_payload_satisfies_the_editor_invariants():
 
 def test_several_reads_share_one_coordinate_system():
     reference = reference_around(trace().sequence[60:520])
+    forward = DATA / "contig-ACHLO006-09_1_F.ab1"
+    # A second, different trace: the forward read of the contig fixtures, placed after it.
+    coi = read_trace(forward.name, forward.read_bytes())
+    start, end = mott_trim(coi.quality)
+    reference += coi.sequence[start:end].replace("N", "A") + clean_dna(300, 206)
     payload = alignment_payload("pTest", reference, False,
-                                [("a.ab1", AB1.read_bytes()), ("b.ab1", AB1.read_bytes())])
+                                [("a.ab1", AB1.read_bytes()), (forward.name, forward.read_bytes())])
     tracks = payload["alignmentTracks"]
     assert len(tracks) == 3
     assert len({len(t["alignmentData"]["sequence"]) for t in tracks}) == 1
     assert payload["first_covered"] == payload["reads"][0]["start"]
+
+
+def test_the_same_trace_chosen_twice_is_one_read():
+    reference = reference_around(trace().sequence[60:520])
+    payload = alignment_payload("pTest", reference, False,
+                                [("a.ab1", AB1.read_bytes()), ("b.ab1", AB1.read_bytes())])
+    assert len(payload["reads"]) == 1
+    assert payload["warnings"] == ["“b.ab1” is the same trace as “a.ab1”: it is counted once."]
 
 
 def test_an_insertion_in_one_read_opens_a_column_in_every_track():

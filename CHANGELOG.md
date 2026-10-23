@@ -2,6 +2,13 @@
 
 The download links in the README always point to the latest release.
 
+## Unreleased — several Sanger reads, one verdict
+
+- In Tools → Align to Reference DNA Sequence…, two or more reads of a clone give one consensus over the expected plasmid: the reads vote with their summed quality, an insertion or deletion is voted as one event, N and mixed calls are no call, and every position where the reads disagree is listed with each read's call and quality. The same trace chosen twice is counted once.
+- A coverage strip and one sentence say which stretches are read on both strands, on one strand only, or not at all, in plasmid numbering.
+- The verdict is given on the consensus: a difference is confirmed when two reads show it at Q20 or better, or one read at Q30 or better, and no good read shows something else; otherwise it says to check the trace.
+- Save Consensus opens the consensus as a new document, with the plasmid's features, every difference annotated (those to check say so), the clearly called stretches annotated "Sanger verified (n reads)" and the bases no read called clearly marked.
+
 ## Unreleased — Detect Common Features keeps to its identity threshold
 
 - Fixed: with the minimum identity at 98 %, Detect Common Features could still list an element at 95 % (an SV40 polyA in pTAL7B and in pT-PGK-mCherry). The bases that differed were the cloning sites around the element, which were annotated as part of it. Only the part of the element that is really there is annotated now, the identity shown is over exactly those bases, and no row is below the threshold.

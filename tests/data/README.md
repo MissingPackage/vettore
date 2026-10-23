@@ -89,3 +89,20 @@ The independent records:
 | `features-MQ296444.1.fasta` | MQ296444.1, sequence 123 from patent WO 2021216503 (Kmiec et al.) | 7SK promoter (human), the record's own 7SK promoter sequence |
 | `features-MP040844.1.fasta` | MP040844.1, sequence 35 from patent WO 2018206791 (Duchateau et al.) | SFFV promoter, the record's own SFFV promoter sequence |
 | `features-HG530138.1.fasta` | HG530138.1, cloning vector pTAL7B (Frank, Skryabin & Greber) | CAG promoter (full length), annotated there at 3272..4948 |
+
+## Sanger contig fixtures (`contig-*.ab1`)
+
+A forward and a reverse Sanger read of the same template (a COI barcode of the earthworm
+*Allolobophora chlorotica*, sample ACHLO006-09), copied unchanged on 2026-10-21 from the
+sangeranalyseR package (Chao, Lanfear et al.; https://github.com/roblanf/sangeranalyseR,
+`inst/extdata/Allolobophora_chlorotica/ACHLO/`, commit 4c5ebc9). The repository's LICENSE file
+is MIT; its package DESCRIPTION says GPL-2.
+
+| File | Original name | SHA-256 |
+|---|---|---|
+| `contig-ACHLO006-09_1_F.ab1` | `Achl_ACHLO006-09_1_F.ab1` | `fa16320fddcaf0a0d9003551c188192c0bcfb3efc93716017c8443bb28054646` |
+| `contig-ACHLO006-09_2_R.ab1` | `Achl_ACHLO006-09_2_R.ab1` | `e885871a776c70292efa45df9634b84812784d95191b174d8a5ef403e19d05c5` |
+
+`tests/test_contig.py` builds the reference from the forward read's trimmed calls between
+filler, with its N calls replaced by the reverse read's; the known differences are then planted
+in that reference.
