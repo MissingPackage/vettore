@@ -2,6 +2,7 @@ import collections
 import functools
 import json
 from pathlib import Path
+from typing import ClassVar
 from unittest import mock
 
 import pytest
@@ -847,14 +848,22 @@ DETECTION_BUDGET = 2.0
 #   all-in-one, 4 codons         2.53-3.10 s    3.31-3.77 s    1.95-2.07 s
 #   packed stress, 1 codon       -              -              2.75 s
 #
-# So the criterion is met on the realistic divergences on both containers, which is what PR #13
-# set out to do, from 2.3 s with a codon lost per element and 5.5 s with five. The all-in-one
-# plasmid has 1.1x to 1.3x of room on the slower container, the same engine is 7 to 23 % quicker
-# on the other, and the four-site point — where the fixture's even cuts land on the engine's
-# seed positions, so the merge cannot help — is over two seconds on ordinary hardware. The real
-# records in `tests/data` are a different matter and far cheaper: the slowest is 0.52 s, and the
-# fixtures above are deliberately the worst case, every element diverged so that none takes the
-# exact-copy shortcut.
+# Read those figures carefully, because the favourable reading is wrong. PR #13 brought the
+# all-in-one plasmid from 2.3 s with a codon lost per element and 5.5 s with five down to the
+# ranges above, which is what it set out to do, and on the faster container every realistic
+# point is inside the two seconds. On the slower one the criterion is met by the **median** run
+# and not by the range: the 1-codon and 5-codon points both reach 2.10 s idle, and the 5-codon
+# point is over budget across its whole contended range. So the margin is 1.1x to 1.3x at the
+# fastest runs and nothing at the slowest, and the four-site point — where the fixture's even
+# cuts land on the engine's seed positions, so the merge cannot help — is over two seconds on
+# both. The same engine is 7 to 23 % quicker on the faster container, point by point against
+# this one's fastest idle runs.
+#
+# Two things keep that from being a failure of S5.4. The fixtures are deliberately the worst
+# case, every element diverged so that none takes the exact-copy shortcut, which is not a
+# plasmid anyone builds; and the real records in `tests/data` are far cheaper, the slowest of
+# them 0.61 s. But the honest statement is the one below: a test asserting two seconds would
+# report which container ran it.
 #
 # **Why none of it is asserted.** An assertion at two seconds fails on the slower container
 # with nothing regressed, which is what sent this down four rounds:
@@ -863,22 +872,26 @@ DETECTION_BUDGET = 2.0
 #     one run in ten on a container a third slower, because the jitter here is slow drift that
 #     three consecutive runs share rather than spikes a minimum filters out;
 #   - a loose ceiling (3 s, then 8 s) cannot see a regression that costs a factor: matching the
-#     seeds base by base in Python instead of with `str.find` is 0.53 -> 2.28 s on the AAV
-#     fixture with identical annotations and identical cells, and 2.28 s is inside the slowest
-#     honest run of the all-in-one points;
+#     seeds base by base in Python instead of with `str.find` is 0.44 -> 2.25 s on the AAV
+#     fixture at three deleted sites, with identical annotations and identical cells, and
+#     2.25 s is inside the slowest honest run of the all-in-one points. A ceiling placed where
+#     the fixtures need it is a ceiling that regression fits under;
 #   - the share of the time spent outside `PairwiseAligner.align` looked like the
-#     machine-independent answer — healthy 28-37 % against 58-85 % for that scan — and is not.
-#     It is a property of how much of the document needs aligning, not of the engine: a real
-#     `tests/data` plasmid runs at 45-58 %, a verbatim fixture at 76-83 %, and it rises with the
-#     catalogue (39.6 % at the 60 entries PR #10 adds, 49 % at 100) and with mild contention
-#     (45.6 % at the AAV points). Meanwhile a per-alignment Python step costing 1.25x sits at
-#     44-49 %. The healthy range and the regression range overlap, so no threshold sits between
-#     them.
+#     machine-independent answer and is not. It is a property of how much of the document needs
+#     aligning, not of the engine, so it ranges as widely as the documents do: measured here,
+#     healthy, 28.2-30.9 % on the all-in-one fixture, 33.8-36.4 % on the AAV one, 32.1-32.9 % on
+#     a real record — and **78.7-79.5 % on the verbatim AAV fixture**, where almost nothing is
+#     aligned. Against that, the base-by-base scan drops to 53.2-55.4 % on the packed stress
+#     plasmid. So a healthy run reaches 79 % while a regressed one sits at 53 %: the two ranges
+#     overlap, and no threshold fits between them.
 #
-# What survives is deterministic: `ALIGNMENT_WORK` for the alignment work, the annotation tests
-# for what is found, and `test_the_catalogue_is_parsed_once_however_many_documents_are_opened`
-# for the one cost too small for any clock. The regression the clock cannot catch is recorded
-# where someone would introduce it, in `_candidate_offsets`.
+# What survives is deterministic. `ALIGNMENT_WORK` pins the alignment work; the annotation tests
+# pin what is found; `test_the_catalogue_is_parsed_once_however_many_documents_are_opened` pins
+# the one cost too small for any clock; and
+# `test_the_document_is_never_scanned_base_by_base_in_python` pins the scan the clock could not
+# see, by counting the document's own indexing rather than timing it. That last one is what the
+# fourth refutation above was reaching for, and it needs no threshold at all: the engine indexes
+# the document 0 times from Python and the base-by-base scan 3,962,927.
 
 #: A single-AAV nuclease vector, with the elements of pX601 the catalogue carries, in that
 #: construct's own order: the AAV ends, the CMV–SaCas9–bGH polyA cassette, the U6 promoter of
@@ -906,8 +919,9 @@ AAV_INVERTED = ("AAV2 ITR (truncated)",)
 #: between the nuclease and its polyA signal — and a backbone of one marker and two origins.
 #: 10.4 kb of catalogue elements, one nuclease, and nothing that has to fit a packaging limit.
 #: This is the plausible heavy case: the one that used to miss S5.4's budget, at 2.3 s with a
-#: codon lost per element, and now meets it — 1.1 s on one container and 1.5 to 2.1 s on a
-#: slower one, as the block under `DETECTION_BUDGET` records in full.
+#: codon lost per element. It now meets it on one container, at 1.2 s, and sits on the line on a
+#: slower one, 1.5 to 2.1 s across runs with the budget at 2.0 — which is why nothing asserts
+#: the seconds. The block under `DETECTION_BUDGET` records them in full.
 ALL_IN_ONE_ELEMENTS = (
     "U6 promoter (human)", "EF-1α promoter (human)", "SpCas9", "WPRE", "bGH polyA",
     "CMV promoter", "tdTomato", "SV40 polyA", "AmpR promoter", "AmpR", "ori", "f1 ori",
@@ -1045,9 +1059,9 @@ def _plasmid(element_names: tuple[str, ...], sites: int = 0,
 #: grows. Figures for the catalogue as it stands and for the 60 entries PR #10 grows it to,
 #: keyed by (fixture, deleted sites). The bounds are sized for the grown one, since the
 #: criterion is written for it; the seconds are one container's on the catalogue as it stands,
-#: for scale only — they move by a tenth between runs on a machine with other work on it and
-#: by nearly half between the containers this project has run on, which is why the bounds are
-#: in cells and not in them.
+#: for scale only — they move by a third between runs on one container and by up to a quarter
+#: between the two containers this project has run on, point by point, which is why the bounds
+#: are in cells and not in them. The ranges are recorded beside `DETECTION_BUDGET`.
 #:
 #: Each bound sits a sixth to a fifth above the grown catalogue's figure — 17 to 19 %, the
 #: spread being the rounding to a tidy number — except ("aav", 0): a
@@ -1257,15 +1271,26 @@ def test_enough_deleted_sites_stop_an_element_being_found_at_all(label, element_
 
 def test_the_catalogue_is_parsed_once_however_many_documents_are_opened():
     """The regression no clock in this file can see, counted instead of timed. Parsing
-    `common_features.json` costs 0.28 to 0.65 ms across runs — three to four orders of magnitude
-    under the seconds recorded under `DETECTION_BUDGET`, and so under the jitter of any timed
-    assertion that survived those measurements — and a version that parsed it per document, or
-    per element, would be invisible while the user paid for it on every file they open.
+    `common_features.json` costs 0.06 to 0.17 ms across 200 runs, and the whole cache miss —
+    reading the file, parsing it and building the 36 dataclasses — 0.15 to 0.66 ms. That is four
+    to five orders of magnitude under the seconds recorded beside `DETECTION_BUDGET`, and so far
+    under the jitter of any timed assertion that a version parsing it per document, or per
+    element, would be invisible while the user paid for it on every file they open.
 
     So this counts the parses rather than their cost, which is the same assertion on every
     machine: two documents, one parse. Counting `json.loads` rather than the `lru_cache`'s own
     miss counter on purpose — a second loader, or a merge with a user catalogue, would leave
-    that counter at one and still reparse.
+    that counter at one and still reparse. Counting it on the `json` module rather than on this
+    module's reference to it, so that a loader written as `json.load(fh)` is counted too, since
+    that calls `loads` itself. What slips through is a loader that goes round `loads`
+    altogether: a review planted a user catalogue merged in on every detection through
+    `json.JSONDecoder().decode` and this test passed while reparsing on every document. That is
+    the limit of the method and worth knowing before trusting it; what it would hide is another
+    0.06 to 0.17 ms per file opened.
+
+    One more thing to expect rather than debug: parsing the catalogue eagerly at import is a
+    *correct* change, and it fails this test on `cache_clear()` with an `AttributeError` rather
+    than on the count, because there is then no `lru_cache` to clear.
 
     The second document is what makes the count mean anything, since `detect` asks for the
     catalogue once per call. Both carry an element, so the per-element and the aligning paths
@@ -1299,6 +1324,67 @@ def test_the_catalogue_is_parsed_once_however_many_documents_are_opened():
     assert [names(matches) for matches in found] == [["EGFP"], ["EGFP"]], found
 
 
+class _CountsItsOwnIndexing(str):
+    """A document that counts every time Python itself indexes or slices it.
+
+    `str.find` on a `str` subclass still runs in C and never reaches `__getitem__`, so a scan
+    that leaves the per-base work to the standard library counts zero however long the document
+    is, and one that walks the bases from Python counts one per comparison."""
+
+    __slots__ = ()
+    counted: ClassVar[list[int]] = [0]
+
+    def __getitem__(self, item):
+        _CountsItsOwnIndexing.counted[0] += 1
+        return str.__getitem__(self, item)
+
+
+def test_the_document_is_never_scanned_base_by_base_in_python():
+    """The other regression no clock can see, and this one asserted rather than recorded.
+
+    `_candidate_offsets` scans the whole document for six seeds of every catalogue entry, which
+    is most of what detection does on a plasmid whose elements are not diverged — the common
+    case, since most elements sit in a vector unchanged and are then taken by the exact-copy
+    shortcut without being aligned at all. `str.find` does that scan in C. Pulling it into
+    Python costs **45x** there (37 ms to 1.65 s on the verbatim AAV fixture) and 20x on a real
+    record, while leaving every annotation and, where it preserves exactness, every cell of
+    `ALIGNMENT_WORK` untouched. Four rounds of timed assertions could not separate that from a
+    slower machine.
+
+    This can be asserted without a clock, because the property that matters is not a duration:
+    it is that the per-base loop is not in Python. Over the 33 entries longer than
+    `SHORT_FEATURE`, on a 15 kb document, the engine as it stands indexes the document **0**
+    times and a base-by-base scan **3,962,927** — the same two numbers on every machine, in 10
+    ms. The bound is one index per seed per entry rather than zero, so that a scan which slices
+    the document a constant number of times still passes, and the count is taken again on the
+    same document doubled, because anything proportional to the document's length is the loop
+    this test exists to forbid.
+
+    It forbids the loop and not the tolerance. A reader of ambiguity codes built on a compiled
+    regex — which is what `_candidate_offsets`'s own docstring recommends — indexes the
+    document 0 times and finds the same 25 offsets, so it passes. A mismatch-tolerant scan is
+    another matter and is caught elsewhere: it finds *more* starting points, so `ALIGNMENT_WORK`
+    fails on it, which is the alarm working and not a stale bound."""
+    long_enough = [e for e in catalogue() if e.length > SHORT_FEATURE]
+    assert len(long_enough) > 20, len(long_enough)
+    document = _plasmid(AAV_ELEMENTS, 1, AAV_INVERTED)
+    budget = 6 * len(long_enough)        # one index per seed per entry, not per base
+    counts = []
+    for target in (document, document * 2):
+        _CountsItsOwnIndexing.counted[0] = 0
+        counted = _CountsItsOwnIndexing(target)
+        for element in long_enough:
+            features_module._candidate_offsets(counted, element.sequence)
+        counts.append(_CountsItsOwnIndexing.counted[0])
+    assert counts[0] <= budget, (
+        f"the document was indexed from Python {counts[0]} times for {len(long_enough)} "
+        f"entries, against {budget}: the per-base loop belongs in C")
+    # And it is not merely under the bound by luck of this document's length.
+    assert counts[1] <= budget, (
+        f"doubling the document took the count from {counts[0]} to {counts[1]}, so the scan "
+        f"costs Python work per base")
+
+
 def test_a_second_deleted_site_per_element_is_nearly_free():
     """What the merge bought, asserted rather than described: the cost barely depends on how
     many times an element has been cut, because the registers of one copy are one alignment
@@ -1324,8 +1410,9 @@ def test_a_second_deleted_site_per_element_is_nearly_free():
     spaced cuts, not of divergence — it is one of the two points the tests pin where the
     engine does more work than aligning every guess separately, 87.3 M cells against 84.1 M
     here and 40.4 M against 39.4 M on the packed stress plasmid with nothing deleted at all,
-    and the only one over S5.4's two seconds on a plausible vector: 1.95 to 2.07 s across runs
-    on one container, against 1.86 to 1.96 s per guess, and 2.53 to 3.10 s on a slower one. So
+    and the point furthest over S5.4's two seconds on a plausible vector: 1.95 to 2.07 s across
+    runs on one container, against 1.86 to 1.96 s per guess, and 2.53 to 3.10 s on a slower
+    one, where the 1-codon and 5-codon points only touch the budget rather than clear it. So
     this is the one point where the merge neither saves work nor leaves room against the
     budget, which is one reason no test asserts the seconds. `ALIGNMENT_WORK` records the point
     so it cannot drift unseen, and `MERGE_GAP`'s own comment records what widening the gap

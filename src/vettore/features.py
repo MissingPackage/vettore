@@ -81,16 +81,38 @@ def _candidate_offsets(target: str, feature: str) -> set[int]:
 
     `str.find` is load-bearing for the speed criterion, and not only for tidiness. It is a C
     scan over the whole document for every seed of every catalogue entry, which is most of what
-    detection does on a 15 kb plasmid, and anything that pulls that loop into Python — matching
-    a seed base by base, so that it can tolerate a mismatch or read IUPAC ambiguity codes in the
-    document — costs 1.4x to 4.4x of the whole detection: 0.53 s to 2.28 s on the AAV fixture of
-    `tests/test_features.py`. No test will catch it. The annotations come out **identical**,
-    because the seeds found are the same, and so does the alignment work `ALIGNMENT_WORK` pins,
-    because the same guesses are aligned over the same windows; the only thing that changes is
-    the clock, and the measurements recorded in that file establish that no timed assertion on
-    this hardware class can tell such a factor from a slower machine. So if tolerance here is
-    ever wanted, the tolerant scan belongs in C or in a compiled matcher, and the cost has to be
-    measured by hand before it is believed.
+    detection does on a plasmid whose elements are not diverged — the common case, since an
+    element present verbatim is then taken whole below without being aligned at all. Pulling
+    that loop into Python costs, measured on the fixtures of `tests/test_features.py`:
+
+      * 45x on the verbatim AAV vector, 37 ms to 1.65 s, and 20x on a real record from
+        `tests/data`. This is the case the user meets most often, and the one the figures used
+        to miss, because the diverged fixtures dilute the scan with alignment;
+      * 5.1x on the AAV fixture at three deleted sites, 0.44 s to 2.25 s;
+      * 1.4x on the packed stress plasmid, where alignment dominates everything.
+
+    Which tests see it depends on what the rewrite changes, and the distinction matters because
+    the wrong reading of a failure here is to raise a bound:
+
+      * a rewrite that keeps the scan **exact** — the same seeds, found in the same places — is
+        seen by nothing. Annotations are identical, every cell `ALIGNMENT_WORK` pins is
+        identical, and the whole suite passes. The test named for this case,
+        `test_the_document_is_never_scanned_base_by_base_in_python`, counts the document's own
+        indexing instead of timing it, 0 against 3,962,927, and needs no clock;
+      * a scan that tolerates a **mismatch** finds *more* starting points, so more guesses are
+        aligned, and `ALIGNMENT_WORK` fails: on the AAV fixture 15.49 M cells become 42.20 M,
+        on the verbatim one 0.34 M become 27.04 M, on the packed stress plasmid 111.75 M become
+        152.15 M, with the annotations unchanged throughout. Those failures are the alarm
+        working. The bounds are not stale and must not be raised to accommodate it;
+      * a scan that reads **IUPAC ambiguity codes** in the document changes nothing today only
+        because no catalogue entry carries an ambiguity code — 0 of the 36 — so no seed does
+        either. Add one and it behaves like the mismatch case.
+
+    So if tolerance is ever wanted here, the tolerant scan belongs in C or in a compiled
+    matcher: a regex-based reader of ambiguity codes indexes the document 0 times from Python,
+    finds the same offsets, and passes both guards. And whatever route is taken, the cost has to
+    be measured by hand on a *verbatim* plasmid before it is believed, because that is where the
+    factor is largest and where no timed test can see it.
     """
     offsets: set[int] = set()
     for position, seed in _seeds(feature):
