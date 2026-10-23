@@ -764,9 +764,11 @@ def test_a_label_naming_the_other_species_is_flagged(element, label, wrong):
 
 # ---- detection speed --------------------------------------------------------------------
 # S5.4 asks that detection stay under two seconds for a 15 kb plasmid with the grown
-# catalogue. The cost is not in the catalogue's size — a feature absent from the sequence is
-# ruled out by an exact seed search and costs almost nothing — but in the elements that *are*
-# there, each of which is aligned where its seeds land.
+# catalogue. (S5.4 is a line of the S5-S6 roadmap, which lives in the notes repository rather
+# than here, so the two seconds are quoted in this file and nowhere under `specs/`.) The cost
+# is not in the catalogue's size — a feature absent from the sequence is ruled out by an exact
+# seed search and costs almost nothing — but in the elements that *are* there, each of which is
+# aligned where its seeds land.
 #
 # Three mistakes are easy here, and earlier versions of these tests made all three.
 #
@@ -820,18 +822,26 @@ def test_a_label_naming_the_other_species_is_flagged(element, label, wrong):
 
 #: S5.4's criterion, in the seconds it is written in. Nothing asserts it, and saying so is the
 #: point of this comment: seconds on a shared container measure the container — the same engine
-#: runs these plasmids 25 to 40 % quicker on one container than another — so an assertion at
+#: runs these plasmids 15 to 26 % quicker on one container than another — so an assertion at
 #: two seconds would report the runner. What is asserted instead is that the *work* does not
 #: drift, in cells of dynamic programming, by `ALIGNMENT_WORK`, which is the same number on
-#: every machine; three of its bounds are at points this file times above two seconds, so it is
-#: a guard against change and not a restatement of the criterion. The criterion itself is
+#: every machine; three of its bounds are at points this file *records* above two seconds — the
+#: three it deliberately does not time — so it is a guard against the work changing and not a
+#: restatement of the criterion. The criterion itself is
 #: recorded, in seconds and per container, by
 #: `test_nothing_outside_the_aligner_dominates_the_seconds`.
 DETECTION_BUDGET = 2.0
 
-#: What that test asserts: more than twice the slowest run ever measured on the plasmids it
-#: times, deliberate CPU contention included. It is loose on purpose — see the test, which has
-#: the measurements of what a clock here can and cannot see.
+#: The share of `detect`'s wall time that may fall outside `PairwiseAligner.align`. This is
+#: what the timed test really asserts: a ratio of two clocks in the same process, so a slow or
+#: loaded machine moves both and cancels, which no ceiling in seconds can do. The test has the
+#: measured baselines and the regression it separates.
+OUTSIDE_THE_ALIGNER = 0.50
+
+#: And a ceiling in seconds, kept as the second half of the pair: the share cannot see a
+#: detection that got slower *inside* the aligner without doing more cells, and this can. More
+#: than twice the slowest run ever measured on the plasmids it times — 3.48 s, under deliberate
+#: CPU contention — so no runner reaches it.
 SECONDS_CEILING = 8.0
 
 #: A single-AAV nuclease vector, with the elements of pX601 the catalogue carries, in that
@@ -1204,54 +1214,87 @@ def test_enough_deleted_sites_stop_an_element_being_found_at_all(label, element_
     assert max(counts) < sites
 
 
+def _outside_the_aligner(sequence: str) -> tuple[float, float]:
+    """One detection: its seconds, and the share of them spent outside the aligner.
+
+    Work Biopython defers out of the `align` call itself — materialising an alignment from the
+    object it returns — counts as outside here, which is why a healthy share is a third and not
+    a tenth. That is a property of the engine rather than of the machine, which is the whole
+    point: both clocks run on the same CPU in the same process, so a slow or contended host
+    moves them together."""
+    aligner = features_module._aligner()
+    original = aligner.align
+    inside = 0.0
+
+    def timed(*args, **kwargs):
+        nonlocal inside
+        start = time.perf_counter()
+        try:
+            return original(*args, **kwargs)
+        finally:
+            inside += time.perf_counter() - start
+
+    with mock.patch.object(aligner, "align", timed):
+        start = time.perf_counter()
+        matches = detect(sequence, circular=True)
+        elapsed = time.perf_counter() - start
+    assert matches, "the plasmid should carry recognisable elements"
+    return elapsed, 1.0 - inside / elapsed
+
+
 def test_nothing_outside_the_aligner_dominates_the_seconds():
-    """The guard for a cost that is not alignment at all: a cache lost, the catalogue reparsed
-    per call, something quadratic outside the aligner. `ALIGNMENT_WORK` counts cells of dynamic
-    programming and by construction cannot see work that is not an alignment, so this test
-    times the whole of `detect` instead.
+    """The guard for a cost that is not alignment at all, which `ALIGNMENT_WORK` cannot see
+    because it counts cells of dynamic programming and that cost does none. What the file used
+    to do here was assert S5.4's two seconds, and that cannot work: the same engine runs these
+    plasmids 15 to 26 % quicker on one container than another, and the all-in-one plasmid sits
+    *at* two seconds on the slower one, so the assertion reported the runner. Twelve warm runs
+    per point, idle and with four busy loops on four cores:
 
-    Because it times, what it asserts is `SECONDS_CEILING` and not S5.4's two seconds
-    (`DETECTION_BUDGET`), and the ceiling is four times the figures below. That looks like
-    giving up, so here is the measurement behind it. Twelve warm runs per point on one
-    container, idle and then with four busy-loops on its four cores, which is the "runner a
-    third slower" this file keeps invoking:
+        plasmid                     this container, idle   contended   the other one
+        AAV, 1 codon per element     0.46-0.59 s           0.51-0.82 s   0.39 s
+        AAV, 5 codons                0.44-0.62 s           0.54-0.72 s   0.41 s
+        all-in-one, 1 codon          1.49-2.10 s           1.84-2.26 s   1.19 s
+        all-in-one, 5 codons         1.70-2.10 s           2.11-2.61 s   1.53 s
 
-        plasmid                     idle         contended      another container
-        AAV, 1 codon per element    0.46-0.59 s  0.51-0.82 s    0.38 s
-        AAV, 5 codons               0.44-0.62 s  0.54-0.72 s    0.35 s
-        all-in-one, 1 codon         1.49-2.10 s  1.84-2.26 s    1.11 s
-        all-in-one, 5 codons        1.70-2.10 s  2.11-2.61 s    1.51 s
+    So S5.4's two seconds (`DETECTION_BUDGET`) are met on the realistic divergences on both,
+    which is what PR #13 set out to do, from 2.3 s with a codon lost per element and 5.5 s with
+    five — and they are recorded here rather than asserted.
 
-    Two things follow. S5.4's two seconds are met on the realistic divergences — which is what
-    PR #13 set out to do, from 2.3 s with a codon lost per element and 5.5 s with five — but on
-    this container the all-in-one plasmid runs *at* two seconds, over it on single runs, and
-    the same engine is 25 to 40 % quicker on the other container. An assertion at two seconds
-    reports which container ran it. And the gap between the two columns, 1.3x, is the whole
-    range a modest ceiling could hope to resolve.
+    What is asserted is `OUTSIDE_THE_ALIGNER`, the share of the time that is not inside
+    `PairwiseAligner.align`, because that share is the thing a machine cannot move. The
+    regression that made this necessary, found by review and reproduced here: matching the
+    seeds base by base in Python instead of with `str.find` — which is what a seed with IUPAC
+    codes, or any mismatch tolerance, would have to do, and `_candidate_offsets` is the natural
+    place for it. It changes no annotation and not one cell of dynamic programming, and it
+    costs a factor:
 
-    What a clock here can actually see, planted and measured rather than imagined:
+        plasmid               seconds         share outside the aligner
+        AAV, 1 codon          0.53 -> 2.28 s    36 % -> 82 %
+        AAV, 5 codons         0.48 -> 2.37 s    36 % -> 79 %
+        all-in-one, 1 codon   1.55 -> 3.23 s    32 % -> 66 %
+        all-in-one, 5 codons  1.93 -> 3.59 s    31 % -> 62 %
 
-      - the catalogue reparsed on every call, or the aligner rebuilt on every call: **0.4 to
-        1.1 ms**, three orders of magnitude under any ceiling. Invisible at two seconds as much
-        as at eight, which is why those two shapes have a test of their own that counts the
-        parses instead of timing them — see
-        `test_the_catalogue_is_parsed_once_and_the_aligner_built_once`.
-      - the `_self_similarity` memo lost: inside the run-to-run noise.
-      - a pass over the 15 kb sequence that is quadratic in Python: **tens of seconds**, which
-        any ceiling catches.
+    Four times the work at the AAV points, paid on every document the user opens, and invisible
+    to every absolute ceiling this test could carry: 2.28 s is inside the slowest honest run of
+    the all-in-one points. The share separates them at every point and under contention, where
+    the healthy figures stay at 30 to 38 % and the planted ones do not fall below 56 %.
 
-    Two adversarial rounds looked for a realistic regression costing between half again and an
-    order of magnitude, the band a tighter ceiling would buy, and found none: the shapes that
-    exist are either a millisecond or a factor of ten. So the ceiling is set where no container
-    and no contention can reach it — more than twice the worst run ever measured — and what it
-    catches is the order of magnitude, which is the only thing it was ever able to catch.
+    `SECONDS_CEILING` stays as the other half of the pair, loose, because the share is blind to
+    the converse case — a detection that got slower inside the aligner without doing more cells,
+    which `ALIGNMENT_WORK` would also miss.
+
+    Two shapes this test cannot see at all, measured rather than assumed: the catalogue
+    reparsed on every call and the aligner rebuilt on every call are **0.4 to 1.1 ms** each,
+    which is both too small for any clock and inside the aligner's own share. They are counted
+    instead of timed, by
+    `test_the_catalogue_is_parsed_once_however_many_documents_are_opened`.
 
     One timing, not the fastest of several: a cost paid once per process, such as a warm-up
     that needs two calls to finish, would hide inside a minimum. The call before the timed one
-    is there so that what is timed is a warm engine, which is the thing the user waits for
-    twice over.
+    is there so that what is timed is a warm engine, which is what the user waits for twice
+    over.
 
-    Two plausible points are left out and both are pinned in cells. The packed stress plasmid
+    Two plausible points are left out, and both are pinned in cells. The packed stress plasmid
     is a vector nobody builds, every awkward entry in the catalogue at once. And the all-in-one
     plasmid at **four** deleted sites per element is the one point where the merge cannot help,
     because there the fixture's cuts coincide with the engine's seed positions; it is 1.95 to
@@ -1266,40 +1309,51 @@ def test_nothing_outside_the_aligner_dominates_the_seconds():
                                            (ALL_IN_ONE_ELEMENTS, 5, ())):
         sequence = _plasmid(element_names, sites, inverted)
         detect(sequence, circular=True)      # warm the catalogue and the aligner
-        start = time.perf_counter()
-        matches = detect(sequence, circular=True)
-        elapsed = time.perf_counter() - start
-        assert matches, "the plasmid should carry recognisable elements"
+        elapsed, outside = _outside_the_aligner(sequence)
+        where = f"{len(element_names)} elements, {sites} deleted sites"
+        # The share first: it is the assertion that means something on an unknown machine.
+        assert outside < OUTSIDE_THE_ALIGNER, (
+            f"{where}: {100 * outside:.0f} % of {elapsed:.2f} s spent outside the aligner, "
+            f"against {100 * OUTSIDE_THE_ALIGNER:.0f} %. A healthy detection is 30 to 38 %, "
+            f"on any machine and under load, so this is work that is not alignment — "
+            f"`ALIGNMENT_WORK` will say the cells are unchanged.")
         assert elapsed < SECONDS_CEILING, (
-            f"{len(element_names)} elements, {sites} deleted sites: {elapsed:.2f} s against a "
-            f"{SECONDS_CEILING:.1f} s ceiling. This is a factor, not a loaded runner: the "
-            f"ceiling is twice the worst run ever measured. `ALIGNMENT_WORK` says whether the "
-            f"alignment work grew; if it did not, the cost is outside the aligner.")
+            f"{where}: {elapsed:.2f} s against a {SECONDS_CEILING:.1f} s ceiling, which is "
+            f"more than twice the slowest run ever measured here. Almost certainly a factor "
+            f"rather than a loaded runner, and inside the aligner, since the share above "
+            f"passed; `ALIGNMENT_WORK` says whether it is doing more cells.")
 
 
-def test_the_catalogue_is_parsed_once_and_the_aligner_built_once():
-    """The two regressions a clock cannot see, counted instead of timed. Reparsing
-    `common_features.json` on every call costs about a millisecond, and rebuilding the
-    `PairwiseAligner` about the same — three orders of magnitude under anything
-    `test_nothing_outside_the_aligner_dominates_the_seconds` could notice, and both of them
-    paid once per element per strand on every document the user opens. So what this test
-    asserts is that each is built *once* however many times it is asked for, which is exactly
-    what the caches promise and is the same assertion on every machine.
+def test_the_catalogue_is_parsed_once_however_many_documents_are_opened():
+    """The regression no clock in this file can see, counted instead of timed. Parsing
+    `common_features.json` costs about a millisecond — three orders of magnitude under anything
+    `test_nothing_outside_the_aligner_dominates_the_seconds` could notice, and under its share
+    of the aligner too — and a version that parsed it per document, or per element, would be
+    invisible while the user paid for it on every file they open.
 
-    `misses == 1` is the body having run once; `hits >= 1` is the cache having been consulted
-    again, so that a cache nobody reads a second time cannot pass. The second document is what
-    makes that reading happen: `detect` asks for the catalogue once per call, so one document
-    would leave the count at a single miss whether the cache works or not."""
-    cached = (features_module.catalogue, features_module._aligner)
-    sequence = _plasmid(ALL_IN_ONE_ELEMENTS, 1)      # built before the counters are cleared
-    for cache in cached:
-        cache.cache_clear()
-    assert detect(sequence, circular=True), "the plasmid should carry recognisable elements"
-    detect(clean_dna(2_000, 12), circular=False)     # a second document, cheap on purpose
-    for cache in cached:
-        info = cache.cache_info()
-        assert info.misses == 1, f"{cache.__wrapped__.__name__} was built {info.misses} times"
-        assert info.hits >= 1, f"{cache.__wrapped__.__name__} cache never read: {info}"
+    So this counts the parses rather than their cost, which is the same assertion on every
+    machine: two documents, one parse. Counting `json.loads` rather than the `lru_cache`'s own
+    miss counter on purpose — a second loader, or a merge with a user catalogue, would leave
+    that counter at one and still reparse.
+
+    The aligner's cache needs nothing here: every test that patches `align` on the object
+    `_aligner()` returns — `_alignment_work`, `_passes` and `_outside_the_aligner` — fails
+    outright if a second aligner is built behind its back, which a review confirmed on both of
+    the shapes it tried."""
+    first, second = clean_dna(2_000, 12), clean_dna(2_000, 13)
+    features_module.catalogue.cache_clear()
+    parses = 0
+    original = features_module.json.loads
+
+    def counted(*args, **kwargs):
+        nonlocal parses
+        parses += 1
+        return original(*args, **kwargs)
+
+    with mock.patch.object(features_module.json, "loads", counted):
+        detect(first, circular=False)
+        detect(second, circular=False)
+    assert parses == 1, f"the catalogue was parsed {parses} times for two documents"
 
 
 def test_a_second_deleted_site_per_element_is_nearly_free():
@@ -1328,7 +1382,7 @@ def test_a_second_deleted_site_per_element_is_nearly_free():
     engine does more work than aligning every guess separately, 87.3 M cells against 84.1 M
     here and 40.4 M against 39.4 M on the packed stress plasmid with nothing deleted at all,
     and the only one over S5.4's two seconds on a plausible vector: 1.95 to 2.07 s across runs
-    on one container, against 1.86 to 1.96 s per guess, and 2.6 to 3.0 s on a slower one. So
+    on one container, against 1.86 to 1.96 s per guess, and 2.58 to 3.10 s on a slower one. So
     this is the one point where the merge neither saves work nor leaves room against the
     budget, and `test_nothing_outside_the_aligner_dominates_the_seconds` does not time it for
     that reason. `ALIGNMENT_WORK` records it so it cannot drift unseen, and `MERGE_GAP`'s own
