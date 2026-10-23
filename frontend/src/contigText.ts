@@ -112,10 +112,14 @@ export function contigVerdict(contig: Contig, referenceName: string, coveragePer
         + " the plasmid's base is kept there, unverified."
       : "");
   if (!total) {
+    const ok = !contig.unclear && !contig.doubtful;
     return {
-      ok: !contig.unclear && !contig.doubtful,
-      text: `No differences: the consensus of ${n(contig.reads)} reads matches ${referenceName} wherever they cover it`
-        + ` (${where}).${settled}`,
+      ok,
+      text: ok
+        ? `No differences: the consensus of ${n(contig.reads)} reads matches ${referenceName} wherever they cover it`
+          + ` (${where}).${settled}`
+        : `No difference found, but not every covered base is verified: the consensus of ${n(contig.reads)} reads`
+          + ` shows ${referenceName}'s sequence (covering ${where}).${settled}`,
     };
   }
   const confirmed = contig.differences.filter((d) => d.confirmed).length;

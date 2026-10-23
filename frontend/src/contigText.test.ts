@@ -78,6 +78,7 @@ describe("contigVerdict", () => {
   it("does not pass a clone where some covered bases have no clear call", () => {
     const v = contigVerdict(contig({ unclear: 2 }), "pCOI", 61.4);
     expect(v.ok).toBe(false);
+    expect(v.text).toMatch(/^No difference found, but not every covered base is verified/);
     expect(v.text).toContain("2 covered positions have no clear call in any read");
   });
 });

@@ -270,18 +270,28 @@ def contig_payload(reference: str, circular: bool, reads: list[AlignedRead],
             for index, p in enumerate(unit):
                 if p not in per_read[i][0]:
                     continue
-                call, quality, clear, joined = column(i, unit, index)
-                if not clear:
-                    # A good-quality N or mixed call (a mixed peak: two clones?) is doubt.
-                    if quality >= SUPPORTING_QUALITY:
-                        disputed = conflict = True
-                    continue
-                if call == (parts[index] if joined else parts[index][-1]):
-                    if quality >= SUPPORTING_QUALITY:
-                        support[p] += 1      # the reads that back the consensus at Q20+
-                else:
-                    disputed = True
-                    conflict = conflict or quality >= SUPPORTING_QUALITY
+                # The base and the bases inserted before it are judged apart, each by its
+                # own quality, so a weak extra base never hides a good call next to it.
+                bases, inserts = per_read[i]
+                here = bases[p]
+                judged = [(here.base, here.quality, parts[index][-1], True)]
+                if index > 0 and unit[index - 1] in bases:
+                    previous = bases[unit[index - 1]]
+                    # No insertion weighs the weaker of the two bases around the slot.
+                    text, quality = inserts.get(p, ("", min(previous.quality, here.quality)))
+                    judged.append((text, quality, parts[index][:-1], False))
+                for call, quality, expected, is_base in judged:
+                    good = quality >= SUPPORTING_QUALITY
+                    if not (call == "-" or _clear(call)):
+                        # A good-quality N or mixed call (a mixed peak: two clones?) is doubt.
+                        disputed = disputed or good
+                        conflict = conflict or good
+                    elif call == expected:
+                        if is_base and good:
+                            support[p] += 1  # the reads that back the consensus at Q20+
+                    else:
+                        disputed = True
+                        conflict = conflict or good
         if disputed:
             disagreements.append({"kind": "base", "position": first + 1,
                                   "reference": ref_value.replace("|", ""),
@@ -374,6 +384,8 @@ def _new_range(start: int, end: int, start_of: list[int], kept: list[bool],
         if new_end < new_start:
             return None
         return new_start % new_length, new_end
+    if not any(kept[p] for p in _positions(start, end, len(kept))):
+        return None                  # across the origin, and every base of it deleted
     return new_start % new_length, new_end % new_length if circular else new_end
 
 

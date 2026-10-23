@@ -461,3 +461,55 @@ def test_a_flag_on_deleted_bases_stays_in_the_document():
     assert difference["kind"] == "deletion" and difference["confirmed"] is False
     checks = [f for f in result["document"]["features"] if f["name"] == "Sanger: check the trace"]
     assert checks and checks[0]["end"] - checks[0]["start"] == 1
+
+
+# ---- fourth review: alignments set by hand -------------------------------------------------
+
+def hand_read(name: str, reference_gapped: str, read_gapped: str, offset: int,
+              quality: list[int] | int = 40, strand: int = 1):
+    """A read whose alignment to the reference is given column by column."""
+    from vettore.sanger import AlignedRead
+
+    bases = read_gapped.replace("-", "")
+    qualities = quality if isinstance(quality, list) else [quality] * len(bases)
+    trace = Trace(name, bases, qualities, [{}] * len(bases), strand)
+    span = len(reference_gapped.replace("-", ""))
+    return AlignedRead(trace, reference_gapped, read_gapped, offset, offset + span - 1, 99.0, [],
+                       (0, len(bases)), len(bases), False, offset)
+
+
+def test_a_weak_extra_base_never_hides_a_good_contrary_call_beside_it():
+    from vettore.contig import contig_payload
+
+    reference = REFERENCE[:300]
+    other = {"A": "C", "C": "G", "G": "T", "T": "A"}[reference[101]]
+    # a: Q40, a mismatch at 101. b: Q40 at 101 with the reference base, but 100 deleted and a
+    # Q15 extra base before 101. c: a Q5 deletion of 101, which makes 100–101 one unit.
+    a = hand_read("a", reference[50:151], reference[50:101] + other + reference[102:151], 50)
+    b_read = reference[50:100] + "-" + "T" + reference[101:151]
+    b_quality = [40] * len(b_read.replace("-", ""))
+    b_quality[50] = 15
+    b = hand_read("b", reference[50:100] + reference[100] + "-" + reference[101:151], b_read, 50,
+                  b_quality, -1)
+    c_read = reference[60:101] + "-" + reference[102:141]
+    c_quality = [40] * len(c_read.replace("-", ""))
+    c_quality[40] = c_quality[41] = 5
+    c = hand_read("c", reference[60:141], c_read, 60, c_quality)
+    result = contig_payload(reference, False, [a, b, c], doc("p", reference, False))
+    mismatches = [d for d in result["differences"] if d["kind"] == "mismatch"]
+    assert mismatches and all(d["confirmed"] is False for d in mismatches)
+    assert not verified_at(result, 101)
+
+
+def test_a_deleted_stretch_across_the_origin_maps_to_nothing():
+    from vettore.contig import _new_range
+
+    kept = [True] * 10
+    kept[8] = kept[9] = kept[0] = False
+    start_of, cursor = [], 0
+    for k in kept:
+        start_of.append(cursor)
+        cursor += k
+    assert _new_range(8, 0, start_of, kept, cursor, True) is None
+    assert _new_range(7, 1, start_of, kept, cursor, True) == (6, 0)
+
