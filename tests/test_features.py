@@ -192,29 +192,37 @@ def _egfp_edited(edit) -> str:
     return edit(egfp.sequence)
 
 
-@pytest.mark.parametrize(("edit", "frameshift", "shifted"), [
+@pytest.mark.parametrize(("edit", "changed", "stop", "warning"), [
     # One base rotated 18 places, as in the pac gene of the pIRESpuro vectors (Z75185.1):
-    # the aligner reads it as a deletion and an insertion, and the six codons between are
-    # other residues of a whole protein, not a broken frame.
-    (lambda s: s[:300] + s[301:319] + s[300] + s[319:], False, 6),
-    # One base in at 300 and one out at 330: eleven codons differ, the frame is restored.
-    (lambda s: s[:300] + ("A" if s[300] != "A" else "C") + s[300:330] + s[331:], False, 11),
-    # A T in at 303 and a base out at 333: the codons between read TAA, a stop.
-    (lambda s: s[:303] + "T" + s[303:333] + s[334:], True, 0),
+    # the aligner reads it as a deletion and an insertion, and six residues of a whole
+    # protein differ.
+    (lambda s: s[:300] + s[301:319] + s[300] + s[319:], 6, 0, False),
+    # One base in at 300 and one out at 330: eleven residues differ, more than a few.
+    (lambda s: s[:300] + ("A" if s[300] != "A" else "C") + s[300:330] + s[331:], 11, 0, True),
+    # A T in at 303 and a base out at 333: the codons between read TAA, a stop at residue 102.
+    (lambda s: s[:303] + "T" + s[303:333] + s[334:], 11, 102, True),
+    # One base in at 150 and one out at 550: the frame comes back, 130 residues later.
+    (lambda s: s[:150] + "A" + s[150:550] + s[551:], 130, 0, True),
+    # No indel, a TAA in place of codon 151: the protein ends there.
+    (lambda s: s[:450] + "TAA" + s[453:], 0, 151, False),
 ])
-def test_an_insertion_and_a_deletion_that_make_up_for_each_other(edit, frameshift, shifted):
-    """The frame is right again after the second indel, so the protein is broken only when
-    the codons between bring a stop into it; otherwise the row says how many codons differ
-    instead of calling it a frameshift."""
+def test_indels_that_cancel_out_and_stops_inside_a_cds(edit, changed, stop, warning):
+    """The frame is right again after the second indel, so it is not a frameshift: the row
+    says how many residues differ (counted on the translations, as a biologist would), is
+    amber past a few, and a stop codon inside the protein, from indels or a substitution, is
+    named with the residue where the protein ends."""
     edited = _egfp_edited(edit)
-    stop = "*" in str(Seq(edited).translate())[:-1]
-    assert stop is frameshift
+    protein = str(Seq(edited).translate())
+    assert (protein.find("*") + 1 if "*" in protein[:-1] else 0) == stop
     filler = clean_dna(400, 314)
     for strand in (1, -1):
         construct = filler + (edited if strand == 1 else rc(edited)) + filler
         [match] = [m for m in detect(construct, False) if m.name == "EGFP"]
-        assert (match.frameshift, match.shifted) == (frameshift, shifted), strand
-        assert match.as_dict(len(construct))["codonsOutOfFrame"] == shifted
+        assert not match.frameshift, strand
+        assert (match.shifted, match.stop) == (changed, stop), strand
+        row = match.as_dict(len(construct))
+        assert (row["residuesChanged"], row["shiftWarning"]) == (changed, warning)
+        assert row["prematureStop"] == (stop or None)
 
 
 def test_one_mismatch_in_a_long_element_is_not_shown_as_100_percent():

@@ -421,8 +421,11 @@ feature's notes say the same; "798 bp · 3 bp inserted" says the copy here has b
 catalogue entry does not. A coding sequence with an insertion or deletion that breaks its
 reading frame is marked "Frameshift" and left unticked: the match can be over 99 % while the
 protein is different after the break. An insertion and a deletion that cancel each other out
-only change the codons between them, so the protein is still whole: the row says so ("6 codons
-out of frame") instead, unless those codons bring in a stop, which is a frameshift again.
+only change the residues between them: when that is a few residues the row says so ("5
+residues changed by indels") and is ticked as usual; when it is more than 10, a stretch of the
+protein is another sequence, and the row is amber and unticked. A stop codon inside the
+protein, from a substitution or from indels, is marked "Premature stop" with the residue where
+the protein ends, and left unticked too.
 
 Tick the ones you want and they are added to the map, coloured by type, with their provenance
 kept in the feature's notes.

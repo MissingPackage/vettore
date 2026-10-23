@@ -27,8 +27,12 @@ interface Detected {
   catalogueTo?: number;
   /** A coding sequence whose indels break its reading frame. */
   frameshift?: boolean;
-  /** Codons read in another frame between an insertion and a deletion that cancel out. */
-  codonsOutOfFrame?: number;
+  /** Residues changed by indels that cancel out (the frame is restored after them). */
+  residuesChanged?: number;
+  /** Set when that is more than a few residues: a stretch of the protein is another sequence. */
+  shiftWarning?: boolean;
+  /** The residue at which a premature stop codon ends the protein, or null. */
+  prematureStop?: number | null;
   isNew: boolean;
   /** The existing feature that already covers this match, under whatever name. */
   annotatedAs?: string | null;
@@ -49,8 +53,8 @@ function annotatedText(f: Detected): string {
 /**
  * "bases 4–708 of 711" when the match covers only part of the catalogue entry, so a 100 %
  * over a shorter stretch is not read as the whole element, and "3 bp inserted" (or missing)
- * when the vector's copy is longer or shorter than that part, and "6 codons out of frame"
- * when two indels that cancel out change the residues between them; null when none of these.
+ * when the vector's copy is longer or shorter than that part, and "5 residues changed by
+ * indels" when indels that cancel out change a few residues; null when none of these.
  */
 function partText(f: Detected): string | null {
   const { catalogueFrom: from, catalogueTo: to, catalogueLength: total } = f;
@@ -59,10 +63,15 @@ function partText(f: Detected): string | null {
   if (from !== 1 || to !== total) pieces.push(`bases ${from}–${to} of ${total}`);
   const extra = f.length - (to - from + 1);
   if (extra) pieces.push(`${Math.abs(extra)} bp ${extra > 0 ? "inserted" : "missing"}`);
-  const shifted = f.codonsOutOfFrame ?? 0;
-  if (shifted) pieces.push(`${shifted} codon${shifted === 1 ? "" : "s"} out of frame`);
+  const changed = f.residuesChanged ?? 0;
+  if (changed && !f.shiftWarning) {
+    pieces.push(`${changed} residue${changed === 1 ? "" : "s"} changed by indels`);
+  }
   return pieces.length ? pieces.join(", ") : null;
 }
+
+/** A coding sequence whose protein is not the catalogue's: shown in amber and left unticked. */
+const brokenProtein = (f: Detected) => Boolean(f.frameshift || f.prematureStop || f.shiftWarning);
 
 /** A message as a sentence, so another sentence can follow it. */
 const sentence = (text: string) => (/[.!?]$/.test(text.trim()) ? text.trim() : `${text.trim()}.`);
@@ -113,7 +122,7 @@ export default function DetectFeaturesDialog(props: { doc: OpenDoc; onClose: () 
         setResult(payload);
         // Everything not annotated yet is ticked: one click adds the useful result. A coding
         // sequence with a broken reading frame is shown but left for the user to decide.
-        setChosen(new Set(payload.features.filter((f) => f.isNew && !f.frameshift).map(key)));
+        setChosen(new Set(payload.features.filter((f) => f.isNew && !brokenProtein(f)).map(key)));
       })
       .catch((e) => setError(String((e as Error).message)))
       .finally(() => setBusy(false));
@@ -150,7 +159,9 @@ export default function DetectFeaturesDialog(props: { doc: OpenDoc; onClose: () 
         note: [f.note || f.name],
         detected_from: [
           `${f.source} (${f.identity.toFixed(1)}% identity${partText(f) ? ` over ${partText(f)}` : ""})`
-            + (f.frameshift ? "; the reading frame is broken (frameshift)" : ""),
+            + (f.frameshift ? "; the reading frame is broken (frameshift)" : "")
+            + (f.prematureStop ? `; a premature stop codon ends the protein at residue ${f.prematureStop}` : "")
+            + (f.shiftWarning ? `; ${f.residuesChanged} residues changed by indels that cancel out` : ""),
         ],
       },
     }));
@@ -246,7 +257,7 @@ export default function DetectFeaturesDialog(props: { doc: OpenDoc; onClose: () 
                 {result.features.map((f) => (
                   <tr
                     key={key(f)}
-                    className={f.labelWarning || f.frameshift ? "vt-detect-doubt" : f.isNew ? "" : "vt-muted"}
+                    className={f.labelWarning || brokenProtein(f) ? "vt-detect-doubt" : f.isNew ? "" : "vt-muted"}
                     data-testid="detect-row"
                   >
                     <td>
@@ -260,6 +271,19 @@ export default function DetectFeaturesDialog(props: { doc: OpenDoc; onClose: () 
                         <span className="vt-warn vt-detect-doubt-text" data-testid="detect-frameshift">
                           Frameshift: an insertion or deletion inside breaks the reading frame, so
                           the protein differs after it. Check the sequence before adding it.
+                        </span>
+                      )}
+                      {f.prematureStop ? (
+                        <span className="vt-warn vt-detect-doubt-text" data-testid="detect-stop">
+                          Premature stop: a stop codon ends the protein at residue {f.prematureStop}.
+                          Check the sequence before adding it.
+                        </span>
+                      ) : null}
+                      {f.shiftWarning && (
+                        <span className="vt-warn vt-detect-doubt-text" data-testid="detect-shift">
+                          {f.residuesChanged} residues changed: an insertion and a deletion restore
+                          the reading frame, but the protein between them is another sequence.
+                          Check the sequence before adding it.
                         </span>
                       )}
                       {f.labelWarning ? (
