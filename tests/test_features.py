@@ -862,7 +862,7 @@ DETECTION_BUDGET = 2.0
 # Two things keep that from being a failure of S5.4. The fixtures are deliberately the worst
 # case, every element diverged so that none takes the exact-copy shortcut, which is not a
 # plasmid anyone builds; and the real records in `tests/data` are far cheaper. The dearest of
-# the 41 of them is `cloning-multisite-entry-l4r1.gb`, 8.6 kb and circular, at 0.62 to 0.71 s
+# them all is `cloning-multisite-entry-l4r1.gb`, 8.6 kb and circular, at 0.62 to 0.71 s
 # across warm runs on the slower container, and every other record is at or under 0.50 s. But
 # the honest statement is the one below: a test asserting two seconds would report which
 # container ran it.
@@ -874,9 +874,9 @@ DETECTION_BUDGET = 2.0
 #     one run in ten on a container a third slower, because the jitter here is slow drift that
 #     three consecutive runs share rather than spikes a minimum filters out;
 #   - a loose ceiling (3 s, then 8 s) cannot see a regression that costs a factor: matching the
-#     seeds base by base in Python instead of with `str.find` is 0.44 -> 2.25 s on the AAV
+#     seeds base by base in Python instead of with `str.find` is 0.47 -> 2.12 s on the AAV
 #     fixture at three deleted sites, with identical annotations and identical cells, and
-#     2.25 s is inside the slowest honest run of the all-in-one points. A ceiling placed where
+#     2.12 s is inside the slowest honest run of the all-in-one points. A ceiling placed where
 #     the fixtures need it is a ceiling that regression fits under;
 #   - the share of the time spent outside `PairwiseAligner.align` looked like the
 #     machine-independent answer and is not. It is a property of how much of the document needs
@@ -892,8 +892,8 @@ DETECTION_BUDGET = 2.0
 # the one cost too small for any clock; and
 # `test_the_document_is_not_walked_in_python_once_per_element` pins the scan the clock could not
 # see, by counting the document's own indexing rather than timing it. That last one is what the
-# fourth refutation above was reaching for, and it needs no threshold at all: the engine indexes
-# the document 0 times from Python and the base-by-base scan 3,962,927.
+# fourth refutation above was reaching for, and it needs no threshold at all: the engine asks
+# the document for 267 things and a base-by-base scan for 3,962,927 of its bases.
 
 #: A single-AAV nuclease vector, with the elements of pX601 the catalogue carries, in that
 #: construct's own order: the AAV ends, the CMV–SaCas9–bGH polyA cassette, the U6 promoter of
@@ -1326,50 +1326,105 @@ def test_the_catalogue_is_parsed_once_however_many_documents_are_opened():
     assert [names(matches) for matches in found] == [["EGFP"], ["EGFP"]], found
 
 
+def _bases_in(result: object) -> int:
+    """How many of the document's bases a call on it handed back."""
+    if isinstance(result, (str, bytes, bytearray)):
+        return len(result)
+    if isinstance(result, (list, tuple)):
+        return sum(_bases_in(part) for part in result)
+    return 0
+
+
 class _WatchesHowItIsRead(str):
-    """A document that charges for every base Python itself takes out of it.
+    """A document that charges for what Python asks of it.
 
-    `str.find` runs in C on a `str` subclass too and reaches none of these methods, so a scan
-    that leaves the per-base work to the standard library is charged nothing however long the
-    document is. Every other route a Python-level scan can take to the bases is charged what it
-    yields: a subscript or a slice one base, and iterating, encoding, translating or copying the
-    whole document its whole length, because each of those hands the caller every base at once.
+    Every call Python makes on the document costs at least one, and a call that hands back the
+    document's bases costs however many it hands back. So `document.find(seed)`, which scans the
+    whole thing in C and returns a number, costs one — that is the idiom the engine is built on,
+    six times per catalogue entry — while `document[i]` costs one base, `document.upper()` or
+    `document.encode()` cost the document's whole length, and `document.startswith(seed, i)` at
+    every position costs one per position.
 
-    `bytearray(document, "ascii")` is the one route that reaches no method at all, so a scan
-    that copies itself out that way and walks the copy is charged nothing and is not caught —
-    see the test's own docstring."""
+    What it cannot see, and what no `str` subclass can: `bytes(document, "ascii")` and
+    `bytearray(document, "ascii")`, which go through the buffer protocol and reach no method;
+    an unbound call such as `str.__getitem__(document, i)` or `str.upper(document)`, which looks
+    the method up on the type rather than on the instance; and the bases of any copy once it has
+    been made, so a scan that takes **one** full-length copy of the document and then walks that
+    copy from Python is charged for the copy alone. The test's own docstring says what that
+    leaves open."""
 
     __slots__ = ()
     bases: ClassVar[list[int]] = [0]
 
+    @classmethod
+    def _charge(cls, amount: int) -> None:
+        cls.bases[0] += amount
+
+    def __getattribute__(self, name):
+        attribute = str.__getattribute__(self, name)
+        if name.startswith("_") or not callable(attribute):
+            return attribute
+
+        def charged(*args, **kwargs):
+            result = attribute(*args, **kwargs)
+            _WatchesHowItIsRead._charge(max(1, _bases_in(result)))
+            return result
+
+        return charged
+
+    # The dunders syntax reaches through the type, so `__getattribute__` never sees them.
     def __getitem__(self, item):
         taken = str.__getitem__(self, item)
-        _WatchesHowItIsRead.bases[0] += len(taken)
+        _WatchesHowItIsRead._charge(len(taken))
         return taken
 
     def __iter__(self):
-        _WatchesHowItIsRead.bases[0] += len(self)
+        _WatchesHowItIsRead._charge(len(self))
         return str.__iter__(self)
 
     def __str__(self):
-        _WatchesHowItIsRead.bases[0] += len(self)
+        _WatchesHowItIsRead._charge(len(self))
         return str.__str__(self)
 
-    def encode(self, *args, **kwargs):
-        _WatchesHowItIsRead.bases[0] += len(self)
-        return str.encode(self, *args, **kwargs)
+    def __add__(self, other):
+        _WatchesHowItIsRead._charge(len(self))
+        return str.__add__(self, other)
 
-    def translate(self, table):
-        _WatchesHowItIsRead.bases[0] += len(self)
-        return str.translate(self, table)
+    def __mul__(self, other):
+        _WatchesHowItIsRead._charge(len(self) * max(1, other))
+        return str.__mul__(self, other)
+
+    def __mod__(self, other):
+        _WatchesHowItIsRead._charge(len(self))
+        return str.__mod__(self, other)
 
 
-def _bases_taken_from_the_document(document: str, elements) -> int:
-    """What `_candidate_offsets` takes out of `document` in Python, scanning for `elements`."""
+def _a_base_at_a_time(target: str, feature: str) -> set[int]:
+    """`_candidate_offsets` rewritten with the per-base loop in Python, exactness preserved.
+
+    The reference regression, kept so that the counting below can be checked against something
+    rather than trusted. It returns the same offsets as the engine does."""
+    offsets: set[int] = set()
+    for position, seed in features_module._seeds(feature):
+        width = len(seed)
+        for start in range(len(target) - width + 1):
+            for index in range(width):
+                if target[start + index] != seed[index]:
+                    break
+            else:
+                offsets.add(max(0, start - position))
+    return offsets
+
+
+def _bases_taken_from_the_document(document: str, elements, scan=None) -> int:
+    """What `scan` takes out of `document` in Python, looking for `elements`.
+
+    `scan` defaults to the engine's own `_candidate_offsets`."""
+    scan = scan or features_module._candidate_offsets
     _WatchesHowItIsRead.bases[0] = 0
     watched = _WatchesHowItIsRead(document)
     for element in elements:
-        features_module._candidate_offsets(watched, element.sequence)
+        scan(watched, element.sequence)
     return _WatchesHowItIsRead.bases[0]
 
 
@@ -1382,47 +1437,80 @@ def test_the_document_is_not_walked_in_python_once_per_element():
     taken whole without being aligned at all. `str.find` does that scan in C. Pulling it into
     Python costs 40x there (0.040 s to 1.60 s on the verbatim AAV fixture, medians) and 2.8x to
     19x on the real records in `tests/data`, while leaving every annotation and, where the
-    rewrite preserves exactness, every cell of `ALIGNMENT_WORK` untouched. Four rounds of timed
-    assertions could not separate that from a slower machine.
+    rewrite preserves exactness, every cell of `ALIGNMENT_WORK` untouched. The factor is widest
+    where there is least alignment to dilute it, so the cheap records suffer worst and the
+    dearest one, which pays most of its time inside the aligner, only doubles; the figures are
+    in `_candidate_offsets`. Four rounds of timed assertions could not separate any of it from a
+    slower machine.
 
     It can be asserted without a clock, because the property that matters is not a duration. It
-    is that the per-base work happens **once per document and not once per element**: that is
-    what separates the regression from the two correct implementations that also read the
-    document in Python, and it is why neither bound below is a constant. Measured here, over
-    the 33 entries and a 15 kb document, in 11 ms:
+    is that the document is not read out of the C layer **once per element**: that is what
+    separates the regression from a correct implementation that also reads the document in
+    Python, and it is why neither bound below is a constant. Measured here, over the 33 entries
+    and a 15 kb document, in 10 ms:
 
-        as shipped, `str.find`                              0 bases
-        a k-mer index built once per document         269,694          correct, and quicker
-        base by base over `iter(document)`            495,000          the regression
-        base by base over `document.encode()`         495,000          the regression
+        as shipped, `str.find`                            267 things asked of the document
+        a k-mer index built once per document         269,694 bases    correct, and quicker
+        a compiled-regex IUPAC reader                       0          correct
         base by base, exactness preserved           3,962,927          the regression
+        base by base over a `.upper()` copy           495,000          the regression
+        base by base over `document + ""`             495,000          the regression
+        base by base over `document.encode()`         495,000          the regression
+        base by base over `iter(document)`            495,000          the regression
+        `document.startswith(seed, i)` per position  2,966,634          the regression
 
-    All five find exactly the same offsets, and the index is not a straw man: it is 1.4x quicker
-    than `str.find` on the verbatim fixture (0.029 s against 0.042 s) and level with it at one
-    deleted site, so a test that forbade it would be sending a developer to C to undo a
-    speed-up. Note that the index reads *more* bases per pass than
-    any of the regressions — a window of `SEED` bases at every position — and still costs the
-    least, because it reads them once where each of the others reads the whole document again
-    for every entry. So the bound is one windowed pass over the document, and what it forbids is
-    the per-element repetition: at 33 entries the cheapest of the three regressions is already
-    1.7x above it, and every extra entry takes it further over while the index stays put. The
-    count is then taken again on the same document doubled, against a bound that doubles with
-    it, so that a scan cannot slip under by the document being short.
+    All nine find exactly the same offsets. The index is not a straw man: on this container it
+    is 1.4x quicker than `str.find` on the verbatim fixture (0.029 s against 0.042 s) and level
+    with it at one deleted site, so a test that forbade it would be sending a developer to C to
+    undo a speed-up. Note that it reads *more* bases per pass than any of the regressions — a
+    window of `SEED` bases at every position — and still costs the least, because it reads them
+    once where each of the others reads the whole document again for every entry. So the bound
+    is one windowed pass over the document, and what it forbids is the per-element repetition:
+    at 33 entries the cheapest of the regressions is already 1.7x above it, and every extra
+    entry takes it further over while the index stays put. (Which is also why
+    `assert len(long_enough) > 20` above is load-bearing and not decoration: at nineteen entries
+    a full read per entry would fit inside the bound.) The count is then taken again on the same
+    document doubled, against a bound that doubles with it, so that a scan cannot slip under by
+    the document being short.
 
-    Two holes to know about before trusting it. `bytearray(document, "ascii")` reaches no method
-    on the document, so a scan that copies itself out that way and walks the copy is charged
-    nothing; and the test calls `_candidate_offsets` directly, because `detect` normalises the
-    document with `sequence.upper()` and hands on a plain `str`, so a per-base loop introduced
-    anywhere else — in `_match_long`, or in a new helper — is not seen here either.
+    What it does not catch, measured rather than assumed, and all three verified to pass while
+    costing 22x to 60x:
+
+      * `bytes(document, "ascii")` or `bytearray(...)`, which take the bases through the buffer
+        protocol and reach no method the document can charge for;
+      * an unbound call, `str.__getitem__(document, i)`, which finds the method on the type;
+      * **one** full-length copy, however it is made, followed by a walk over the copy. The
+        copy is charged; the walking is not, because by then the document is not involved. Only
+        a copy *per element* is caught, and that is the shape of every regression above.
+
+    No `str` subclass can close the first two. The third is the real limit of the method, and
+    the honest summary is that this test forbids reading the document out of C once per
+    element, not reading it in Python. It also calls `_candidate_offsets` directly, because
+    `detect` hands on a plain `str` from `sequence.upper()`, so a per-base loop introduced in
+    `_match_long` or in a new helper is not seen here either.
+
+    One false positive to expect, and it is the mirror of the third hole: a scan that calls
+    `document.encode("ascii")` once **per element** and then does all its per-base work in C
+    with `bytes.find` is charged 495,000 and fails, although it is correct and at parity with
+    the engine. Hoisting that encode out of the loop — which is what it wants anyway — brings
+    it to 15,000 and passes.
 
     It forbids the per-element loop and not the tolerance. A reader of ambiguity codes built on
-    a compiled regex — which is what `_candidate_offsets`'s own docstring recommends — takes 0
-    bases and finds the same 25 offsets, so it passes. A mismatch-tolerant scan is another
+    a compiled regex — which is what `_candidate_offsets`'s own docstring recommends — is
+    charged nothing at all, because `re` takes the document into C, and it finds the same 25
+    offsets, so it passes. A mismatch-tolerant scan is another
     matter and is caught elsewhere: it finds *more* starting points, so `ALIGNMENT_WORK` fails
     on it, which is the alarm working and not a stale bound."""
     long_enough = [e for e in catalogue() if e.length > SHORT_FEATURE]
     assert len(long_enough) > 20, len(long_enough)
     document = _plasmid(AAV_ELEMENTS, 1, AAV_INVERTED)
+    # A counter that charges nothing looks exactly like an engine that reads nothing, and this
+    # PR adds `assert passes` two tests above for the same reason. So before trusting a zero,
+    # check the instrument against the regression it exists to catch.
+    reference = _bases_taken_from_the_document(document, long_enough, _a_base_at_a_time)
+    assert reference > 1_000_000, (
+        f"the instrument charged a base-by-base scan only {reference} bases, so a zero below "
+        f"would mean nothing")
     for target in (document, document * 2):
         #: One windowed pass over it — `SEED` bases at each position, which is what building an
         #: index costs — plus one base per seed per entry.

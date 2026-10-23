@@ -91,7 +91,9 @@ def _candidate_offsets(target: str, feature: str) -> set[int]:
         scan with alignment;
       * on the real records, 19x on `cloning-gateway-destination.gb` (0.065 s to 1.21 s), 9.0x
         on `PZ629150.1.gb`, and 2.8x on `cloning-multisite-entry-l4r1.gb`, which is the dearest
-        record there is and so the one with the most alignment to dilute it;
+        record there is and so the one with the most alignment to dilute it. A review measured
+        others in that directory above 30x; the factor is widest wherever least of the document
+        has to be aligned, which is the case the user meets most;
       * 4.5x on the AAV fixture at three deleted sites, 0.47 s to 2.12 s;
       * 1.4x on the packed stress plasmid, where alignment dominates everything.
 
@@ -101,8 +103,9 @@ def _candidate_offsets(target: str, feature: str) -> set[int]:
       * a rewrite that keeps the scan **exact** — the same seeds, found in the same places — is
         seen by nothing else. Annotations are identical, every cell `ALIGNMENT_WORK` pins is
         identical, and every other test passes. The test named for this case,
-        `test_the_document_is_not_walked_in_python_once_per_element`, counts the document's own
-        indexing instead of timing it, 0 against 3,962,927, and needs no clock;
+        `test_the_document_is_not_walked_in_python_once_per_element`, charges the document for
+        what is asked of it rather than timing the scan: 267 things for the engine against
+        3,962,927 of its bases for the rewrite, and no clock;
       * a scan that tolerates a **mismatch** finds *more* starting points, so more guesses are
         aligned, and `ALIGNMENT_WORK` fails: on the AAV fixture 15.49 M cells become 42.20 M,
         on the verbatim one 0.34 M become 27.04 M, on the packed stress plasmid 111.75 M become
@@ -113,10 +116,10 @@ def _candidate_offsets(target: str, feature: str) -> set[int]:
         either. Add one and it behaves like the mismatch case.
 
     So if tolerance is ever wanted here, the tolerant scan belongs in C or in a compiled
-    matcher: a regex-based reader of ambiguity codes indexes the document 0 times from Python,
-    finds the same offsets, and passes both guards. And whatever route is taken, the cost has to
-    be measured by hand on a *verbatim* plasmid before it is believed, because that is where the
-    factor is largest and where no timed test can see it.
+    matcher: a regex-based reader of ambiguity codes takes the document into C and is charged
+    nothing at all, finds the same offsets, and passes both guards. And whatever route is taken,
+    the cost has to be measured by hand on a *verbatim* plasmid before it is believed, because
+    that is where the factor is largest and where no timed test can see it.
     """
     offsets: set[int] = set()
     for position, seed in _seeds(feature):
