@@ -150,7 +150,7 @@ ENTRIES: list[Entry] = [
           "intron-less core of the human EF-1α promoter, as the patent record gives it: its "
           "first 5 bases are a cloning site that neither cross-check carries; "
           "cross-check MP933339.1 (99.6 % over the 233 bp the two share)"),
-    # CBh (Gray JL et al., Hum Gene Ther 2011;22:1143): a CMV enhancer fragment, the chicken
+    # CBh (Gray SJ et al., Hum Gene Ther 2011;22:1143; PY026696.1 is Gray,S. and Sinnett,S.): a CMV enhancer fragment, the chicken
     # β-actin promoter and a shortened hybrid intron — the CAG of AAV vectors, made shorter
     # again. PY026696.1 (University of Texas) annotates the 796 bp as one misc_feature;
     # QQ167606.1 (University of Pennsylvania) carries the same promoter in an AAV cassette.

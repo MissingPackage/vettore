@@ -438,12 +438,14 @@ their bases, so each is its own entry. For the rest the catalogue carries the ve
 unrelated vectors agree on, both named in the entry's notes, and a construct built from
 another version may not be recognised. The 2A peptides are the common case and the most
 variable: of the public records that annotate one of these peptides, the P2A entry is found
-in 6 of the 15 that annotate a P2A, and the T2A entry in 8 of the 16 that annotate a T2A. What to do depends on how long the
-element is. For the 2A peptides, the IRES and anything else over 50 bases, lower the identity
-threshold for one run and the near match is found. At 50 bases or shorter — the Myc and V5
-tags, and the loxP, lox2272, loxN, FRT and F3 sites — the search asks for an exact match and
-the threshold does nothing, because a 33-base tag found loosely would be found everywhere;
-annotate those by hand.
+in 6 of the 15 that annotate a P2A, and the T2A entry in 8 of the 16 that annotate a T2A. Lowering the identity threshold helps a long
+element that is a few bases off — an IRES, a promoter, a marker gene — and it does not help
+here. For the short ones the threshold is not what stands in the way: at 50 bases or shorter
+(the Myc and V5 tags, the loxP, lox2272, loxN, FRT and F3 sites) the search asks for an exact
+match and ignores the threshold altogether, and just above that the search still has to find
+an exact 18-base stretch to start from, which a 54-base T2A written in other codons does not
+have. Dropping the threshold as far as it goes adds no T2A record and one P2A record. A 2A
+peptide written another way is annotated by hand, and so are the short tags and sites.
 
 Features already annotated are shown greyed and left unticked. This includes elements inside a
 larger feature named after them, however long that feature is: vendors often draw one "CMV

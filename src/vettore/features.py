@@ -584,11 +584,14 @@ WORD_ALIASES = {"hcmv": "cmv", "hef1a": "ef1a", "camkii": "camkiia", "hsyn1": "h
 #:   chicken β-actin promoter that follows it is not a catalogue element of its own.
 #: - CAG promoter (truncated): the same elements, but it starts 131 bp inside the enhancer, so
 #:   only part of it is there and a search does not find the enhancer in it.
-#: - EF-1α promoter (human): the EFS promoter is its intron-less core, the first 232 bp of
-#:   the entry, so a search finds EFS inside it and a block named "EF-1α" is not a wrong
-#:   label for the core.
-#: - WPRE: WPRE3 is 246 bp of it, base for base, so a cassette carrying the short element and
-#:   labelled "WPRE" by its author is labelled loosely, not wrongly.
+#: - EF-1α promoter (human): the EFS promoter is its intron-less core — EFS bases 7..239 are
+#:   EF-1α bases 6..238, 233 of them — so a search finds EFS inside it and a block named
+#:   "EF-1α" is not a wrong label for the core.
+#: - WPRE: WPRE3 is the WPRE with its middle taken out, in two pieces (WPRE3 3..160 is WPRE
+#:   1..158, WPRE3 166..246 is WPRE 302..382) and seven bases in neither, so it is not a
+#:   contiguous stretch of the WPRE and a search does not find it inside one. Listed here by
+#:   hand, like the truncated CAG below: a cassette carrying the short element and labelled
+#:   "WPRE" by its author is labelled loosely, not wrongly.
 HOLDS = {"SaCas9": frozenset({"3×HA"}),
          "CAG promoter": frozenset({"CMV enhancer"}),
          "CAG promoter (truncated)": frozenset({"CMV enhancer"}),
@@ -670,9 +673,21 @@ def _names_another_element(label: str, element: str) -> bool:
 #: "…intron" is not a polyA signal, whatever name it shares with one. Promoters and enhancers
 #: are deliberately absent, because a CMV enhancer-and-promoter block is labelled either way
 #: and neither label is wrong.
-_KIND_WORDS = {"intron": frozenset({"intron"}),
-               "polya": frozenset({"polyA_signal"}),
-               "polyadenylation": frozenset({"polyA_signal"})}
+#: A word in a label and the catalogue types it rules out, so that a label sharing a name with
+#: an entry of a kind it cannot be is not read as claiming to be that entry: "rabbit β-globin
+#: intron", the piece a CAG promoter is made of, shares "β-globin" with the rabbit β-globin
+#: polyA signal and is not it.
+#:
+#: Stated as what each word excludes, not as what it allows. Reading it the other way around
+#: made a word the catalogue has no type for exclude everything at once: nothing here is typed
+#: ``intron``, so "EF-1α promoter with intron A" and "hPGK (intron-less)" contradicted all
+#: sixty entries and switched the wrong-label warning off altogether.
+#:
+#: Promoters and enhancers do not exclude each other on purpose, because a CMV
+#: enhancer-and-promoter block is labelled either way and neither label is wrong.
+_KIND_WORDS = {"intron": frozenset({"polyA_signal"}),
+               "polya": frozenset({"promoter", "enhancer"}),
+               "polyadenylation": frozenset({"promoter", "enhancer"})}
 
 
 def _kind_conflict(label: str, element: str) -> bool:
@@ -682,9 +697,13 @@ def _kind_conflict(label: str, element: str) -> bool:
     if element not in types:
         return False
     tokens = {t for t in re.split(r"[^a-z0-9]+", label.translate(_LETTERS).lower()) if t}
-    claimed = frozenset().union(*(_KIND_WORDS[t] for t in tokens & _KIND_WORDS.keys())) \
-        if tokens & _KIND_WORDS.keys() else frozenset()
-    return bool(claimed) and types[element] not in claimed
+    kinds = tokens & _KIND_WORDS.keys()
+    if not kinds:
+        return False
+    # A label naming more than one kind ("β-globin intron and polyA") rules out only what every
+    # one of them rules out, because it describes a composite and claims to be none of them.
+    ruled_out = frozenset.intersection(*(_KIND_WORDS[kind] for kind in kinds))
+    return types[element] in ruled_out
 
 
 @lru_cache(maxsize=1)

@@ -658,9 +658,10 @@ def shared_span(feature, found: str) -> tuple[float, float]:
     """(identity, coverage) of a catalogue ``feature`` against a copy of it found in another
     record, measured here rather than taken from the match: identity over the bases the two
     share, coverage over the entry's own length. The two are reported apart because a second
-    record often carries the element with a few bases less at one end — the last 19 bp of the
-    EFS promoter, 27 of FLPe and FLPo, 22 of hph — and averaging a missing flank into an
-    identity would hide how well the bases that are there agree.
+    record often carries the element a few bases short — 19 bp of the EFS promoter, 5 at its
+    head and 14 at its tail; 27 of FLPe and FLPo, all at the head; 22 of hph, 4 at the head
+    and 18 at the tail — and averaging a missing flank into an identity would hide how well
+    the bases that are there agree.
 
     Computed with a plain local alignment, not with ``Match.identity``, so that this check
     tests the sequences and not the engine that found them.
@@ -979,7 +980,8 @@ def test_the_species_check_covers_the_new_entries(element, label, wrong):
     ("CAG promoter", "chicken β-actin promoter"),
     ("CAG promoter", "rabbit beta-globin intron"),
     ("CBh promoter", "chicken ACTB promoter"),
-    # WPRE3 is 246 bp of the WPRE, base for base, so its author's loose "WPRE" is not wrong.
+    # WPRE3 is the WPRE with its middle taken out — two pieces of it, not a contiguous
+    # stretch — so its author's loose "WPRE" is not wrong. HOLDS says why.
     ("WPRE3", "WPRE"),
 ])
 def test_a_label_naming_what_a_hybrid_is_made_of_is_not_a_wrong_label(element, label):
@@ -990,8 +992,9 @@ def test_a_label_naming_what_a_hybrid_is_made_of_is_not_a_wrong_label(element, l
 
 
 def test_a_label_of_the_wrong_kind_or_species_is_still_caught():
-    """The two new filters narrow the check; they do not switch it off. A block that really is
-    the human β-actin promoter and calls itself the chicken one is still a wrong label."""
+    """The two filters narrow the check for the element the label contradicts; they do not
+    switch it off. A block that really is the human β-actin promoter and calls itself the
+    chicken one is still a wrong label."""
     from vettore.features import _kind_conflict, _names_another_element, _species_conflict
 
     assert _species_conflict("chicken β-actin promoter", "β-actin promoter (human)")
@@ -1001,11 +1004,29 @@ def test_a_label_of_the_wrong_kind_or_species_is_still_caught():
     # block is labelled either way and neither label is wrong.
     assert not _kind_conflict("CMV promoter", "CMV enhancer")
     assert _names_another_element("hSyn1 promoter", "CamKIIα promoter")
+    # A label naming two kinds claims to be neither, so it rules out neither.
+    assert _names_another_element("β-globin intron and polyA", "rabbit β-globin polyA")
 
     sequence, existing = _plasmid_with("β-actin promoter (human)", "chicken ACTB promoter")
     out = detect_payload(sequence, False, DEFAULT_MIN_IDENTITY, existing)
     [row] = [r for r in out["features"] if r["name"] == "β-actin promoter (human)"]
     assert row["labelWarning"]
+
+
+@pytest.mark.parametrize(("element", "label"), [
+    # A kind word the catalogue has no entry of is no evidence about any entry. Read as what a
+    # word allows rather than what it rules out, "intron" — which no entry is — contradicted
+    # all sixty at once, and these four labels, each naming the wrong promoter, went unflagged.
+    ("EF-1α promoter (human)", "UbC promoter with intron 1"),
+    ("UbC promoter (human)", "EF-1α promoter with intron A"),
+    ("CMV promoter", "hPGK promoter (intron-less)"),
+    ("PGK promoter (human)", "CMV promoter, intron removed"),
+])
+def test_a_kind_the_catalogue_has_no_entry_of_does_not_silence_the_check(element, label):
+    sequence, existing = _plasmid_with(element, label)
+    out = detect_payload(sequence, False, DEFAULT_MIN_IDENTITY, existing)
+    [row] = [r for r in out["features"] if r["name"] == element]
+    assert row["labelWarning"], f"{label!r} over {element} went unflagged"
 
 
 # ---- detection speed --------------------------------------------------------------------
@@ -1336,8 +1357,9 @@ def _plasmid(element_names: tuple[str, ...], sites: int = 0,
 #: between the two containers this project has run on, point by point, which is why the bounds
 #: are in cells and not in them. The ranges are recorded beside `DETECTION_BUDGET`.
 #:
-#: Each bound sits a sixth to a fifth above the grown catalogue's figure — 17 to 19 %, the
-#: spread being the rounding to a tidy number — except ("aav", 0): a
+#: Each bound sits about a sixth to a fifth above the grown catalogue's figure — 16 to 20 %,
+#: the spread being the rounding to a tidy number, with ("grown", 1) lowest at 16.3 % and
+#: ("grown", 0) highest at 20.3 % — except ("aav", 0): a
 #: verbatim AAV vector costs almost nothing precisely because every element is exact, so 2 M
 #: is nearly six times its cost and still an eighth of the 15.3 M it costs without the
 #: shortcut that makes it cheap.
@@ -1961,6 +1983,36 @@ def test_the_cbh_promoter_is_not_reported_on_a_cag_promoter():
     assert coverage == pytest.approx(87.8, abs=0.1), coverage
     assert coverage < needed, f"{coverage:.1f} % covered, {needed} % asked"
     assert "CBh promoter" not in names(detect(cag.sequence, circular=False))
+
+
+def test_the_pac_of_a_pirespuro_vector_is_reported_and_called_a_frameshift():
+    """A known wrong word, recorded rather than left to be discovered twice.
+
+    Z75185.1 is pIRES-P, of the pIRESpuro family, and its pac is a complete gene: 603 bases,
+    divisible by three, a 200-residue protein with no internal stop. It differs from the entry
+    over an 18-base window that reads as one base rotated — a deletion and an insertion
+    nineteen bases apart — and the aligner prefers that to the mismatches an ungapped placement
+    would need. The engine's rule then calls a compensated indel pair a frameshift, which is
+    what it documents, and the user is shown "Frameshift" over a gene whose protein is intact
+    outside those six codons.
+
+    The element is still reported, at honest coordinates, unticked and with a warning that asks
+    the user to look, so this errs towards caution rather than towards a silent wrong
+    annotation. The word belongs to the engine's story, not to the catalogue's, and the thread
+    that owns it has been told. This test holds the shape of the case so that a fix there shows
+    up here as a failure to update rather than as a silent change of answer.
+    """
+    pac = entry("PuroR (pac)")
+    [match] = [m for m in detect(record_sequence("Z75185.1")) if m.name == pac.name]
+    found = record_sequence("Z75185.1")[match.start:match.end + 1]
+    if match.strand == -1:
+        found = str(Seq(found).reverse_complement())
+
+    assert len(found) == 603 and len(found) % 3 == 0
+    protein = str(Seq(found).translate())
+    assert protein.endswith("*") and "*" not in protein[:-1], "the gene is intact"
+    assert len(protein) - 1 == 200, len(protein) - 1
+    assert match.frameshift is True, "if this fails, the engine was fixed: drop this test"
 
 
 def test_both_copies_of_a_tandem_tag_are_reported():
