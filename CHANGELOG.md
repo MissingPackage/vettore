@@ -2,6 +2,13 @@
 
 The download links in the README always point to the latest release.
 
+## Unreleased — several Sanger reads, one verdict
+
+- In Tools → Align to Reference DNA Sequence…, two or more reads of a clone give one consensus over the expected plasmid: the reads vote with their summed quality, an insertion or deletion is voted as one event, N and mixed calls are no call, and every position where the reads disagree is listed with each read's call and quality. The same trace chosen twice is counted once.
+- A coverage strip and one sentence say which stretches are read on both strands, on one strand only, or not at all, in plasmid numbering.
+- The verdict is given on the consensus: a difference is confirmed when two reads show it at Q20 or better, or one read at Q30 or better, and no good read shows something else; otherwise it says to check the trace.
+- Save Consensus opens the consensus as a new document, with the plasmid's features, every difference annotated (those to check say so), the clearly called stretches annotated "Sanger verified (n reads)" and the bases no read called clearly marked.
+
 ## Unreleased — Detect Common Features keeps to its identity threshold
 
 - Fixed: with the minimum identity at 98 %, Detect Common Features could still list an element at 95 % (an SV40 polyA in pTAL7B and in pT-PGK-mCherry). The bases that differed were the cloning sites around the element, which were annotated as part of it. Only the part of the element that is really there is annotated now, the identity shown is over exactly those bases, and no row is below the threshold.
@@ -9,6 +16,17 @@ The download links in the README always point to the latest release.
 - A coding sequence whose insertions or deletions break the reading frame is marked "Frameshift" and not ticked, instead of passing as a 99 % match. An insertion and a deletion that cancel out (one base rotated a few places, as in the pac gene of the pIRESpuro vectors) only change the residues between them: the row says "5 residues changed by indels", and only more than 10 changed residues make it amber. A stop codon inside a coding sequence, from a substitution or from indels, is marked "Premature stop" with the residue where the protein ends, and not ticked.
 - When a match covers only part of the catalogue entry, the Size column and the feature's notes say which part ("708 bp · bases 4–711 of 711"), and how many bases the copy here has more or fewer than that part ("3 bp inserted").
 - An identity just below 100 % (one mismatch in SaCas9 is 99.97 %) is shown as 99.9 %, not 100.0 %.
+
+## Unreleased — 24 more elements in the catalogue
+
+- Detect Common Features knows 60 elements instead of 36. New: the promoters a construct is first checked with in a cell line (SV40 early, human β-actin, EFS, HSV TK, RSV LTR, and the compact CBh), the doxycycline-inducible TRE promoter (the "tight" version), the recombinases Cre, FLPe and FLPo, the recombination sites loxN and F3, the EMCV IRES, the P2A and T2A self-cleaving peptides, WPRE3, the human growth hormone and rabbit β-globin polyA signals, the selection markers PuroR, BlastR, HygR and ZeoR, and the Myc and V5 tags.
+- Every new entry is a real subsequence of a public record at the coordinates that record annotates, and each was found again in an independent record — another laboratory or another applicant — at 98 % identity or better; both accessions are in the table Detect Common Features shows.
+- An element a record annotates on its minus strand is stored the way a vector reads it, and its provenance says so: `LT727488.1:complement(3997..4178)` for the RSV LTR promoter.
+- The label check knows the new names: "pac", "hph", "bsd", "Sh ble" and "ACTB promoter" all name their element, and a human β-actin promoter labelled "mActb" is flagged like any other wrong species.
+- The label check no longer questions a correct label on a hybrid promoter. A CAG or CBh promoter its author labelled "chicken β-actin promoter" or "rabbit β-globin intron" named the pieces the hybrid is made of; the check used to read those as the human β-actin promoter and the rabbit β-globin polyA signal and ask the user to check a label that was right. It now reads the species in a label beyond human and mouse ("chicken", "rabbit", "rat") and takes a label that says what kind of element it is at its word, so an "…intron" is not read as a polyA signal. A WPRE3 labelled "WPRE" is likewise left alone: it is the WPRE with its middle taken out, two pieces of it rather than a contiguous stretch, so the loose name is not a wrong one.
+- Two of the new entries now cite a vector rather than a bare patent sequence as their second record: the Myc tag against MF966512.1, which carries it twice, and the EMCV IRES against OQ427855.1, which carries it on its minus strand.
+- The P2A entry is the codon version detection finds in the most public records: 6 of the 15 records that annotate a P2A, where those 15 hold 13 distinct sequences between them. The T2A entry is found in 8 of the 16 that annotate a T2A. Both censuses are listed by accession in `tests/data/README.md`. The user guide says what to do when a construct's 2A is written another way, and that for an element of 50 bases or fewer — the Myc and V5 tags, the lox and FRT sites — lowering the identity threshold cannot help, because those are matched exactly.
+- Detection of a 15 kb plasmid packed with the new elements takes about 0.2 s on the machine it was measured on, and about 0.6 s when every element the engine aligns is missing a base — the case a real vector gives, three times the work, and every element is still reported. The catalogue's growth adds 3.8 M cells of alignment to the heaviest sequence measured before it, about 3 %, which neither puts that sequence inside the two-second budget nor is what keeps it out: it was already over at 36 entries, and closing that gap is its own piece of work.
 
 ## Unreleased — opening a record from NCBI
 

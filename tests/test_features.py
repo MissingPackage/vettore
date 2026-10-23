@@ -1,12 +1,12 @@
 import collections
 import functools
 import json
-import time
 from pathlib import Path
+from typing import ClassVar
 from unittest import mock
 
 import pytest
-from Bio import SeqIO
+from Bio import Align, SeqIO
 from Bio.Seq import Seq
 from cloning_helpers import clean_dna, rc
 
@@ -33,12 +33,24 @@ def names(matches) -> list[str]:
     return [m.name for m in matches]
 
 
+def cited(source: str) -> tuple[str, int, int, int]:
+    """(accession, start, end, strand) of a ``source`` such as ``X64410.1:429..598`` or, for
+    an element a record annotates on its minus strand, ``LT727488.1:complement(3997..4178)``.
+    Coordinates are 1-based and inclusive, as the record's FEATURES table prints them."""
+    accession, _, span = source.partition(":")
+    strand = 1
+    if span.startswith("complement(") and span.endswith(")"):
+        span, strand = span[len("complement("):-1], -1
+    start, _, end = span.partition("..")
+    assert accession and start.isdigit() and end.isdigit(), source
+    return accession, int(start), int(end), strand
+
+
 def test_every_catalogue_entry_cites_a_record_and_a_range():
     for feature in catalogue():
-        accession, _, span = feature.source.partition(":")
-        start, _, end = span.partition("..")
-        assert accession and start.isdigit() and end.isdigit(), feature.name
-        assert int(end) - int(start) + 1 == feature.length, feature.name
+        accession, start, end, _ = cited(feature.source)
+        assert accession, feature.name
+        assert end - start + 1 == feature.length, feature.name
         assert set(feature.sequence) <= set("ACGTRYSWKMBDHVN"), feature.name
 
 
@@ -610,6 +622,32 @@ CROSS_CHECKS = {
     "7SK promoter (human)": "MQ296444.1",
     "SFFV promoter": "MP040844.1",
     "CAG promoter": "HG530138.1",
+    # The ubiquitous promoters a construct carries while it is checked in a cell line, before
+    # it goes into neurons, and the parts those cassettes are built from.
+    "EFS promoter (human)": "MP933339.1",
+    "CBh promoter": "QQ167606.1",
+    "SV40 early promoter": "M83237.1",
+    "β-actin promoter (human)": "AY952326.1",
+    "HSV TK promoter": "AJ277960.1",
+    "RSV LTR promoter": "M83237.1",
+    "TRE promoter (tight)": "OQ427855.1",
+    "Cre": "AB542060.1",
+    "FLPe": "KM521212.1",
+    "FLPo": "MH493814.1",
+    "loxN": "KP686439.1",
+    "F3": "HQ333206.1",
+    "EMCV IRES": "OQ427855.1",
+    "P2A": "MG880225.1",
+    "T2A": "PZ285977.1",
+    "WPRE3": "MQ017553.1",
+    "hGH polyA": "MP470633.1",
+    "rabbit β-globin polyA": "OP697988.1",
+    "PuroR (pac)": "PZ267690.1",
+    "BlastR (bsd)": "PZ267689.1",
+    "HygR (hph)": "U40398.1",
+    "ZeoR (ble)": "MW471125.1",
+    "Myc tag": "MF966512.1",
+    "V5 tag": "AY682091.1",
 }
 
 
@@ -624,37 +662,70 @@ def record_sequence(accession: str) -> str:
 
 
 @pytest.mark.parametrize("element", sorted(CROSS_CHECKS))
-def test_a_catalogue_promoter_is_its_record_at_the_coordinates_it_cites(element):
+def test_a_catalogue_entry_is_its_record_at_the_coordinates_it_cites(element):
     """The entry's own record is here too, so the claim its ``source`` makes — these are the
     record's bases at these coordinates — is checked without the network, and the element is
     found there whole and exact."""
     feature = entry(element)
-    accession, _, span = feature.source.partition(":")
-    start, _, end = span.partition("..")
+    accession, start, end, strand = cited(feature.source)
     record = record_sequence(accession)
-    assert record[int(start) - 1 : int(end)] == feature.sequence, element
+    span = record[start - 1 : end]
+    assert (rc(span) if strand == -1 else span) == feature.sequence, element
     matches = [m for m in detect(record, False) if m.name == element]
-    assert len(matches) == 1, element
-    assert matches[0].identity == 100.0, element
-    assert matches[0].start == int(start) - 1, element
-    assert matches[0].end == int(end) - 1, element
+    # A vector can carry the same element twice (two loxN sites in one cassette), so the copy
+    # the source cites must be among the matches rather than the only one; each copy found is
+    # whole and exact.
+    assert matches, element
+    assert all(m.identity == 100.0 for m in matches), element
+    assert all(m.end - m.start + 1 == feature.length for m in matches), element
+    assert (start - 1, end - 1, strand) in {(m.start, m.end, m.strand) for m in matches}
+
+
+def shared_span(feature, found: str) -> tuple[float, float]:
+    """(identity, coverage) of a catalogue ``feature`` against a copy of it found in another
+    record, measured here rather than taken from the match: identity over the bases the two
+    share, coverage over the entry's own length. The two are reported apart because a second
+    record often carries the element a few bases short — 19 bp of the EFS promoter, 5 at its
+    head and 14 at its tail; 27 of FLPe and FLPo, all at the head; 22 of hph, 4 at the head
+    and 18 at the tail — and averaging a missing flank into an identity would hide how well
+    the bases that are there agree.
+
+    Computed with a plain local alignment, not with ``Match.identity``, so that this check
+    tests the sequences and not the engine that found them.
+    """
+    aligner = Align.PairwiseAligner(scoring="blastn")
+    aligner.mode = "local"
+    alignment = aligner.align(feature.sequence, found)[0]
+    reference, query = alignment[0], alignment[1]
+    same = sum(1 for a, b in zip(reference, query) if a == b and a != "-")
+    identity = 100.0 * same / len(reference)
+    aligned = sum(1 for a in reference if a != "-")
+    return identity, 100.0 * aligned / feature.length
 
 
 @pytest.mark.parametrize(("element", "accession"), sorted(CROSS_CHECKS.items()))
-def test_a_catalogue_promoter_is_found_in_an_independent_record(element, accession):
+def test_a_catalogue_entry_is_found_in_an_independent_record(element, accession):
     feature = entry(element)
     assert not feature.source.startswith(accession), element
     sequence = record_sequence(accession)
     matches = [m for m in detect(sequence, False) if m.name == element]
-    assert len(matches) == 1, element
-    assert matches[0].identity >= 98.0, element
-    found = matches[0].end - matches[0].start + 1
+    assert matches, element
+    assert all(m.identity >= 98.0 for m in matches), element
+    found = max(m.end - m.start + 1 for m in matches)
     assert found >= 0.9 * feature.length, element
+    # The same claim again, measured outside the engine: the bases the two records share
+    # agree at 98 % or better, over at least nine tenths of the entry.
+    best = max(matches, key=lambda m: m.identity)
+    copy = sequence[best.start : best.end + 1]
+    identity, coverage = shared_span(feature, rc(copy) if best.strand == -1 else copy)
+    assert identity >= 98.0, f"{element}: {identity:.1f} % over the shared bases"
+    assert coverage >= 90.0, f"{element}: {coverage:.1f} % of the entry found"
 
 
-def test_the_new_promoters_are_all_found_side_by_side_in_one_construct():
-    """Seven promoters in one sequence: each is reported once, whole, at its own position and
-    at full identity, so none of them swallows or hides another."""
+def test_every_cross_checked_element_is_found_side_by_side_in_one_construct():
+    """Every cross-checked element in one sequence, promoters, recombinases, markers and tags
+    together: each is reported once, whole, at its own position and at full identity, so none
+    of them swallows or hides another."""
     filler = [clean_dna(300, 60 + i) for i in range(len(CROSS_CHECKS) + 1)]
     pieces: list[str] = []
     starts: dict[str, int] = {}
@@ -789,11 +860,210 @@ def test_a_label_naming_the_other_species_is_flagged(element, label, wrong):
         assert row["labelWarning"].startswith(f"Annotated as “{label}”, but the sequence is the {element}")
 
 
+# ---- the elements of the cell-line pretests ---------------------------------------------
+# The constructs are not used in neurons only: they are checked in a cell line first, and
+# those pretests drive the payload from a ubiquitous promoter (S5.4, group 1b). Each of those
+# promoters is in the catalogue, named like the rest.
+
+PRETEST_PROMOTERS = ("CMV promoter", "SV40 early promoter", "β-actin promoter (human)",
+                     "EFS promoter (human)", "HSV TK promoter", "RSV LTR promoter")
+
+
+def test_the_catalogue_carries_the_promoters_of_the_cell_line_pretests():
+    held = {f.name for f in catalogue()}
+    assert set(PRETEST_PROMOTERS) <= held
+    # The CMV/chicken β-actin hybrids the pretests also use, and the inducible promoter.
+    assert {"CAG promoter", "CAG promoter (truncated)", "CBh promoter",
+            "TRE promoter (tight)"} <= held
+
+
+@pytest.mark.parametrize("element", PRETEST_PROMOTERS)
+def test_each_pretest_promoter_is_found_whole_on_either_strand(element):
+    feature = entry(element)
+    ahead = clean_dna(200, 31) + feature.sequence + clean_dna(200, 32)
+    behind = clean_dna(200, 33) + rc(feature.sequence) + clean_dna(200, 34)
+    [forward] = [m for m in detect(ahead, False) if m.name == element]
+    [reverse] = [m for m in detect(behind, False) if m.name == element]
+    assert (forward.strand, forward.start, forward.identity) == (1, 200, 100.0)
+    assert (reverse.strand, reverse.start, reverse.identity) == (-1, 200, 100.0)
+    assert forward.end - forward.start + 1 == feature.length
+
+
+def test_the_rsv_promoter_is_stored_as_a_vector_reads_it_though_its_record_is_reversed():
+    """LT727488.1 annotates the RSV U3 promoter on its minus strand, so the entry is the
+    reverse complement of the cited span and its source says ``complement(...)``. What the
+    catalogue holds is the promoter the way a vector carries it, pointing at its payload."""
+    feature = entry("RSV LTR promoter")
+    accession, start, end, strand = cited(feature.source)
+    assert (accession, start, end, strand) == ("LT727488.1", 3997, 4178, -1)
+    record = record_sequence(accession)
+    assert feature.sequence == rc(record[start - 1 : end])
+    # In the independent record the promoter reads forward, which is the orientation stored.
+    [match] = [m for m in detect(record_sequence("M83237.1"), False)
+               if m.name == "RSV LTR promoter"]
+    assert match.strand == 1 and match.identity >= 98.0
+
+
+def test_the_human_actb_promoter_is_not_the_chicken_one_inside_cag_and_cbh():
+    """CAG and CBh are built on the *chicken* β-actin promoter; the new entry is the human
+    ACTB promoter. Neither is found in the other, which is what makes them separate entries
+    rather than one element named twice."""
+    human = entry("β-actin promoter (human)")
+    for hybrid in ("CAG promoter", "CAG promoter (truncated)", "CBh promoter"):
+        assert not [m for m in detect(entry(hybrid).sequence, False) if m.name == human.name]
+        assert not [m for m in detect(human.sequence, False) if m.name == hybrid]
+
+
+def test_the_efs_core_is_not_reported_beside_the_whole_ef1a_promoter():
+    """EFS is the intron-less core of the EF-1α promoter and sits inside the longer entry, so
+    a cassette carrying the whole promoter shows one element; the core on its own is EFS."""
+    full, core = entry("EF-1α promoter (human)"), entry("EFS promoter (human)")
+    assert names(detect(clean_dna(300, 41) + full.sequence + clean_dna(300, 42), False)) \
+        == ["EF-1α promoter (human)"]
+    assert names(detect(clean_dna(300, 43) + core.sequence + clean_dna(300, 44), False)) \
+        == ["EFS promoter (human)"]
+
+
+def test_a_block_named_ef1a_is_not_a_wrong_label_for_the_efs_core():
+    """HOLDS lists the pair, so the label that names the whole promoter is read as naming its
+    core too."""
+    sequence, existing = _plasmid_with("EFS promoter (human)", "EF-1α promoter")
+    out = detect_payload(sequence, False, DEFAULT_MIN_IDENTITY, existing)
+    [row] = [r for r in out["features"] if r["name"] == "EFS promoter (human)"]
+    assert row["isNew"] is False and row["labelWarning"] is None
+
+
+def test_wpre3_and_the_full_length_wpre_are_told_apart():
+    """WPRE3 is the shortened element AAV cassettes carry, not a piece of the long one: each
+    is reported where it is and neither stands for the other."""
+    for element in ("WPRE", "WPRE3"):
+        sequence = clean_dna(200, 45) + entry(element).sequence + clean_dna(200, 46)
+        assert names(detect(sequence, False)) == [element]
+
+
+def test_flpe_and_flpo_are_two_entries_a_search_tells_apart():
+    """Vectors carry both the thermostable yeast gene and the mammalian codon-optimised one,
+    and they share too little for one entry to find the other."""
+    for element in ("FLPe", "FLPo"):
+        assert names(detect(entry(element).sequence, False)) == [element]
+
+
+def test_the_new_recombination_sites_are_exact_and_not_each_other():
+    """A single base in a lox or Flp site changes what the recombinase does with it, so the
+    new sites are matched exactly and no site is reported for another."""
+    for element in ("loxN", "F3"):
+        feature = entry(element)
+        assert feature.length <= SHORT_FEATURE, element
+        found = names(detect(clean_dna(200, 47) + feature.sequence + clean_dna(200, 48), False))
+        assert found == [element], found
+    for site in ("loxP", "lox2272", "loxN"):
+        others = {"loxP", "lox2272", "loxN"} - {site}
+        assert not others & set(names(detect(entry(site).sequence, False)))
+
+
+@pytest.mark.parametrize(("label", "element", "expected"), [
+    ("pac", "PuroR (pac)", True), ("PuroR", "PuroR (pac)", True),
+    ("hph", "HygR (hph)", True), ("HygR", "HygR (hph)", True),
+    ("bsd", "BlastR (bsd)", True), ("BlastR", "BlastR (bsd)", True),
+    ("Sh ble", "ZeoR (ble)", True), ("ZeoR", "ZeoR (ble)", True),
+    ("ACTB promoter", "β-actin promoter (human)", True),
+    ("hACTB", "β-actin promoter (human)", True),
+    ("beta-actin promoter", "β-actin promoter (human)", True),
+    ("EFS", "EFS promoter (human)", True), ("CBh", "CBh promoter", True),
+    ("myc tag", "Myc tag", True), ("V5", "V5 tag", True),
+    ("P2A", "P2A", True), ("T2A", "T2A", True),
+    ("pac", "NeoR/KanR", False), ("hph", "PuroR (pac)", False),
+    ("P2A", "T2A", False), ("Myc tag", "V5 tag", False),
+    ("CBh", "CAG promoter", False), ("WPRE", "WPRE3", False),
+])
+def test_the_markers_sites_and_tags_are_named_by_the_labels_vectors_use(label, element,
+                                                                       expected):
+    from vettore.features import _names_element
+
+    assert _names_element(label, element) is expected
+
+
+@pytest.mark.parametrize(("element", "label", "wrong"), [
+    ("β-actin promoter (human)", "hACTB promoter", False),
+    ("β-actin promoter (human)", "ACTB promoter", False),
+    ("β-actin promoter (human)", "mouse Actb promoter", True),
+    ("EFS promoter (human)", "mEFS", True),
+    ("EFS promoter (human)", "hEFS promoter", False),
+])
+def test_the_species_check_covers_the_new_entries(element, label, wrong):
+    sequence, existing = _plasmid_with(element, label)
+    out = detect_payload(sequence, False, DEFAULT_MIN_IDENTITY, existing)
+    [row] = [r for r in out["features"] if r["name"] == element]
+    assert row["isNew"] is False and row["annotatedAs"] == label
+    assert bool(row["labelWarning"]) is wrong
+
+
+@pytest.mark.parametrize(("element", "label"), [
+    # The CAG and CBh promoters are hybrids, and the labels their users write name the pieces
+    # they are made of. Each of those names belongs to a different catalogue entry — the human
+    # β-actin promoter, the rabbit β-globin polyA signal — and before the kind and species
+    # checks every one of these raised a wrong-label warning on a correctly labelled construct.
+    ("CAG promoter", "chicken beta-actin promoter"),
+    ("CAG promoter", "chicken β-actin promoter"),
+    ("CAG promoter", "rabbit beta-globin intron"),
+    ("CBh promoter", "chicken ACTB promoter"),
+    # WPRE3 is the WPRE with its middle taken out — two pieces of it, not a contiguous
+    # stretch — so its author's loose "WPRE" is not wrong. HOLDS says why.
+    ("WPRE3", "WPRE"),
+])
+def test_a_label_naming_what_a_hybrid_is_made_of_is_not_a_wrong_label(element, label):
+    sequence, existing = _plasmid_with(element, label)
+    out = detect_payload(sequence, False, DEFAULT_MIN_IDENTITY, existing)
+    [row] = [r for r in out["features"] if r["name"] == element]
+    assert not row["labelWarning"], row["labelWarning"]
+
+
+def test_a_label_of_the_wrong_kind_or_species_is_still_caught():
+    """The two filters narrow the check for the element the label contradicts; they do not
+    switch it off. A block that really is the human β-actin promoter and calls itself the
+    chicken one is still a wrong label."""
+    from vettore.features import _kind_conflict, _names_another_element, _species_conflict
+
+    assert _species_conflict("chicken β-actin promoter", "β-actin promoter (human)")
+    assert _kind_conflict("rabbit β-globin intron", "rabbit β-globin polyA")
+    assert not _kind_conflict("rabbit β-globin polyA", "rabbit β-globin polyA")
+    # A promoter label over an enhancer is left alone on purpose: a CMV enhancer-and-promoter
+    # block is labelled either way and neither label is wrong.
+    assert not _kind_conflict("CMV promoter", "CMV enhancer")
+    assert _names_another_element("hSyn1 promoter", "CamKIIα promoter")
+    # A label naming two kinds claims to be neither, so it rules out neither.
+    assert _names_another_element("β-globin intron and polyA", "rabbit β-globin polyA")
+
+    sequence, existing = _plasmid_with("β-actin promoter (human)", "chicken ACTB promoter")
+    out = detect_payload(sequence, False, DEFAULT_MIN_IDENTITY, existing)
+    [row] = [r for r in out["features"] if r["name"] == "β-actin promoter (human)"]
+    assert row["labelWarning"]
+
+
+@pytest.mark.parametrize(("element", "label"), [
+    # A kind word the catalogue has no entry of is no evidence about any entry. Read as what a
+    # word allows rather than what it rules out, "intron" — which no entry is — contradicted
+    # all sixty at once, and these four labels, each naming the wrong promoter, went unflagged.
+    ("EF-1α promoter (human)", "UbC promoter with intron 1"),
+    ("UbC promoter (human)", "EF-1α promoter with intron A"),
+    ("CMV promoter", "hPGK promoter (intron-less)"),
+    ("PGK promoter (human)", "CMV promoter, intron removed"),
+])
+def test_a_kind_the_catalogue_has_no_entry_of_does_not_silence_the_check(element, label):
+    sequence, existing = _plasmid_with(element, label)
+    out = detect_payload(sequence, False, DEFAULT_MIN_IDENTITY, existing)
+    [row] = [r for r in out["features"] if r["name"] == element]
+    assert row["labelWarning"], f"{label!r} over {element} went unflagged"
+
+
 # ---- detection speed --------------------------------------------------------------------
 # S5.4 asks that detection stay under two seconds for a 15 kb plasmid with the grown
-# catalogue. The cost is not in the catalogue's size — a feature absent from the sequence is
-# ruled out by an exact seed search and costs almost nothing — but in the elements that *are*
-# there, each of which is aligned where its seeds land.
+# catalogue. (`specs/vettore.md` lists S5.4 as the catalogue's growth to human and mouse
+# elements; the two-second criterion attached to it is in the S5-S6 roadmap, which lives in the
+# notes repository, so the seconds are quoted in this file and nowhere under `specs/`.) The cost
+# is not in the catalogue's size — a feature absent from the sequence is ruled out by an exact
+# seed search and costs almost nothing — but in the elements that *are* there, each of which is
+# aligned where its seeds land.
 #
 # Three mistakes are easy here, and earlier versions of these tests made all three.
 #
@@ -813,7 +1083,7 @@ def test_a_label_naming_the_other_species_is_flagged(element, label, wrong):
 # the number of surviving seed registers and is now the number of copies: registers a few bases
 # apart are merged and aligned once (`MERGE_GAP`). That change is what brought the all-in-one
 # plasmid inside S5.4's two seconds, and it flattened the curve with it. On the AAV fixture
-# (36 entries, this machine):
+# (36 entries, one container):
 #
 #   sites     0      1      2      3      4      5      6
 #   cells   0.34 M 15.49M 15.44M 15.55M 29.57M 15.57M 29.56M
@@ -845,7 +1115,80 @@ def test_a_label_naming_the_other_species_is_flagged(element, label, wrong):
 # AAV nuclease vector, a dense all-in-one expression plasmid, and that packed plasmid, kept as
 # a stress case and named as one.
 
+#: S5.4's criterion, in the seconds it is written in. **Nothing asserts it**, and saying so is
+#: the point of this constant: four attempts to assert it, and four adversarial rounds that
+#: measured each one, established that no quantity a clock can produce here separates the code
+#: from the machine. What the suite asserts instead is the *work*, in cells of dynamic
+#: programming, by `ALIGNMENT_WORK`, which is the same number on every machine — three of whose
+#: bounds are at points recorded above two seconds, so it is a guard against the work changing
+#: and not a restatement of the criterion. The seconds are recorded below.
 DETECTION_BUDGET = 2.0
+
+# ---- what detection costs, measured and not asserted --------------------------------------
+#
+# Every figure here is a measurement, kept because the criterion is written in seconds and
+# somebody will want to know whether it is met. None of it is asserted, and the four rounds
+# that got it to that state are worth recording, because the obvious fixes all look sound until
+# they are measured.
+#
+# Twelve warm runs per point, 36 entries, on one container idle and with four busy loops on its
+# four cores, and the same points on a second container (its figures are the seconds column of
+# `ALIGNMENT_WORK`):
+#
+#   plasmid                      idle           contended      the other container
+#   AAV, 1 codon per element     0.46-0.59 s    0.51-0.82 s    0.39 s
+#   AAV, 5 codons                0.44-0.62 s    0.54-0.72 s    0.41 s
+#   all-in-one, 1 codon          1.49-2.10 s    1.84-2.26 s    1.19 s
+#   all-in-one, 5 codons         1.70-2.10 s    2.11-2.61 s    1.53 s
+#   all-in-one, 4 codons         2.53-3.10 s    3.31-3.77 s    1.95-2.07 s
+#   packed stress, 1 codon       -              -              2.75 s
+#
+# Read those figures carefully, because the favourable reading is wrong. PR #13 brought the
+# all-in-one plasmid from 2.3 s with a codon lost per element and 5.5 s with five down to the
+# ranges above, which is what it set out to do. But the criterion is met by the **median** run
+# and not by the range: on the slower container the 1-codon and 5-codon points both reach
+# 2.10 s idle and the 5-codon point is over budget across its whole contended range, so the
+# margin is 1.1x to 1.3x at the fastest runs and nothing at the slowest. The four-site point —
+# where the fixture's even cuts land on the engine's seed positions, so the merge cannot help —
+# straddles the budget on the faster container, at 1.95 to 2.07 s, and is over it on the
+# slower. The same engine is 7 to 23 % quicker on the faster container, point by point against
+# this one's fastest idle runs.
+#
+# Two things keep that from being a failure of S5.4. The fixtures are deliberately the worst
+# case, every element diverged so that none takes the exact-copy shortcut, which is not a
+# plasmid anyone builds; and the real records in `tests/data` are far cheaper. The dearest of
+# them all is `cloning-multisite-entry-l4r1.gb`, 8.6 kb and circular, at 0.62 to 0.71 s
+# across warm runs on the slower container, and every other record is at or under 0.50 s. But
+# the honest statement is the one below: a test asserting two seconds would report which
+# container ran it.
+#
+# **Why none of it is asserted.** An assertion at two seconds fails on the slower container
+# with nothing regressed, which is what sent this down four rounds:
+#
+#   - the fastest of three timings hides a cost paid once per process, and still failed about
+#     one run in ten on a container a third slower, because the jitter here is slow drift that
+#     three consecutive runs share rather than spikes a minimum filters out;
+#   - a loose ceiling (3 s, then 8 s) cannot see a regression that costs a factor: matching the
+#     seeds base by base in Python instead of with `str.find` is 0.47 -> 2.12 s on the AAV
+#     fixture at three deleted sites, with identical annotations and identical cells, and
+#     2.12 s is inside the slowest honest run of the all-in-one points. A ceiling placed where
+#     the fixtures need it is a ceiling that regression fits under;
+#   - the share of the time spent outside `PairwiseAligner.align` looked like the
+#     machine-independent answer and is not. It is a property of how much of the document needs
+#     aligning, not of the engine, so it ranges as widely as the documents do: measured here,
+#     healthy, 28.2-30.9 % on the all-in-one fixture, 33.8-36.4 % on the AAV one, 30-38 % on the
+#     dearest real record but 55-60 % on two cheaper ones — and **78.7-79.5 % on the verbatim
+#     AAV fixture**, where almost nothing is aligned. Against that, the base-by-base scan drops
+#     to 53.2-55.4 % on the packed stress plasmid. So a healthy run reaches 79 % while a
+#     regressed one sits at 53 %: the two ranges overlap, and no threshold fits between them.
+#
+# What survives is deterministic. `ALIGNMENT_WORK` pins the alignment work; the annotation tests
+# pin what is found; `test_the_catalogue_is_parsed_once_however_many_documents_are_opened` pins
+# the one cost too small for any clock; and
+# `test_the_document_is_not_walked_in_python_once_per_element` pins the scan the clock could not
+# see, by charging the document for what is asked of it rather than timing it. That last one is
+# what the fourth refutation above was reaching for, and it needs no threshold at all: the
+# engine asks the document for 387 things and a base-by-base scan for 6,361,551 of its bases.
 
 #: A single-AAV nuclease vector, with the elements of pX601 the catalogue carries, in that
 #: construct's own order: the AAV ends, the CMV–SaCas9–bGH polyA cassette, the U6 promoter of
@@ -872,8 +1215,10 @@ AAV_INVERTED = ("AAV2 ITR (truncated)",)
 #: promoter, a coding sequence and a terminator, with the WPRE where it belongs, in the 3' UTR
 #: between the nuclease and its polyA signal — and a backbone of one marker and two origins.
 #: 10.4 kb of catalogue elements, one nuclease, and nothing that has to fit a packaging limit.
-#: This is the plausible heavy case: the one that used to miss S5.4's budget, at 2.3 s, and
-#: now meets it at 1.26 s.
+#: This is the plausible heavy case: the one that used to miss S5.4's budget, at 2.3 s with a
+#: codon lost per element. It now meets it on one container, at 1.2 s, and sits on the line on a
+#: slower one, 1.5 to 2.1 s across runs with the budget at 2.0 — which is why nothing asserts
+#: the seconds. The block under `DETECTION_BUDGET` records them in full.
 ALL_IN_ONE_ELEMENTS = (
     "U6 promoter (human)", "EF-1α promoter (human)", "SpCas9", "WPRE", "bGH polyA",
     "CMV promoter", "tdTomato", "SV40 polyA", "AmpR promoter", "AmpR", "ori", "f1 ori",
@@ -889,6 +1234,19 @@ PACKED_ELEMENTS = (
     "AAV2 ITR", "AAV2 ITR (truncated)", "3×HA", "loxP", "lox2272", "FRT",
 )
 
+#: The entries S5.4 added, packed the same way: the long recombinases and markers first, then
+#: the promoters of the cell-line pretests, then the short sites and tags. 10.3 kb of elements
+#: none of which the other fixtures carry, so this is the one that says what the new half of
+#: the catalogue costs on its own. Named rather than taken by length, for the same reason as
+#: PACKED_ELEMENTS.
+GROWN_ELEMENTS = (
+    "FLPe", "FLPo", "Cre", "HygR (hph)", "CBh promoter", "PuroR (pac)", "EMCV IRES",
+    "β-actin promoter (human)", "hGH polyA", "BlastR (bsd)", "ZeoR (ble)",
+    "SV40 early promoter", "TRE promoter (tight)", "EFS promoter (human)", "WPRE3",
+    "RSV LTR promoter", "HSV TK promoter", "rabbit β-globin polyA", "P2A", "T2A",
+    "loxN", "F3", "Myc tag", "V5 tag",
+)
+
 #: Each fixture with the points on the cost curve the tests pin for it: none, one deleted site
 #: per element, three, and five where five is still annotated as the verbatim plasmid is. The
 #: stress plasmid is not pinned at five because it loses an element there — see
@@ -897,6 +1255,9 @@ FIXTURES = (
     ("aav", AAV_ELEMENTS, AAV_INVERTED, (0, 1, 3, 5)),
     ("all-in-one", ALL_IN_ONE_ELEMENTS, (), (0, 1, 3, 4, 5)),
     ("stress", PACKED_ELEMENTS, (), (0, 1, 3)),
+    # Pinned only to one site: the entries S5.4 added include T2A at 54 bp, barely above
+    # SHORT_FEATURE, and three deletions in 54 bases leave it no seed at all.
+    ("grown", GROWN_ELEMENTS, (), (0, 1)),
 )
 
 #: Where each fixture loses an element, and which: the deleted-site count at which the
@@ -908,7 +1269,15 @@ LOSES_AN_ELEMENT = {
     "aav": (6, "AmpR promoter"),         # 105 bp
     "all-in-one": (6, "AmpR promoter"),  # 105 bp
     "stress": (5, "3×HA"),               #  81 bp, the copy that stands on its own
+    "grown": (3, "T2A"),                 #  54 bp, the shortest entry S5.4 aligns
 }
+#: Both halves of the "grown" boundary are measured, not reasoned: at three sites exactly
+#: the T2A goes and nothing else, and nothing is reported that the verbatim plasmid does not
+#: report. At two sites nothing is lost at all, and the T2A — cut at 18 and 36 of its 54
+#: bases, which leaves the first seed window free — sits at 96.30 %, 1.30 points above the
+#: 95 % floor. That is the thinnest margin in this fixture: P2A has 1.97 and the rabbit
+#: β-globin polyA 2.98. Worth writing down because adding another short entry to
+#: GROWN_ELEMENTS is what would break it, and the failure would read as a budget problem.
 
 #: One case per (fixture, deleted sites), named so a failure says which.
 POINTS = tuple(
@@ -1010,15 +1379,27 @@ def _plasmid(element_names: tuple[str, ...], sites: int = 0,
 #: length times the query's — so a count of passes can stay flat while the work behind it
 #: grows. Figures for the catalogue as it stands and for the 60 entries PR #10 grows it to,
 #: keyed by (fixture, deleted sites). The bounds are sized for the grown one, since the
-#: criterion is written for it; the seconds are this machine's on the catalogue as it stands,
-#: for scale only — they move by a tenth between runs on a machine with other work on it,
-#: which is why the bounds are in cells and not in them.
+#: criterion is written for it; the seconds are one container's on the catalogue as it stands,
+#: for scale only — they move by a third between runs on one container and by up to a quarter
+#: between the two containers this project has run on, point by point, which is why the bounds
+#: are in cells and not in them. The ranges are recorded beside `DETECTION_BUDGET`.
 #:
-#: Each bound sits a sixth to a fifth above the grown catalogue's figure — 17 to 19 %, the
-#: spread being the rounding to a tidy number — except ("aav", 0): a
+#: Each bound sits about a sixth to a fifth above the grown catalogue's figure — 16 to 20 %,
+#: the spread being the rounding to a tidy number, with ("grown", 1) lowest at 16.3 % and
+#: ("grown", 0) highest at 20.2 % — except ("aav", 0): a
 #: verbatim AAV vector costs almost nothing precisely because every element is exact, so 2 M
 #: is nearly six times its cost and still an eighth of the 15.3 M it costs without the
 #: shortcut that makes it cheap.
+#:
+#: Growing the catalogue from 36 entries to 60 moves only the stress and all-in-one figures,
+#: and by a few per cent: on the stress plasmid 3.8 M cells, and all of that is the CBh
+#: promoter, whose seeds land on the CAG promoter there and whose alignment is then thrown
+#: away. Thrown away for want of coverage, not identity: CBh and CAG agree on 96.2 % of the
+#: bases they align, which clears the 95 % the engine asks, but the alignment reaches only
+#: 87.8 % of the CBh entry, short of the 90 % a promoter must cover.
+#: `test_the_cbh_promoter_is_not_reported_on_a_cag_promoter` pins both figures, because an
+#: engine that let this pair through would call every CAG promoter a CBh as well. The cost is
+#: in the elements a sequence carries, not in how many entries the catalogue holds.
 #:
 #: Each shortcut the engine takes was removed on a scratch copy to see which bounds notice.
 #: The one that reports an exact copy without aligning it is reached only where an element is
@@ -1046,6 +1427,9 @@ ALIGNMENT_WORK = {
     ("stress",     0):  52_000_000,  #   40.42 M / 39 p    44.22 M / 44 p     0.93
     ("stress",     1): 136_000_000,  #  111.75 M / 58 p   115.55 M / 63 p     2.75
     ("stress",     3): 147_000_000,  #  121.05 M / 65 p   124.85 M / 70 p     3.04
+    # The S5.4 fixture exists only in the grown catalogue, so it has one column.
+    ("grown",      0):   8_000_000,  #        —           6.65 M / 15 p     0.20
+    ("grown",      1):  24_000_000,  #        —          20.64 M / 41 p     0.57
 }
 
 
@@ -1088,7 +1472,12 @@ def _fixture_work(element_names: tuple[str, ...], sites: int,
 def test_the_alignment_work_of_a_15kb_plasmid_is_pinned(label, element_names, inverted, sites):
     """The work each point on the curve costs, pinned so that it cannot grow unnoticed."""
     bound = ALIGNMENT_WORK[label, sites]       # before the measurement, so a gap fails fast
-    _, cells = _fixture_work(element_names, sites, inverted)
+    passes, cells = _fixture_work(element_names, sites, inverted)
+    # An upper bound alone is satisfied by work that vanished rather than grew, and that is not
+    # hypothetical: `_alignment_work` counts the aligner `_aligner()` hands out, so an engine
+    # that built a fresh one per call would be counted as doing nothing at all and would pass
+    # every bound in the table. Every point here aligns something.
+    assert passes, f"{label}, {sites} deleted sites: no alignment was counted"
     assert cells <= bound, f"{label}, {sites} deleted sites: {cells / 1e6:.2f} M cells"
 
 
@@ -1215,39 +1604,310 @@ def test_enough_deleted_sites_stop_an_element_being_found_at_all(label, element_
     assert max(counts) < sites
 
 
-def test_the_budget_is_met_in_seconds_at_the_points_this_test_times():
-    """S5.4's two seconds as they are written, in seconds, on the plasmids the criterion is
-    for. The cells tests are what fail on a regression; this one catches a cost that is not
-    alignment at all.
+def test_the_catalogue_is_parsed_once_however_many_documents_are_opened():
+    """The regression no clock in this file can see, counted instead of timed. Parsing
+    `common_features.json` costs 0.06 to 0.17 ms across 200 runs, and the whole cache miss —
+    reading the file, parsing it and building the 36 dataclasses — 0.15 to 0.66 ms. That is
+    three to five orders of magnitude under the seconds recorded beside `DETECTION_BUDGET`, and
+    so far under the jitter of any timed assertion that a version parsing it per document, or
+    per element, would be invisible while the user paid for it on every file they open.
 
-    The all-in-one plasmid is the case the criterion was missed on, at 2.3 s with a codon lost
-    per element and 5.5 s with five; it now takes 1.11 s and 1.51 s on this machine. The
-    margins against the two seconds are about 5x for the AAV vector (0.35 to 0.38 s) and 1.3x
-    for the all-in-one one at five sites (1.51 s), which is the tightest of the four: a shared
-    runner a third slower than this machine would fail it with nothing having regressed, which
-    is why `ALIGNMENT_WORK` and not this test is where a regression shows.
+    So this counts the parses rather than their cost, which is the same assertion on every
+    machine: two documents, one parse. Counting `json.loads` rather than the `lru_cache`'s own
+    miss counter on purpose — a second loader, or a merge with a user catalogue, would leave
+    that counter at one and still reparse. Counting it on the `json` module rather than on this
+    module's reference to it, so that a loader written as `json.load(fh)` is counted too, since
+    that calls `loads` itself. What slips through is a loader that goes round `loads`
+    altogether: a review planted a user catalogue merged in on every detection through
+    `json.JSONDecoder().decode` and this test passed while reparsing on every document. That is
+    the limit of the method and worth knowing before trusting it; what it would hide is another
+    0.06 to 0.17 ms per file opened.
 
-    Two plausible points are left out, and both are pinned in cells instead. The packed stress
-    plasmid, at 2.6 s, is over the budget: it is a vector nobody builds — every awkward entry
-    in the catalogue at once. And the all-in-one plasmid at **four** deleted sites sits on the
-    line at 1.95 to 2.07 s across runs, because there the fixture's cuts coincide with the
-    engine's seed positions and the merge cannot join the registers they leave; timing it
-    would be a coin toss on the machine rather than a statement about the code, so
-    `ALIGNMENT_WORK` pins its work and
-    `test_a_second_deleted_site_per_element_is_nearly_free` records why it is what it is.
-    """
-    for element_names, sites, inverted in ((AAV_ELEMENTS, 1, AAV_INVERTED),
-                                           (AAV_ELEMENTS, 5, AAV_INVERTED),
-                                           (ALL_IN_ONE_ELEMENTS, 1, ()),
-                                           (ALL_IN_ONE_ELEMENTS, 5, ())):
-        sequence = _plasmid(element_names, sites, inverted)
-        detect(sequence, circular=True)      # warm the catalogue and the aligner
-        start = time.perf_counter()
-        matches = detect(sequence, circular=True)
-        elapsed = time.perf_counter() - start
-        assert matches, "the plasmid should carry recognisable elements"
-        assert elapsed < DETECTION_BUDGET, (
-            f"{len(element_names)} elements, {sites} deleted sites: {elapsed:.2f} s")
+    One more thing to expect rather than debug: parsing the catalogue eagerly at import is a
+    *correct* change, and it fails this test on `cache_clear()` with an `AttributeError` rather
+    than on the count, because there is then no `lru_cache` to clear.
+
+    The second document is what makes the count mean anything, since `detect` asks for the
+    catalogue once per call. Both carry an element, so the per-element and the aligning paths
+    are walked and not only the seed search: a review found that two random documents reach no
+    alignment at all, which would have left a reparse on the aligning path uncounted.
+
+    The aligner's cache needs nothing here. A review built a second aligner two ways — the
+    cache removed, and `_match_long` constructing its own — and five existing tests fail on
+    either, because they patch `align` on the object `_aligner()` returns; and
+    `test_the_alignment_work_of_a_15kb_plasmid_is_pinned` now fails too rather than counting
+    zero passes and passing."""
+    entry_in_it = entry("EGFP").sequence
+    first = clean_dna(400, 12) + entry_in_it + clean_dna(400, 13)
+    changed = list(entry_in_it)
+    changed[200] = "A" if changed[200] != "A" else "C"
+    second = clean_dna(400, 14) + "".join(changed) + clean_dna(400, 15)
+    features_module.catalogue.cache_clear()
+    parses = 0
+    original = features_module.json.loads
+
+    def counted(*args, **kwargs):
+        nonlocal parses
+        parses += 1
+        return original(*args, **kwargs)
+
+    with mock.patch.object(features_module.json, "loads", counted):
+        found = [detect(first, circular=False), detect(second, circular=False)]
+    assert parses == 1, f"the catalogue was parsed {parses} times for two documents"
+    # And both documents really were annotated, so that a `detect` which found nothing — and
+    # therefore walked none of the paths a reparse could sit on — cannot pass this test.
+    assert [names(matches) for matches in found] == [["EGFP"], ["EGFP"]], found
+
+
+def _bases_in(result: object) -> int:
+    """How many of the document's bases a call on it handed back."""
+    if isinstance(result, (str, bytes, bytearray)):
+        return len(result)
+    if isinstance(result, (list, tuple)):
+        return sum(_bases_in(part) for part in result)
+    return 0
+
+
+class _WatchesHowItIsRead(str):
+    """A document that charges for what Python asks of it *through its own methods*.
+
+    A call that goes through the instance costs at least one, and one that hands back the
+    document's bases costs however many it hands back. So `document.find(seed)`, which scans the
+    whole thing in C and returns a number, costs one — that is the idiom the engine is built on,
+    six times per catalogue entry — while `document[i]` costs one base, `document.upper()` or
+    `document.encode()` cost the document's whole length, and `document.startswith(seed, i)` at
+    every position costs one per position.
+
+    Three ways to the bases go round the instance entirely and are charged **nothing**, even
+    once per element, and no `str` subclass can close them:
+
+      * a C-level constructor or codec, which reads the characters with no method call at all —
+        `bytes(document, "ascii")`, `bytearray(...)`, and anything built on them, which includes
+        Biopython, since `Seq.__init__` encodes a `str` that way: `str(Seq(document))` is
+        charged 0, and this module's own `_reverse_complement` is written like that;
+      * an unbound call, `str.__getitem__(document, i)` or `str.upper(document)`, which finds
+        the method on the type;
+      * a call on some *other* object that takes the document as an argument, such as
+        `"".join([document])`.
+
+    And once a copy exists by any route, walking the copy is not charged, because the document
+    is no longer involved. The test's own docstring records what all of that leaves open."""
+
+    __slots__ = ()
+    bases: ClassVar[list[int]] = [0]
+
+    @classmethod
+    def _charge(cls, amount: int) -> None:
+        cls.bases[0] += amount
+
+    def __getattribute__(self, name):
+        attribute = str.__getattribute__(self, name)
+        if name.startswith("_") or not callable(attribute):
+            return attribute
+
+        def charged(*args, **kwargs):
+            result = attribute(*args, **kwargs)
+            _WatchesHowItIsRead._charge(max(1, _bases_in(result)))
+            return result
+
+        return charged
+
+    # The dunders syntax reaches through the type, so `__getattribute__` never sees them.
+    def __getitem__(self, item):
+        taken = str.__getitem__(self, item)
+        _WatchesHowItIsRead._charge(len(taken))
+        return taken
+
+    def __iter__(self):
+        _WatchesHowItIsRead._charge(len(self))
+        return str.__iter__(self)
+
+    def __str__(self):
+        _WatchesHowItIsRead._charge(len(self))
+        return str.__str__(self)
+
+    def __add__(self, other):
+        _WatchesHowItIsRead._charge(len(self))
+        return str.__add__(self, other)
+
+    def __mul__(self, other):
+        _WatchesHowItIsRead._charge(len(self) * max(1, other))
+        return str.__mul__(self, other)
+
+    def __mod__(self, other):
+        _WatchesHowItIsRead._charge(len(self))
+        return str.__mod__(self, other)
+
+    def __radd__(self, other):
+        _WatchesHowItIsRead._charge(len(self))
+        return str.__add__(other, str.__str__(self))
+
+    def __rmul__(self, other):
+        _WatchesHowItIsRead._charge(len(self) * max(1, other))
+        return str.__mul__(self, other)
+
+    def __contains__(self, other):
+        _WatchesHowItIsRead._charge(1)
+        return str.__contains__(self, other)
+
+
+def _a_base_at_a_time(target: str, feature: str) -> set[int]:
+    """`_candidate_offsets` rewritten with the per-base loop in Python, exactness preserved.
+
+    The reference regression, kept so that the counting below can be checked against something
+    rather than trusted. It returns the same offsets as the engine does."""
+    offsets: set[int] = set()
+    for position, seed in features_module._seeds(feature):
+        width = len(seed)
+        for start in range(len(target) - width + 1):
+            for index in range(width):
+                if target[start + index] != seed[index]:
+                    break
+            else:
+                offsets.add(max(0, start - position))
+    return offsets
+
+
+def _bases_taken_from_the_document(document: str, elements, scan=None) -> int:
+    """What `scan` takes out of `document` in Python, looking for `elements`.
+
+    `scan` defaults to the engine's own `_candidate_offsets`."""
+    scan = scan or features_module._candidate_offsets
+    _WatchesHowItIsRead.bases[0] = 0
+    watched = _WatchesHowItIsRead(document)
+    for element in elements:
+        scan(watched, element.sequence)
+    return _WatchesHowItIsRead.bases[0]
+
+
+def test_the_document_is_not_walked_in_python_once_per_element():
+    """The other regression no clock can see, and this one asserted rather than recorded.
+
+    `_candidate_offsets` scans the whole document for six seeds of every catalogue entry longer
+    than `SHORT_FEATURE`, which is the largest single part of what detection does on a plasmid
+    whose elements are not diverged — the common case, since an element present verbatim is
+    taken whole without being aligned at all. `str.find` does that scan in C. Pulling it into
+    Python costs 40x there (0.040 s to 1.60 s on the verbatim AAV fixture, medians), while
+    leaving every annotation and, where the rewrite preserves exactness, every cell of
+    `ALIGNMENT_WORK` untouched. On the real records the factor is widest where there is least
+    alignment to dilute it, so the cheap ones suffer worst and the dearest of them, which pays
+    most of its time inside the aligner, costs under three times as much. Those figures, and
+    how much they move between containers, are in `_candidate_offsets`. Four rounds of timed
+    assertions could not separate any of it from a slower machine.
+
+    It can be asserted without a clock, because the property that matters is not a duration. It
+    is that the document is not read out of the C layer **once per element**: that is what
+    separates the regression from a correct implementation that also reads the document in
+    Python, and it is why neither bound below is a constant. Measured here, over the 53 entries
+    longer than `SHORT_FEATURE` and a 15 kb document, in 13 ms (the test as a whole costs
+    0.26 s, most of it the instrument's own check below). Six of the nine figures move with the
+    catalogue, so they were taken again when S5.4 grew it from 36 entries to 60; the index's
+    and the regex reader's do not, since those read the document and not the entries:
+
+        as shipped, `str.find`                            387 things asked of the document
+        a k-mer index built once per document         269,694 bases    correct, and quicker
+        a compiled-regex IUPAC reader                       0          correct
+        base by base, exactness preserved           6,361,551          the regression
+        base by base over a `.upper()` copy           795,000          the regression
+        base by base over `document + ""`             795,000          the regression
+        base by base over `document.encode()`         795,000          the regression
+        base by base over `iter(document)`            795,000          the regression
+        `document.startswith(seed, i)` per position  4,764,594          the regression
+
+    All nine find exactly the same offsets. The index is not a straw man: on this container it
+    is 1.4x quicker than `str.find` on the verbatim fixture (0.029 s against 0.042 s, at the
+    36 entries of the time) and level with it at one deleted site, so a test that forbade it would be sending a developer to C to
+    undo a speed-up. Note that it reads *more* bases per pass than any of the regressions — a
+    window of `SEED` bases at every position — and still costs the least, because it reads them
+    once where each of the others reads the whole document again for every entry. So the bound
+    is one windowed pass over the document, and what it forbids is the per-element repetition:
+    at 53 entries the cheapest of the regressions is already 2.8x above it, and every extra
+    entry takes it further over while the index stays put. (Which is also why
+    `assert len(long_enough) > 20` above is load-bearing and not decoration: at nineteen entries
+    a full read per entry would fit inside the bound.) The count is then taken again on the same
+    document doubled, against a bound that doubles with it, so that a scan cannot slip under by
+    the document being short.
+
+    **What it does not catch**, measured rather than assumed, every route below verified to
+    pass while costing 46x to 75x on the verbatim fixture:
+
+      * a copy taken by any of the three routes that go round the document's own methods, even
+        *per element*: a C-level constructor or codec, including `str(Seq(document))`, which is
+        the idiom this module's own `_reverse_complement` uses; an unbound
+        `str.__getitem__(document, i)`;
+        and `"".join([document])`. `_WatchesHowItIsRead`'s docstring has the list, and no `str`
+        subclass can close it. A developer adding a protein-level search writes
+        `str(Seq(target).translate())` and this test will not see the walk that follows;
+      * **one** full-length copy by *any* route, including the charged ones, followed by a walk
+        over the copy. The copy is charged once and the walking never is, because by then the
+        document is not involved.
+
+    So the honest summary is narrower than it first looks: this forbids *asking the document
+    itself* for its bases once per element. It is a guard on the shape the regression has taken
+    every time it has been written here, not a proof that the per-base loop is in C. The layer
+    underneath is `ALIGNMENT_WORK`, which catches the tolerant scans whatever route they take,
+    and the one tolerant scan that slips past this guard is caught there. This test also calls
+    `_candidate_offsets` directly, because `detect` hands on a plain `str` from
+    `sequence.upper()`, so a per-base loop introduced in `_match_long` or in a new helper is
+    not seen here either.
+
+    **False positives to expect**, and they are the mirror of the second hole: a scan that
+    copies the document once **per element** through a charged route and then does all its
+    per-base work in C is charged 495,000 and fails, although it is correct. That covers
+    `encode()` with `bytes.find`, and `translate()` with `str.find`, which is the obvious way
+    to canonicalise ambiguity codes and costs 1.05x the engine. Hoisting the copy out of the
+    loop into a per-document cache — which is what either wants anyway — brings it to 15,000
+    and passes.
+
+    It forbids the per-element loop and not the tolerance. A reader of ambiguity codes built on
+    a compiled regex — which is what `_candidate_offsets`'s own docstring recommends — is
+    charged nothing at all, because `re` takes the document into C, and it finds the same 25
+    offsets, so it passes. A mismatch-tolerant scan is another matter: it finds *more* starting
+    points, so `ALIGNMENT_WORK` fails on it, which is the alarm working and not a stale
+    bound."""
+    long_enough = [e for e in catalogue() if e.length > SHORT_FEATURE]
+    assert len(long_enough) > 20, len(long_enough)
+    document = _plasmid(AAV_ELEMENTS, 1, AAV_INVERTED)
+    # A counter that charges nothing looks exactly like an engine that reads nothing, which is
+    # the hole `assert passes` closes in `test_the_alignment_work_of_a_15kb_plasmid_is_pinned`.
+    # So before a low count below is trusted, check the instrument against the regression it
+    # exists to catch — and against *both* of the ways it charges, since a review found that a
+    # control going only through `__getitem__` passes with the rest of the instrument blind.
+    # Two entries are enough, and keep this to 0.06 s rather than the 1.8 s all 53 would cost
+    # on this container (0.2 s against 3.7 s when there were 33, on a slower one).
+    # Entries the fixture actually carries, because the equality below is vacuous on an element
+    # that is absent: the two longest are SpCas9 and SaCas9, and this is the SaCas9 vector.
+    a_couple = [element for element in long_enough
+                if features_module._candidate_offsets(document, element.sequence)][:2]
+    subscripted = _bases_taken_from_the_document(document, a_couple, _a_base_at_a_time)
+    assert subscripted > 100_000, (
+        f"the instrument charged a base-by-base scan over {len(a_couple)} entries only "
+        f"{subscripted} bases, so a low count below would mean nothing")
+
+    def _over_a_copy(target: str, feature: str) -> set[int]:
+        """The same scan over a full-length copy, which reaches the document by a method."""
+        return _a_base_at_a_time(target.upper(), feature)
+
+    copied = _bases_taken_from_the_document(document, a_couple, _over_a_copy)
+    assert copied >= 2 * len(document), (
+        f"the instrument charged {copied} bases for {len(a_couple)} full-length copies of a "
+        f"{len(document)} bp document, so it is not watching how the document is copied")
+    # And the reference regression really is the engine's scan, so that the control above
+    # cannot be satisfied by a scan that is merely expensive.
+    found = [features_module._candidate_offsets(document, element.sequence)
+             for element in a_couple]
+    assert len(a_couple) == 2 and all(found), (a_couple, found)
+    assert [_a_base_at_a_time(document, element.sequence) for element in a_couple] == found, (
+        "the reference scan is not the engine's scan")
+    for target in (document, document * 2):
+        #: One windowed pass over it — `SEED` bases at each position, which is what building an
+        #: index costs — plus one base per seed per entry.
+        budget = (features_module.SEED + 1) * len(target) + 6 * len(long_enough)
+        taken = _bases_taken_from_the_document(target, long_enough)
+        assert taken <= budget, (
+            f"{taken} bases of a {len(target)} bp document were taken out in Python for "
+            f"{len(long_enough)} entries, against {budget}: the per-base work belongs in C, or "
+            f"at least in a single pass over the document rather than one pass per element")
 
 
 def test_a_second_deleted_site_per_element_is_nearly_free():
@@ -1275,10 +1935,13 @@ def test_a_second_deleted_site_per_element_is_nearly_free():
     spaced cuts, not of divergence — it is one of the two points the tests pin where the
     engine does more work than aligning every guess separately, 87.3 M cells against 84.1 M
     here and 40.4 M against 39.4 M on the packed stress plasmid with nothing deleted at all,
-    and the only one anywhere near S5.4's two seconds: 1.95 to 2.07 s across runs against
-    1.86 to 1.96 s per guess. So this is the one point where the merge neither saves work nor
-    leaves room against the budget. `ALIGNMENT_WORK` records it so it cannot drift unseen, and
-    `MERGE_GAP`'s own comment records what widening the gap would cost and buy there.
+    and the point furthest over S5.4's two seconds on a plausible vector: 1.95 to 2.07 s across
+    runs on one container, against 1.86 to 1.96 s per guess, and 2.53 to 3.10 s on a slower
+    one, where the 1-codon and 5-codon points only touch the budget rather than clear it. So
+    this is the one point where the merge neither saves work nor leaves room against the
+    budget, which is one reason no test asserts the seconds. `ALIGNMENT_WORK` records the point
+    so it cannot drift unseen, and `MERGE_GAP`'s own comment records what widening the gap
+    would cost and buy there.
     """
     for element_names, inverted, slack in ((AAV_ELEMENTS, AAV_INVERTED, 1.01),
                                            (ALL_IN_ONE_ELEMENTS, (), 1.30)):
@@ -1330,6 +1993,49 @@ def test_an_element_present_verbatim_is_found_without_aligning_it():
     assert found.end == 400 + feature.length - 1
     # Only this element is searched for, so any pass at all would be this one being aligned.
     assert _alignment_work(sequence, circular=False, features=(feature,)) == (0, 0)
+
+
+def test_the_cbh_promoter_is_not_reported_on_a_cag_promoter():
+    """Why the growth above costs what it costs, and why the cost is worth paying. CBh is a
+    CAG made shorter, so its seeds hit every CAG and the engine aligns the two in full. What
+    keeps it from reporting a CBh on every CAG is coverage, not identity: the two agree on
+    almost every base they align, and the alignment simply does not reach enough of the CBh
+    entry. Both figures are pinned, because a change that loosened either one would start
+    reporting an element the construct does not carry.
+    """
+    from vettore.features import COVERAGE_BY_TYPE, DEFAULT_MIN_COVERAGE
+
+    cbh, cag = entry("CBh promoter"), entry("CAG promoter")
+    identity, coverage = shared_span(cbh, cag.sequence)
+    needed = COVERAGE_BY_TYPE.get("promoter", DEFAULT_MIN_COVERAGE)
+    assert identity == pytest.approx(96.2, abs=0.1), identity
+    assert identity >= DEFAULT_MIN_IDENTITY, "identity alone would let the pair through"
+    assert coverage == pytest.approx(87.8, abs=0.1), coverage
+    assert coverage < needed, f"{coverage:.1f} % covered, {needed} % asked"
+    assert "CBh promoter" not in names(detect(cag.sequence, circular=False))
+
+
+def test_the_pac_of_a_pirespuro_vector_is_reported_as_an_intact_gene():
+    """Z75185.1 is pIRES-P, of the pIRESpuro family, and its pac is a complete gene: 603 bases,
+    divisible by three, a 200-residue protein with no internal stop. It differs from the entry
+    over an 18-base window that reads as one base rotated — a deletion and an insertion
+    nineteen bases apart — and the aligner prefers that to the mismatches an ungapped placement
+    would need. The indels cancel out, so this is not a frameshift: the row counts the residues
+    the rotation changes (5), names no premature stop, and is ticked like any other match.
+    """
+    pac = entry("PuroR (pac)")
+    [match] = [m for m in detect(record_sequence("Z75185.1")) if m.name == pac.name]
+    found = record_sequence("Z75185.1")[match.start:match.end + 1]
+    if match.strand == -1:
+        found = str(Seq(found).reverse_complement())
+
+    assert len(found) == 603 and len(found) % 3 == 0
+    protein = str(Seq(found).translate())
+    assert protein.endswith("*") and "*" not in protein[:-1], "the gene is intact"
+    assert len(protein) - 1 == 200, len(protein) - 1
+    assert not match.frameshift and not match.stop
+    assert match.shifted == 5
+    assert match.as_dict(len(record_sequence("Z75185.1")))["shiftWarning"] is False
 
 
 def test_both_copies_of_a_tandem_tag_are_reported():

@@ -1,0 +1,30 @@
+.vt-contig { margin: var(--vt-space-3) 0; }
+.vt-contig-head { gap: var(--vt-space-3); align-items: center; }
+.vt-contig-title { margin: 0; }
+.vt-contig-coverage { margin: var(--vt-space-2) 0; }
+.vt-contig-strip {
+  display: block;
+  width: 100%;
+  height: 12px;
+  border: 1px solid var(--vt-border-subtle);
+  border-radius: var(--vt-radius-sm);
+}
+.vt-contig-cover-0 { fill: var(--vt-surface); background: var(--vt-surface); }
+.vt-contig-cover-1 { fill: var(--vt-warning); background: var(--vt-warning); }
+.vt-contig-cover-2 { fill: var(--vt-success); background: var(--vt-success); }
+.vt-contig-scale {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--vt-font-size-xs);
+  margin-top: 2px;
+}
+.vt-contig-legend { display: flex; gap: var(--vt-space-3); }
+.vt-contig-swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 4px;
+  vertical-align: -1px;
+  border: 1px solid var(--vt-border-subtle);
+}
+.vt-contig-disputed summary { cursor: pointer; margin: var(--vt-space-2) 0; }

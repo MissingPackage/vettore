@@ -400,12 +400,17 @@ every later step will use to refer to this file.
 Opened a plasmid that arrives bare, or built one from scratch? This searches it, on both
 strands, for the elements AAV and lentiviral work use every day: AAV2 ITRs (including the
 truncated ones found in real vectors), the CMV enhancer and promoter, CAG (the full-length
-promoter and the shorter one of some AAV vectors), hSyn, EF-1α, CaMKIIα, GFAP, PGK, UbC and SFFV
-promoters, the RNA polymerase III promoters U6, H1 and 7SK, WPRE, bGH and SV40 polyA, AmpR and
-KanR, pUC and f1 origins, EGFP, mCherry, tdTomato, loxP, lox2272, FRT, SpCas9, SaCas9 and the
-FLAG and HA tags. When a promoter is used in vectors in more than one species, the name says
-which one it is: "PGK promoter (human)" and "PGK promoter (mouse)" are two entries, and the
-table tells you which one your plasmid carries.
+promoter and the shorter one of some AAV vectors) and the compact CBh, hSyn, EF-1α and its
+intron-less core EFS, CaMKIIα, GFAP, PGK, UbC and SFFV promoters, the RNA polymerase III
+promoters U6, H1 and 7SK, the promoters a construct is usually checked with in a cell line
+before it goes into neurons (SV40 early, human β-actin, HSV TK and RSV LTR), the inducible
+TRE promoter (tight), WPRE and the shorter WPRE3, bGH, SV40, human growth hormone and rabbit β-globin
+polyA signals, AmpR, KanR and the selection markers PuroR, BlastR, HygR and ZeoR, pUC and f1
+origins, EGFP, mCherry, tdTomato, the recombinases Cre, FLPe and FLPo with the loxP, lox2272,
+loxN, FRT and F3 sites, the P2A and T2A self-cleaving peptides, the EMCV IRES, SpCas9, SaCas9
+and the FLAG, HA, Myc and V5 tags. When a promoter is used in vectors in more than one
+species, the name says which one it is: "PGK promoter (human)" and "PGK promoter (mouse)" are
+two entries, and the table tells you which one your plasmid carries.
 
 Every entry in the catalogue is a real subsequence of a public GenBank record. The table shows
 which record it came from and the percent identity of the match, so you can judge a hit
@@ -425,10 +430,27 @@ only change the residues between them: when that is a few residues the row says 
 residues changed by indels") and is ticked as usual; when it is more than 10, a stretch of the
 protein is another sequence, and the row is amber and unticked. A stop codon inside the
 protein, from a substitution or from indels, is marked "Premature stop" with the residue where
-the protein ends, and left unticked too.
+the protein ends, and left unticked too. A record that annotates an element on its lower strand
+is cited as `LT727488.1:complement(3997..4178)`: the element is stored the way a vector reads
+it.
 
-Tick the ones you want and they are added to the map, coloured by type, with their provenance
-kept in the feature's notes.
+Tick the ones you want and they are added to the map, coloured by type, with their
+provenance kept in the feature's notes.
+
+A few elements are written in more than one codon version, the 2A peptides and the short
+epitope tags above all; Flp comes as two whole genes, FLPe and FLPo, which share only 73 % of
+their bases, so each is its own entry. For the rest the catalogue carries the version two
+unrelated vectors agree on, both named in the entry's notes, and a construct built from
+another version may not be recognised. The 2A peptides are the common case and the most
+variable: of the public records that annotate one of these peptides, the P2A entry is found
+in 6 of the 15 that annotate a P2A, and the T2A entry in 8 of the 16 that annotate a T2A. Lowering the identity threshold helps a long
+element that is a few bases off — an IRES, a promoter, a marker gene — and it does not help
+here. For the short ones the threshold is not what stands in the way: at 50 bases or shorter
+(the Myc and V5 tags, the loxP, lox2272, loxN, FRT and F3 sites) the search asks for an exact
+match and ignores the threshold altogether, and just above that the search still has to find
+an exact 18-base stretch to start from, which a 54-base T2A written in other codons does not
+have. Dropping the threshold as far as it goes adds no T2A record and one P2A record. A 2A
+peptide written another way is annotated by hand, and so are the short tags and sites.
 
 Features already annotated are shown greyed and left unticked. This includes elements inside a
 larger feature named after them, however long that feature is: vendors often draw one "CMV
@@ -440,9 +462,15 @@ amber, for example: “Annotated as “PGK promoter”, but the sequence is the 
 identity). Check the label.” A notice at the top says how many labels to check. These rows are
 not ticked, so nothing changes unless you tick one: the element is then added under its
 catalogue name, and you can rename or delete the old feature in the Features view. The same check
-reads the species in a label — a word ("human", "mouse", "murine") or a prefix ("hPGK",
-"mU6") — so a mouse PGK promoter labelled "PGK promoter (human)" is flagged too. A feature
-whose name is not an element, such as "my insert", is never questioned.
+reads the species in a label — a word ("human", "mouse", "murine", "chicken", "rabbit") or a
+prefix ("hPGK", "mU6") — so a mouse PGK promoter labelled "PGK promoter (human)" is flagged
+too. A label that names what a hybrid promoter is made of is not questioned: the CAG and CBh
+promoters hold a chicken β-actin promoter and a rabbit β-globin intron, and a block a user
+labels with either of those names is right, even though the catalogue has a human β-actin
+promoter and a rabbit β-globin polyA signal under similar names. A feature whose name is not
+an element, such as "my insert", is never questioned. The check compares names and species, not
+kinds of element beyond that: an SV40 early promoter labelled "SV40 polyA" shares the name
+"SV40" with a catalogue entry and is not flagged.
 
 When a promoter or an ITR is a few bases off, loosen the identity threshold for one run; the
 default is a preference.
@@ -525,6 +553,18 @@ A sentence above the table answers "is my clone right?". Either the reads match 
 - every difference, written as `position: reference → read`.
 
 Next to each difference is the read quality at that base. Hover it to see the chance that the base call is wrong. Differences on low-quality bases (under Q20) are flagged: check those peaks in the chromatogram before trusting them. Long lists show the first few differences, and **show all** opens the rest. Insertions and deletions are grouped into one event each. Reads that cross the origin of a circular plasmid are handled and marked. If no read can be aligned, the dialog explains why and what to try (gentler trimming, or the right plasmid tab).
+
+### Several reads of one clone: the contig
+
+With two or more reads, the verdict is given on their **consensus**, and a **Contig** section appears under the table:
+
+- **Coverage.** A sentence and a strip under it say which stretches of the plasmid are read on both strands, on one strand only, or by no read at all, in plasmid numbering ("223–861 covered on both strands; 862–903 on one strand only; no read over 1–222 and 904–1,125").
+- **The consensus.** At each position the reads vote with their quality: the qualities of reads that show the same base add up, so three good reads outweigh one slightly better read. An insertion or deletion is voted as one event, so a read never wins half of its own deletion. A call that is not A, C, G or T (`N`, or a mixed call such as `R`) is no call: it never wins, and where no read calls a base clearly the plasmid's base is kept and the verdict says so. A mixed call at good quality (Q20 or better) can mean a mixed colony, so the base is not verified there. Where the reads disagree, the position is listed with every read's call and quality, so you can open those peaks.
+- **Differences, with a verdict.** A difference from the plasmid is **confirmed** when two reads show it at Q20 or better, or one read at Q30 or better (1 wrong call in 1,000), and no read at Q20 or better shows something else there. Otherwise it says **check the trace**.
+- **What is verified.** A base counts as verified only when a read calls it clearly at Q20 or better and no read at Q20 or better shows something else there, even a read that covers only part of an insertion or deletion. Where good reads conflict, where the vote is tied (the plasmid's base is shown), or where only calls under Q20 back the base (or the join before it), the verdict says how many positions are not verified, so you can check them in the traces. Where a forward read ends exactly where a reverse read begins, no read runs across the join: bases inserted there would not show (the alignment clips them off the read ends), so the join is not verified and the verdict says so. In a run of one base (a homopolymer) two reads can place the same insertion or deletion differently; such places are marked to check, never verified.
+- **Save consensus** opens the consensus as a new document: the plasmid's features (moved over any insertion or deletion), every difference annotated where it is (those still to check say so), the verified stretches annotated "Sanger verified (n reads)" (n is the fewest reads agreeing with the consensus over any of their bases), the bases no read called clearly annotated "Sanger: no clear call", and the positions not verified annotated "Sanger: check the trace". Where no read reaches, the consensus keeps the plasmid's own sequence.
+
+Reads that do not come from this plasmid are listed apart, above the table, and never enter the consensus. The same trace chosen twice (a copied file) is counted once. The contig needs the expected plasmid: reads are not assembled without a reference.
 
 ## Simulating a gel (Tools → Simulate Agarose Gel…)
 

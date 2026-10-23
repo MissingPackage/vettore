@@ -65,25 +65,55 @@ test("a planted mismatch is reported with the read quality behind it", async ({ 
   await expect(differences).toContainText(/\(Q\d+/);
 });
 
-test("a mutation seen by two reads is counted once", async ({ page }) => {
-  // One base changed in the reference and the same trace loaded twice, as a forward and a
-  // reverse read over the same insert would be: one mutated position, reported by both reads.
-  const reference = referenceAroundTheRead();
-  const index = 4 * 74 + 200;
-  const replacement = reference[index] === "A" ? "G" : "A";
-  await newSequence(page, "pMutant", reference.slice(0, index) + replacement + reference.slice(index + 1));
+/** The two public contig reads agree on this reference (scripts/make_contig_fixture.py). */
+function contigReference(): string {
+  return fs.readFileSync(path.resolve(import.meta.dirname, "fixtures/contig-reference.txt"), "utf-8").trim();
+}
 
+const PAIR = ["contig-ACHLO006-09_1_F.ab1", "contig-ACHLO006-09_2_R.ab1"].map((f) => path.join(DATA, f));
+
+test("the same trace chosen twice is counted once", async ({ page }) => {
+  await newSequence(page, "pExpected", referenceAroundTheRead());
   await menu(page, "Tools", "Align to Reference DNA Sequence…");
   const trace = fs.readFileSync(path.join(DATA, "3730.ab1"));
   await page.getByTestId("sanger-files").setInputFiles([
-    { name: "read_F.ab1", mimeType: "application/octet-stream", buffer: trace },
-    { name: "read_R.ab1", mimeType: "application/octet-stream", buffer: trace },
+    { name: "read.ab1", mimeType: "application/octet-stream", buffer: trace },
+    { name: "read (1).ab1", mimeType: "application/octet-stream", buffer: trace },
   ]);
+  await expect(page.getByTestId("sanger-warning")).toContainText("is the same trace as “read.ab1”: it is counted once",
+    { timeout: 30_000 });
+  await expect(page.getByTestId("sanger-verdict")).toContainText("No differences: the read matches pExpected");
+  await expect(page.getByTestId("sanger-contig")).toHaveCount(0);
+});
+
+test("a forward and a reverse read give one consensus that opens as a new document", async ({ page }) => {
+  // One base changed in the reference where both reads cover it: the clone differs there.
+  const reference = contigReference();
+  const index = 3 * 74 + 300;
+  const replacement = reference[index] === "A" ? "G" : "A";
+  await newSequence(page, "pCOI", reference.slice(0, index) + replacement + reference.slice(index + 1));
+
+  await menu(page, "Tools", "Align to Reference DNA Sequence…");
+  await page.getByTestId("sanger-files").setInputFiles(PAIR);
   const verdict = page.getByTestId("sanger-verdict");
-  await expect(verdict).toContainText("1 difference across 2 reads", { timeout: 30_000 });
-  await expect(verdict).toContainText("Both reads covering it show it.");
-  // The per-read table still lists the difference under each read.
-  const differences = page.getByTestId("sanger-differences");
-  await expect(differences).toHaveCount(2);
-  await expect(differences.nth(1)).toContainText(`${index + 1}: ${replacement} → ${reference[index]}`);
+  await expect(verdict).toContainText("1 difference between the consensus of 2 reads and pCOI", { timeout: 30_000 });
+  await expect(verdict).toContainText("It is confirmed");
+  // The forward read makes two N calls where it is alone: those bases are kept, unverified.
+  await expect(verdict).toContainText("2 covered positions have no clear call in any read");
+
+  await expect(page.getByTestId("sanger-contig")).toBeVisible();
+  const coverage = page.getByTestId("sanger-coverage");
+  await expect(coverage).toContainText("223–861 covered on both strands");
+  await expect(coverage).toContainText("862–903 on one strand only");
+  await expect(coverage).toContainText("no read over 1–222 and 904–1,125");
+  await expect(page.getByTestId("sanger-coverage-strip")).toBeVisible();
+  const differences = page.getByTestId("sanger-contig-differences");
+  await expect(differences).toContainText(`${index + 1}: ${replacement} → ${reference[index]}`);
+  await expect(differences).toContainText("seen in 2 reads");
+  await expect(differences).toContainText("confirmed");
+  await page.screenshot({ path: "test-results/sanger-contig.png" });
+
+  await page.getByTestId("sanger-save-consensus").click();
+  await page.getByRole("button", { name: "Close" }).last().click();
+  await expect(page.locator(".vt-doctab.active")).toContainText("pCOI consensus");
 });

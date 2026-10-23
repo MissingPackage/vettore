@@ -77,7 +77,50 @@ def _seeds(sequence: str, count: int = 6) -> list[tuple[int, str]]:
 
 
 def _candidate_offsets(target: str, feature: str) -> set[int]:
-    """Where the feature could start in the target, from exact seed hits."""
+    """Where the feature could start in the target, from exact seed hits.
+
+    `str.find` is load-bearing for the speed criterion, and not only for tidiness. It is a C
+    scan over the whole document for every seed of every catalogue entry, which is most of what
+    detection does on a plasmid whose elements are not diverged — the common case, since an
+    element present verbatim is then taken whole below without being aligned at all. Pulling
+    that loop into Python costs, measured as medians on the fixtures of `tests/test_features.py`
+    and on the records in `tests/data`:
+
+      * 40x on the verbatim AAV vector, 0.040 s to 1.60 s. This is the case the user meets most
+        often, and the one the figures used to miss, because the diverged fixtures dilute the
+        scan with alignment;
+      * on the real records, 19x on `cloning-gateway-destination.gb` (0.065 s to 1.21 s), 9.0x
+        on `PZ629150.1.gb`, and 2.8x on `cloning-multisite-entry-l4r1.gb`, which is the dearest
+        record there is and so the one with the most alignment to dilute it. A review measured
+        others in that directory above 30x; the factor is widest wherever least of the document
+        has to be aligned, which is the case the user meets most;
+      * 4.5x on the AAV fixture at three deleted sites, 0.47 s to 2.12 s;
+      * 1.4x on the packed stress plasmid, where alignment dominates everything.
+
+    Which tests see it depends on what the rewrite changes, and the distinction matters because
+    the wrong reading of a failure here is to raise a bound:
+
+      * a rewrite that keeps the scan **exact** — the same seeds, found in the same places — is
+        seen by nothing else. Annotations are identical, every cell `ALIGNMENT_WORK` pins is
+        identical, and every other test passes. The test named for this case,
+        `test_the_document_is_not_walked_in_python_once_per_element`, charges the document for
+        what is asked of it rather than timing the scan: 267 things for the engine against
+        3,962,927 of its bases for the rewrite, and no clock;
+      * a scan that tolerates a **mismatch** finds *more* starting points, so more guesses are
+        aligned, and `ALIGNMENT_WORK` fails: on the AAV fixture 15.49 M cells become 42.20 M,
+        on the verbatim one 0.34 M become 27.04 M, on the packed stress plasmid 111.75 M become
+        152.15 M, with the annotations unchanged throughout. Those failures are the alarm
+        working. The bounds are not stale and must not be raised to accommodate it;
+      * a scan that reads **IUPAC ambiguity codes** in the document changes nothing today only
+        because no catalogue entry carries an ambiguity code — 0 of the 36 — so no seed does
+        either. Add one and it behaves like the mismatch case.
+
+    So if tolerance is ever wanted here, the tolerant scan belongs in C or in a compiled
+    matcher: a regex-based reader of ambiguity codes takes the document into C and is charged
+    nothing at all, finds the same offsets, and passes both guards. And whatever route is taken,
+    the cost has to be measured by hand on a *verbatim* plasmid before it is believed, because
+    that is where the factor is largest and where no timed test can see it.
+    """
     offsets: set[int] = set()
     for position, seed in _seeds(feature):
         start = target.find(seed)
@@ -613,11 +656,12 @@ GENERIC_WORDS = frozenset({
     "optimized", "optimised", "resistance", "marker", "cassette", "insert", "left", "right",
     "forward", "reverse", "fwd", "rev", "start", "stop", "binding", "misc", "feature", "variant",
     "short", "long", "copy", "upstream", "downstream", "fusion", "wild", "type", "wt", "new",
+    "rabbit",
 })
 
 #: Other spellings of a word, as found in vendors' and labs' labels.
 WORD_ALIASES = {"hcmv": "cmv", "hef1a": "ef1a", "camkii": "camkiia", "hsyn1": "hsyn",
-                "hpgk": "pgk"}
+                "hpgk": "pgk", "actb": "bactin"}
 
 #: Catalogue elements that hold another catalogue element, so a block named after the first is
 #: not a wrong label for the second (checked against the catalogue sequences in tests):
@@ -629,9 +673,19 @@ WORD_ALIASES = {"hcmv": "cmv", "hef1a": "ef1a", "camkii": "camkiia", "hsyn1": "h
 #:   chicken β-actin promoter that follows it is not a catalogue element of its own.
 #: - CAG promoter (truncated): the same elements, but it starts 131 bp inside the enhancer, so
 #:   only part of it is there and a search does not find the enhancer in it.
+#: - EF-1α promoter (human): the EFS promoter is its intron-less core — EFS bases 7..239 are
+#:   EF-1α bases 6..238, 233 of them — so a search finds EFS inside it and a block named
+#:   "EF-1α" is not a wrong label for the core.
+#: - WPRE: WPRE3 is the WPRE with its middle taken out, in two pieces (WPRE3 3..160 is WPRE
+#:   1..158, WPRE3 166..246 is WPRE 302..382) and seven bases in neither, so it is not a
+#:   contiguous stretch of the WPRE and a search does not find it inside one. Listed here by
+#:   hand, like the truncated CAG below: a cassette carrying the short element and labelled
+#:   "WPRE" by its author is labelled loosely, not wrongly.
 HOLDS = {"SaCas9": frozenset({"3×HA"}),
          "CAG promoter": frozenset({"CMV enhancer"}),
-         "CAG promoter (truncated)": frozenset({"CMV enhancer"})}
+         "CAG promoter (truncated)": frozenset({"CMV enhancer"}),
+         "EF-1α promoter (human)": frozenset({"EFS promoter (human)"}),
+         "WPRE": frozenset({"WPRE3"})}
 
 _LETTERS = str.maketrans({"α": "a", "β": "b", "γ": "g", "δ": "d", "Δ": "d", "κ": "k",
                           "×": "x", "′": "'", "’": "'"})
@@ -667,9 +721,12 @@ def _element_words() -> tuple[tuple[str, frozenset[str]], ...]:
 
 
 def _label_words(label: str) -> frozenset[str]:
-    """A label's identifying words, with a species prefix also read off ("mU6" names U6)."""
+    """A label's identifying words, with a species prefix also read off ("mU6" names U6).
+    What is left after the prefix is read like any other word, so a spelling ``WORD_ALIASES``
+    knows is understood there too ("hACTB" names the β-actin promoter)."""
     words = name_words(label)
-    return words | {w[1:] for w in words if w[:1] in "hm" and len(w) > 2}
+    stripped = {w[1:] for w in words if w[:1] in "hm" and len(w) > 2}
+    return words | {WORD_ALIASES.get(w, w) for w in stripped}
 
 
 def named_elements(label: str) -> set[str]:
@@ -687,15 +744,67 @@ def _names_element(label: str, element: str) -> bool:
 
 def _names_another_element(label: str, element: str) -> bool:
     """Whether ``label`` names a known element other than ``element`` and not one that holds
-    it (a "CAG" block holds the CMV enhancer, so that label is right)."""
-    others = named_elements(label)
+    it (a "CAG" block holds the CMV enhancer, so that label is right).
+
+    An element the label names but contradicts does not count, because the label is then
+    not claiming to be that element at all: it only shares a word with it. "chicken β-actin
+    promoter" shares "β-actin" with the human β-actin promoter and names the other species;
+    "rabbit β-globin intron" shares "β-globin" with the rabbit β-globin polyA signal and
+    names another kind of element. Both are right labels for the CAG promoter they sit on,
+    and before this both raised a wrong-label warning on every CAG a user annotated by hand.
+    """
+    others = {name for name in named_elements(label)
+              if not _species_conflict(label, name) and not _kind_conflict(label, name)}
     return bool(others) and not any(element in HOLDS.get(name, ()) for name in others)
 
 
+#: A word a label can use to say outright what kind of element it is, and the catalogue types
+#: that word rules out. It keeps a label that shares a name with an entry of a kind it cannot
+#: be from being read as claiming to be that entry: "rabbit β-globin intron", the piece a CAG
+#: promoter is made of, shares "β-globin" with the rabbit β-globin polyA signal and is not it.
+#:
+#: Stated as what each word excludes, not as what it allows. Reading it the other way around
+#: made a word the catalogue has no type for exclude everything at once: nothing here is typed
+#: ``intron``, so "EF-1α promoter with intron A" and "hPGK (intron-less)" contradicted all
+#: sixty entries and switched the wrong-label warning off altogether.
+#:
+#: Promoters and enhancers do not exclude each other, on purpose: a CMV enhancer-and-promoter
+#: block is labelled either way and neither label is wrong.
+_KIND_WORDS = {"intron": frozenset({"polyA_signal"}),
+               "polya": frozenset({"promoter", "enhancer"}),
+               "polyadenylation": frozenset({"promoter", "enhancer"})}
+
+
+def _kind_conflict(label: str, element: str) -> bool:
+    """Whether ``label`` says outright that it is a kind of element the catalogue ``element``
+    is not."""
+    types = _element_types()
+    if element not in types:
+        return False
+    tokens = {t for t in re.split(r"[^a-z0-9]+", label.translate(_LETTERS).lower()) if t}
+    kinds = tokens & _KIND_WORDS.keys()
+    if not kinds:
+        return False
+    # A label naming more than one kind ("β-globin intron and polyA") rules out only what every
+    # one of them rules out, because it describes a composite and claims to be none of them.
+    ruled_out = frozenset.intersection(*(_KIND_WORDS[kind] for kind in kinds))
+    return types[element] in ruled_out
+
+
+@lru_cache(maxsize=1)
+def _element_types() -> dict[str, str]:
+    """Each catalogue entry's name and type."""
+    return {feature.name: feature.type for feature in catalogue()}
+
+
 #: How labels say which species an element comes from: a word ("human", "murine"), or a
-#: one-letter prefix on the element's own word ("hPGK", "mU6").
+#: one-letter prefix on the element's own word ("hPGK", "mU6"). The species that are not
+#: human or mouse are here because a label naming one contradicts a "(human)" or "(mouse)"
+#: entry: "chicken β-actin promoter" is not the human β-actin promoter.
 _SPECIES_WORDS = {"human": "human", "homo": "human", "mouse": "mouse", "murine": "mouse",
-                  "mus": "mouse"}
+                  "mus": "mouse", "chicken": "chicken", "gallus": "chicken",
+                  "rabbit": "rabbit", "oryctolagus": "rabbit", "rat": "rat",
+                  "rattus": "rat", "bovine": "bovine", "woodchuck": "woodchuck"}
 _PREFIXES = {"h": "human", "m": "mouse"}
 
 
