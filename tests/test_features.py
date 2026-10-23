@@ -1196,9 +1196,19 @@ def test_the_budget_is_met_in_seconds_at_the_points_this_test_times():
     The all-in-one plasmid is the case the criterion was missed on, at 2.3 s with a codon lost
     per element and 5.5 s with five; it now takes 1.11 s and 1.51 s on this machine. The
     margins against the two seconds are about 5x for the AAV vector (0.35 to 0.38 s) and 1.3x
-    for the all-in-one one at five sites (1.51 s), which is the tightest of the four: a shared
-    runner a third slower than this machine would fail it with nothing having regressed, which
-    is why `ALIGNMENT_WORK` and not this test is where a regression shows.
+    for the all-in-one one at five sites (1.51 s), which is the tightest of the four and
+    thin enough that a shared runner a third slower would fail it with nothing having
+    regressed. `ALIGNMENT_WORK` and not this test is where a regression shows.
+
+    Hence the **fastest** of three timings rather than one. A machine with other work on it
+    adds time; it cannot take any away, so the fastest run is the closest thing to the cost of
+    the code and the floor it measures still rises if the code gets slower. Measured, the
+    tight point is the all-in-one plasmid at five sites: nine warm repetitions on a second
+    container put its median at 1.72 s and its slowest at 1.90 s — and at 1.85 s on the
+    catalogue grown to 60 entries, which is the 0.6 % the cells table predicts — with none of
+    the eighteen over two seconds. The same point reached 2.08 s while a whole suite ran
+    beside it, and failed once there on a single timing. That is the suite's load, not the
+    engine, and taking the fastest of three is what tells the two apart.
 
     Two plausible points are left out, and both are pinned in cells instead. The packed stress
     plasmid, at 2.6 s, is over the budget: it is a vector nobody builds — every awkward entry
@@ -1215,12 +1225,15 @@ def test_the_budget_is_met_in_seconds_at_the_points_this_test_times():
                                            (ALL_IN_ONE_ELEMENTS, 5, ())):
         sequence = _plasmid(element_names, sites, inverted)
         detect(sequence, circular=True)      # warm the catalogue and the aligner
-        start = time.perf_counter()
-        matches = detect(sequence, circular=True)
-        elapsed = time.perf_counter() - start
+        elapsed = []
+        for _ in range(3):
+            start = time.perf_counter()
+            matches = detect(sequence, circular=True)
+            elapsed.append(time.perf_counter() - start)
         assert matches, "the plasmid should carry recognisable elements"
-        assert elapsed < DETECTION_BUDGET, (
-            f"{len(element_names)} elements, {sites} deleted sites: {elapsed:.2f} s")
+        assert min(elapsed) < DETECTION_BUDGET, (
+            f"{len(element_names)} elements, {sites} deleted sites: "
+            f"{', '.join(f'{seconds:.2f}' for seconds in elapsed)} s")
 
 
 def test_a_second_deleted_site_per_element_is_nearly_free():
