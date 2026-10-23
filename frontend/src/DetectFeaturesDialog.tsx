@@ -27,6 +27,8 @@ interface Detected {
   catalogueTo?: number;
   /** A coding sequence whose indels break its reading frame. */
   frameshift?: boolean;
+  /** Codons read in another frame between an insertion and a deletion that cancel out. */
+  codonsOutOfFrame?: number;
   isNew: boolean;
   /** The existing feature that already covers this match, under whatever name. */
   annotatedAs?: string | null;
@@ -47,7 +49,8 @@ function annotatedText(f: Detected): string {
 /**
  * "bases 4–708 of 711" when the match covers only part of the catalogue entry, so a 100 %
  * over a shorter stretch is not read as the whole element, and "3 bp inserted" (or missing)
- * when the vector's copy is longer or shorter than that part; null when neither.
+ * when the vector's copy is longer or shorter than that part, and "6 codons out of frame"
+ * when two indels that cancel out change the residues between them; null when none of these.
  */
 function partText(f: Detected): string | null {
   const { catalogueFrom: from, catalogueTo: to, catalogueLength: total } = f;
@@ -56,6 +59,8 @@ function partText(f: Detected): string | null {
   if (from !== 1 || to !== total) pieces.push(`bases ${from}–${to} of ${total}`);
   const extra = f.length - (to - from + 1);
   if (extra) pieces.push(`${Math.abs(extra)} bp ${extra > 0 ? "inserted" : "missing"}`);
+  const shifted = f.codonsOutOfFrame ?? 0;
+  if (shifted) pieces.push(`${shifted} codon${shifted === 1 ? "" : "s"} out of frame`);
   return pieces.length ? pieces.join(", ") : null;
 }
 

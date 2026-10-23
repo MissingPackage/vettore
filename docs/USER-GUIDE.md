@@ -420,7 +420,9 @@ example "708 bp · bases 4–711 of 711" for an mCherry whose first codon is not
 feature's notes say the same; "798 bp · 3 bp inserted" says the copy here has bases the
 catalogue entry does not. A coding sequence with an insertion or deletion that breaks its
 reading frame is marked "Frameshift" and left unticked: the match can be over 99 % while the
-protein is different after the break.
+protein is different after the break. An insertion and a deletion that cancel each other out
+only change the codons between them, so the protein is still whole: the row says so ("6 codons
+out of frame") instead, unless those codons bring in a stop, which is a frameshift again.
 
 Tick the ones you want and they are added to the map, coloured by type, with their provenance
 kept in the feature's notes.

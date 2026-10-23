@@ -187,15 +187,34 @@ def test_an_indel_that_breaks_the_reading_frame_is_flagged(edit, frameshift):
     assert match.as_dict(len(construct))["frameshift"] is frameshift
 
 
-def test_an_insertion_and_a_deletion_that_make_up_for_each_other_are_flagged():
-    """One base in at 300, one out at 330: the frame is right again after, but the ten codons
-    between are another protein."""
+def _egfp_edited(edit) -> str:
     [egfp] = [f for f in catalogue() if f.name == "EGFP"]
-    seq = egfp.sequence
+    return edit(egfp.sequence)
+
+
+@pytest.mark.parametrize(("edit", "frameshift", "shifted"), [
+    # One base rotated 18 places, as in the pac gene of the pIRESpuro vectors (Z75185.1):
+    # the aligner reads it as a deletion and an insertion, and the six codons between are
+    # other residues of a whole protein, not a broken frame.
+    (lambda s: s[:300] + s[301:319] + s[300] + s[319:], False, 6),
+    # One base in at 300 and one out at 330: eleven codons differ, the frame is restored.
+    (lambda s: s[:300] + ("A" if s[300] != "A" else "C") + s[300:330] + s[331:], False, 11),
+    # A T in at 303 and a base out at 333: the codons between read TAA, a stop.
+    (lambda s: s[:303] + "T" + s[303:333] + s[334:], True, 0),
+])
+def test_an_insertion_and_a_deletion_that_make_up_for_each_other(edit, frameshift, shifted):
+    """The frame is right again after the second indel, so the protein is broken only when
+    the codons between bring a stop into it; otherwise the row says how many codons differ
+    instead of calling it a frameshift."""
+    edited = _egfp_edited(edit)
+    stop = "*" in str(Seq(edited).translate())[:-1]
+    assert stop is frameshift
     filler = clean_dna(400, 314)
-    edited = seq[:300] + ("A" if seq[300] != "A" else "C") + seq[300:330] + seq[331:]
-    [match] = [m for m in detect(filler + edited + filler, False) if m.name == "EGFP"]
-    assert len(edited) == len(seq) and match.frameshift
+    for strand in (1, -1):
+        construct = filler + (edited if strand == 1 else rc(edited)) + filler
+        [match] = [m for m in detect(construct, False) if m.name == "EGFP"]
+        assert (match.frameshift, match.shifted) == (frameshift, shifted), strand
+        assert match.as_dict(len(construct))["codonsOutOfFrame"] == shifted
 
 
 def test_one_mismatch_in_a_long_element_is_not_shown_as_100_percent():
