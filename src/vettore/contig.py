@@ -478,7 +478,8 @@ def _consensus_document(document: dict[str, Any], reference: str, circular: bool
         add("Sanger: check the trace", "misc_feature",
             _new_range(start, end, start_of, kept, new_length, circular) or flanks(start),
             f"Reference bases {start + 1:,}–{end + 1:,}: the reads conflict here, a difference "
-            "is not confirmed, or only calls under Q20 back the consensus; check the traces")
+            "is not confirmed, or only calls under Q20 back the consensus (here or across the join "
+            "before it); check the traces")
     for position in unread:
         add("Sanger: join not read across", "misc_feature", flanks(position),
             f"No read runs across the join before reference base "

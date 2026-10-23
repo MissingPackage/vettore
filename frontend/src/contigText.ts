@@ -112,7 +112,7 @@ export function contigVerdict(contig: Contig, referenceName: string, coveragePer
       : "")
     + (contig.doubtful
       ? ` ${n(contig.doubtful)} covered position${contig.doubtful === 1 ? " is" : "s are"} not verified: good reads`
-        + ` conflict there, a difference is not confirmed, or only calls under Q${SUPPORTING_QUALITY} back it. Check ${contig.doubtful === 1 ? "it" : "them"}`
+        + ` conflict there, a difference is not confirmed, or only calls under Q${SUPPORTING_QUALITY} back it (or the join before it). Check ${contig.doubtful === 1 ? "it" : "them"}`
         + " in the traces."
       : "")
     + (contig.unclear
