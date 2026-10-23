@@ -77,7 +77,21 @@ def _seeds(sequence: str, count: int = 6) -> list[tuple[int, str]]:
 
 
 def _candidate_offsets(target: str, feature: str) -> set[int]:
-    """Where the feature could start in the target, from exact seed hits."""
+    """Where the feature could start in the target, from exact seed hits.
+
+    `str.find` is load-bearing for the speed criterion, and not only for tidiness. It is a C
+    scan over the whole document for every seed of every catalogue entry, which is most of what
+    detection does on a 15 kb plasmid, and anything that pulls that loop into Python — matching
+    a seed base by base, so that it can tolerate a mismatch or read IUPAC ambiguity codes in the
+    document — costs 1.4x to 4.4x of the whole detection: 0.53 s to 2.28 s on the AAV fixture of
+    `tests/test_features.py`. No test will catch it. The annotations come out **identical**,
+    because the seeds found are the same, and so does the alignment work `ALIGNMENT_WORK` pins,
+    because the same guesses are aligned over the same windows; the only thing that changes is
+    the clock, and the measurements recorded in that file establish that no timed assertion on
+    this hardware class can tell such a factor from a slower machine. So if tolerance here is
+    ever wanted, the tolerant scan belongs in C or in a compiled matcher, and the cost has to be
+    measured by hand before it is believed.
+    """
     offsets: set[int] = set()
     for position, seed in _seeds(feature):
         start = target.find(seed)
