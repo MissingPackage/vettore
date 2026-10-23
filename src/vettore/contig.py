@@ -68,6 +68,8 @@ def _read_calls(read: AlignedRead,
     inserts: dict[int, tuple[str, int]] = {}
     position = read.offset
     for ref_base, read_base, quality in zip(read.reference_gapped, read.read_gapped, qualities):
+        if position - read.offset >= length:
+            break                    # a read longer than a small ring: its first lap only
         if ref_base == "-":
             key = position % length
             text, low = inserts.get(key, ("", quality))
@@ -166,6 +168,7 @@ def contig_payload(reference: str, circular: bool, reads: list[AlignedRead],
     disagreements: list[dict[str, Any]] = []
     unclear: set[int] = set()        # covered positions without a clear call (reference kept)
     doubtful: set[int] = set()       # positions where good reads conflict, or the vote is tied
+    unread: set[int] = set()         # joins (before these positions) no read runs across
     support = [0] * length           # reads whose clear call at Q20+ agrees with the consensus
 
     def listed(calls: list[Call]) -> list[dict[str, Any]]:
@@ -196,10 +199,12 @@ def contig_payload(reference: str, circular: bool, reads: list[AlignedRead],
             # Both sides are read, but no read runs across the join between them: what the
             # clone has there (bases a local alignment clips off the read ends) is unknown.
             if depth[previous] and depth[position]:
-                doubtful.add(position)
+                unread.add(position)
                 disagreements.append({"kind": "not read across", "position": position + 1,
                                       "reference": "", "consensus": "", "calls": []})
             return
+        if not any(c.quality >= SUPPORTING_QUALITY for c in slot):
+            doubtful.add(position)   # only reads under Q20 run across this join
         votes = [c for c in slot if _clear(c.value)]
         unclear_calls = [c for c in slot if not _clear(c.value)]
         if not votes:
@@ -353,6 +358,8 @@ def contig_payload(reference: str, circular: bool, reads: list[AlignedRead],
         if not d["confirmed"]:
             doubtful.update(_positions(d["_start"], d["_end"], length))
     doubtful -= unclear
+    doubtful_bases = set(doubtful)   # annotated on their own, apart from the unread joins
+    doubtful |= unread
     state = [0 if not depth[p] else 1 if p in doubtful or p in unclear else 2
              for p in range(length)]
     verified = [(start, end, min(support[p] for p in _positions(start, end, length)))
@@ -368,7 +375,8 @@ def contig_payload(reference: str, circular: bool, reads: list[AlignedRead],
         "verified": [{"start": start + 1, "end": end + 1, "reads": n}
                      for start, end, n in verified],
         "unclear": len(unclear),
-        "doubtful": len(doubtful),
+        "doubtful": len(doubtful_bases),
+        "unread": len(unread),
         "differences": [{k: v for k, v in d.items() if not k.startswith("_")}
                         for d in differences],
         "disagreements": disagreements,
@@ -380,7 +388,8 @@ def contig_payload(reference: str, circular: bool, reads: list[AlignedRead],
 
         out["document"] = _consensus_document(document, reference, circular, consensus,
                                               start_of, kept, verified, runs_of(unclear),
-                                              runs_of(doubtful), differences)
+                                              runs_of(doubtful_bases),
+                                              sorted(unread), differences)
     return out
 
 
@@ -433,6 +442,7 @@ def _consensus_document(document: dict[str, Any], reference: str, circular: bool
                         verified: list[tuple[int, int, int]],
                         unclear: list[tuple[int, int]],
                         doubtful: list[tuple[int, int]],
+                        unread: list[int],
                         differences: list[dict[str, Any]]) -> dict[str, Any]:
     """The consensus as a new document: the reference's features moved over any insertion or
     deletion, the verified stretches annotated, every difference annotated where it is (those
@@ -469,6 +479,10 @@ def _consensus_document(document: dict[str, Any], reference: str, circular: bool
             _new_range(start, end, start_of, kept, new_length, circular) or flanks(start),
             f"Reference bases {start + 1:,}–{end + 1:,}: the reads conflict here, a difference "
             "is not confirmed, or only calls under Q20 back the consensus; check the traces")
+    for position in unread:
+        add("Sanger: join not read across", "misc_feature", flanks(position),
+            f"No read runs across the join before reference base "
+            f"{position + 1:,}: bases inserted there would not show; read across it")
     for d in differences:
         evidence = (f"{d['reads']} reads" if d["reads"] > 1
                     else f"1 read at Q{d['quality']}")

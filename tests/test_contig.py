@@ -151,7 +151,7 @@ def test_verified_stretches_leave_out_the_positions_no_read_called():
     # Bases backed only by a call under Q20 are not verified either.
     weak = [p for p, c in forward_calls().items() if p >= both_end(result)
             and c.base != "N" and c.quality < 20]
-    assert weak and result["doubtful"] == len(weak)
+    assert weak and result["doubtful"] >= len(weak)
     for position in unclear + weak:
         assert not any(start <= position <= end for start, end, _ in verified)
 
@@ -529,8 +529,20 @@ def test_a_join_no_read_runs_across_is_not_verified():
     assert result["differences"] == []
     assert [d["kind"] for d in result["disagreements"]] == ["not read across"]
     assert result["disagreements"][0]["position"] == 201
-    assert result["doubtful"] == 1
+    assert result["unread"] == 1 and result["doubtful"] == 0
     assert not any(r["start"] <= 200 and r["end"] >= 201 for r in result["verified"])
+    [join] = [f for f in result["document"]["features"]
+              if f["name"] == "Sanger: join not read across"]
+    assert (join["start"], join["end"]) == (199, 200)
+    # A third read across the join, but only at Q10, does not make it known.
+    weak = hand_read("W", reference[150:251], reference[150:251], 150, 10)
+    result = contig_payload(reference, False, [forward, reverse, weak], doc("p", reference, False))
+    assert result["unread"] == 0 and result["doubtful"] >= 1
+    assert not any(r["start"] <= 200 and r["end"] >= 201 for r in result["verified"])
+    good = hand_read("G", reference[150:251], reference[150:251], 150, 30)
+    result = contig_payload(reference, False, [forward, reverse, good], doc("p", reference, False))
+    assert result["unread"] == 0
+    assert any(r["start"] <= 200 and r["end"] >= 201 for r in result["verified"])
 
 
 def test_a_read_round_a_whole_small_ring_does_not_read_its_own_join():
@@ -542,3 +554,16 @@ def test_a_read_round_a_whole_small_ring_does_not_read_its_own_join():
     result = contig_payload(ring, True, [whole], doc("pSmall", ring, True))
     assert [d["kind"] for d in result["disagreements"]] == ["not read across"]
     assert result["disagreements"][0]["position"] == 41
+
+
+def test_a_read_longer_than_a_small_ring_counts_its_first_lap_only():
+    from vettore.contig import contig_payload
+
+    ring = clean_dna(150, 307)
+    clone = ring[:70] + "T" + ring[70:]                    # a true 1 bp insertion
+    read = (clone + clone)[:200]
+    gapped_reference = (ring + ring)[:199][:70] + "-" + (ring + ring)[70:199]
+    lap = hand_read("lap", gapped_reference, read, 0)
+    result = contig_payload(ring, True, [lap], doc("pSmall", ring, True))
+    assert len(result["document"]["sequence"]) == len(ring) + 1
+    assert [d["consensus"] for d in result["differences"]] == ["T"]

@@ -46,6 +46,8 @@ export interface Contig {
   unclear: number;
   /** Covered positions where good reads conflict, the vote is tied, or only calls under Q20 back the consensus. */
   doubtful: number;
+  /** Joins between two read positions that no read runs across. */
+  unread: number;
   differences: ContigDifference[];
   disagreements: Disagreement[];
   document?: SequenceData;
@@ -98,14 +100,15 @@ export function contigVerdict(contig: Contig, referenceName: string, coveragePer
   const where = `${coveragePercent} % of ${referenceName}`;
   const total = contig.differences.length;
   const disputed = contig.disagreements.filter((d) => d.kind === "base" || d.kind === "insertion").length;
-  const unread = contig.disagreements.filter((d) => d.kind === "not read across").length;
+  const { unread } = contig;
   const settled = (disputed
     ? ` The reads disagree at ${n(disputed)} place${disputed === 1 ? "" : "s"} (listed under Contig); the consensus`
       + " takes the call with the most quality behind it, and the plasmid's base where the reads are even."
     : "")
     + (unread
-      ? ` No read runs across ${unread === 1 ? "the join" : `${n(unread)} joins`} between two reads (listed under`
-        + " Contig): extra bases there would not show, so read across it with another primer."
+      ? ` No read runs across ${unread === 1 ? "one join" : `${n(unread)} joins`}`
+        + ` between read bases (listed under Contig): extra bases there would not show, so read across`
+        + ` ${unread === 1 ? "it" : "them"} with another primer.`
       : "")
     + (contig.doubtful
       ? ` ${n(contig.doubtful)} covered position${contig.doubtful === 1 ? " is" : "s are"} not verified: good reads`
@@ -117,7 +120,7 @@ export function contigVerdict(contig: Contig, referenceName: string, coveragePer
         + " the plasmid's base is kept there, unverified."
       : "");
   if (!total) {
-    const ok = !contig.unclear && !contig.doubtful;
+    const ok = !contig.unclear && !contig.doubtful && !contig.unread;
     return {
       ok,
       text: ok

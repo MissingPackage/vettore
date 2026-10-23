@@ -15,6 +15,7 @@ function contig(over: Partial<Contig> = {}): Contig {
     verified: [{ start: 223, end: 903, reads: 1 }],
     unclear: 0,
     doubtful: 0,
+    unread: 0,
     differences: [],
     disagreements: [],
     ...over,
@@ -77,11 +78,11 @@ describe("contigVerdict", () => {
 
   it("says when no read runs across the join between two reads", () => {
     const v = contigVerdict(contig({
-      doubtful: 1,
+      unread: 1,
       disagreements: [{ kind: "not read across", position: 201, reference: "", consensus: "", calls: [] }],
     }), "pCOI", 61.4);
     expect(v.ok).toBe(false);
-    expect(v.text).toContain("No read runs across the join between two reads");
+    expect(v.text).toContain("No read runs across one join between read bases");
     expect(v.text).not.toContain("The reads disagree");
   });
 

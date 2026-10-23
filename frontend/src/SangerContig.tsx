@@ -97,8 +97,8 @@ export default function SangerContig(props: {
       {disputed.length > 0 && (
         <details className="vt-contig-disputed" data-testid="sanger-disagreements" open={disputed.length <= 5}>
           <summary>
-            {disputed.length === 1 ? "1 position" : `${n(disputed.length)} positions`} where the reads do not agree
-            or make no clear call: the consensus takes the best-quality call
+            {disputed.length === 1 ? "1 place" : `${n(disputed.length)} places`} to look at in the traces: the reads
+            do not agree, make no clear call, or no read runs across a join
           </summary>
           <table className="bp3-html-table bp3-html-table-condensed vt-table">
             <thead><tr><th>Position</th><th>Reference</th><th>Consensus</th><th>Each read</th></tr></thead>
