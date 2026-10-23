@@ -83,21 +83,25 @@ def _candidate_offsets(target: str, feature: str) -> set[int]:
     scan over the whole document for every seed of every catalogue entry, which is most of what
     detection does on a plasmid whose elements are not diverged — the common case, since an
     element present verbatim is then taken whole below without being aligned at all. Pulling
-    that loop into Python costs, measured on the fixtures of `tests/test_features.py`:
+    that loop into Python costs, measured as medians on the fixtures of `tests/test_features.py`
+    and on the records in `tests/data`:
 
-      * 45x on the verbatim AAV vector, 37 ms to 1.65 s, and 20x on a real record from
-        `tests/data`. This is the case the user meets most often, and the one the figures used
-        to miss, because the diverged fixtures dilute the scan with alignment;
-      * 5.1x on the AAV fixture at three deleted sites, 0.44 s to 2.25 s;
+      * 40x on the verbatim AAV vector, 0.040 s to 1.60 s. This is the case the user meets most
+        often, and the one the figures used to miss, because the diverged fixtures dilute the
+        scan with alignment;
+      * on the real records, 19x on `cloning-gateway-destination.gb` (0.065 s to 1.21 s), 9.0x
+        on `PZ629150.1.gb`, and 2.8x on `cloning-multisite-entry-l4r1.gb`, which is the dearest
+        record there is and so the one with the most alignment to dilute it;
+      * 4.5x on the AAV fixture at three deleted sites, 0.47 s to 2.12 s;
       * 1.4x on the packed stress plasmid, where alignment dominates everything.
 
     Which tests see it depends on what the rewrite changes, and the distinction matters because
     the wrong reading of a failure here is to raise a bound:
 
       * a rewrite that keeps the scan **exact** — the same seeds, found in the same places — is
-        seen by nothing. Annotations are identical, every cell `ALIGNMENT_WORK` pins is
-        identical, and the whole suite passes. The test named for this case,
-        `test_the_document_is_never_scanned_base_by_base_in_python`, counts the document's own
+        seen by nothing else. Annotations are identical, every cell `ALIGNMENT_WORK` pins is
+        identical, and every other test passes. The test named for this case,
+        `test_the_document_is_not_walked_in_python_once_per_element`, counts the document's own
         indexing instead of timing it, 0 against 3,962,927, and needs no clock;
       * a scan that tolerates a **mismatch** finds *more* starting points, so more guesses are
         aligned, and `ALIGNMENT_WORK` fails: on the AAV fixture 15.49 M cells become 42.20 M,

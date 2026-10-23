@@ -850,20 +850,22 @@ DETECTION_BUDGET = 2.0
 #
 # Read those figures carefully, because the favourable reading is wrong. PR #13 brought the
 # all-in-one plasmid from 2.3 s with a codon lost per element and 5.5 s with five down to the
-# ranges above, which is what it set out to do, and on the faster container every realistic
-# point is inside the two seconds. On the slower one the criterion is met by the **median** run
-# and not by the range: the 1-codon and 5-codon points both reach 2.10 s idle, and the 5-codon
-# point is over budget across its whole contended range. So the margin is 1.1x to 1.3x at the
-# fastest runs and nothing at the slowest, and the four-site point — where the fixture's even
-# cuts land on the engine's seed positions, so the merge cannot help — is over two seconds on
-# both. The same engine is 7 to 23 % quicker on the faster container, point by point against
+# ranges above, which is what it set out to do. But the criterion is met by the **median** run
+# and not by the range: on the slower container the 1-codon and 5-codon points both reach
+# 2.10 s idle and the 5-codon point is over budget across its whole contended range, so the
+# margin is 1.1x to 1.3x at the fastest runs and nothing at the slowest. The four-site point —
+# where the fixture's even cuts land on the engine's seed positions, so the merge cannot help —
+# straddles the budget on the faster container, at 1.95 to 2.07 s, and is over it on the
+# slower. The same engine is 7 to 23 % quicker on the faster container, point by point against
 # this one's fastest idle runs.
 #
 # Two things keep that from being a failure of S5.4. The fixtures are deliberately the worst
 # case, every element diverged so that none takes the exact-copy shortcut, which is not a
-# plasmid anyone builds; and the real records in `tests/data` are far cheaper, the slowest of
-# them 0.61 s. But the honest statement is the one below: a test asserting two seconds would
-# report which container ran it.
+# plasmid anyone builds; and the real records in `tests/data` are far cheaper. The dearest of
+# the 41 of them is `cloning-multisite-entry-l4r1.gb`, 8.6 kb and circular, at 0.62 to 0.71 s
+# across warm runs on the slower container, and every other record is at or under 0.50 s. But
+# the honest statement is the one below: a test asserting two seconds would report which
+# container ran it.
 #
 # **Why none of it is asserted.** An assertion at two seconds fails on the slower container
 # with nothing regressed, which is what sent this down four rounds:
@@ -879,16 +881,16 @@ DETECTION_BUDGET = 2.0
 #   - the share of the time spent outside `PairwiseAligner.align` looked like the
 #     machine-independent answer and is not. It is a property of how much of the document needs
 #     aligning, not of the engine, so it ranges as widely as the documents do: measured here,
-#     healthy, 28.2-30.9 % on the all-in-one fixture, 33.8-36.4 % on the AAV one, 32.1-32.9 % on
-#     a real record — and **78.7-79.5 % on the verbatim AAV fixture**, where almost nothing is
-#     aligned. Against that, the base-by-base scan drops to 53.2-55.4 % on the packed stress
-#     plasmid. So a healthy run reaches 79 % while a regressed one sits at 53 %: the two ranges
-#     overlap, and no threshold fits between them.
+#     healthy, 28.2-30.9 % on the all-in-one fixture, 33.8-36.4 % on the AAV one, 30-38 % on the
+#     dearest real record but 55-60 % on two cheaper ones — and **78.7-79.5 % on the verbatim
+#     AAV fixture**, where almost nothing is aligned. Against that, the base-by-base scan drops
+#     to 53.2-55.4 % on the packed stress plasmid. So a healthy run reaches 79 % while a
+#     regressed one sits at 53 %: the two ranges overlap, and no threshold fits between them.
 #
 # What survives is deterministic. `ALIGNMENT_WORK` pins the alignment work; the annotation tests
 # pin what is found; `test_the_catalogue_is_parsed_once_however_many_documents_are_opened` pins
 # the one cost too small for any clock; and
-# `test_the_document_is_never_scanned_base_by_base_in_python` pins the scan the clock could not
+# `test_the_document_is_not_walked_in_python_once_per_element` pins the scan the clock could not
 # see, by counting the document's own indexing rather than timing it. That last one is what the
 # fourth refutation above was reaching for, and it needs no threshold at all: the engine indexes
 # the document 0 times from Python and the base-by-base scan 3,962,927.
@@ -1272,10 +1274,10 @@ def test_enough_deleted_sites_stop_an_element_being_found_at_all(label, element_
 def test_the_catalogue_is_parsed_once_however_many_documents_are_opened():
     """The regression no clock in this file can see, counted instead of timed. Parsing
     `common_features.json` costs 0.06 to 0.17 ms across 200 runs, and the whole cache miss —
-    reading the file, parsing it and building the 36 dataclasses — 0.15 to 0.66 ms. That is four
-    to five orders of magnitude under the seconds recorded beside `DETECTION_BUDGET`, and so far
-    under the jitter of any timed assertion that a version parsing it per document, or per
-    element, would be invisible while the user paid for it on every file they open.
+    reading the file, parsing it and building the 36 dataclasses — 0.15 to 0.66 ms. That is
+    three to five orders of magnitude under the seconds recorded beside `DETECTION_BUDGET`, and
+    so far under the jitter of any timed assertion that a version parsing it per document, or
+    per element, would be invisible while the user paid for it on every file they open.
 
     So this counts the parses rather than their cost, which is the same assertion on every
     machine: two documents, one parse. Counting `json.loads` rather than the `lru_cache`'s own
@@ -1324,65 +1326,112 @@ def test_the_catalogue_is_parsed_once_however_many_documents_are_opened():
     assert [names(matches) for matches in found] == [["EGFP"], ["EGFP"]], found
 
 
-class _CountsItsOwnIndexing(str):
-    """A document that counts every time Python itself indexes or slices it.
+class _WatchesHowItIsRead(str):
+    """A document that charges for every base Python itself takes out of it.
 
-    `str.find` on a `str` subclass still runs in C and never reaches `__getitem__`, so a scan
-    that leaves the per-base work to the standard library counts zero however long the document
-    is, and one that walks the bases from Python counts one per comparison."""
+    `str.find` runs in C on a `str` subclass too and reaches none of these methods, so a scan
+    that leaves the per-base work to the standard library is charged nothing however long the
+    document is. Every other route a Python-level scan can take to the bases is charged what it
+    yields: a subscript or a slice one base, and iterating, encoding, translating or copying the
+    whole document its whole length, because each of those hands the caller every base at once.
+
+    `bytearray(document, "ascii")` is the one route that reaches no method at all, so a scan
+    that copies itself out that way and walks the copy is charged nothing and is not caught —
+    see the test's own docstring."""
 
     __slots__ = ()
-    counted: ClassVar[list[int]] = [0]
+    bases: ClassVar[list[int]] = [0]
 
     def __getitem__(self, item):
-        _CountsItsOwnIndexing.counted[0] += 1
-        return str.__getitem__(self, item)
+        taken = str.__getitem__(self, item)
+        _WatchesHowItIsRead.bases[0] += len(taken)
+        return taken
+
+    def __iter__(self):
+        _WatchesHowItIsRead.bases[0] += len(self)
+        return str.__iter__(self)
+
+    def __str__(self):
+        _WatchesHowItIsRead.bases[0] += len(self)
+        return str.__str__(self)
+
+    def encode(self, *args, **kwargs):
+        _WatchesHowItIsRead.bases[0] += len(self)
+        return str.encode(self, *args, **kwargs)
+
+    def translate(self, table):
+        _WatchesHowItIsRead.bases[0] += len(self)
+        return str.translate(self, table)
 
 
-def test_the_document_is_never_scanned_base_by_base_in_python():
+def _bases_taken_from_the_document(document: str, elements) -> int:
+    """What `_candidate_offsets` takes out of `document` in Python, scanning for `elements`."""
+    _WatchesHowItIsRead.bases[0] = 0
+    watched = _WatchesHowItIsRead(document)
+    for element in elements:
+        features_module._candidate_offsets(watched, element.sequence)
+    return _WatchesHowItIsRead.bases[0]
+
+
+def test_the_document_is_not_walked_in_python_once_per_element():
     """The other regression no clock can see, and this one asserted rather than recorded.
 
-    `_candidate_offsets` scans the whole document for six seeds of every catalogue entry, which
-    is most of what detection does on a plasmid whose elements are not diverged — the common
-    case, since most elements sit in a vector unchanged and are then taken by the exact-copy
-    shortcut without being aligned at all. `str.find` does that scan in C. Pulling it into
-    Python costs **45x** there (37 ms to 1.65 s on the verbatim AAV fixture) and 20x on a real
-    record, while leaving every annotation and, where it preserves exactness, every cell of
-    `ALIGNMENT_WORK` untouched. Four rounds of timed assertions could not separate that from a
-    slower machine.
+    `_candidate_offsets` scans the whole document for six seeds of every catalogue entry longer
+    than `SHORT_FEATURE`, which is the largest single part of what detection does on a plasmid
+    whose elements are not diverged — the common case, since an element present verbatim is
+    taken whole without being aligned at all. `str.find` does that scan in C. Pulling it into
+    Python costs 40x there (0.040 s to 1.60 s on the verbatim AAV fixture, medians) and 2.8x to
+    19x on the real records in `tests/data`, while leaving every annotation and, where the
+    rewrite preserves exactness, every cell of `ALIGNMENT_WORK` untouched. Four rounds of timed
+    assertions could not separate that from a slower machine.
 
-    This can be asserted without a clock, because the property that matters is not a duration:
-    it is that the per-base loop is not in Python. Over the 33 entries longer than
-    `SHORT_FEATURE`, on a 15 kb document, the engine as it stands indexes the document **0**
-    times and a base-by-base scan **3,962,927** — the same two numbers on every machine, in 10
-    ms. The bound is one index per seed per entry rather than zero, so that a scan which slices
-    the document a constant number of times still passes, and the count is taken again on the
-    same document doubled, because anything proportional to the document's length is the loop
-    this test exists to forbid.
+    It can be asserted without a clock, because the property that matters is not a duration. It
+    is that the per-base work happens **once per document and not once per element**: that is
+    what separates the regression from the two correct implementations that also read the
+    document in Python, and it is why neither bound below is a constant. Measured here, over
+    the 33 entries and a 15 kb document, in 11 ms:
 
-    It forbids the loop and not the tolerance. A reader of ambiguity codes built on a compiled
-    regex — which is what `_candidate_offsets`'s own docstring recommends — indexes the
-    document 0 times and finds the same 25 offsets, so it passes. A mismatch-tolerant scan is
-    another matter and is caught elsewhere: it finds *more* starting points, so `ALIGNMENT_WORK`
-    fails on it, which is the alarm working and not a stale bound."""
+        as shipped, `str.find`                              0 bases
+        a k-mer index built once per document         269,694          correct, and quicker
+        base by base over `iter(document)`            495,000          the regression
+        base by base over `document.encode()`         495,000          the regression
+        base by base, exactness preserved           3,962,927          the regression
+
+    All five find exactly the same offsets, and the index is not a straw man: it is 1.4x quicker
+    than `str.find` on the verbatim fixture (0.029 s against 0.042 s) and level with it at one
+    deleted site, so a test that forbade it would be sending a developer to C to undo a
+    speed-up. Note that the index reads *more* bases per pass than
+    any of the regressions — a window of `SEED` bases at every position — and still costs the
+    least, because it reads them once where each of the others reads the whole document again
+    for every entry. So the bound is one windowed pass over the document, and what it forbids is
+    the per-element repetition: at 33 entries the cheapest of the three regressions is already
+    1.7x above it, and every extra entry takes it further over while the index stays put. The
+    count is then taken again on the same document doubled, against a bound that doubles with
+    it, so that a scan cannot slip under by the document being short.
+
+    Two holes to know about before trusting it. `bytearray(document, "ascii")` reaches no method
+    on the document, so a scan that copies itself out that way and walks the copy is charged
+    nothing; and the test calls `_candidate_offsets` directly, because `detect` normalises the
+    document with `sequence.upper()` and hands on a plain `str`, so a per-base loop introduced
+    anywhere else — in `_match_long`, or in a new helper — is not seen here either.
+
+    It forbids the per-element loop and not the tolerance. A reader of ambiguity codes built on
+    a compiled regex — which is what `_candidate_offsets`'s own docstring recommends — takes 0
+    bases and finds the same 25 offsets, so it passes. A mismatch-tolerant scan is another
+    matter and is caught elsewhere: it finds *more* starting points, so `ALIGNMENT_WORK` fails
+    on it, which is the alarm working and not a stale bound."""
     long_enough = [e for e in catalogue() if e.length > SHORT_FEATURE]
     assert len(long_enough) > 20, len(long_enough)
     document = _plasmid(AAV_ELEMENTS, 1, AAV_INVERTED)
-    budget = 6 * len(long_enough)        # one index per seed per entry, not per base
-    counts = []
     for target in (document, document * 2):
-        _CountsItsOwnIndexing.counted[0] = 0
-        counted = _CountsItsOwnIndexing(target)
-        for element in long_enough:
-            features_module._candidate_offsets(counted, element.sequence)
-        counts.append(_CountsItsOwnIndexing.counted[0])
-    assert counts[0] <= budget, (
-        f"the document was indexed from Python {counts[0]} times for {len(long_enough)} "
-        f"entries, against {budget}: the per-base loop belongs in C")
-    # And it is not merely under the bound by luck of this document's length.
-    assert counts[1] <= budget, (
-        f"doubling the document took the count from {counts[0]} to {counts[1]}, so the scan "
-        f"costs Python work per base")
+        #: One windowed pass over it — `SEED` bases at each position, which is what building an
+        #: index costs — plus one base per seed per entry.
+        budget = (features_module.SEED + 1) * len(target) + 6 * len(long_enough)
+        taken = _bases_taken_from_the_document(target, long_enough)
+        assert taken <= budget, (
+            f"{taken} bases of a {len(target)} bp document were taken out in Python for "
+            f"{len(long_enough)} entries, against {budget}: the per-base work belongs in C, or "
+            f"at least in a single pass over the document rather than one pass per element")
 
 
 def test_a_second_deleted_site_per_element_is_nearly_free():
