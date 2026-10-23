@@ -1343,7 +1343,7 @@ def _plasmid(element_names: tuple[str, ...], sites: int = 0,
 #: shortcut that makes it cheap.
 #:
 #: Growing the catalogue from 36 entries to 60 moves only the stress and all-in-one figures,
-#: and by a few per cent: on the stress plasmid 3.0 M cells, and all of that is the CBh
+#: and by a few per cent: on the stress plasmid 3.8 M cells, and all of that is the CBh
 #: promoter, whose seeds land on the CAG promoter there and whose alignment is then thrown
 #: away. Thrown away for want of coverage, not identity: CBh and CAG agree on 96.2 % of the
 #: bases they align, which clears the 95 % the engine asks, but the alignment reaches only
@@ -1379,8 +1379,8 @@ ALIGNMENT_WORK = {
     ("stress",     1): 136_000_000,  #  111.75 M / 58 p   115.55 M / 63 p     2.75
     ("stress",     3): 147_000_000,  #  121.05 M / 65 p   124.85 M / 70 p     3.04
     # The S5.4 fixture exists only in the grown catalogue, so it has one column.
-    ("grown",      0):   8_000_000,  #        —           0.00 M /  0 p     0.00
-    ("grown",      1):  32_000_000,  #        —           0.00 M /  0 p     0.00
+    ("grown",      0):   8_000_000,  #        —           6.65 M / 15 p     0.20
+    ("grown",      1):  24_000_000,  #        —          20.64 M / 41 p     0.57
 }
 
 
