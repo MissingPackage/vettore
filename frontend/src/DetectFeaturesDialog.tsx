@@ -158,7 +158,7 @@ export default function DetectFeaturesDialog(props: { doc: OpenDoc; onClose: () 
       notes: {
         note: [f.note || f.name],
         detected_from: [
-          `${f.source} (${f.identity.toFixed(1)}% identity${partText(f) ? ` over ${partText(f)}` : ""})`
+          `${f.source} (${f.identity.toFixed(1)}% identity${partText(f) ? `; ${partText(f)}` : ""})`
             + (f.frameshift ? "; the reading frame is broken (frameshift)" : "")
             + (f.prematureStop ? `; a premature stop codon ends the protein at residue ${f.prematureStop}` : "")
             + (f.shiftWarning ? `; ${f.residuesChanged} residues changed by indels that cancel out` : ""),
@@ -281,8 +281,8 @@ export default function DetectFeaturesDialog(props: { doc: OpenDoc; onClose: () 
                       ) : null}
                       {f.shiftWarning && (
                         <span className="vt-warn vt-detect-doubt-text" data-testid="detect-shift">
-                          {f.residuesChanged} residues changed: an insertion and a deletion restore
-                          the reading frame, but the protein between them is another sequence.
+                          {f.residuesChanged} residues changed: indels that restore the reading
+                          frame leave a stretch of the protein that is another sequence.
                           Check the sequence before adding it.
                         </span>
                       )}

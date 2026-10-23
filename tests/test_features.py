@@ -1685,3 +1685,18 @@ def test_a_tandem_array_reports_a_copy_for_every_repeat():
         sequence = clean_dna(414, 19) + tag.sequence * copies + clean_dna(414, 20)
         starts = {m.start for m in detect(sequence, circular=False) if m.name == tag.name}
         assert {414 + i * tag.length for i in range(copies)} <= starts, copies
+
+
+def test_indels_adding_up_to_a_codon_count_the_residues_that_really_change():
+    """Two bases in at 285 and one at 309 put a whole codon in: compared position by position,
+    every residue after the extra one would count as changed. The count is the edit distance
+    between the two stretches of protein."""
+    [kan] = [f for f in catalogue() if f.name == "KanR"]
+    seq = kan.sequence
+    edited = seq[:285] + "GC" + seq[285:309] + "A" + seq[309:]
+    filler = clean_dna(400, 315)
+    [match] = [m for m in detect(filler + edited + filler, False) if m.name == "KanR"]
+    assert not match.frameshift and not match.stop
+    mine, theirs = str(Seq(edited).translate()), str(Seq(seq).translate())
+    assert len(mine) == len(theirs) + 1
+    assert match.shifted == 7

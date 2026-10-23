@@ -267,8 +267,7 @@ def _frameshift(columns: list[Column], target: str, query: str,
                     # already shows as bases inserted or missing; only bases read in another
                     # frame count as changed residues.
                     if read_out:
-                        changed += (sum(a != b for a, b in zip(mine, theirs))
-                                    + abs(len(mine) - len(theirs)))
+                        changed += _residue_edits(mine, theirs)
                     opened, read_out = None, False
                 anchor = (t, q)
             elif shift % 3:
@@ -278,6 +277,22 @@ def _frameshift(columns: list[Column], target: str, query: str,
     if shift % 3 or opened is not None:
         return True, 0
     return False, changed
+
+
+def _residue_edits(a: str, b: str) -> int:
+    """How many residues differ between two stretches of protein: position by position when
+    they are the same length, and otherwise the fewest substitutions, insertions and deletions
+    (indels adding up to a whole codon make one a residue longer, and comparing them position
+    by position would count every residue after the extra one as different)."""
+    if len(a) == len(b):
+        return sum(x != y for x, y in zip(a, b))
+    previous = list(range(len(b) + 1))
+    for i, x in enumerate(a, 1):
+        current = [i]
+        for j, y in enumerate(b, 1):
+            current.append(min(previous[j] + 1, current[j - 1] + 1, previous[j - 1] + (x != y)))
+        previous = current
+    return previous[-1]
 
 
 def _premature_stop(coding: str) -> int:
