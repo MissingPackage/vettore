@@ -786,7 +786,7 @@ def test_a_label_naming_the_other_species_is_flagged(element, label, wrong):
 # the number of surviving seed registers and is now the number of copies: registers a few bases
 # apart are merged and aligned once (`MERGE_GAP`). That change is what brought the all-in-one
 # plasmid inside S5.4's two seconds, and it flattened the curve with it. On the AAV fixture
-# (36 entries, this machine):
+# (36 entries, one container):
 #
 #   sites     0      1      2      3      4      5      6
 #   cells   0.34 M 15.49M 15.44M 15.55M 29.57M 15.57M 29.56M
@@ -818,16 +818,21 @@ def test_a_label_naming_the_other_species_is_flagged(element, label, wrong):
 # AAV nuclease vector, a dense all-in-one expression plasmid, and that packed plasmid, kept as
 # a stress case and named as one.
 
-#: S5.4's criterion, in the seconds it is written in. It is not asserted in seconds, because
-#: seconds on a shared container measure the container: it is asserted in cells of dynamic
-#: programming by `ALIGNMENT_WORK`, which is the same number on every machine, and recorded in
-#: seconds by `test_nothing_outside_the_aligner_dominates_the_seconds`, whose docstring has the
-#: figures for every container this project has run on.
+#: S5.4's criterion, in the seconds it is written in. Nothing asserts it, and saying so is the
+#: point of this comment: seconds on a shared container measure the container — the same engine
+#: runs these plasmids 25 to 40 % quicker on one container than another — so an assertion at
+#: two seconds would report the runner. What is asserted instead is that the *work* does not
+#: drift, in cells of dynamic programming, by `ALIGNMENT_WORK`, which is the same number on
+#: every machine; three of its bounds are at points this file times above two seconds, so it is
+#: a guard against change and not a restatement of the criterion. The criterion itself is
+#: recorded, in seconds and per container, by
+#: `test_nothing_outside_the_aligner_dominates_the_seconds`.
 DETECTION_BUDGET = 2.0
 
-#: What that test asserts instead: half again above the slowest run ever measured on the
-#: plasmids it times, so that what trips it is a cost outside the aligner and never the runner.
-SECONDS_CEILING = 3.0
+#: What that test asserts: more than twice the slowest run ever measured on the plasmids it
+#: times, deliberate CPU contention included. It is loose on purpose — see the test, which has
+#: the measurements of what a clock here can and cannot see.
+SECONDS_CEILING = 8.0
 
 #: A single-AAV nuclease vector, with the elements of pX601 the catalogue carries, in that
 #: construct's own order: the AAV ends, the CMV–SaCas9–bGH polyA cassette, the U6 promoter of
@@ -854,8 +859,9 @@ AAV_INVERTED = ("AAV2 ITR (truncated)",)
 #: promoter, a coding sequence and a terminator, with the WPRE where it belongs, in the 3' UTR
 #: between the nuclease and its polyA signal — and a backbone of one marker and two origins.
 #: 10.4 kb of catalogue elements, one nuclease, and nothing that has to fit a packaging limit.
-#: This is the plausible heavy case: the one that used to miss S5.4's budget, at 2.3 s, and
-#: now meets it at 1.26 s.
+#: This is the plausible heavy case: the one that used to miss S5.4's budget, at 2.3 s with a
+#: codon lost per element, and now meets it — 1.1 s on one container and 1.5 to 2.1 s on a
+#: slower one, which `test_nothing_outside_the_aligner_dominates_the_seconds` records in full.
 ALL_IN_ONE_ELEMENTS = (
     "U6 promoter (human)", "EF-1α promoter (human)", "SpCas9", "WPRE", "bGH polyA",
     "CMV promoter", "tdTomato", "SV40 polyA", "AmpR promoter", "AmpR", "ori", "f1 ori",
@@ -1205,29 +1211,40 @@ def test_nothing_outside_the_aligner_dominates_the_seconds():
     times the whole of `detect` instead.
 
     Because it times, what it asserts is `SECONDS_CEILING` and not S5.4's two seconds
-    (`DETECTION_BUDGET`). Here is why, in the measurements. Across the containers this project
-    has run on — the same engine, since the cell counts above reproduce to the digit, so every
-    difference below is the machine — nine warm runs per point:
+    (`DETECTION_BUDGET`), and the ceiling is four times the figures below. That looks like
+    giving up, so here is the measurement behind it. Twelve warm runs per point on one
+    container, idle and then with four busy-loops on its four cores, which is the "runner a
+    third slower" this file keeps invoking:
 
-        plasmid                    fastest run   slowest run
-        AAV, 1 codon per element      0.38 s        0.73 s
-        AAV, 5 codons                 0.35 s        0.62 s
-        all-in-one, 1 codon           1.11 s        1.79 s
-        all-in-one, 5 codons          1.51 s        1.98 s
+        plasmid                     idle         contended      another container
+        AAV, 1 codon per element    0.46-0.59 s  0.51-0.82 s    0.38 s
+        AAV, 5 codons               0.44-0.62 s  0.54-0.72 s    0.35 s
+        all-in-one, 1 codon         1.49-2.10 s  1.84-2.26 s    1.11 s
+        all-in-one, 5 codons        1.70-2.10 s  2.11-2.61 s    1.51 s
 
-    The criterion is met everywhere in that table, which is what PR #13 set out to do: the
-    all-in-one plasmid was the case it was missed on, at 2.3 s with a codon lost per element
-    and 5.5 s with five. But on the slower container the all-in-one plasmid has only 1.1x to
-    1.3x of room against two seconds, and that is too little to assert. A single timing of the
-    five-site point reached 2.08 s with a whole suite running beside it and failed there; the
-    fastest of three runs still fails about one time in ten on a container a third slower,
-    because the jitter here is slow drift that three consecutive runs share rather than spikes
-    a minimum filters out. An assertion at two seconds would be measuring the runner.
+    Two things follow. S5.4's two seconds are met on the realistic divergences — which is what
+    PR #13 set out to do, from 2.3 s with a codon lost per element and 5.5 s with five — but on
+    this container the all-in-one plasmid runs *at* two seconds, over it on single runs, and
+    the same engine is 25 to 40 % quicker on the other container. An assertion at two seconds
+    reports which container ran it. And the gap between the two columns, 1.3x, is the whole
+    range a modest ceiling could hope to resolve.
 
-    So the criterion lives in `ALIGNMENT_WORK`, in cells, which is the same number on every
-    machine, and the seconds above are recorded rather than asserted. What is asserted is half
-    again above the slowest run in the table: enough room that no runner trips it, tight enough
-    that a cost outside the aligner — which would be a factor, not a per cent — does.
+    What a clock here can actually see, planted and measured rather than imagined:
+
+      - the catalogue reparsed on every call, or the aligner rebuilt on every call: **0.4 to
+        1.1 ms**, three orders of magnitude under any ceiling. Invisible at two seconds as much
+        as at eight, which is why those two shapes have a test of their own that counts the
+        parses instead of timing them — see
+        `test_the_catalogue_is_parsed_once_and_the_aligner_built_once`.
+      - the `_self_similarity` memo lost: inside the run-to-run noise.
+      - a pass over the 15 kb sequence that is quadratic in Python: **tens of seconds**, which
+        any ceiling catches.
+
+    Two adversarial rounds looked for a realistic regression costing between half again and an
+    order of magnitude, the band a tighter ceiling would buy, and found none: the shapes that
+    exist are either a millisecond or a factor of ten. So the ceiling is set where no container
+    and no contention can reach it — more than twice the worst run ever measured — and what it
+    catches is the order of magnitude, which is the only thing it was ever able to catch.
 
     One timing, not the fastest of several: a cost paid once per process, such as a warm-up
     that needs two calls to finish, would hide inside a minimum. The call before the timed one
@@ -1237,11 +1254,11 @@ def test_nothing_outside_the_aligner_dominates_the_seconds():
     Two plausible points are left out and both are pinned in cells. The packed stress plasmid
     is a vector nobody builds, every awkward entry in the catalogue at once. And the all-in-one
     plasmid at **four** deleted sites per element is the one point where the merge cannot help,
-    because there the fixture's cuts coincide with the engine's seed positions; it is 2.0 s on
-    the faster container and 2.8 s on the slower one, so it is genuinely over the criterion on
-    ordinary hardware. That is a real figure about an artificial divergence — evenly spaced
-    cuts, which is why the fixtures pin the odd counts — and
-    `test_a_second_deleted_site_per_element_is_nearly_free` records what it is and why.
+    because there the fixture's cuts coincide with the engine's seed positions; it is 1.95 to
+    2.07 s on the other container and 2.58 to 3.10 s here, 3.31 to 3.77 s contended, so it is
+    genuinely over the criterion on ordinary hardware. That is a real figure about an
+    artificial divergence — evenly spaced cuts, which is why the fixtures pin the odd counts —
+    and `test_a_second_deleted_site_per_element_is_nearly_free` records what it is and why.
     """
     for element_names, sites, inverted in ((AAV_ELEMENTS, 1, AAV_INVERTED),
                                            (AAV_ELEMENTS, 5, AAV_INVERTED),
@@ -1254,8 +1271,35 @@ def test_nothing_outside_the_aligner_dominates_the_seconds():
         elapsed = time.perf_counter() - start
         assert matches, "the plasmid should carry recognisable elements"
         assert elapsed < SECONDS_CEILING, (
-            f"{len(element_names)} elements, {sites} deleted sites: {elapsed:.2f} s "
-            f"against a {SECONDS_CEILING:.1f} s ceiling")
+            f"{len(element_names)} elements, {sites} deleted sites: {elapsed:.2f} s against a "
+            f"{SECONDS_CEILING:.1f} s ceiling. This is a factor, not a loaded runner: the "
+            f"ceiling is twice the worst run ever measured. `ALIGNMENT_WORK` says whether the "
+            f"alignment work grew; if it did not, the cost is outside the aligner.")
+
+
+def test_the_catalogue_is_parsed_once_and_the_aligner_built_once():
+    """The two regressions a clock cannot see, counted instead of timed. Reparsing
+    `common_features.json` on every call costs about a millisecond, and rebuilding the
+    `PairwiseAligner` about the same — three orders of magnitude under anything
+    `test_nothing_outside_the_aligner_dominates_the_seconds` could notice, and both of them
+    paid once per element per strand on every document the user opens. So what this test
+    asserts is that each is built *once* however many times it is asked for, which is exactly
+    what the caches promise and is the same assertion on every machine.
+
+    `misses == 1` is the body having run once; `hits >= 1` is the cache having been consulted
+    again, so that a cache nobody reads a second time cannot pass. The second document is what
+    makes that reading happen: `detect` asks for the catalogue once per call, so one document
+    would leave the count at a single miss whether the cache works or not."""
+    cached = (features_module.catalogue, features_module._aligner)
+    sequence = _plasmid(ALL_IN_ONE_ELEMENTS, 1)      # built before the counters are cleared
+    for cache in cached:
+        cache.cache_clear()
+    assert detect(sequence, circular=True), "the plasmid should carry recognisable elements"
+    detect(clean_dna(2_000, 12), circular=False)     # a second document, cheap on purpose
+    for cache in cached:
+        info = cache.cache_info()
+        assert info.misses == 1, f"{cache.__wrapped__.__name__} was built {info.misses} times"
+        assert info.hits >= 1, f"{cache.__wrapped__.__name__} cache never read: {info}"
 
 
 def test_a_second_deleted_site_per_element_is_nearly_free():
