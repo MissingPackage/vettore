@@ -50,14 +50,27 @@ annotated tag and the GitHub release notes.
    Order: S5.1 → S5.3 → S5.2 → S5.4 → S6.1 → S6.2 → S6.3. S5.1, the diagnostic digest planner
    (`src/vettore/digest_planner.py`, `frontend/src/tools/digestPlanner.tsx`), is built; S5.3
    (lab primer library, a shared .csv) is next.
-   Catalogue 0.3.1 added PGK (human, mouse), UbC, H1, 7SK, SFFV and full-length CAG; mouse U6,
-   H1, 7SK, UbC, Eef1a1 and Gfap and human CAMK2A have no public vector record annotating them.
+   Catalogue 0.3.1 added PGK (human, mouse), UbC, H1, 7SK, SFFV and full-length CAG; S5.4 added
+   24 more (60 entries in all): the promoters of the cell-line pretests (SV40 early, human
+   β-actin, EFS, HSV TK, RSV LTR, CBh), TRE (tight), Cre/FLPe/FLPo, loxN and F3, the EMCV IRES, P2A and
+   T2A, WPRE3, hGH and rabbit β-globin polyA, PuroR/BlastR/HygR/ZeoR and the Myc and V5 tags.
+   Still out, for want of evidence rather than want of work: mouse U6, H1, 7SK, UbC, Eef1a1 and
+   Gfap and human CAMK2A (no public vector record annotates them); the MeCP2 promoter (none
+   found at all); mDlx, Dre, rox and lox511 (one record or one patent family only — and one
+   patent record labelled "lox511" carries loxP's spacer, so those annotations cannot be
+   trusted); E2A and F2A (no two independent records); iCre (the codon-optimised Cre: public records
+   hold two unrelated codon versions, and the only two records that agree on one are
+   MK773642.1 and MK773643.1, from a single submission, so neither version has a second
+   independent record — the catalogue carries the P1 gene instead); 6×His
+   (18–21 bp of CAC/CAT repeats, too short to annotate without false hits). Each needs a second independent record before it can
+   be added — see the PR for S5.4 for the searches already run.
 4. Progressive multiple alignment (S6.2) is built in Python (`src/vettore/msa.py`,
    `frontend/src/tools/alignmentMultiple.tsx`), not a bundled aligner: nothing to package.
    On simulated families it recovers 92 % of the true residue pairs against FAMSA's 94 %
    (measured locally, not a dependency). Still to do: check against a published alignment
-   of AAV serotype capsid genes once their records can be fetched (NCBI was not reachable
-   from the build machine); today the AAV check uses the AAV2 and AAV9 VP1 fixtures.
+   of AAV serotype capsid genes once their records can be fetched; today the AAV check uses
+   the AAV2 and AAV9 VP1 fixtures. NCBI is reachable from a cloud session again since
+   2026-10-21, so that check is no longer blocked on the network.
 5. Printing in the Linux (Qt WebEngine) window; history graph.
 6. S6.3 File → Open from NCBI… (`src/vettore/ncbi.py`, `frontend/src/files/NcbiDialog.tsx`) is
    built: the only network call, NCBI E-utilities `efetch` with the accession alone; preference

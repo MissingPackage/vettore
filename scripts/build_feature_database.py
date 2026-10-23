@@ -37,7 +37,10 @@ class Entry:
     strand: int = 1
 
 
-#: Only elements whose coordinates were checked against the record's FEATURES table.
+#: Only elements whose coordinates were checked against the record's FEATURES table. A note
+#: that says "over the N bp the two share" means the independent record carries the element
+#: with a few bases less at one end: the identity is over the bases both records hold, and
+#: tests/test_features.py also requires that to be at least nine tenths of the entry.
 ENTRIES: list[Entry] = [
     # The two ends of the AAV genome carry the same inverted repeat, so one entry covers both.
     Entry("AAV2 ITR", "repeat_region", "NC_001401.2", 1, 145,
@@ -136,7 +139,139 @@ ENTRIES: list[Entry] = [
           "Staphylococcus aureus Cas9 with NLS and 3×HA"),
     Entry("3×FLAG", "misc_feature", "PV031350.1", 956, 1027, "epitope tag"),
     Entry("3×HA", "misc_feature", "PZ629150.1", 3842, 3922, "epitope tag"),
+
+    # ---- Ubiquitous promoters: what a construct carries in the cell-line pretests --------
+    # The intron-less core of the human EF-1α promoter, the one AAV and lentiviral cassettes
+    # take when the 1.2 kb intron-bearing promoter is too long for the payload. LP754738.1
+    # (WO2018026976, Editas) is the record's whole sequence, annotated "EFS promoter";
+    # MP933339.1 (EP3789521, an unrelated applicant) carries the same core with 23 bp more at
+    # one end, and MP864627.1 has it in reverse orientation.
+    Entry("EFS promoter (human)", "promoter", "LP754738.1", 1, 252,
+          "intron-less core of the human EF-1α promoter, as the patent record gives it: its "
+          "first 5 bases are a cloning site that neither cross-check carries; "
+          "cross-check MP933339.1 (99.6 % over the 233 bp the two share)"),
+    # CBh (Gray SJ et al., Hum Gene Ther 2011;22:1143; PY026696.1 is Gray,S. and Sinnett,S.): a CMV enhancer fragment, the chicken
+    # β-actin promoter and a shortened hybrid intron — the CAG of AAV vectors, made shorter
+    # again. PY026696.1 (University of Texas) annotates the 796 bp as one misc_feature;
+    # QQ167606.1 (University of Pennsylvania) carries the same promoter in an AAV cassette.
+    Entry("CBh promoter", "promoter", "PY026696.1", 1, 796,
+          "chicken β-actin hybrid promoter, a compact CAG; cross-check QQ167606.1 (99.9 %)"),
+    # The SV40 early promoter with its 21 bp repeats, the 72 bp enhancer repeats and the
+    # origin: the block that drives the resistance marker of most mammalian vectors.
+    # X85976.1 (pSG424) annotates it; M83237.1 (RSV.5(neo), another laboratory) carries the
+    # same 348 bp as "SV40 early promoter and origin of replication".
+    Entry("SV40 early promoter", "promoter", "X85976.1", 2537, 2884,
+          "SV40 early promoter with the 72 bp enhancer repeats and the origin; "
+          "cross-check M83237.1 (100 % over the 344 bp the two share)"),
+    # The human ACTB promoter, the 520 bp fragment of β-actin-driven cassettes. Not the
+    # chicken β-actin promoter of CAG and CBh, which is a different species' promoter and a
+    # separate entry. JN964682.1 annotates the fragment; AY952326.1, from another laboratory,
+    # holds it inside a 2.6 kb β-actin fragment.
+    Entry("β-actin promoter (human)", "promoter", "JN964682.1", 20222, 20741,
+          "human ACTB promoter; cross-check AY952326.1 (99.8 %)"),
+    # Herpes simplex virus thymidine kinase promoter, the weak constitutive promoter of
+    # selection cassettes. X64410.1 (pBLCAT2) and AJ277960.1 (pMAR) are unrelated vectors
+    # and annotate the same 170 bp.
+    Entry("HSV TK promoter", "promoter", "X64410.1", 429, 598,
+          "herpes simplex virus thymidine kinase promoter; "
+          "cross-check AJ277960.1 (100 % over the 169 bp the two share)"),
+    # The promoter part of the Rous sarcoma virus LTR, annotated on the minus strand in
+    # LT727488.1 ("RSV-LTR", regulatory_class promoter), so the entry is the reverse complement
+    # of that span. It is not the whole LTR: M83237.1 annotates that as 528 bp (4581..5108) with
+    # these 182 bp inside it. Vectors carry this fragment, which is why it is the entry; which
+    # parts of U3, R and U5 fall inside it is not annotated in either record, so it is not said.
+    Entry("RSV LTR promoter", "promoter", "LT727488.1", 3997, 4178,
+          "promoter fragment of the Rous sarcoma virus LTR, 182 bp of the 528 bp LTR; "
+          "cross-check M83237.1 (99.5 %)", strand=-1),
+    # The tetracycline-responsive promoter: seven tet operators in front of a minimal CMV
+    # promoter, the "tight" version with no residual activity. MT891336.1 and OQ427855.1 come
+    # from different laboratories and give the same 315 bp.
+    Entry("TRE promoter (tight)", "promoter", "MT891336.1", 554, 868,
+          "7× tet operator and a minimal CMV promoter, doxycycline-inducible; this is the "
+          "\"tight\" version both records annotate, not the 271 bp classic TRE; "
+          "cross-check OQ427855.1 (100 %)"),
+
+    # ---- Recombinases and their sites ---------------------------------------------------
+    # Cre from bacteriophage P1. Public records carry two unrelated codon versions of this
+    # gene (the P1 sequence and codon-optimised ones that share only ~80 % of their bases);
+    # this is the P1 version, which five unrelated vectors annotate identically.
+    Entry("Cre", "CDS", "MK854762.1", 215, 1246,
+          "Cre recombinase from bacteriophage P1; cross-check AB542060.1 (100 %)"),
+    # Flp comes in two versions vectors use side by side: FLPe, the thermostable yeast gene,
+    # and FLPo, codon-optimised for mammalian cells. Both spans are the nls-FLP fusion the two
+    # records annotate — an SV40 nuclear localisation signal in front of the 423-residue
+    # recombinase — so the two encode the same protein in two codon versions. They share 73 %
+    # of their bases, far too little for one entry to find the other, so each has its own.
+    Entry("FLPe", "CDS", "GU253315.1", 2581, 3879,
+          "thermostable Flp recombinase (FLPe), yeast gene, behind an SV40 NLS; "
+          "cross-check KM521212.1 (99.8 % over the 1272 bp the two share)"),
+    Entry("FLPo", "CDS", "KX151728.1", 1842, 3140,
+          "Flp recombinase codon-optimised for mammalian cells (FLPo), behind an SV40 NLS; "
+          "cross-check MH493814.1 (100 % over the 1272 bp the two share)"),
+    # loxN: a Cre site whose spacer differs from loxP, so Cre recombines it with itself and
+    # not with loxP — the second site of a Brainbow-type cassette.
+    Entry("loxN", "protein_bind", "OR242273.1", 3825, 3858,
+          "Cre site with the GTATACCT spacer; cross-check KP686439.1 (100 %)"),
+    # F3: the Flp site variant used opposite FRT, as lox2272 is used opposite loxP.
+    Entry("F3", "misc_feature", "LC086648.1", 2498, 2531,
+          "Flp site variant 3 (F3), recombined with itself and not with FRT; "
+          "cross-check HQ333206.1 (100 %)"),
+
+    # ---- Expression parts ---------------------------------------------------------------
+    # EMCV IRES, the 576 bp of the bicistronic vectors. Z75185.1 (pIRES-P) annotates it as
+    # "EMC IRES sequence"; OQ427855.1, an unrelated laboratory's vector, carries it on its
+    # minus strand annotated "IRES2". Cross-checked against that vector rather than against
+    # the patent sequence PG196517.1, which is the element alone with nothing around it.
+    Entry("EMCV IRES", "misc_feature", "Z75185.1", 1118, 1693,
+          "encephalomyocarditis virus internal ribosome entry site; "
+          "cross-check OQ427855.1 (99.7 %)"),
+    # P2A and T2A: the self-cleaving peptides of multi-gene cassettes. Both are short and
+    # written in many codon versions, so no single entry finds them all. The two below were
+    # picked by census rather than by preference: of the public records that annotate one of
+    # these peptides, 16 annotate T2A in 7 distinct sequences and 15 annotate P2A in 13, and
+    # these are the versions detection finds in the most of those records — T2A in 8 of the
+    # 16, P2A in 6 of the 15. tests/data/README.md lists every accession in that census, so
+    # the count can be repeated. A construct whose 2A is written another way is not found,
+    # and the user guide says so.
+    Entry("P2A", "misc_feature", "LT962383.1", 1899, 1964,
+          "porcine teschovirus-1 2A self-cleaving peptide, with its GSG linker; "
+          "cross-check MG880225.1 (98.5 %)"),
+    Entry("T2A", "misc_feature", "ON417756.1", 739, 792,
+          "Thosea asigna virus 2A self-cleaving peptide; cross-check PZ285977.1 (100 %)"),
+    # WPRE3, the 246 bp WPRE: the shortened element of AAV cassettes, where the full 589 bp
+    # WPRE does not fit. PZ036182.1 annotates it; MQ017553.1 (WO2021081280) is an unrelated
+    # applicant's copy.
+    Entry("WPRE3", "misc_feature", "PZ036182.1", 1844, 2089,
+          "shortened woodchuck hepatitis virus post-transcriptional regulatory element; "
+          "cross-check MQ017553.1 (100 %)"),
+    Entry("hGH polyA", "polyA_signal", "MQ026515.1", 1, 480,
+          "human growth hormone polyadenylation signal; cross-check MP470633.1 (100 %)"),
+    Entry("rabbit β-globin polyA", "polyA_signal", "MP470629.1", 1, 99,
+          "rabbit β-globin polyadenylation signal (Gil A, Proudfoot NJ, Cell 1987;49:399); "
+          "cross-check OP697988.1 (99.0 %)"),
+
+    # ---- Selection markers and tags -----------------------------------------------------
+    Entry("PuroR (pac)", "CDS", "PZ709769.1", 1, 600,
+          "pac from Streptomyces alboniger, puromycin resistance; "
+          "cross-check PZ267690.1 (99.8 %)"),
+    Entry("BlastR (bsd)", "CDS", "GU474201.1", 1, 399,
+          "bsd from Aspergillus terreus, blasticidin S resistance; "
+          "cross-check PZ267689.1 (99.5 %)"),
+    Entry("HygR (hph)", "CDS", "AJ439603.2", 884, 1903,
+          "hph from Escherichia coli, hygromycin B resistance; "
+          "cross-check U40398.1 (99.6 % over the 998 bp the two share)"),
+    Entry("ZeoR (ble)", "CDS", "L36850.1", 5896, 6270,
+          "Sh ble from Streptoalloteichus hindustanus, zeocin and phleomycin resistance; "
+          "cross-check MW471125.1 (100 %)"),
+    # The two tags, like the 2A peptides, exist in more than one codon version; these are the
+    # versions two unrelated vectors share.
+    Entry("Myc tag", "misc_feature", "AJ243205.1", 147, 179,
+          "c-Myc epitope tag; cross-check MF966512.1 (100 %)"),
+    Entry("V5 tag", "misc_feature", "AM700585.1", 70, 111,
+          "V5 epitope tag; cross-check AY682091.1 (100 %)"),
 ]
+
+COMPLEMENT = str.maketrans("ACGTRYSWKMBDHVNacgtryswkmbdhvn", "TGCAYRSWMKVHDBNtgcayrswmkvhdbn")
 
 
 def fetch(accession: str) -> str:
@@ -145,8 +280,18 @@ def fetch(accession: str) -> str:
     if email := os.environ.get("NCBI_EMAIL"):
         params["email"] = email
     url = f"{EUTILS}?{urllib.parse.urlencode(params)}"
-    with urllib.request.urlopen(url, timeout=60) as response:
-        text = response.read().decode()
+    # E-utilities answers 429 when several callers share an address, and the whole run is
+    # wasted if one record fails, so a refusal is waited out rather than raised.
+    for attempt in range(5):
+        try:
+            with urllib.request.urlopen(url, timeout=60) as response:
+                text = response.read().decode()
+            break
+        except urllib.error.URLError as error:
+            if attempt == 4:
+                raise SystemExit(f"NCBI did not answer for {accession}: {error}") from error
+            print(f"{accession}: {error}; waiting {2 ** attempt} s", file=sys.stderr)
+            time.sleep(2 ** attempt)
     lines = [line.strip() for line in text.splitlines() if line and not line.startswith(">")]
     sequence = "".join(lines).upper()
     if not sequence:
@@ -168,13 +313,20 @@ def main() -> None:
         sequence = record[entry.start - 1 : entry.end]
         if set(sequence) - set("ACGTRYSWKMBDHVN"):
             raise SystemExit(f"{entry.name} contains unexpected characters")
+        # An element a record annotates on its minus strand (the RSV LTR promoter below) is
+        # stored the way it reads in a vector, and its source says so in GenBank's own
+        # notation, so that the claim stays checkable against the record.
+        span = f"{entry.start}..{entry.end}"
+        if entry.strand == -1:
+            sequence = sequence.translate(COMPLEMENT)[::-1]
+            span = f"complement({span})"
         features.append({
             "name": entry.name,
             "type": entry.type,
             "sequence": sequence,
             "length": len(sequence),
             "note": entry.note,
-            "source": f"{entry.accession}:{entry.start}..{entry.end}",
+            "source": f"{entry.accession}:{span}",
         })
     payload = {
         "source": "NCBI GenBank/RefSeq records fetched with E-utilities; coordinates from "

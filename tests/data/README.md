@@ -90,6 +90,72 @@ The independent records:
 | `features-MP040844.1.fasta` | MP040844.1, sequence 35 from patent WO 2018206791 (Duchateau et al.) | SFFV promoter, the record's own SFFV promoter sequence |
 | `features-HG530138.1.fasta` | HG530138.1, cloning vector pTAL7B (Frank, Skryabin & Greber) | CAG promoter (full length), annotated there at 3272..4948 |
 
+### The elements S5.4 added
+
+Downloaded unchanged with E-utilities `efetch rettype=fasta` on 2026-10-21, two records per
+element: the one the entry cites, and an independent one — another laboratory or another
+applicant — that carries the same element. `tests/test_features.py` checks the cited
+coordinates against the first and finds the element in the second at ≥ 98 % identity.
+
+Where a row says "over the N bp the two share", the two records agree on every one of those
+bases but the independent record does not carry the whole entry: a patent record's cloning
+site, or a slightly differently bounded annotation, falls outside. Several rows cite a patent
+sequence whose only annotation is the `source` feature's `/note`, which is the applicant's
+word for what the sequence is; those entries rest on the two applicants agreeing, not on a
+curated feature table.
+
+| Element (entry) | The record it cites | The independent record |
+|---|---|---|
+| EFS promoter (human), `LP754738.1:1..252` | LP754738.1, sequence 14 from WO2018026976 (Editas Medicine) | MP933339.1, sequence 22 from EP3789521 (Shenzhen Istirbio), 99.6 % over the 233 bp the two share |
+| CBh promoter, `PY026696.1:1..796` | PY026696.1, sequence 25 from US 12359219 B2 (Gray & Sinnett, University of Texas) | QQ167606.1, JP 2024542950-A/60 (University of Pennsylvania), 99.9 % |
+| SV40 early promoter, `X85976.1:2537..2884` | X85976.1, plasmid pSG424 (Sadowski & Ptashne, Nucleic Acids Res 1989;17:7539) | M83237.1, vector RSV.5(neo) (Long et al., Hum Immunol 1991;31:229), 100 % over the 344 bp the two share |
+| β-actin promoter (human), `JN964682.1:20222..20741` | JN964682.1, targeted allele Vmp1:tm1e(KOMP)Wtsi (Skarnes et al., Nature 2011;474:337) | AY952326.1, β-actin GFP expression vector (Costa et al., Nat Methods 2005;2:259), 99.8 % |
+| HSV TK promoter, `X64410.1:429..598` | X64410.1, plasmid pBLCAT2 (Luckow & Schütz, Nucleic Acids Res 1987;15:5490) | AJ277960.1, cloning vector pMAR (Ciana et al., Mol Endocrinol 2001;15:1104), 100 % over the 169 bp the two share |
+| RSV LTR promoter (182 bp of the 528 bp LTR), `LT727488.1:complement(3997..4178)` | LT727488.1, vector pGal4-p65 (De Schamphelaire et al., direct submission) | M83237.1, vector RSV.5(neo), whose 5′ LTR holds it, 99.5 % |
+| TRE promoter (tight), `MT891336.1:554..868` | MT891336.1, vector pGLM92 (Frei et al., Nat Commun 2020;11:4641) | OQ427855.1, vector Puro-iDEST-3×FLAG-hWFS1-WT (Tokuma, direct submission), 100 % |
+| Cre, `MK854762.1:215..1246` | MK854762.1, shuttle vector pBFS109 (Sakanaka et al., Sci Adv 2019;5:eaaw7696) | AB542060.1, Cre expression vector pTN75 (Nishiyama), 100 % |
+| FLPe, `GU253315.1:2581..3879` | GU253315.1, vector pLV.FLPe (Gonçalves et al., PLoS One 2010;5:e10954) | KM521212.1, cloning vector pECA102 (Cameron & Collins), 99.8 % over the 1272 bp the two share |
+| FLPo, `KX151728.1:1842..3140` | KX151728.1, vector DBH-FLPo (Sun & Ray, PLoS One 2016;11:e0159474) | MH493814.1, vector pDC50/pT3TS-FLPo (Grajevskaja et al., PLoS One 2018;13:e0197293), 100 % over the 1272 bp the two share |
+| loxN, `OR242273.1:3825..3858` | OR242273.1, vector AGG1741 (Carabajal Paladino et al., Front Bioeng Biotechnol 2023;11:1254863) | KP686439.1, vector pC-(lox2-attB2-SA-Hsp70)₃ (Diao et al., Cell Rep 2015;10:1410), 100 % |
+| F3, `LC086648.1:2498..2531` | LC086648.1, BPATrap vector (Yamanishi et al.) | HQ333206.1, cloning vector pEFFS-sigHA (Wilke et al., direct submission), 100 % |
+| EMCV IRES, `Z75185.1:1118..1693` | Z75185.1, vector pIRES-P (Hobbs et al., Biochem Biophys Res Commun 1998;252:368) | OQ427855.1, vector Puro-iDEST-3×FLAG-hWFS1-WT-IRES2-mCherry (Tokuma, direct submission), 99.7 % on its minus strand |
+| P2A, `LT962383.1:1899..1964` | LT962383.1, somatostatin receptor 3 vector (Paramonov, direct submission) | MG880225.1, vector pSOSV/ZsG-FL (Welch et al., PLoS Negl Trop Dis 2018;12:e0006326), 98.5 % |
+| T2A, `ON417756.1:739..792` | ON417756.1, MITI donor vector (Maddalena, direct submission) | PZ285977.1, pZac2.1-GfaABC1D-Nrf2-mCherry (Faust et al., Sci Adv 2026;12:eaef6777), 100 % |
+| WPRE3, `PZ036182.1:1844..2089` | PZ036182.1, clone AiP12805 (Hunker & Mich, Nat Commun, in press) | MQ017553.1, sequence 23 from WO2021081280 (Shire/Klugmann), 100 % |
+| hGH polyA, `MQ026515.1:1..480` | MQ026515.1, sequence 20 from WO2021071976 (Exhaura, Trinity College Dublin) | MP470633.1, sequence 45 from WO2019243847 (Replimune), 100 % |
+| rabbit β-globin polyA, `MP470629.1:1..99` | MP470629.1, sequence 41 from WO2019243847 (Replimune) | OP697988.1, vector pCAG-rRBD-xrepEBNA1 (Green et al., BMC Biotechnol 2023;23:7), 99.0 % |
+| PuroR (pac), `PZ709769.1:1..600` | PZ709769.1, pac gene (de la Fuente & Simarro, direct submission) | PZ267690.1, clone UbC.WT-AcrIIA4.pLenti (Sabol et al.), 99.8 % |
+| BlastR (bsd), `GU474201.1:1..399` | GU474201.1, vector pYC6/CT bsd gene (Zhang et al., direct submission) | PZ267689.1, clone U6.gRNA.pLenti (Sabol et al.), 99.5 % |
+| HygR (hph), `AJ439603.2:884..1903` | AJ439603.2, chimaeric cloning vector (Benito et al., Eur J Plant Pathol 1998;104:207) | U40398.1, hygromycin cassette of a mammalian vector (Yin & Schimke, Cancer Res 1995;55:4922), 99.6 % over the 998 bp the two share |
+| ZeoR (ble), `L36850.1:5896..6270` | L36850.1, vector pZEO (Drocourt et al., Nucleic Acids Res 1990;18:4009) | MW471125.1, clone pCRISPR01-FnCpf1 (Abdulrachman & Pootanakit, direct submission), 100 % |
+| Myc tag, `AJ243205.1:147..179` | AJ243205.1, cloning vector pUR4546 (Harmsen et al., Mol Immunol 2000;37:579) | MF966512.1, epitope-tagged latrophilin-1 (University of Kent, direct submission), which carries it twice, 100 % |
+| V5 tag, `AM700585.1:70..111` | AM700585.1, V5-tagged FcεRIγ construct (Viertlböck et al., PNAS 2007;104:11718) | AY682091.1, DEC205 construct (Gurer et al., Blood 2008;112:1231), 100 % |
+
+### The 2A census
+
+The P2A and T2A entries were chosen by counting, not by preference. Searching E-utilities on
+2026-10-21 for records whose FEATURES table annotates one of these peptides gave the records
+below; each was fetched, the annotated span extracted, and Vettore's own `detect` run with
+that span as a one-entry catalogue against every other record in the list. The entries in the
+catalogue are the versions found in the most records. Only the two cited records and the two
+cross-checks are shipped as fixtures here — the census is repeated from the network, not
+offline, which is why the accessions are written down.
+
+**T2A** — 16 records, 7 distinct sequences; the entry (`ON417756.1:739..792`) is found in 8:
+
+KY825159.1, MK816962.1, MW503936.1, MW503937.1, MW503938.1, MW503939.1, MZ127811.1,
+ON417756.1, OQ427855.1, PQ659180.1, PQ671723.1, PQ671724.1, PQ671725.1, PV611053.1,
+PV611054.1, PZ285977.1
+
+**P2A** — 15 records, 13 distinct sequences; the entry (`LT962383.1:1899..1964`) is found in 6:
+
+KX151729.1, LT962381.1, LT962382.1, LT962383.1, MG880225.1, MK816962.1, MT559572.1,
+OK413188.1, OK413189.1, OP243710.1, OR961518.1, PV863446.1, PV863447.1, PZ036169.1,
+PZ259196.1
+
+The runner-up T2A version, which the review proposed as the entry (`MK816962.1:2103..2156`),
+is found in 2 of the 16.
+
 ## Sanger contig fixtures (`contig-*.ab1`)
 
 A forward and a reverse Sanger read of the same template (a COI barcode of the earthworm
